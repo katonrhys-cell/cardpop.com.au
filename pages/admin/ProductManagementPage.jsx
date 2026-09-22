@@ -137,6 +137,7 @@ const ProductManagementPage = () => {
                 <TableHead className="font-semibold text-foreground">Product Name</TableHead>
                 <TableHead className="font-semibold text-foreground">Category</TableHead>
                 <TableHead className="font-semibold text-foreground">Price</TableHead>
+                <TableHead className="font-semibold text-foreground">RRP</TableHead>
                 <TableHead className="font-semibold text-foreground">Status</TableHead>
                 <TableHead className="font-semibold text-foreground">Stock</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -149,6 +150,7 @@ const ProductManagementPage = () => {
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -156,14 +158,14 @@ const ProductManagementPage = () => {
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
                     <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
                     <p>Failed to load products</p>
                   </TableCell>
                 </TableRow>
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-48 text-center text-muted-foreground">
                     <Package className="w-10 h-10 mb-3 mx-auto opacity-40" />
                     <p>No products found</p>
                   </TableCell>
@@ -174,6 +176,9 @@ const ProductManagementPage = () => {
                     <TableCell className="font-bold text-foreground">{product.title}</TableCell>
                     <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
                     <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : 'text-muted-foreground'}`}>
                         {product.status}

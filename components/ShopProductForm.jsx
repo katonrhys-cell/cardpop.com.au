@@ -18,6 +18,7 @@ const INITIAL_STATE = {
   title: '',
   description: '',
   price_aud: '',
+  retail_price_aud: '',
   stock_quantity: '1',
   category: '',
   product_type: 'sealed',
@@ -44,6 +45,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         title: product.title || '',
         description: product.description || '',
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
+        retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
         stock_quantity: product.stock_quantity != null ? String(product.stock_quantity) : '0',
         category: product.category || '',
         product_type: product.product_type || 'sealed',
@@ -112,6 +114,12 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (formData.price_aud === '' || Number.isNaN(price) || price < 0) {
       return toast.error('A valid price is required');
     }
+    // RRP is optional; when given it must be a valid non-negative amount.
+    const rrpRaw = String(formData.retail_price_aud ?? '').trim();
+    const rrp = rrpRaw === '' ? null : Number(rrpRaw);
+    if (rrp !== null && (Number.isNaN(rrp) || rrp < 0)) {
+      return toast.error('RRP must be a valid amount, or left blank');
+    }
     const stock = parseInt(formData.stock_quantity, 10);
 
     setLoading(true);
@@ -122,6 +130,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         title: formData.title.trim(),
         description: formData.description.trim() || null,
         price_aud: price,
+        retail_price_aud: rrp,
         stock_quantity: Number.isNaN(stock) ? 0 : Math.max(0, stock),
         category: formData.category.trim() || null,
         product_type: formData.product_type || null,
@@ -195,12 +204,40 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Price ($AUD) <span className="text-destructive">*</span></Label>
-              <Input required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
+              <Label htmlFor="shop-product-price">Price ($AUD) <span className="text-destructive">*</span></Label>
+              <Input id="shop-product-price" required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
-              <Label>Stock Quantity</Label>
-              <Input type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+              <Label htmlFor="shop-product-stock">Stock Quantity</Label>
+              <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+            </div>
+          </div>
+
+          {/* RRP: the manufacturer's recommended retail price. Shown
+              struck-through on the shop when it's above the selling price.
+              "Use RRP as price" is the one-click "sell at RRP" path. */}
+          <div className="space-y-2">
+            <Label htmlFor="shop-product-rrp">RRP ($AUD) <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <div className="flex gap-2">
+              <Input
+                id="shop-product-rrp"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Recommended retail price"
+                value={formData.retail_price_aud}
+                onChange={(e) => handleInputChange('retail_price_aud', e.target.value)}
+                className="bg-background tabular-nums"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={String(formData.retail_price_aud ?? '').trim() === ''}
+                onClick={() => handleInputChange('price_aud', String(formData.retail_price_aud).trim())}
+              >
+                Use RRP as price
+              </Button>
             </div>
           </div>
 
