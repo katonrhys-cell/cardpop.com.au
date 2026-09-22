@@ -109,6 +109,6 @@ describe('ProductCard sold-out state', () => {
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('Provider down');
-    expect(alert.querySelector('a').getAttribute('href')).toMatch(/^mailto:admin@cardpop\.com\.au/);
+    expect(alert.querySelector('a').getAttribute('href')).toMatch(/^mailto:noreply@cardpop\.com\.au/);
   });
 });

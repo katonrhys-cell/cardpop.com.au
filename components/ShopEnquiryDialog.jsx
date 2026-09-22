@@ -18,14 +18,14 @@ import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 
-export const SHOP_ENQUIRY_EMAIL = 'admin@cardpop.com.au';
+export const SHOP_ENQUIRY_EMAIL = 'noreply@cardpop.com.au';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_MESSAGE = 2000;
 
 /**
  * "Enquire" dialog for a sold-out shop product. Posts to /shop-enquiry, which
- * emails the admin inbox (admin@cardpop.com.au) with reply-to set to the
+ * emails the admin inbox (noreply@cardpop.com.au) with reply-to set to the
  * shopper. Works logged-out; a signed-in shopper gets name/email pre-filled.
  *
  * Props:

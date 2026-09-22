@@ -8,7 +8,7 @@ const router = Router();
 
 // Where sold-out enquiries land. The shop is platform-owned, so this is the
 // admin inbox rather than a seller — overridable for staging.
-export const SHOP_ENQUIRY_EMAIL = process.env.SHOP_ENQUIRY_EMAIL?.trim() || 'admin@cardpop.com.au';
+export const SHOP_ENQUIRY_EMAIL = process.env.SHOP_ENQUIRY_EMAIL?.trim() || 'noreply@cardpop.com.au';
 
 const isEmail = (v) => typeof v === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 const isUuid = (v) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);

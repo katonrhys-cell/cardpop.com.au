@@ -31,7 +31,7 @@ The transactional emails and where they fire:
 | Refund issued | Seller | `src/services/refundService.js` |
 | Welcome offer (trial + discount) | New user | `src/services/welcomeOfferService.js` |
 | Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
-| Sold-out shop enquiry | Admin (`admin@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
+| Sold-out shop enquiry | Admin (`noreply@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
 
 Email HTML is built by the templates in `src/emails/templates.js`.
 
@@ -254,7 +254,7 @@ What each tag does:
 - `rua=mailto:…` — where daily **aggregate** (XML) reports are sent. Point this
   at a mailbox you can receive at. `dmarc-reports@cardpop.com.au` must exist as a
   real Google Workspace address/alias/group **before** you rely on it — or swap
-  it for `admin@cardpop.com.au`, or a DMARC analytics service address
+  it for `noreply@cardpop.com.au`, or a DMARC analytics service address
   (dmarcian, Postmark DMARC, Valimail — all have free tiers that make the XML
   readable).
 - `ruf=mailto:…` — **forensic/failure** reports (per-message). Optional; many

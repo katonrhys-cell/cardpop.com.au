@@ -113,13 +113,13 @@ describe('POST /shop-enquiry — product lookup', () => {
 });
 
 describe('POST /shop-enquiry — delivery', () => {
-  it('emails admin@cardpop.com.au with the DB title and the shopper as reply-to', async () => {
+  it('emails noreply@cardpop.com.au with the DB title and the shopper as reply-to', async () => {
     const res = await request(app).post('/').send({ ...VALID, name: '  Ash Ketchum  ' });
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
-    expect(SHOP_ENQUIRY_EMAIL).toBe('admin@cardpop.com.au');
+    expect(SHOP_ENQUIRY_EMAIL).toBe('noreply@cardpop.com.au');
     expect(mockSendShopEnquiry).toHaveBeenCalledWith(expect.objectContaining({
-      to: 'admin@cardpop.com.au',
+      to: 'noreply@cardpop.com.au',
       productTitle: PRODUCT.title,
       productId: PRODUCT_ID,
       productUrl: expect.stringContaining(`/product/shop/${PRODUCT_ID}`),
@@ -133,7 +133,7 @@ describe('POST /shop-enquiry — delivery', () => {
     mockSendShopEnquiry.mockResolvedValue(false);
     const res = await request(app).post('/').send(VALID);
     expect(res.status).toBe(502);
-    expect(res.body.error).toContain('admin@cardpop.com.au');
+    expect(res.body.error).toContain('noreply@cardpop.com.au');
   });
 
   it('returns 500 when the product lookup throws', async () => {
