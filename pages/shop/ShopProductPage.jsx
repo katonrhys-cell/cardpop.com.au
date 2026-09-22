@@ -6,6 +6,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { Button } from '@/components/ui/button';
+import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -37,6 +38,7 @@ const ShopProductPage = () => {
 
   const [row, setRow] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
 
   const validPair = Boolean(product && category && product.categorySlug === category.slug);
 
@@ -193,8 +195,8 @@ const ShopProductPage = () => {
                       ${rrp.toFixed(2)}
                     </span>
                   )}
-                  <Badge variant={inStock ? 'default' : 'secondary'}>
-                    {inStock ? 'In stock' : 'Out of stock'}
+                  <Badge variant={inStock ? 'default' : 'destructive'}>
+                    {inStock ? 'In stock' : 'Sold out'}
                   </Badge>
                 </>
               ) : rrp != null ? (
@@ -209,14 +211,31 @@ const ShopProductPage = () => {
             </p>
 
             <div className="mt-6">
-              {isPurchasable ? (
-                <Button size="lg" className="w-full sm:w-auto" disabled={!inStock} onClick={handleAddToCart}>
-                  {inStock ? (
-                    <><ShoppingCart className="w-5 h-5 mr-2" />Add to cart</>
-                  ) : (
-                    <><PackageX className="w-5 h-5 mr-2" />Out of stock</>
-                  )}
+              {isPurchasable && inStock ? (
+                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart}>
+                  <ShoppingCart className="w-5 h-5 mr-2" />Add to cart
                 </Button>
+              ) : isPurchasable ? (
+                // Sold out: 0 stock on an otherwise live product. Offer an
+                // enquiry that emails admin instead of a dead button.
+                <>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button size="lg" variant="secondary" className="w-full sm:w-auto" disabled>
+                      <PackageX className="w-5 h-5 mr-2" />Sold out
+                    </Button>
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto" onClick={() => setEnquiryOpen(true)}>
+                      <MessageSquare className="w-5 h-5 mr-2" />Enquire
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Sold out for now — enquire and we&apos;ll let you know when it&apos;s back.
+                  </p>
+                  <ShopEnquiryDialog
+                    open={enquiryOpen}
+                    onOpenChange={setEnquiryOpen}
+                    product={{ id: row.id, title: product.title }}
+                  />
+                </>
               ) : (
                 <>
                   <Button size="lg" className="w-full sm:w-auto" asChild>

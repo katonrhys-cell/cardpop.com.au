@@ -21,7 +21,7 @@ links — but that is a **fourth, separate** pipeline handled entirely by Supaba
 unset it logs a warning and returns without sending, so a missing key never
 crashes a checkout or refund.
 
-The six transactional emails and where they fire:
+The transactional emails and where they fire:
 
 | Email | Recipient | Triggered from |
 |---|---|---|
@@ -31,6 +31,7 @@ The six transactional emails and where they fire:
 | Refund issued | Seller | `src/services/refundService.js` |
 | Welcome offer (trial + discount) | New user | `src/services/welcomeOfferService.js` |
 | Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
+| Sold-out shop enquiry | Admin (`admin@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
 
 Email HTML is built by the templates in `src/emails/templates.js`.
 

@@ -412,6 +412,33 @@ ${summaryTable([
   );
 }
 
+// ─── Shop stock enquiry (admin) ──────────────────────────────────────────────
+
+// A shopper hit "Enquire" on a sold-out shop product. Delivered to the admin
+// inbox with reply_to set to the shopper so a restock reply is one click.
+export function shopEnquiryEmail({ productTitle, productId, productUrl, name, email, message }) {
+  const body = `<p>A shopper asked about a <strong>sold-out</strong> product in the CardPop shop.</p>
+${summaryTable([
+  ['Product', esc(productTitle)],
+  ['Product ID', esc(productId)],
+  ['From', `${esc(name)} (${esc(email)})`],
+])}
+${message
+    ? `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;white-space:pre-wrap;font-size:15px;line-height:1.7;color:#374151;">${esc(message)}</div>`
+    : '<p style="color:#6B7280;">No message was included — they just want to know when it is back in stock.</p>'}
+<p style="font-size:13px;color:#9CA3AF;">Reply directly to this email to respond to ${esc(name)}.</p>`;
+
+  return cpEmail(
+    `Stock enquiry: ${esc(productTitle)}`,
+    'Sold-Out Product Enquiry',
+    'A shopper wants a sold-out item',
+    body,
+    productUrl || null,
+    productUrl ? 'View Product' : null,
+    'You received this because you are the CardPop shop admin.',
+  );
+}
+
 // ─── Refund issued (seller) ───────────────────────────────────────────────────
 
 export function refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }) {

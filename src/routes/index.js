@@ -34,6 +34,7 @@ import recommendationsRouter from './recommendations.js';
 import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import contactRouter from './contact.js';
+import shopEnquiryRouter from './shop-enquiry.js';
 import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
@@ -209,6 +210,10 @@ export default () => {
     // Public contact form → support inbox (Resend)
     router.use('/contact', apiLimiter);
     router.use('/contact', contactRouter);
+
+    // Sold-out shop product enquiry → admin inbox (Resend)
+    router.use('/shop-enquiry', apiLimiter);
+    router.use('/shop-enquiry', shopEnquiryRouter);
 
     // Meta (Facebook) data deletion request callback + public status lookup.
     // No auth: the callback is called server-to-server by Facebook and is

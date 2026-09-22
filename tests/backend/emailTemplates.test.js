@@ -6,6 +6,7 @@ import {
   eventSubmittedEmail,
   orderAdminNoticeEmail,
   offerReceivedEmail,
+  shopEnquiryEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -72,5 +73,27 @@ describe('offerReceivedEmail', () => {
   it('omits the message block when the buyer left no note', () => {
     const html = offerReceivedEmail({ sellerName: 'Kat', cardName: 'A card', amountAud: 10 });
     expect(html).not.toContain('Their message');
+  });
+});
+
+describe('shopEnquiryEmail', () => {
+  it('escapes shopper-controlled name, email and message', () => {
+    const html = shopEnquiryEmail({
+      productTitle: XSS,
+      productId: '11111111-2222-4333-8444-555555555555',
+      productUrl: 'https://cardpop.com.au/product/shop/1',
+      name: XSS,
+      email: 'a@b.co',
+      message: XSS,
+    });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
+    expect(html).toContain('&lt;a href=&quot;https://evil.example&quot;&gt;click&lt;/a&gt;');
+    expect(html).toContain('Sold-Out Product Enquiry');
+    expect(html).toContain('View Product');
+  });
+
+  it('notes when no message was included', () => {
+    const html = shopEnquiryEmail({ productTitle: 'Binder', productId: 'x', name: 'Ash', email: 'a@b.co', message: '' });
+    expect(html).toContain('No message was included');
   });
 });

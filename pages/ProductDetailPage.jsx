@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag } from 'lucide-react';
+import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare } from 'lucide-react';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -31,6 +31,7 @@ import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVa
 import { sellerFromProfile, OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
+import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -46,6 +47,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const { settings } = usePlatformSettings();
   
   const [product, setProduct] = useState(null);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
@@ -654,16 +656,39 @@ const ProductDetailPage = ({ source: sourceProp }) => {
               </div>
             )}
 
-            {isShop ? (
+            {isShop && outOfStock ? (
+              // Sold out (0 stock): swap the dead Add to Cart for an enquiry
+              // that emails admin — see ShopEnquiryDialog.
+              <div className="flex flex-col gap-3 mb-8">
+                <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>
+                  <PackageX className="w-5 h-5 mr-2" /> Sold Out
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-14 rounded-xl font-bold text-lg"
+                  onClick={() => setEnquiryOpen(true)}
+                >
+                  <MessageSquare className="w-5 h-5 mr-2" /> Enquire about this item
+                </Button>
+                <p className="text-sm text-center font-medium text-muted-foreground">
+                  This item is sold out. Enquire and we&apos;ll let you know when it&apos;s back.
+                </p>
+                <ShopEnquiryDialog
+                  open={enquiryOpen}
+                  onOpenChange={setEnquiryOpen}
+                  product={{ id: product.id, title: product.title || product.name }}
+                />
+              </div>
+            ) : isShop ? (
               <div className="flex flex-col gap-3 mb-8">
                 <Button 
                   size="lg" 
                   className="w-full h-14 rounded-xl font-bold text-lg shadow-md hover:shadow-lg transition-all"
                   onClick={handleAddToCart}
-                  disabled={outOfStock}
                 >
                   <ShoppingCart className="w-5 h-5 mr-2" />
-                  {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+                  Add to Cart
                 </Button>
                 {product.stockQuantity !== null && (
                   <p className="text-sm text-center font-medium text-muted-foreground">
