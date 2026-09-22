@@ -38,6 +38,9 @@ concurrency:
   group: supabase-migrations-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   check-versions:
     runs-on: ubuntu-latest

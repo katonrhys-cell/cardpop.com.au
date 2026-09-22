@@ -246,6 +246,7 @@ describe('POST /create-checkout', () => {
           counter_amount_aud: 80,
           status: 'countered',
           buyer_id: 'user-123',
+          seller_id: 'seller-999',
           listing_id: 'listing-1',
         },
         error: null,
@@ -260,6 +261,32 @@ describe('POST /create-checkout', () => {
     expect(itemLine.price_data.unit_amount).toBe(8000);
   });
 
+  // The forged-seller attack (2026-09-21 audit): an offer on this listing that
+  // an accomplice account "accepted" must never price the checkout, however
+  // consented its status looks.
+  it('rejects an accepted offer whose seller is not the listing seller', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
+      .mockResolvedValueOnce({
+        data: {
+          amount_aud: 1,
+          counter_amount_aud: null,
+          status: 'accepted',
+          buyer_id: 'user-123',
+          seller_id: 'accomplice-1',
+          listing_id: 'listing-1',
+        },
+        error: null,
+      }); // offer lookup
+
+    const res = await request(app).post('/create-checkout').send({ ...VALID_CHECKOUT_BODY, offerId: 'offer-forged' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid offer');
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
   it("charges the counter amount when the buyer accepted the counter first (status 'accepted', counter set)", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
@@ -270,6 +297,7 @@ describe('POST /create-checkout', () => {
           counter_amount_aud: 80,
           status: 'accepted',
           buyer_id: 'user-123',
+          seller_id: 'seller-999',
           listing_id: 'listing-1',
         },
         error: null,
@@ -294,6 +322,7 @@ describe('POST /create-checkout', () => {
           counter_amount_aud: null,
           status: 'pending',
           buyer_id: 'user-123',
+          seller_id: 'seller-999',
           listing_id: 'listing-1',
         },
         error: null,
@@ -328,6 +357,7 @@ describe('GET /calculate', () => {
           counter_amount_aud: 80,
           status: 'accepted',
           buyer_id: 'user-123',
+          seller_id: 'seller-999',
           listing_id: 'listing-1',
         },
         error: null,
@@ -353,6 +383,7 @@ describe('GET /calculate', () => {
           counter_amount_aud: null,
           status: 'pending',
           buyer_id: 'user-123',
+          seller_id: 'seller-999',
           listing_id: 'listing-1',
         },
         error: null,
@@ -683,7 +714,7 @@ describe('POST /create-cart-checkout', () => {
   const AU_ADDRESS = { name: 'A Buyer', address: '1 Test St', suburb: 'Sydney', state: 'NSW', postcode: '2000' };
 
   it('returns 400 when items is missing', async () => {
-    const res = await request(app).post('/create-cart-checkout').send({ successUrl: 'a', cancelUrl: 'b' });
+    const res = await request(app).post('/create-cart-checkout').send({ successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b' });
     expect(res.status).toBe(400);
   });
 
@@ -694,7 +725,7 @@ describe('POST /create-cart-checkout', () => {
 
   it('refuses a non-Australian delivery address', async () => {
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b',
       shippingAddress: { name: 'A Buyer', address: '1 Main St', suburb: 'Austin', state: 'TX', postcode: '73301' },
     });
     expect(res.status).toBe(400);
@@ -705,7 +736,7 @@ describe('POST /create-cart-checkout', () => {
 
   it('refuses an address that names a non-Australian country even with an AU-shaped state', async () => {
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b',
       shippingAddress: { ...AU_ADDRESS, country: 'NZ' },
     });
     expect(res.status).toBe(400);
@@ -717,7 +748,7 @@ describe('POST /create-cart-checkout', () => {
     // tests, and in any environment where the key isn't configured), so before
     // the Australia gate an addressless cart checked out fine.
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b',
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b',
     });
     expect(res.status).toBe(400);
     expect(res.body.code).toBe('au_only');
@@ -731,7 +762,7 @@ describe('POST /create-cart-checkout', () => {
       error: null,
     });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(409);
   });
@@ -744,7 +775,7 @@ describe('POST /create-cart-checkout', () => {
       error: null,
     });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(403);
   });
@@ -755,7 +786,7 @@ describe('POST /create-cart-checkout', () => {
     // mockResolvedValueOnce values would bleed into later tests).
     emailVerifyOff();
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'mystery', id: 'x' }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'mystery', id: 'x' }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(400);
   });
@@ -770,7 +801,7 @@ describe('POST /create-cart-checkout', () => {
     mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_cart', url: 'https://stripe.com/pay/cs_cart' });
 
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
 
     expect(res.status).toBe(200);
@@ -799,7 +830,7 @@ describe('POST /create-cart-checkout', () => {
       .mockResolvedValueOnce({ error: null });
 
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
 
     expect(res.status).toBe(200);
@@ -814,7 +845,7 @@ describe('POST /create-cart-checkout', () => {
     // email_confirmed_at (the auth mock) must be rejected before any pricing.
     mockMaybeSingle.mockResolvedValueOnce({ data: { value: true }, error: null });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('EMAIL_NOT_VERIFIED');
@@ -824,7 +855,7 @@ describe('POST /create-cart-checkout', () => {
   it('blocks a marketplace listing purchase with 403 when the buyer is not identity-verified', async () => {
     mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: false }, error: null });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'listing', id: 'l1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
     expect(res.status).toBe(403);
     expect(res.body.code).toBe('IDENTITY_NOT_VERIFIED');
@@ -836,7 +867,7 @@ describe('POST /create-cart-checkout', () => {
     // identity — it proceeds past the gate (and fails later only if pricing does).
     mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: false }, error: null });
     const res = await request(app).post('/create-cart-checkout').send({
-      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'a', cancelUrl: 'b', shippingAddress: AU_ADDRESS,
+      items: [{ type: 'shop', id: 'p1', quantity: 1 }], successUrl: 'https://example.com/a', cancelUrl: 'https://example.com/b', shippingAddress: AU_ADDRESS,
     });
     expect(res.body.code).not.toBe('IDENTITY_NOT_VERIFIED');
   });

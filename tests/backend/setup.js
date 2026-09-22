@@ -10,3 +10,6 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ey
 process.env.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpdGVzdC1kdW1teSIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjIwMDAwMDAwMDB9.vitest_dummy_signature';
 process.env.ENCRYPTION_KEY = 'vitest_dummy_encryption_key_32ch';
 process.env.PSA_API_TOKEN = 'vitest_dummy_psa_token';
+// Payment return URLs are pinned to the app's own origins (src/utils/returnUrl.js);
+// the route tests use https://example.com, so allow it here.
+process.env.CHECKOUT_RETURN_ORIGINS = 'https://example.com';

@@ -3,6 +3,8 @@ import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requireAal2 } from '../middleware/requireAal2.js';
+import { invalidReturnUrl } from '../utils/returnUrl.js';
 import { ensureWalletCustomer, getWalletBalanceCents } from '../services/walletService.js';
 import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 
@@ -29,7 +31,8 @@ router.get('/balance', authMiddleware, async (req, res) => {
 // Creates a Checkout Session for a card payment that credits the buyer's
 // Stripe Customer Balance once the webhook confirms payment.
 
-router.post('/topup', authMiddleware, async (req, res) => {
+// Money in and saved payment methods: MFA-enrolled users must be stepped up.
+router.post('/topup', authMiddleware, requireAal2, async (req, res) => {
   try {
     const { amountAud, successUrl, cancelUrl } = req.body;
     const amount = Number(amountAud);
@@ -40,6 +43,8 @@ router.post('/topup', authMiddleware, async (req, res) => {
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
+    const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
+    if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
     const customerId = await ensureWalletCustomer(stripe, req.user.id, { email: req.user.email });
 
@@ -78,12 +83,14 @@ router.post('/topup', authMiddleware, async (req, res) => {
 // top-up / subscription checkout. The saved method is attached to the user's
 // Stripe Customer and used for future purchases.
 
-router.post('/save-card', authMiddleware, async (req, res) => {
+router.post('/save-card', authMiddleware, requireAal2, async (req, res) => {
   try {
     const { successUrl, cancelUrl } = req.body;
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
+    const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
+    if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
     const customerId = await ensureWalletCustomer(stripe, req.user.id, { email: req.user.email });
 

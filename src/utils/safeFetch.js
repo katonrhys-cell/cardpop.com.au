@@ -1,5 +1,6 @@
 import dns from 'dns/promises';
 import net from 'net';
+import ipaddr from 'ipaddr.js';
 import { Agent, fetch as undiciFetch } from 'undici';
 import logger from './logger.js';
 
@@ -14,24 +15,59 @@ import logger from './logger.js';
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const DEFAULT_MAX_TEXT_LENGTH = 8000;
+// Hard cap on how much of a page we will read. Everything downstream truncates
+// to a few KB of text anyway; reading an attacker's multi-hundred-MB body into
+// memory first just pins the function until the platform kills it.
+const DEFAULT_MAX_BODY_BYTES = 2 * 1024 * 1024;
 
-/** True if an IP literal is in a private / loopback / link-local / reserved range. */
+/**
+ * True if an IP literal is in a private / loopback / link-local / reserved
+ * range — i.e. anything that is not plain public unicast.
+ *
+ * Parsed with ipaddr.js rather than by hand: the previous string-prefix
+ * checks understood `::ffff:127.0.0.1` but not the hex form `::ffff:7f00:1`
+ * that the WHATWG URL parser normalises bracketed IPv4-mapped literals to, so
+ * `http://[::ffff:127.0.0.1]/` sailed through. ipaddr.js's range() classifies
+ * every special-purpose block (loopback, private, link-local, CGNAT, unique
+ * local, multicast, unspecified, 6to4/teredo/NAT64 embeddings…) and unwraps
+ * IPv4-mapped addresses before classifying. Anything unparsable is treated as
+ * private (fail closed).
+ */
 export function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
-    if (a === 10 || a === 127 || a === 0) return true;            // private / loopback / this-host
-    if (a === 169 && b === 254) return true;                       // link-local (incl. cloud metadata 169.254.169.254)
-    if (a === 172 && b >= 16 && b <= 31) return true;              // private
-    if (a === 192 && b === 168) return true;                       // private
-    if (a === 100 && b >= 64 && b <= 127) return true;             // CGNAT
-    return false;
+  let addr;
+  try {
+    addr = ipaddr.process(String(ip).trim());
+  } catch {
+    return true;
   }
-  const lower = ip.toLowerCase();
-  if (lower === '::1' || lower === '::') return true;              // loopback / unspecified
-  if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // unique-local
-  if (lower.startsWith('fe80')) return true;                       // link-local
-  if (lower.startsWith('::ffff:')) return isPrivateIp(lower.slice(7)); // IPv4-mapped
+  if (addr.kind() === 'ipv4') {
+    // ipaddr.js labels 100.64.0.0/10 (CGNAT) as 'carrierGradeNat' and every
+    // other special block by name; only 'unicast' is routable public space.
+    return addr.range() !== 'unicast';
+  }
+  const range = addr.range();
+  if (range !== 'unicast') return true;
+  // NAT64 (64:ff9b::/96) embeds an IPv4 address that ipaddr.js does not
+  // unwrap — classify the embedded IPv4 as well.
+  const parts = addr.parts;
+  if (parts[0] === 0x64 && parts[1] === 0xff9b && parts.slice(2, 6).every((p) => p === 0)) {
+    const v4 = [parts[6] >> 8, parts[6] & 0xff, parts[7] >> 8, parts[7] & 0xff].join('.');
+    return isPrivateIp(v4);
+  }
   return false;
+}
+
+/**
+ * The hostname of a URL with IPv6 brackets removed, so an IP literal can be
+ * recognised as one. `new URL('http://[::1]/').hostname` is the string
+ * `"[::1]"` — brackets included — which net.isIP() does not recognise, so a
+ * bracketed literal used to be treated as a *hostname* and skipped the
+ * literal-address check; undici then strips the brackets itself and connects
+ * to the IP directly, and Node never runs the custom lookup for IP literals,
+ * so the second guard never saw it either.
+ */
+export function urlHost(url) {
+  return new URL(url).hostname.replace(/^\[|\]$/g, '');
 }
 
 export function isValidUrl(url) {
@@ -59,12 +95,13 @@ export function isFetchableHttpUrl(url) {
  * below, which pins the connection to the address it validates.
  */
 export function assertNotLiteralPrivateAddress(url) {
-  const { hostname } = new URL(url);
+  const hostname = urlHost(url);
   if (net.isIP(hostname)) {
     if (isPrivateIp(hostname)) throw new Error('Blocked: private address');
     return;
   }
-  if (hostname.toLowerCase() === 'localhost') throw new Error('Blocked: localhost');
+  const lower = hostname.toLowerCase();
+  if (lower === 'localhost' || lower.endsWith('.localhost')) throw new Error('Blocked: localhost');
 }
 
 /**
@@ -112,12 +149,42 @@ export const ssrfSafeDispatcher = new Agent({ connect: { lookup: ssrfSafeLookup 
 const MAX_REDIRECTS = 5;
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
+/** Read a response body as text, stopping (and closing the socket) after maxBytes. */
+async function readBodyCapped(response, maxBytes) {
+  // Non-streaming bodies (and test doubles) still get the cap applied.
+  if (typeof response.body?.getReader !== 'function') {
+    const text = typeof response.text === 'function' ? await response.text() : '';
+    return text.length > maxBytes ? text.slice(0, maxBytes) : text;
+  }
+  const chunks = [];
+  let total = 0;
+  const reader = response.body.getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        chunks.push(value.subarray(0, value.byteLength - (total - maxBytes)));
+        await reader.cancel().catch(() => {});
+        break;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 /**
  * Fetch a page's HTML with the SSRF guard applied and a hard timeout.
  * `logPrefix` just tags the log lines with the calling subsystem.
  */
-export async function fetchWebpageContent(url, { timeoutMs = DEFAULT_TIMEOUT_MS, logPrefix = 'SAFE_FETCH' } = {}) {
-  logger.info(`[${logPrefix}] Fetching content from URL: ${url}`);
+export async function fetchWebpageContent(url, { timeoutMs = DEFAULT_TIMEOUT_MS, maxBodyBytes = DEFAULT_MAX_BODY_BYTES, logPrefix = 'SAFE_FETCH' } = {}) {
+  // Log the parsed form: new URL() strips CR/LF, so logging the raw string
+  // would let a crafted URL forge extra log lines.
+  logger.info(`[${logPrefix}] Fetching content from URL: ${new URL(url).href}`);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -162,13 +229,17 @@ export async function fetchWebpageContent(url, { timeoutMs = DEFAULT_TIMEOUT_MS,
         continue;
       }
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
+        clearTimeout(timeoutId);
+        await response.body?.cancel().catch(() => {});
         throw new Error(`Failed to fetch webpage: ${response.status} ${response.statusText}`);
       }
 
-      const content = await response.text();
+      // The timeout stays armed until the body has been read: clearing it
+      // before response.text() left the body read uncovered, so a slow-drip
+      // server could hold the function open indefinitely.
+      const content = await readBodyCapped(response, maxBodyBytes);
+      clearTimeout(timeoutId);
       logger.info(`[${logPrefix}] Successfully fetched ${content.length} bytes from ${currentUrl}`);
       return content;
     }

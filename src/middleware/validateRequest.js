@@ -13,8 +13,10 @@ const getZodIssues = (error) => {
 export const validateRequestBody = (schema) => {
   return async (req, res, next) => {
     try {
-      const validated = await schema.parseAsync(req.body);
-      Object.assign(req.body, validated);
+      // Replace, don't merge: Object.assign kept every key zod stripped, so a
+      // handler that spreads req.body into a write still received unknown
+      // (attacker-chosen) columns. Handlers now only ever see the validated shape.
+      req.body = await schema.parseAsync(req.body);
       next();
     } catch (error) {
       const issues = getZodIssues(error).map(e => ({

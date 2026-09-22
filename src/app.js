@@ -13,10 +13,50 @@ import { secureHeadersMiddleware, noCacheHeaders } from './middleware/secureHead
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
 
+// Sentry captures every 5xx via setupExpressErrorHandler below. With the
+// default request-data integration that included the JSON body and every
+// header — so a throw inside /auth/password/change shipped the user's current
+// AND new password, plus their bearer token, to a third party. Bodies, cookies
+// and headers are now excluded outright and a final scrub strips anything
+// secret-shaped that still reaches an event.
+const SENSITIVE_KEY = /pass(word)?|token|secret|authorization|cookie|otp|code|card|cvc|ssn|api[-_]?key/i;
+export function scrubSentryEvent(event) {
+	if (event?.request) {
+		delete event.request.data;
+		delete event.request.cookies;
+		if (event.request.headers) {
+			for (const k of Object.keys(event.request.headers)) {
+				if (/^(authorization|cookie|x-csrf-token|x-api-key)$/i.test(k)) delete event.request.headers[k];
+			}
+		}
+		if (typeof event.request.query_string === 'string' && /token|code|secret|key/i.test(event.request.query_string)) {
+			event.request.query_string = '[Filtered]';
+		}
+	}
+	const scrub = (obj, depth = 0) => {
+		if (!obj || typeof obj !== 'object' || depth > 6) return;
+		for (const k of Object.keys(obj)) {
+			if (SENSITIVE_KEY.test(k)) obj[k] = '[Filtered]';
+			else scrub(obj[k], depth + 1);
+		}
+	};
+	scrub(event?.extra);
+	scrub(event?.contexts);
+	if (event?.user) event.user = event.user.id ? { id: event.user.id } : undefined;
+	return event;
+}
+
 Sentry.init({
 	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
 	tracesSampleRate: 0.2,
 	environment: process.env.NODE_ENV || 'production',
+	sendDefaultPii: false,
+	integrations: [
+		Sentry.requestDataIntegration({
+			include: { cookies: false, data: false, headers: false, ip: false, query_string: true, url: true, user: false },
+		}),
+	],
+	beforeSend: scrubSentryEvent,
 });
 
 const app = express();

@@ -214,4 +214,25 @@ const emailCheckLimiter = rateLimit({
 	},
 });
 
-export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter, pwnedCheckLimiter, emailCheckLimiter };
+// Password-change limiter: 5 attempts per 15 minutes per authenticated user.
+// /auth/password/change verifies the *current* password with a real GoTrue
+// sign-in, so without a per-user cap a stolen session could guess the current
+// password at the global limiter's rate — and every guess also spends the
+// server's shared per-IP auth quota at Supabase.
+const passwordChangeLimiter = rateLimit({
+	windowMs: 15 * 60 * 1000,
+	max: 5,
+	store: new PgRateLimitStore('pwchange'),
+	standardHeaders: true,
+	legacyHeaders: false,
+	keyGenerator: (req) => req.user?.id || ipKeyGenerator(req),
+	handler: (req, res) => {
+		logger.warn(`[RATE_LIMIT] Password change limit exceeded for user: ${req.user?.id}`);
+		res.status(429).json({
+			error: 'Too many password change attempts, please try again later',
+			retryAfter: req.rateLimit.resetTime,
+		});
+	},
+});
+
+export { loginLimiter, passwordResetLimiter, apiLimiter, stripeLimiter, backupCodeLimiter, reportLimiter, resendVerificationLimiter, welcomeOfferIssueLimiter, pwnedCheckLimiter, emailCheckLimiter, passwordChangeLimiter };

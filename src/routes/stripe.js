@@ -4,7 +4,7 @@ import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
-import { requireAdmin } from '../middleware/requireAal2.js';
+import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 import { calculateBreakdown, calculateProcessingFee, calculateGst } from '../services/commissionService.js';
@@ -28,6 +28,7 @@ import { applyStripeSubscription } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress, checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
+import { invalidReturnUrl } from '../utils/returnUrl.js';
 import { requireIdentityForMarketplacePurchase } from '../middleware/requireIdentityForPurchase.js';
 import { isValidAbn, normalizeAbn } from '../../utils/abn.js';
 import { checkoutPaymentMethodTypes } from '../utils/checkoutPaymentMethods.js';
@@ -76,7 +77,7 @@ router.get('/calculate', authMiddleware, validateRequestQuery(calculateBreakdown
     // forced to 'offer' for the same reason checkout derives it server-side.
     let priceSource = listing;
     if (offerId) {
-      const resolved = await resolveOfferPrice({ offerId, listingId, userId: req.user.id });
+      const resolved = await resolveOfferPrice({ offerId, listingId, userId: req.user.id, listingSellerId: listing.seller_id });
       if (resolved.error) return res.status(400).json({ error: resolved.error });
       priceSource = { ...listing, price_aud: resolved.itemPrice };
       transactionType = 'offer';
@@ -290,6 +291,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     } else if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
+    // Stripe sends the buyer to these after paying — they must be ours.
+    const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl, returnUrl });
+    if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
     if (promoCode && useWalletBalance) {
       return res.status(400).json({ error: 'Apply either a promo code or your wallet balance, not both.' });
     }
@@ -835,7 +839,12 @@ router.get('/identity/status', authMiddleware, getIdentityStatus);
 
 // ─── POST /connect/onboard ───────────────────────────────────────────────────
 
-router.post('/connect/onboard', authMiddleware, connectOnboard);
+// Connect routes move (or redirect to where a seller can redirect) real money,
+// so an MFA-enrolled seller must present an AAL2 token — a phished password
+// alone can mint an AAL1 token straight from GoTrue and, without this, open the
+// Express dashboard (change payout bank) and drain the held wallet balance.
+// requireAal2 only bites users who enrolled MFA, so nobody is locked out.
+router.post('/connect/onboard', authMiddleware, requireAal2, connectOnboard);
 
 // ─── GET /connect/status ─────────────────────────────────────────────────────
 
@@ -843,12 +852,12 @@ router.get('/connect/status', authMiddleware, getConnectStatus);
 
 // ─── POST /connect/dashboard-link ────────────────────────────────────────────
 
-router.post('/connect/dashboard-link', authMiddleware, getDashboardLink);
+router.post('/connect/dashboard-link', authMiddleware, requireAal2, getDashboardLink);
 
 // ─── POST /connect/withdraw ──────────────────────────────────────────────────
 // Pays a held wallet balance out to the seller's connected Stripe account.
 
-router.post('/connect/withdraw', authMiddleware, withdrawHeldBalance);
+router.post('/connect/withdraw', authMiddleware, requireAal2, withdrawHeldBalance);
 
 // ─── GET /reconcile-pending ──────────────────────────────────────────────────
 // Vercel Cron: flags orders Stripe reports as paid that are still 'pending'

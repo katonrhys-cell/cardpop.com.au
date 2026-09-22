@@ -23,6 +23,13 @@ vi.mock('../../../src/utils/logger.js', () => ({
 vi.mock('../../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1', email: 'test@example.com' }; next(); },
 }));
+vi.mock('../../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  requireAdmin: (_req, _res, next) => next(),
+}));
+vi.mock('../../../src/middleware/endpoint-rate-limit.js', () => ({
+  passwordChangeLimiter: (_req, _res, next) => next(),
+}));
 
 // Mock the anon client created inside password.js via createClient
 const mockAnonSignIn = vi.hoisted(() => vi.fn().mockResolvedValue({ error: null }));
@@ -82,25 +89,12 @@ describe('POST /validate', () => {
 // ─── POST /reset/request ──────────────────────────────────────────────────────
 
 describe('POST /reset/request', () => {
-  it('returns 400 when email is missing', async () => {
-    const res = await request(app).post('/reset/request').send({});
-    expect(res.status).toBe(400);
-  });
-
-  it('always returns success (prevents enumeration)', async () => {
-    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
+  // Removed: it bypassed CAPTCHA (service-role resetPasswordForEmail) and was
+  // unused by the frontend, which resets straight through Supabase.
+  it('no longer exists', async () => {
     const res = await request(app).post('/reset/request').send({ email: 'test@example.com' });
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-  });
-
-  it('sends the reset email via resetPasswordForEmail (generateLink never sent anything)', async () => {
-    mockSupabase.from.mockReturnValue(makeBuilder({ data: null, error: null }));
-    await request(app).post('/reset/request').send({ email: 'test@example.com' });
-    expect(mockSupabase.auth.resetPasswordForEmail).toHaveBeenCalledWith(
-      'test@example.com',
-      expect.objectContaining({ redirectTo: expect.stringContaining('/reset-password') }),
-    );
+    expect(res.status).toBe(404);
+    expect(mockSupabase.auth.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 });
 
