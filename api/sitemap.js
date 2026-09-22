@@ -189,7 +189,7 @@ export default async function handler(req, res) {
         supabase
           .from('shop_products')
           .select('id, title, updated_at, created_at')
-          .eq('status', 'active')
+          .in('status', ['active', 'coming_soon'])
           .order('created_at', { ascending: false })
           .limit(500),
         supabase

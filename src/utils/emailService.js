@@ -15,6 +15,7 @@ import {
   orderAdminNoticeEmail,
   contactMessageEmail,
   offerReceivedEmail,
+  shopEnquiryEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -175,6 +176,17 @@ export async function sendContactMessage({ to, name, email, subject, message }) 
     to,
     subject: `New contact message: ${subject}`,
     html: contactMessageEmail({ name, email, subject, message }),
+    replyTo: email,
+  });
+}
+
+// Shopper enquiry about a sold-out shop product, delivered to the admin inbox.
+// reply_to is the shopper so admin can answer (restock date etc.) in one click.
+export async function sendShopEnquiry({ to, productTitle, productSku, productId, productUrl, reason = 'sold_out', name, email, message }) {
+  return send({
+    to,
+    subject: `${reason === 'coming_soon' ? 'Coming-soon' : 'Stock'} enquiry: ${productTitle}`,
+    html: shopEnquiryEmail({ productTitle, productSku, productId, productUrl, reason, name, email, message }),
     replyTo: email,
   });
 }

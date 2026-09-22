@@ -412,6 +412,35 @@ ${summaryTable([
   );
 }
 
+// ─── Shop stock enquiry (admin) ──────────────────────────────────────────────
+
+// A shopper hit "Enquire" on a sold-out shop product. Delivered to the admin
+// inbox with reply_to set to the shopper so a restock reply is one click.
+export function shopEnquiryEmail({ productTitle, productSku, productId, productUrl, reason = 'sold_out', name, email, message }) {
+  const comingSoon = reason === 'coming_soon';
+  const body = `<p>A shopper ${comingSoon ? 'registered interest in a <strong>coming-soon</strong> product' : 'asked about a <strong>sold-out</strong> product'} in the CardPop shop.</p>
+${summaryTable([
+  ['Product', esc(productTitle)],
+  ...(productSku ? [['SKU', esc(productSku)]] : []),
+  ['Product ID', esc(productId)],
+  ['From', `${esc(name)} (${esc(email)})`],
+])}
+${message
+    ? `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;white-space:pre-wrap;font-size:15px;line-height:1.7;color:#374151;">${esc(message)}</div>`
+    : `<p style="color:#6B7280;">No message was included — they just want to know when it is ${comingSoon ? 'available' : 'back in stock'}.</p>`}
+<p style="font-size:13px;color:#9CA3AF;">Reply directly to this email to respond to ${esc(name)}.</p>`;
+
+  return cpEmail(
+    `${comingSoon ? 'Coming-soon' : 'Stock'} enquiry: ${esc(productTitle)}`,
+    comingSoon ? 'Coming-Soon Product Enquiry' : 'Sold-Out Product Enquiry',
+    comingSoon ? 'A shopper wants a coming-soon item' : 'A shopper wants a sold-out item',
+    body,
+    productUrl || null,
+    productUrl ? 'View Product' : null,
+    'You received this because you are the CardPop shop admin.',
+  );
+}
+
 // ─── Refund issued (seller) ───────────────────────────────────────────────────
 
 export function refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }) {

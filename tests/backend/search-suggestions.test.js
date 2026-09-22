@@ -24,7 +24,7 @@ const app = makeApp();
 
 function makeBuilder(result = { data: [], error: null }) {
   const b = {
-    select: vi.fn(() => b), ilike: vi.fn(() => b), or: vi.fn(() => b), eq: vi.fn(() => b),
+    select: vi.fn(() => b), ilike: vi.fn(() => b), or: vi.fn(() => b), eq: vi.fn(() => b), in: vi.fn(() => b),
     limit: vi.fn(() => b), order: vi.fn(() => b),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
   };

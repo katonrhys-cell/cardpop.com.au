@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight } from 'lucide-react';
+import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { Button } from '@/components/ui/button';
+import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -27,6 +28,7 @@ const ShopBinderProductPage = () => {
   // renders identically for the SPA, the prerenderer and the sitemap.
   const [row, setRow] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
 
   useEffect(() => {
     if (!product) { setLoading(false); return undefined; }
@@ -60,6 +62,8 @@ const ShopBinderProductPage = () => {
   // rendering Add to cart and emitting an Offer. No code change, no redeploy:
   // stock arriving is an admin edit, not a release.
   const isPurchasable = row?.status === 'active' && price != null;
+  // Admin-flagged pre-launch: shown, not buyable; the CTA opens the enquiry form.
+  const isComingSoon = row?.status === 'coming_soon';
 
   const related = BINDER_PRODUCTS.filter((p) => p.slug !== product.slug).slice(0, 4);
 
@@ -179,9 +183,18 @@ const ShopBinderProductPage = () => {
                       ${rrp.toFixed(2)}
                     </span>
                   )}
-                  <Badge variant={inStock ? 'default' : 'secondary'}>
-                    {inStock ? 'In stock' : 'Out of stock'}
+                  <Badge variant={inStock ? 'default' : 'destructive'}>
+                    {inStock ? 'In stock' : 'Sold out'}
                   </Badge>
+                </>
+              ) : isComingSoon ? (
+                <>
+                  {rrp != null && (
+                    <span className="text-lg font-semibold tabular-nums text-muted-foreground">
+                      RRP ${rrp.toFixed(2)}
+                    </span>
+                  )}
+                  <Badge className="bg-brand-charcoal text-white hover:bg-brand-charcoal">Coming soon</Badge>
                 </>
               ) : rrp != null ? (
                 <span className="text-lg font-semibold tabular-nums text-muted-foreground">
@@ -198,19 +211,46 @@ const ShopBinderProductPage = () => {
                 product was being viewed so the signup page can attribute the
                 enquiry without putting it in the URL. */}
             <div className="mt-6">
-              {isPurchasable ? (
-                <Button
-                  size="lg"
-                  className="w-full sm:w-auto"
-                  disabled={!inStock}
-                  onClick={handleAddToCart}
-                >
-                  {inStock ? (
-                    <><ShoppingCart className="w-5 h-5 mr-2" />Add to cart</>
-                  ) : (
-                    <><PackageX className="w-5 h-5 mr-2" />Out of stock</>
-                  )}
+              {isComingSoon ? (
+                <>
+                  <Button size="lg" className="w-full sm:w-auto" onClick={() => setEnquiryOpen(true)}>
+                    <Clock className="w-5 h-5 mr-2" />Coming soon — register interest
+                  </Button>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Not available to order yet. Enquire and we&apos;ll let you know the moment it is.
+                  </p>
+                  <ShopEnquiryDialog
+                    open={enquiryOpen}
+                    onOpenChange={setEnquiryOpen}
+                    reason="coming_soon"
+                    product={{ id: row.id, title: product.title }}
+                  />
+                </>
+              ) : isPurchasable && inStock ? (
+                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart}>
+                  <ShoppingCart className="w-5 h-5 mr-2" />Add to cart
                 </Button>
+              ) : isPurchasable ? (
+                // Sold out: 0 stock on an otherwise live product. Offer an
+                // enquiry that emails admin instead of a dead button.
+                <>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Button size="lg" variant="secondary" className="w-full sm:w-auto" disabled>
+                      <PackageX className="w-5 h-5 mr-2" />Sold out
+                    </Button>
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto" onClick={() => setEnquiryOpen(true)}>
+                      <MessageSquare className="w-5 h-5 mr-2" />Enquire
+                    </Button>
+                  </div>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Sold out for now — enquire and we&apos;ll let you know when it&apos;s back.
+                  </p>
+                  <ShopEnquiryDialog
+                    open={enquiryOpen}
+                    onOpenChange={setEnquiryOpen}
+                    product={{ id: row.id, title: product.title }}
+                  />
+                </>
               ) : (
                 <>
                   <Button size="lg" className="w-full sm:w-auto" asChild>

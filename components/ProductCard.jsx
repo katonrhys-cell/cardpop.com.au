@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, ZoomIn, ShoppingCart } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn, ShoppingCart, PackageX, MessageSquare, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { slugify } from '@/lib/slugify.js';
@@ -15,9 +15,18 @@ import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
+import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
+import { isSoldOut, isComingSoon } from '@/utils/shopStock.js';
 
 const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
+  // Shop products track stock; 0 means sold out → swap Add to Cart for an
+  // Enquire button that emails admin. Marketplace/vault rows have no
+  // stock_quantity and are never flagged.
+  // Coming soon wins over sold out (a pre-launch product usually has 0 stock).
+  const comingSoon = isComingSoon(product);
+  const soldOut = !comingSoon && isSoldOut(product);
   const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
   const autoLabel = getAutographLabel(product);
@@ -60,12 +69,30 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             sizes={CARD_GRID_SIZES}
             fallbackSrc={imgFallback}
             alt={product.name || product.cardName || product.title || 'Product Image'}
-            imgClassName="w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500"
+            imgClassName={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500 ${soldOut ? 'grayscale opacity-70' : ''}`}
             width="400"
             height="500"
             priority={priority}
           />
         )}
+        {/* Coming-soon ribbon — top right */}
+        {comingSoon && (
+          <div className="absolute top-3 right-3 z-10">
+            <Badge className="shadow-md font-extrabold uppercase tracking-wider bg-brand-charcoal text-white hover:bg-brand-charcoal border-0">
+              Coming soon
+            </Badge>
+          </div>
+        )}
+
+        {/* Sold-out ribbon — top right (shop products with 0 stock only) */}
+        {soldOut && (
+          <div className="absolute top-3 right-3 z-10">
+            <Badge className="shadow-md font-extrabold uppercase tracking-wider bg-brand-red text-white hover:bg-brand-red border-0">
+              Sold out
+            </Badge>
+          </div>
+        )}
+
         {/* Condition badge — top left */}
         {product.condition && (
           <div className="absolute top-3 left-3 z-10">
@@ -160,7 +187,45 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
 
           <BnplMessage amount={product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue} className="-mt-1" />
 
-          {onAddToCart && (
+          {comingSoon ? (
+            <>
+              <Button
+                size="sm"
+                className="w-full rounded-xl font-bold"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEnquiryOpen(true); }}
+              >
+                <Clock className="w-4 h-4 mr-2" /> Coming soon
+              </Button>
+              <ShopEnquiryDialog
+                open={enquiryOpen}
+                onOpenChange={setEnquiryOpen}
+                reason="coming_soon"
+                product={{ id: product.id, title: product.title || product.name || product.cardName }}
+              />
+            </>
+          ) : soldOut ? (
+            <div className="flex flex-col gap-2">
+              <div
+                className="flex items-center justify-center gap-2 h-9 rounded-xl bg-muted text-muted-foreground text-sm font-bold"
+                aria-label="Sold out"
+              >
+                <PackageX className="w-4 h-4" /> Sold out
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                className="w-full rounded-xl font-bold border-brand-red/40 text-brand-red hover:bg-brand-red/5 hover:text-brand-red"
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEnquiryOpen(true); }}
+              >
+                <MessageSquare className="w-4 h-4 mr-2" /> Enquire
+              </Button>
+              <ShopEnquiryDialog
+                open={enquiryOpen}
+                onOpenChange={setEnquiryOpen}
+                product={{ id: product.id, title: product.title || product.name || product.cardName }}
+              />
+            </div>
+          ) : onAddToCart && (
             <Button
               size="sm"
               className="w-full rounded-xl font-bold"

@@ -10,14 +10,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
 import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
+import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 
 const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
 
 const INITIAL_STATE = {
   title: '',
+  sku: '',
   description: '',
   price_aud: '',
+  retail_price_aud: '',
   stock_quantity: '1',
   category: '',
   product_type: 'sealed',
@@ -42,8 +45,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (product) {
       setFormData({
         title: product.title || '',
+        sku: product.sku || '',
         description: product.description || '',
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
+        retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
         stock_quantity: product.stock_quantity != null ? String(product.stock_quantity) : '0',
         category: product.category || '',
         product_type: product.product_type || 'sealed',
@@ -108,20 +113,47 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title.trim()) return toast.error('Product Name is required');
+    // SKU: required, stored upper-cased. The DB also enforces uniqueness
+    // (case-insensitive) and fills a CP-… default if a writer omits it, but
+    // the form asks for one explicitly so every upload is deliberate.
+    const sku = normalizeSku(formData.sku);
+    if (!sku) return toast.error('A SKU is required — use Generate to derive one from the name');
+    if (!isValidSku(sku)) {
+      return toast.error(`SKU must be up to ${SKU_MAX_LENGTH} characters: letters, numbers, . _ / -`);
+    }
     const price = Number(formData.price_aud);
     if (formData.price_aud === '' || Number.isNaN(price) || price < 0) {
       return toast.error('A valid price is required');
+    }
+    // RRP is optional; when given it must be a valid non-negative amount.
+    const rrpRaw = String(formData.retail_price_aud ?? '').trim();
+    const rrp = rrpRaw === '' ? null : Number(rrpRaw);
+    if (rrp !== null && (Number.isNaN(rrp) || rrp < 0)) {
+      return toast.error('RRP must be a valid amount, or left blank');
     }
     const stock = parseInt(formData.stock_quantity, 10);
 
     setLoading(true);
     try {
+      // Friendly pre-check so a duplicate SKU reads as a clear message rather
+      // than a raw constraint error. The unique index is the real guard.
+      let dupQuery = supabase.from('shop_products').select('id, title').ilike('sku', sku).limit(1);
+      if (product?.id) dupQuery = dupQuery.neq('id', product.id);
+      const { data: dup } = await dupQuery;
+      if (dup && dup.length) {
+        toast.error(`SKU ${sku} is already used by "${dup[0].title}"`);
+        setLoading(false);
+        return;
+      }
+
       const imageUrls = await uploadNewImages();
 
       const payload = {
         title: formData.title.trim(),
+        sku,
         description: formData.description.trim() || null,
         price_aud: price,
+        retail_price_aud: rrp,
         stock_quantity: Number.isNaN(stock) ? 0 : Math.max(0, stock),
         category: formData.category.trim() || null,
         product_type: formData.product_type || null,
@@ -148,7 +180,11 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       if (onSuccess) onSuccess();
     } catch (error) {
       console.error('Shop product save error:', error);
-      toast.error(error.message || 'Failed to save product.');
+      if (error?.code === '23505' && /sku/i.test(error.message || '')) {
+        toast.error(`SKU ${sku} is already in use`);
+      } else {
+        toast.error(error.message || 'Failed to save product.');
+      }
     } finally {
       setLoading(false);
     }
@@ -189,18 +225,76 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div className="space-y-5">
           <div className="space-y-2">
-            <Label>Product Name <span className="text-destructive">*</span></Label>
-            <Input required value={formData.title} onChange={(e) => handleInputChange('title', e.target.value)} className="bg-background" />
+            <Label htmlFor="shop-product-title">Product Name <span className="text-destructive">*</span></Label>
+            <Input id="shop-product-title" required value={formData.title} onChange={(e) => handleInputChange('title', e.target.value)} className="bg-background" />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="shop-product-sku">SKU <span className="text-destructive">*</span></Label>
+            <div className="flex gap-2">
+              <Input
+                id="shop-product-sku"
+                required
+                maxLength={SKU_MAX_LENGTH}
+                placeholder="e.g. ZB-09 or CP-ACRYLIC-STAND-5-PACK"
+                value={formData.sku}
+                onChange={(e) => handleInputChange('sku', e.target.value.toUpperCase())}
+                className="bg-background font-mono uppercase"
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={!formData.title.trim()}
+                onClick={() => handleInputChange('sku', suggestSku(formData.title))}
+                title="Derive a CP-… SKU from the product name"
+              >
+                Generate
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Use the manufacturer's SKU for wholesale stock; house products use <span className="font-mono">CP-…</span>. Must be unique.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Price ($AUD) <span className="text-destructive">*</span></Label>
-              <Input required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
+              <Label htmlFor="shop-product-price">Price ($AUD) <span className="text-destructive">*</span></Label>
+              <Input id="shop-product-price" required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
-              <Label>Stock Quantity</Label>
-              <Input type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+              <Label htmlFor="shop-product-stock">Stock Quantity</Label>
+              <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+            </div>
+          </div>
+
+          {/* RRP: the manufacturer's recommended retail price. Shown
+              struck-through on the shop when it's above the selling price.
+              "Use RRP as price" is the one-click "sell at RRP" path. */}
+          <div className="space-y-2">
+            <Label htmlFor="shop-product-rrp">RRP ($AUD) <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <div className="flex gap-2">
+              <Input
+                id="shop-product-rrp"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Recommended retail price"
+                value={formData.retail_price_aud}
+                onChange={(e) => handleInputChange('retail_price_aud', e.target.value)}
+                className="bg-background tabular-nums"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={String(formData.retail_price_aud ?? '').trim() === ''}
+                onClick={() => handleInputChange('price_aud', String(formData.retail_price_aud).trim())}
+              >
+                Use RRP as price
+              </Button>
             </div>
           </div>
 
@@ -273,6 +367,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">Active (visible in shop)</SelectItem>
+                <SelectItem value="coming_soon">Coming soon (visible, not for sale — enquiry button)</SelectItem>
                 <SelectItem value="draft">Draft (hidden)</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>
