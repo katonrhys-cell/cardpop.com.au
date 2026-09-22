@@ -13,7 +13,10 @@ const mockRunsLookup = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   default: {
-    auth: { getUser: mockGetUser },
+    auth: {
+      getUser: mockGetUser,
+      admin: { mfa: { listFactors: async () => ({ data: { factors: [] }, error: null }) } },
+    },
     from: (table) => {
       const query = {
         select: () => query,

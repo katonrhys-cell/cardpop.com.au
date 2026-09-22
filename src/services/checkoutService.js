@@ -7,6 +7,7 @@ import { checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidat
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { validateWelcomeDiscount, buildWelcomeDiscount, reserveWelcomeDiscount } from './welcomeOfferService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from './walletService.js';
+import { invalidReturnUrl } from '../utils/returnUrl.js';
 
 /**
  * Resolve the price the buyer owes on an offer-based purchase, enforcing that
@@ -16,14 +17,23 @@ import { ensureWalletCustomer, getWalletBalanceCents, assertNoOpenWalletCheckout
  *
  * Returns { itemPrice } on success or { error } for the caller to 400 on.
  */
-export async function resolveOfferPrice({ offerId, listingId, userId }) {
+export async function resolveOfferPrice({ offerId, listingId, userId, listingSellerId }) {
   const { data: offer } = await supabase
     .from('offers')
-    .select('amount_aud, counter_amount_aud, status, buyer_id, listing_id')
+    .select('amount_aud, counter_amount_aud, status, buyer_id, seller_id, listing_id')
     .eq('id', offerId)
     .maybeSingle();
 
   if (!offer || offer.listing_id !== listingId || offer.buyer_id !== userId) {
+    return { error: 'Invalid offer' };
+  }
+  // The consent below is only meaningful if the party who "accepted" is the
+  // listing's real owner. offers.seller_id was once client-supplied, so an
+  // offer whose seller_id is anyone else (an accomplice account that accepted
+  // a $1 offer on a stranger's card) must never price a checkout. Callers
+  // pass the seller from the listing row they already loaded; a missing value
+  // fails closed.
+  if (!listingSellerId || offer.seller_id !== listingSellerId) {
     return { error: 'Invalid offer' };
   }
   // Only offers the SELLER has consented to may be paid. A 'pending' offer
@@ -67,6 +77,11 @@ export async function createSingleItemCheckout(req, res) {
 
     const email = req.user.email;
 
+    // The schema only checks these parse as URLs; they must also be ours (see
+    // utils/returnUrl.js — an attacker-chosen success_url is a phishing hop).
+    const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
+    if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
+
     let { data: listing, error: listingErr } = await supabase
       .from('listings')
       .select('id, price_aud, shipping_cost_aud, vault_item_id, seller_id, title, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
@@ -96,7 +111,7 @@ export async function createSingleItemCheckout(req, res) {
 
     let itemPrice = Number(listing.price_aud);
     if (offerId) {
-      const resolved = await resolveOfferPrice({ offerId, listingId, userId });
+      const resolved = await resolveOfferPrice({ offerId, listingId, userId, listingSellerId: listing.seller_id });
       if (resolved.error) {
         return res.status(400).json({ error: resolved.error });
       }

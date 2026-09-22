@@ -250,7 +250,8 @@ router.get('/status', (req, res) => {
   if (!key) {
     return res.status(500).json({ ok: false, error: 'CARDSIGHT_API_KEY is not set in environment variables' });
   }
-  res.json({ ok: true, keyConfigured: true, keyPrefix: key.slice(0, 6) + '...' });
+  // Never echo any part of the key — this route is unauthenticated.
+  res.json({ ok: true, keyConfigured: true });
 });
 
 // ─── GET /cardsight/pricing/:cardId ──────────────────────────────────────────

@@ -3,6 +3,7 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { invalidReturnUrl } from '../utils/returnUrl.js';
 import {
   getOrCreateStripeCustomer,
   applyPaypalSubscription,
@@ -50,6 +51,8 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
+    const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
+    if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
     const userId = req.user.id;
     const customerId = await getOrCreateStripeCustomer(userId, req.user.email);
@@ -123,6 +126,8 @@ router.post('/paypal/create', authMiddleware, async (req, res) => {
     if (!returnUrl || !cancelUrl) {
       return res.status(400).json({ error: 'returnUrl and cancelUrl are required' });
     }
+    const badPaypalUrl = invalidReturnUrl({ returnUrl, cancelUrl });
+    if (badPaypalUrl) return res.status(400).json({ error: badPaypalUrl });
 
     const tier = normalizePaidTier(req.body?.tier);
     const { id, approveUrl } = await createPaypalSubscription({

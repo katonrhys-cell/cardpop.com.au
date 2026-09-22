@@ -63,12 +63,12 @@ jobs:
 
       - name: Run Snyk vulnerability test
         if: env.SNYK_TOKEN != ''
-        uses: snyk/actions/node@master
+        uses: snyk/actions/node@0.4.0
         with:
           args: --severity-threshold=high
 
       - name: Monitor project in Snyk dashboard
         if: env.SNYK_TOKEN != '' && github.ref == 'refs/heads/main' && github.event_name == 'push'
-        uses: snyk/actions/node@master
+        uses: snyk/actions/node@0.4.0
         with:
           command: monitor

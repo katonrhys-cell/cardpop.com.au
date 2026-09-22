@@ -20,6 +20,9 @@ concurrency:
   group: cron-blog-generate
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   run:
     uses: ./.github/workflows/cron-job.yml

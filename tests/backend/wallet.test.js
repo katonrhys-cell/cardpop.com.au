@@ -34,6 +34,11 @@ vi.mock('../../src/middleware/auth.js', () => ({
   },
 }));
 
+vi.mock('../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  requireAdmin: (_req, _res, next) => next(),
+}));
+
 vi.mock('../../src/utils/emailService.js', () => ({
   sendOrderConfirmed: vi.fn().mockResolvedValue(undefined),
   sendItemSold: vi.fn().mockResolvedValue(undefined),

@@ -131,10 +131,7 @@ async function maybeEscalate(target_type, target_id) {
 }
 
 // ─── Admin: list the moderation queue ─────────────────────────────────────────
-router.get('/', authMiddleware, async (req, res) => {
-  if (!(await isAdminUser(req))) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
+router.get('/', authMiddleware, requireAdmin, async (req, res) => {
   const { status } = req.query;
   if (status && !STATUSES.includes(status)) {
     return res.status(400).json({ error: 'Invalid status filter' });

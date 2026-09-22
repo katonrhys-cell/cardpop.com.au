@@ -64,7 +64,16 @@ async function loadOfferContext(offer) {
 }
 
 // POST /offers — make an offer on a listing.
-// Body: { listingId, sellerId, amountAud, message? }
+// Body: { listingId, amountAud, message?, sellerId? }
+//
+// The seller is ALWAYS derived from the listing row on the server. The body's
+// sellerId used to be written verbatim, and nothing (here or in RLS) tied it
+// to the listing's real owner — so an attacker could file an offer on any
+// active listing naming an accomplice account as the "seller", have the
+// accomplice accept it, and then check out the victim's card at a self-chosen
+// price (resolveOfferPrice only demanded an accepted offer). It also let
+// anyone push a forged "offer received" notification + email to any user.
+// A supplied sellerId is now only accepted when it matches the listing.
 router.post('/', authMiddleware, async (req, res) => {
   const token = (req.headers.authorization || '').slice(7);
   const buyerId = req.user.id;
@@ -73,19 +82,38 @@ router.post('/', authMiddleware, async (req, res) => {
   if (!UUID_RE.test(String(listingId ?? ''))) {
     return res.status(400).json({ error: 'A valid listingId is required' });
   }
-  if (!UUID_RE.test(String(sellerId ?? ''))) {
+  if (sellerId != null && !UUID_RE.test(String(sellerId))) {
     return res.status(400).json({ error: 'A valid sellerId is required' });
   }
   const amount = Number(amountAud);
   if (!Number.isFinite(amount) || amount <= 0) {
     return res.status(400).json({ error: 'A valid offer amount is required' });
   }
-  if (sellerId === buyerId) {
-    return res.status(400).json({ error: "You can't make an offer on your own listing" });
-  }
   const note = typeof message === 'string' ? message.trim() : '';
   if (note.length > MAX_MESSAGE_LENGTH) {
     return res.status(400).json({ error: 'Message is too long' });
+  }
+
+  // Resolve the seller from the listing itself (service role: the listing is
+  // public data, and this read must not depend on what the caller can see).
+  const { data: listing, error: listingError } = await supabase
+    .from('listings')
+    .select('id, seller_id, status')
+    .eq('id', listingId)
+    .maybeSingle();
+  if (listingError) {
+    logger.error(`[OFFERS] listing lookup failed for ${listingId}: ${listingError.message}`);
+    return res.status(500).json({ error: 'Failed to submit offer' });
+  }
+  if (!listing || listing.status !== 'active' || !listing.seller_id) {
+    return res.status(404).json({ error: 'Listing not found or no longer active' });
+  }
+  const resolvedSellerId = listing.seller_id;
+  if (sellerId != null && sellerId !== resolvedSellerId) {
+    return res.status(400).json({ error: 'sellerId does not match the listing' });
+  }
+  if (resolvedSellerId === buyerId) {
+    return res.status(400).json({ error: "You can't make an offer on your own listing" });
   }
 
   // The write itself, as the caller. RLS rejects a buyer_id that isn't them.
@@ -95,7 +123,7 @@ router.post('/', authMiddleware, async (req, res) => {
     .insert({
       listing_id: listingId,
       buyer_id: buyerId,
-      seller_id: sellerId,
+      seller_id: resolvedSellerId,
       amount_aud: amount,
       message: note || null,
     })

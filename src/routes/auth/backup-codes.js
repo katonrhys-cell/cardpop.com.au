@@ -5,6 +5,7 @@ import supabase from '../../utils/supabaseClient.js';
 import { generateBackupCodes } from '../../utils/otpGenerator.js';
 import { encrypt, decrypt } from '../../utils/encryption.js';
 import { authMiddleware } from '../../middleware/auth.js';
+import { requireAal2 } from '../../middleware/requireAal2.js';
 import { backupCodeLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
 
@@ -19,7 +20,9 @@ function timingSafeEqualStr(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-router.post('/generate', authMiddleware, async (req, res) => {
+// Rotating backup codes is an MFA-recovery action — an AAL1 token (password
+// only) must not be able to replace the codes of a user who enrolled MFA.
+router.post('/generate', authMiddleware, requireAal2, async (req, res) => {
   const codes = generateBackupCodes(6);
   const encryptedCodes = encrypt({
     codes: codes.map(code => ({ code, used: false })),

@@ -4,10 +4,11 @@ import { createClient } from '@supabase/supabase-js';
 import supabase from '../../utils/supabaseClient.js';
 import { validatePassword } from '../../utils/passwordValidator.js';
 import { authMiddleware } from '../../middleware/auth.js';
+import { requireAal2 } from '../../middleware/requireAal2.js';
+import { passwordChangeLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
 
 const router = express.Router();
-const PASSWORD_RESET_EXPIRY_MS = parseInt(process.env.PASSWORD_RESET_EXPIRY_MS || '900000', 10);
 
 // Anon client used only for verifying current password during /change.
 // This module is imported unconditionally by routes/index.js, so throwing here
@@ -18,7 +19,11 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL |
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY
   || process.env.VITE_SUPABASE_ANON_KEY
   || 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
-const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// No session persistence / refresh timers: this client only ever verifies a
+// password and must not keep the resulting session (or a timer) alive.
+const anonClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
 
 // Validate password strength (no auth required)
 router.post('/validate', async (req, res) => {
@@ -59,47 +64,17 @@ router.get('/pwned-check', async (req, res) => {
   }
 });
 
-// Request a password reset link
-router.post('/reset/request', async (req, res) => {
-  const { email } = req.body;
-  if (!email?.trim()) return res.status(400).json({ error: 'Email is required' });
-
-  const trimmedEmail = email.trim().toLowerCase();
-  logger.info(`Password reset requested for ${trimmedEmail}`);
-
-  // resetPasswordForEmail actually dispatches the reset email via Supabase's
-  // mailer — admin.generateLink (used previously) only RETURNS the link and
-  // never sends anything, so this endpoint claimed success while doing nothing.
-  const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-    redirectTo: `${process.env.APP_URL || 'https://cardpop.com.au'}/reset-password`,
-  });
-
-  if (error) {
-    logger.warn(`Password reset failed for ${trimmedEmail}: ${error.message}`);
-  } else {
-    // Audit log (best-effort) — resolve the user id from the profile email.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', trimmedEmail)
-      .maybeSingle();
-    if (profile?.id) {
-      await supabase.from('audit_logs').insert({
-        user_id: profile.id,
-        event_type: 'password_reset_requested',
-        description: 'Password reset requested',
-        ip_address: req.ip || 'unknown',
-        user_agent: req.headers['user-agent'] || 'unknown',
-      }).then(() => {}, () => {});
-    }
-  }
-
-  // Always return success to prevent user enumeration
-  res.json({ success: true, message: 'If an account exists with this email, a password reset link has been sent.' });
-});
+// NOTE: there is deliberately no /reset/request route here. The frontend
+// requests resets straight from Supabase (AuthContext → resetPasswordForEmail
+// with a Turnstile captchaToken). A server-side copy using the service-role
+// client used to live here: GoTrue skips CAPTCHA for service-role requests, so
+// it was a CAPTCHA-free way to fire reset emails at any address (email
+// bombing), rate-limited only per IP. Removed — see SECURITY_AUDIT_2026-09-21.
 
 // Change password for authenticated user
-router.post('/change', authMiddleware, async (req, res) => {
+// MFA-enrolled users must be stepped up (AAL2) to change their password, and
+// current-password guesses are capped per user (see passwordChangeLimiter).
+router.post('/change', authMiddleware, requireAal2, passwordChangeLimiter, async (req, res) => {
   const { currentPassword, newPassword } = req.body;
 
   if (!currentPassword?.trim()) return res.status(400).json({ error: 'Current password is required' });

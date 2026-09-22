@@ -58,11 +58,12 @@ beforeEach(() => {
 // ─── GET /status ──────────────────────────────────────────────────────────────
 
 describe('GET /status', () => {
-  it('reports ok with a key prefix when configured', async () => {
+  it('reports ok when configured without echoing any part of the key', async () => {
     const res = await request(app).get('/status');
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({ ok: true, keyConfigured: true });
-    expect(res.body.keyPrefix).toBe('cskey_...');
+    expect(res.body.keyPrefix).toBeUndefined();
+    expect(JSON.stringify(res.body)).not.toContain('cskey');
   });
 
   it('reports 500 when the key is missing', async () => {

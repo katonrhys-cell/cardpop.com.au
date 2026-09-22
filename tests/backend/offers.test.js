@@ -66,7 +66,7 @@ beforeEach(() => {
   mockGetUser.mockResolvedValue({ data: { user: { id: BUYER } }, error: null });
   mockInsertSingle.mockResolvedValue({ data: createdOffer, error: null });
   mockListing.mockResolvedValue({
-    data: { listing_type: 'Expression of Interest', vault_item: { card_name: 'Nikola Jokic' } },
+    data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'Expression of Interest', vault_item: { card_name: 'Nikola Jokic' } },
   });
   mockProfiles.mockResolvedValue({
     data: [
@@ -103,9 +103,29 @@ describe('POST /offers — validation', () => {
     expect(mockSendOfferReceived).not.toHaveBeenCalled();
   });
 
-  it('rejects an offer on the caller’s own listing', async () => {
-    const res = await post({ ...VALID, sellerId: BUYER });
+  it('rejects an offer on the caller’s own listing (seller from the listing, not the body)', async () => {
+    mockListing.mockResolvedValue({ data: { id: LISTING, seller_id: BUYER, status: 'active' } });
+    const res = await post({ ...VALID, sellerId: SELLER });
     expect(res.status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  // The forged-seller attack: name an accomplice as the seller of a stranger's
+  // listing, have them accept, then check out at a self-chosen price.
+  it('rejects a sellerId that is not the listing’s seller', async () => {
+    const ACCOMPLICE = '55555555-5555-4555-8555-555555555555';
+    const res = await post({ ...VALID, sellerId: ACCOMPLICE });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/does not match/);
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockSendOfferReceived).not.toHaveBeenCalled();
+  });
+
+  it('rejects an offer on an inactive or unknown listing', async () => {
+    mockListing.mockResolvedValueOnce({ data: { id: LISTING, seller_id: SELLER, status: 'sold' } });
+    expect((await post(VALID)).status).toBe(404);
+    mockListing.mockResolvedValueOnce({ data: null });
+    expect((await post(VALID)).status).toBe(404);
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
@@ -129,6 +149,13 @@ describe('POST /offers — the offer row', () => {
       amount_aud: 600,
       message: 'Would you take $600?',
     });
+  });
+
+  it('derives the seller from the listing when no sellerId is sent', async () => {
+    const { sellerId: _omit, ...body } = VALID;
+    const res = await post(body);
+    expect(res.status).toBe(201);
+    expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ seller_id: SELLER }));
   });
 
   it('stores an empty message as null', async () => {
@@ -180,8 +207,12 @@ describe('POST /offers — seller email', () => {
     expect(res.body.emailed).toBe(false);
   });
 
-  it('still succeeds when the listing lookup fails', async () => {
-    mockListing.mockRejectedValue(new Error('timeout'));
+  it('still succeeds when the post-commit listing lookup (for the email) fails', async () => {
+    // First call resolves the seller (must succeed); the second, inside
+    // loadOfferContext, is best-effort.
+    mockListing
+      .mockResolvedValueOnce({ data: { id: LISTING, seller_id: SELLER, status: 'active' } })
+      .mockRejectedValueOnce(new Error('timeout'));
     const res = await post(VALID);
     expect(res.status).toBe(201);
     expect(res.body.offer.id).toBe(OFFER);

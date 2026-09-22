@@ -35,6 +35,21 @@ export async function handleDisputeCreated(stripe, dispute) {
     const piId = paymentIntentId(dispute);
     const amountAud = (dispute.amount ?? 0) / 100;
 
+    // Idempotency: the webhook's event-level dedupe is fail-open, and Stripe
+    // redelivers on any non-2xx, so the same dispute can arrive twice. Without
+    // this the second delivery reversed the seller payout again (a second
+    // wallet clawback takes money from unrelated sales). stripe_dispute_id is
+    // UNIQUE on payment_disputes, so an existing row means we already acted.
+    const { data: existing } = await supabase
+      .from('payment_disputes')
+      .select('id')
+      .eq('stripe_dispute_id', dispute.id)
+      .maybeSingle();
+    if (existing) {
+      logger.info(`[STRIPE DISPUTE] ${dispute.id} already recorded — skipping duplicate delivery`);
+      return;
+    }
+
     let order = null;
     if (piId) {
       const { data } = await supabase

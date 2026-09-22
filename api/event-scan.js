@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import { runEventScan } from '../src/utils/eventScanner.js';
 import supabase from '../src/utils/supabaseClient.js';
 import logger from '../src/utils/logger.js';
+import { decodeAal } from '../src/middleware/requireAal2.js';
 
 // Dedicated serverless function for the nightly event scan.
 //
@@ -39,13 +40,25 @@ async function resolveAdmin(token) {
   try {
     const { data: { user }, error } = await supabase.auth.getUser(token);
     if (error || !user) return null;
-    if (user.app_metadata?.is_admin === true) return user.id;
-    const { data } = await supabase
-      .from('profiles')
-      .select('is_admin')
-      .eq('id', user.id)
-      .maybeSingle();
-    return data?.is_admin === true ? user.id : null;
+    let isAdmin = user.app_metadata?.is_admin === true;
+    if (!isAdmin) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('is_admin')
+        .eq('id', user.id)
+        .maybeSingle();
+      isAdmin = data?.is_admin === true;
+    }
+    if (!isAdmin) return null;
+    // Same MFA step-up as requireAal2 in the Express app: an admin who enrolled
+    // MFA must present an AAL2 token, otherwise a password alone could start a
+    // paid model run. Fails closed if factor status can't be read.
+    if (decodeAal(token) !== 'aal2') {
+      const { data: mfa, error: mfaError } = await supabase.auth.admin.mfa.listFactors({ userId: user.id });
+      if (mfaError) return null;
+      if ((mfa?.factors ?? []).some((f) => f.status === 'verified')) return null;
+    }
+    return user.id;
   } catch {
     return null;
   }

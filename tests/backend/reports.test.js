@@ -11,7 +11,9 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 vi.mock('../../src/middleware/requireAal2.js', () => ({
   requireAal2: (_req, _res, next) => next(),
-  requireAdmin: (_req, _res, next) => next(),
+  // The real requireAdmin = isAdminUser + AAL2; mirror the admin half so the
+  // non-admin 403 cases still exercise the gate.
+  requireAdmin: async (req, res, next) => ((await mockIsAdminUser(req)) ? next() : res.status(403).json({ error: 'Admin access required' })),
   decodeAal: () => 'aal2',
   default: (_req, _res, next) => next(),
 }));

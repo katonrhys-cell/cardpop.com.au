@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node';
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { invalidReturnUrl } from '../utils/returnUrl.js';
 import { namesMatch } from './identityService.js';
 import { createSellerConnectAccount, isPayoutReady, payoutAccountName, sellerLossLiability } from '../utils/sellerAccountShape.js';
 
@@ -78,6 +79,8 @@ export async function connectOnboard(req, res) {
     if (!returnUrl || !refreshUrl) {
       return res.status(400).json({ error: 'returnUrl and refreshUrl are required' });
     }
+    const badReturnUrl = invalidReturnUrl({ returnUrl, refreshUrl });
+    if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
     const { data: profile } = await supabase
       .from('profiles')

@@ -19,6 +19,9 @@ concurrency:
   group: cron-event-scan
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
   run:
     uses: ./.github/workflows/cron-job.yml

@@ -21,6 +21,12 @@ describe('escapeLike', () => {
     expect(escapeLike('\\%')).toBe('\\\\\\%');
   });
 
+  it('strips PostgREST’s `*` wildcard alias (it cannot be backslash-escaped)', () => {
+    expect(escapeLike('*')).toBe('');
+    expect(escapeLike('Chari*')).toBe('Chari');
+    expect(escapeLike('*%*')).toBe('\\%');
+  });
+
   it('leaves ordinary text untouched', () => {
     expect(escapeLike('Charizard')).toBe('Charizard');
     expect(escapeLike('Pikachu VMAX 2021')).toBe('Pikachu VMAX 2021');

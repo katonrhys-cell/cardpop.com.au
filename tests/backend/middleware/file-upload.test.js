@@ -122,7 +122,7 @@ describe('uploadFiles middleware (real multer + magic-byte validation)', () => {
     const res = await req;
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/unexpected field/i);
+    expect(res.body.error).toMatch(/unexpected (file )?field/i);
   });
 
   it('passes through when no files are attached', async () => {

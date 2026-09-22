@@ -26,6 +26,9 @@ concurrency:
   group: main-ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   # Single quality gate: one checkout + one `npm ci`, then lint, the full test
   # suite, build and the bundle budget run sequentially. Previously these were

@@ -13,6 +13,10 @@ vi.mock('../../../src/utils/logger.js', () => ({
 vi.mock('../../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'user-1' }; next(); },
 }));
+vi.mock('../../../src/middleware/requireAal2.js', () => ({
+  requireAal2: (_req, _res, next) => next(),
+  requireAdmin: (_req, _res, next) => next(),
+}));
 vi.mock('../../../src/utils/otpGenerator.js', () => ({
   generateOTP: vi.fn().mockReturnValue('12345678'),
   generateBackupCodes: vi.fn().mockReturnValue(['CODE1', 'CODE2', 'CODE3', 'CODE4', 'CODE5', 'CODE6']),

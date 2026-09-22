@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
-import { authMiddleware, isAdminUser } from '../middleware/auth.js';
+import { authMiddleware } from '../middleware/auth.js';
+import { requireAdmin } from '../middleware/requireAal2.js';
 import { generateDraft } from '../utils/blogArticleGenerator.js';
 import logger from '../utils/logger.js';
 
@@ -13,12 +14,9 @@ const router = Router();
 //
 // Everything below is admin-only.
 router.use(authMiddleware);
-router.use(async (req, res, next) => {
-  if (!(await isAdminUser(req))) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-  next();
-});
+// requireAdmin = admin check + MFA step-up (requireAal2), the same gate as
+// the /admin router — a bare isAdminUser() check let an AAL1 admin token in.
+router.use(requireAdmin);
 
 /**
  * GET /blog/topics
