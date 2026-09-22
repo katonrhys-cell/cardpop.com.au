@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
+import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { toast } from 'sonner';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -63,7 +64,7 @@ const ShopCategoryPage = () => {
         let query = supabase
           .from('shop_products')
           .select('*', { count: 'exact' })
-          .eq('status', 'active');
+          .in('status', PUBLIC_SHOP_STATUSES);
 
         // shop_products stores a free-text category; match the resolved
         // subcategory/category name against it.

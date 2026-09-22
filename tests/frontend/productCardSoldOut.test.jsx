@@ -63,6 +63,22 @@ describe('ProductCard sold-out state', () => {
     expect(onAddToCart).not.toHaveBeenCalled();
   });
 
+  it('shows a Coming soon button (not Add to Cart) for a coming_soon product and posts reason=coming_soon', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    renderCard({ ...base, status: 'coming_soon', stock_quantity: 0 });
+    expect(screen.queryByRole('button', { name: /add to cart/i })).not.toBeInTheDocument();
+    // Coming soon wins over sold out even with 0 stock.
+    expect(screen.queryByText(/sold out/i)).not.toBeInTheDocument();
+    expect(screen.getAllByText(/coming soon/i).length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole('button', { name: /coming soon/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent(/register your interest/i);
+    fireEvent.click(screen.getByRole('button', { name: /send enquiry/i }));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toMatchObject({ productId: base.id, reason: 'coming_soon' });
+  });
+
   it('does not flag marketplace/vault items that have no stock column', () => {
     renderCard({ ...base, source: 'marketplace', stock_quantity: undefined });
     expect(screen.queryByText(/sold out/i)).not.toBeInTheDocument();

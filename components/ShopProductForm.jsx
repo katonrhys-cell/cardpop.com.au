@@ -367,6 +367,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">Active (visible in shop)</SelectItem>
+                <SelectItem value="coming_soon">Coming soon (visible, not for sale — enquiry button)</SelectItem>
                 <SelectItem value="draft">Draft (hidden)</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>

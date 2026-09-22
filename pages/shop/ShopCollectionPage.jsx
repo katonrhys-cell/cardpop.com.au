@@ -15,7 +15,7 @@ import ProductGrid from '@/components/ProductGrid.jsx';
 import { resolveShopCollection } from '@/data/shopCollectionConfigs.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { slugify } from '@/lib/slugify.js';
-import { isSoldOut } from '@/utils/shopStock.js';
+import { isSoldOut, isComingSoon, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
@@ -48,7 +48,8 @@ const MiniProductCard = ({ product, accentHex }) => {
   const price = Number(product.price_aud ?? product.price ?? 0);
   const title = product.title || 'Product';
   const detailPath = `/product/shop/${product.id}/${slugify(title)}`;
-  const soldOut = isSoldOut(product);
+  const comingSoon = isComingSoon(product);
+  const soldOut = !comingSoon && isSoldOut(product);
 
   return (
     <Link
@@ -56,6 +57,11 @@ const MiniProductCard = ({ product, accentHex }) => {
       className="group flex-shrink-0 w-44 sm:w-48 flex flex-col rounded-2xl overflow-hidden border border-border bg-card hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
     >
       <div className="relative aspect-[4/5] bg-muted/30 overflow-hidden">
+        {comingSoon && (
+          <span className="absolute top-2 right-2 z-10 rounded-md bg-brand-charcoal px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md">
+            Coming soon
+          </span>
+        )}
         {soldOut && (
           <span className="absolute top-2 right-2 z-10 rounded-md bg-brand-red px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md">
             Sold out
@@ -162,7 +168,7 @@ const ShopCollectionPage = () => {
         const { data, error } = await supabase
           .from('shop_products')
           .select('*')
-          .eq('status', 'active')
+          .in('status', PUBLIC_SHOP_STATUSES)
           .or(buildGroupOr())
           .order('created_at', { ascending: false })
           .limit(10);
@@ -192,7 +198,7 @@ const ShopCollectionPage = () => {
       let q = supabase
         .from('shop_products')
         .select('*', { count: 'estimated' })
-        .eq('status', 'active');
+        .in('status', PUBLIC_SHOP_STATUSES);
 
       // A selected pill narrows to one leaf category; otherwise match the group.
       if (activeSub) q = q.ilike('category', `%${activeSub}%`);

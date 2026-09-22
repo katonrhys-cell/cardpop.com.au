@@ -182,11 +182,11 @@ export async function sendContactMessage({ to, name, email, subject, message }) 
 
 // Shopper enquiry about a sold-out shop product, delivered to the admin inbox.
 // reply_to is the shopper so admin can answer (restock date etc.) in one click.
-export async function sendShopEnquiry({ to, productTitle, productSku, productId, productUrl, name, email, message }) {
+export async function sendShopEnquiry({ to, productTitle, productSku, productId, productUrl, reason = 'sold_out', name, email, message }) {
   return send({
     to,
-    subject: `Stock enquiry: ${productTitle}`,
-    html: shopEnquiryEmail({ productTitle, productSku, productId, productUrl, name, email, message }),
+    subject: `${reason === 'coming_soon' ? 'Coming-soon' : 'Stock'} enquiry: ${productTitle}`,
+    html: shopEnquiryEmail({ productTitle, productSku, productId, productUrl, reason, name, email, message }),
     replyTo: email,
   });
 }

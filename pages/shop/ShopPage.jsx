@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
+import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER } from '@/utils/shopStock.js';
 import { toast } from 'sonner';
 
 const ShopPage = () => {
@@ -37,7 +38,7 @@ const ShopPage = () => {
         let query = supabase
           .from('shop_products')
           .select('*')
-          .eq('status', 'active')
+          .in('status', PUBLIC_SHOP_STATUSES)
           .limit(50);
 
         if (searchTerm) {
@@ -69,12 +70,12 @@ const ShopPage = () => {
   }, [sort, searchTerm]);
 
   useEffect(() => {
-    // Scoped to active products — this page already only ever queries
-    // status='active', so a change to a draft/archived product shouldn't
-    // trigger every open shop page to refetch.
+    // Scoped to publicly visible products (active + coming soon) — this page
+    // only ever queries those, so a change to a draft/archived product
+    // shouldn't trigger every open shop page to refetch.
     const channel = supabase
       .channel('shop-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: 'status=eq.active' },
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: PUBLIC_SHOP_STATUS_FILTER },
         () => { if (fetchRef.current) fetchRef.current(); }
       )
       .subscribe();

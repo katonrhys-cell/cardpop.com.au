@@ -30,9 +30,27 @@ const MAX_MESSAGE = 2000;
  *
  * Props:
  *   open, onOpenChange — controlled Dialog state.
- *   product            — { id, title } of the sold-out shop_products row.
+ *   product            — { id, title } of the shop_products row.
+ *   reason             — 'sold_out' (default) | 'coming_soon'; picks the copy
+ *                        and is sent to the server so the email says which.
  */
-const ShopEnquiryDialog = ({ open, onOpenChange, product }) => {
+const COPY = {
+  sold_out: {
+    title: 'Enquire about this item',
+    intro: (title) => <><strong>{title}</strong> is currently sold out. Leave your details and we&apos;ll let you know about restocks or alternatives.</>,
+    placeholder: 'e.g. How many are you expecting, and when?',
+    done: 'and will reply to',
+  },
+  coming_soon: {
+    title: 'Register your interest',
+    intro: (title) => <><strong>{title}</strong> is coming soon. Leave your details and we&apos;ll let you know as soon as it&apos;s available to order.</>,
+    placeholder: 'e.g. Which colour or size are you after?',
+    done: 'and will reply to',
+  },
+};
+
+const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' }) => {
+  const copy = COPY[reason] || COPY.sold_out;
   const auth = useAuth() || {};
   const { currentUser, profile } = auth;
 
@@ -82,7 +100,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product }) => {
     return errs;
   };
 
-  const mailtoUrl = `mailto:${SHOP_ENQUIRY_EMAIL}?subject=${encodeURIComponent(`[CardPop] Stock enquiry: ${title}`)}` +
+  const mailtoUrl = `mailto:${SHOP_ENQUIRY_EMAIL}?subject=${encodeURIComponent(`[CardPop] ${reason === 'coming_soon' ? 'Coming soon' : 'Stock'} enquiry: ${title}`)}` +
     `&body=${encodeURIComponent(`Name: ${name}\nEmail: ${email}\nProduct: ${title}${product?.id ? ` (${product.id})` : ''}\n\n${message}`)}`;
 
   const handleSubmit = async (e) => {
@@ -99,6 +117,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: product.id,
+          reason,
           name: name.trim(),
           email: email.trim(),
           message: message.trim(),
@@ -145,11 +164,8 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product }) => {
         ) : (
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <DialogHeader>
-              <DialogTitle>Enquire about this item</DialogTitle>
-              <DialogDescription>
-                <strong>{title}</strong> is currently sold out. Leave your details and we&apos;ll let you
-                know about restocks or alternatives.
-              </DialogDescription>
+              <DialogTitle>{copy.title}</DialogTitle>
+              <DialogDescription>{copy.intro(title)}</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-1.5">
@@ -188,7 +204,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product }) => {
                 name="message"
                 rows={4}
                 maxLength={MAX_MESSAGE}
-                placeholder="e.g. How many are you expecting, and when?"
+                placeholder={copy.placeholder}
                 value={message}
                 onChange={(e) => { setMessage(e.target.value); if (errors.message) setErrors((p) => ({ ...p, message: undefined })); }}
                 disabled={sending}

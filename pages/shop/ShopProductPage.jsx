@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight } from 'lucide-react';
+import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -73,6 +73,8 @@ const ShopProductPage = () => {
   // Same self-flipping CTA as the binder pages: enquiry-only until priced and
   // active, then Add to cart with an Offer. Stock arriving is an admin edit.
   const isPurchasable = row?.status === 'active' && price != null;
+  // Admin-flagged pre-launch: shown, not buyable; the CTA opens the enquiry form.
+  const isComingSoon = row?.status === 'coming_soon';
 
   const siblings = palmsOffProductsInCategory(category.slug)
     .filter((p) => p.slug !== product.slug)
@@ -199,6 +201,15 @@ const ShopProductPage = () => {
                     {inStock ? 'In stock' : 'Sold out'}
                   </Badge>
                 </>
+              ) : isComingSoon ? (
+                <>
+                  {rrp != null && (
+                    <span className="text-lg font-semibold tabular-nums text-muted-foreground">
+                      RRP ${rrp.toFixed(2)}
+                    </span>
+                  )}
+                  <Badge className="bg-brand-charcoal text-white hover:bg-brand-charcoal">Coming soon</Badge>
+                </>
               ) : rrp != null ? (
                 <span className="text-lg font-semibold tabular-nums text-muted-foreground">
                   RRP ${rrp.toFixed(2)}
@@ -211,7 +222,22 @@ const ShopProductPage = () => {
             </p>
 
             <div className="mt-6">
-              {isPurchasable && inStock ? (
+              {isComingSoon ? (
+                <>
+                  <Button size="lg" className="w-full sm:w-auto" onClick={() => setEnquiryOpen(true)}>
+                    <Clock className="w-5 h-5 mr-2" />Coming soon — register interest
+                  </Button>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Not available to order yet. Enquire and we&apos;ll let you know the moment it is.
+                  </p>
+                  <ShopEnquiryDialog
+                    open={enquiryOpen}
+                    onOpenChange={setEnquiryOpen}
+                    reason="coming_soon"
+                    product={{ id: row.id, title: product.title }}
+                  />
+                </>
+              ) : isPurchasable && inStock ? (
                 <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart}>
                   <ShoppingCart className="w-5 h-5 mr-2" />Add to cart
                 </Button>

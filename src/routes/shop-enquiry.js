@@ -28,6 +28,8 @@ router.post('/', async (req, res) => {
   const name = String(req.body?.name || '').trim();
   const email = String(req.body?.email || '').trim();
   const message = String(req.body?.message || '').trim();
+  // Why they're enquiring: sold out (default) or a coming-soon product.
+  const reason = req.body?.reason === 'coming_soon' ? 'coming_soon' : 'sold_out';
   // Hidden field real users never see; a filled value means a bot. Accept
   // silently so the bot doesn't learn it was caught.
   const honeypot = String(req.body?.company || '').trim();
@@ -55,7 +57,7 @@ router.post('/', async (req, res) => {
       .eq('id', productId)
       .maybeSingle();
     if (lookupError) throw lookupError;
-    if (!product || product.status !== 'active') {
+    if (!product || !['active', 'coming_soon'].includes(product.status)) {
       return res.status(404).json({ error: 'Unknown product.' });
     }
 
@@ -68,6 +70,7 @@ router.post('/', async (req, res) => {
       productSku: product.sku || null,
       productId: product.id,
       productUrl,
+      reason,
       name,
       email,
       message,
@@ -78,7 +81,7 @@ router.post('/', async (req, res) => {
         error: `We could not send your enquiry right now. Please email ${SHOP_ENQUIRY_EMAIL} directly.`,
       });
     }
-    logger.info(`[SHOP-ENQUIRY] ${email} asked about ${product.id} (stock ${product.stock_quantity}) → ${SHOP_ENQUIRY_EMAIL}`);
+    logger.info(`[SHOP-ENQUIRY] ${email} asked about ${product.id} (${reason}, stock ${product.stock_quantity}) → ${SHOP_ENQUIRY_EMAIL}`);
     return res.status(200).json({ ok: true });
   } catch (err) {
     logger.error(`[SHOP-ENQUIRY] send failed: ${err.message}`);

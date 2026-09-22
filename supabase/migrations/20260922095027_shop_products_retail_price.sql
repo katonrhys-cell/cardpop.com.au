@@ -17,9 +17,12 @@ alter table public.shop_products
 
 do $$
 begin
+  -- Production already has this check as `retail_price_aud_check` (added
+  -- with the column, outside the repo); only add ours where no check on the
+  -- column exists yet.
   if not exists (
     select 1 from pg_constraint
-    where conname = 'shop_products_retail_price_aud_check'
+    where conname in ('shop_products_retail_price_aud_check', 'retail_price_aud_check')
       and conrelid = 'public.shop_products'::regclass
   ) then
     alter table public.shop_products

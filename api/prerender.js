@@ -629,7 +629,7 @@ async function renderShopProduct(supabase, id, slugParam) {
   const slug = product?.title ? slugify(product.title) : (slugParam || 'product');
   const canonical = `${BASE_URL}/product/shop/${id}/${slug}`;
 
-  if (!product || product.status !== 'active') {
+  if (!product || !['active', 'coming_soon'].includes(product.status)) {
     return notFound({
       title: 'Product Unavailable | CardPop',
       description: 'This product is no longer available in the CardPop shop.',
@@ -1009,7 +1009,7 @@ async function renderLanding(supabase, path) {
 
   let items = [];
   if (cfg.source === 'shop') {
-    let q = supabase.from('shop_products').select('id, title, price_aud, images, image_url').eq('status', 'active');
+    let q = supabase.from('shop_products').select('id, title, price_aud, images, image_url').in('status', ['active', 'coming_soon']);
     if (cfg.productType) q = q.eq('product_type', cfg.productType);
     const { data } = await q.order('created_at', { ascending: false }).limit(50);
     items = (data || []).map(p => ({

@@ -80,6 +80,7 @@ const ProductManagementPage = () => {
     total: products.length,
     active: products.filter(p => p.status === 'active').length,
     draft: products.filter(p => p.status === 'draft').length,
+    comingSoon: products.filter(p => p.status === 'coming_soon').length,
     archived: products.filter(p => p.status === 'archived').length
   };
 
@@ -97,7 +98,7 @@ const ProductManagementPage = () => {
         </Button>
       </AdminPageHeader>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="p-3 bg-primary/10 text-primary rounded-xl"><Package className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Total Products</p><p className="text-2xl font-bold">{stats.total}</p></div>
@@ -109,6 +110,10 @@ const ProductManagementPage = () => {
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Draft</p><p className="text-2xl font-bold">{stats.draft}</p></div>
+        </Card>
+        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-brand-charcoal/10 text-brand-charcoal dark:text-foreground rounded-xl"><BarChart3 className="w-6 h-6" /></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Coming Soon</p><p className="text-2xl font-bold">{stats.comingSoon}</p></div>
         </Card>
         <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
           <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
@@ -184,8 +189,8 @@ const ProductManagementPage = () => {
                       {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : 'text-muted-foreground'}`}>
-                        {product.status}
+                      <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
+                        {product.status === 'coming_soon' ? 'coming soon' : product.status}
                       </Badge>
                     </TableCell>
                     <TableCell className="tabular-nums">{product.stock_quantity ?? '-'}</TableCell>

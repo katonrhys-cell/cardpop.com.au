@@ -92,6 +92,13 @@ describe('shopEnquiryEmail', () => {
     expect(html).toContain('View Product');
   });
 
+  it('switches copy for a coming-soon enquiry', () => {
+    const html = shopEnquiryEmail({ productTitle: 'Binder', productId: 'x', reason: 'coming_soon', name: 'Ash', email: 'a@b.co', message: '' });
+    expect(html).toContain('Coming-Soon Product Enquiry');
+    expect(html).toContain('coming-soon');
+    expect(html).not.toContain('sold-out');
+  });
+
   it('notes when no message was included', () => {
     const html = shopEnquiryEmail({ productTitle: 'Binder', productId: 'x', name: 'Ash', email: 'a@b.co', message: '' });
     expect(html).toContain('No message was included');

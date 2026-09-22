@@ -77,7 +77,7 @@ async function searchListings(tokens) {
 
 async function searchShop(tokens) {
   const { data, error } = await applyTokens(
-    supabase.from('shop_products').select('*').eq('status', 'active'),
+    supabase.from('shop_products').select('*').in('status', ['active', 'coming_soon']),
     tokens, ['title'],
   ).limit(OVER_FETCH);
   if (error) throw error;

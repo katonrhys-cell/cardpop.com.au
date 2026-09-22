@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare } from 'lucide-react';
+import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare, Clock } from 'lucide-react';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -32,6 +32,7 @@ import { sellerFromProfile, OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js'
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
+import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -151,7 +152,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             .from('shop_products')
             .select('*')
             .eq('id', id)
-            .eq('status', 'active')
+            .in('status', PUBLIC_SHOP_STATUSES)
             .maybeSingle();
 
           if (fetchError) throw fetchError;
@@ -410,14 +411,17 @@ const ProductDetailPage = ({ source: sourceProp }) => {
 
   const isShop = source === 'shop';
   const isSold = !isShop && product.status === 'sold';
-  const outOfStock = isShop && product.stockQuantity !== null && product.stockQuantity <= 0;
+  const comingSoon = isShop && product.status === 'coming_soon';
+  const outOfStock = isShop && !comingSoon && product.stockQuantity !== null && product.stockQuantity <= 0;
   // Expression of Interest: no fixed price — the seller published a target
   // range and buyers negotiate through offers.
   const isEOI = !isShop && product.listing_type === 'Expression of Interest';
   const canOffer = !isShop && !isSold && source === 'marketplace' && (isEOI || product.accepts_offers);
   
   const statusBadge = isShop 
-    ? { label: product.visibility === 'public' ? 'Shop + Marketplace' : 'Shop Only', config: { className: 'bg-primary text-primary-foreground', icon: Store } }
+    ? (comingSoon
+        ? { label: 'Coming Soon', config: { className: 'bg-brand-charcoal text-white', icon: Clock } }
+        : { label: product.visibility === 'public' ? 'Shop + Marketplace' : 'Shop Only', config: { className: 'bg-primary text-primary-foreground', icon: Store } })
     : (() => {
         const config = getVaultListingBadge(product.listing_type);
         return { label: config.label, config };
@@ -661,7 +665,28 @@ const ProductDetailPage = ({ source: sourceProp }) => {
               </div>
             )}
 
-            {isShop && outOfStock ? (
+            {isShop && comingSoon ? (
+              // Coming soon: visible but not for sale yet — the button opens
+              // the enquiry form so shoppers can register interest.
+              <div className="flex flex-col gap-3 mb-8">
+                <Button
+                  size="lg"
+                  className="w-full h-14 rounded-xl font-bold text-lg shadow-md"
+                  onClick={() => setEnquiryOpen(true)}
+                >
+                  <Clock className="w-5 h-5 mr-2" /> Coming Soon — Register Interest
+                </Button>
+                <p className="text-sm text-center font-medium text-muted-foreground">
+                  This item isn&apos;t available to order yet. Enquire and we&apos;ll let you know the moment it is.
+                </p>
+                <ShopEnquiryDialog
+                  open={enquiryOpen}
+                  onOpenChange={setEnquiryOpen}
+                  reason="coming_soon"
+                  product={{ id: product.id, title: product.title || product.name }}
+                />
+              </div>
+            ) : isShop && outOfStock ? (
               // Sold out (0 stock): swap the dead Add to Cart for an enquiry
               // that emails admin — see ShopEnquiryDialog.
               <div className="flex flex-col gap-3 mb-8">

@@ -104,6 +104,19 @@ describe('POST /shop-enquiry — product lookup', () => {
     expect(mockSendShopEnquiry).not.toHaveBeenCalled();
   });
 
+  it('accepts a coming_soon product and passes reason through to the email', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { ...PRODUCT, status: 'coming_soon' }, error: null });
+    const res = await request(app).post('/').send({ ...VALID, reason: 'coming_soon' });
+    expect(res.status).toBe(200);
+    expect(mockSendShopEnquiry).toHaveBeenCalledWith(expect.objectContaining({ reason: 'coming_soon' }));
+  });
+
+  it('defaults an unknown reason to sold_out', async () => {
+    const res = await request(app).post('/').send({ ...VALID, reason: 'nonsense' });
+    expect(res.status).toBe(200);
+    expect(mockSendShopEnquiry).toHaveBeenCalledWith(expect.objectContaining({ reason: 'sold_out' }));
+  });
+
   it('404s for a non-active (draft/archived) product', async () => {
     mockMaybeSingle.mockResolvedValue({ data: { ...PRODUCT, status: 'archived' }, error: null });
     const res = await request(app).post('/').send(VALID);

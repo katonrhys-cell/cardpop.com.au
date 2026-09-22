@@ -16,3 +16,14 @@ export function isSoldOut(product) {
 }
 
 export default isSoldOut;
+
+/** Statuses the public storefront shows. Only `active` can be bought. */
+export const PUBLIC_SHOP_STATUSES = ['active', 'coming_soon'];
+
+/** Realtime filter matching PUBLIC_SHOP_STATUSES (Supabase `in` syntax). */
+export const PUBLIC_SHOP_STATUS_FILTER = `status=in.(${PUBLIC_SHOP_STATUSES.join(',')})`;
+
+/** Marked "coming soon" by admin: visible, not purchasable, enquiry button. */
+export function isComingSoon(product) {
+  return product?.status === 'coming_soon';
+}

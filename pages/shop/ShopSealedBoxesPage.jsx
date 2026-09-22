@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
+import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { toast } from 'sonner';
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
@@ -35,7 +36,7 @@ const ShopSealedBoxesPage = () => {
         let query = supabase
           .from('shop_products')
           .select('*', { count: 'estimated' })
-          .eq('status', 'active')
+          .in('status', PUBLIC_SHOP_STATUSES)
           .eq('product_type', 'sealed')
           .limit(48);
 

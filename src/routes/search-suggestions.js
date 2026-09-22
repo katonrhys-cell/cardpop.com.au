@@ -49,7 +49,7 @@ router.get('/', async (req, res) => {
     const { data: shopProducts, error: productsError } = await supabase
       .from('shop_products')
       .select('title')
-      .eq('status', 'active')
+      .in('status', ['active', 'coming_soon'])
       .ilike('title', `%${safeQ}%`)
       .limit(limit)
       .order('title');
