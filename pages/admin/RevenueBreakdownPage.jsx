@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import {
   DollarSign, Download, RefreshCw, Search, AlertCircle, ShoppingCart,
   TrendingUp, Receipt, RotateCcw, Landmark, ArrowUpDown, Calendar as CalendarIcon,
@@ -223,6 +224,9 @@ const RevenueBreakdownPage = () => {
         title="Revenue Breakdown"
         subtitle="Every sale that makes up total revenue — date, amount, fees and GST."
       >
+        <Button asChild variant="outline" className="h-10 rounded-xl border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+          <Link to="/admin/finance">Finance &amp; Tax</Link>
+        </Button>
         <Select value={range} onValueChange={setRange}>
           <SelectTrigger className="w-[190px] h-10 rounded-xl border-white/20 bg-white/10 text-white">
             <CalendarIcon className="w-4 h-4 mr-2 text-white/60" />

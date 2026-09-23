@@ -274,6 +274,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Chat Moderation" description="Search and review member conversations." icon={MessagesSquare} link="/admin/messages" />
           <ManagementBox title="Chargebacks" description="Review payment disputes and frozen payouts." icon={CreditCard} link="/admin/disputes" />
           <ManagementBox title="Revenue Breakdown" description="Every sale behind total revenue — dates, amounts, fees and GST." icon={DollarSign} link="/admin/revenue" />
+          <ManagementBox title="Finance & Tax" description="Profit on shop sales, GST by BAS quarter, stock valuation and accountant exports." icon={DollarSign} link="/admin/finance" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
         </div>

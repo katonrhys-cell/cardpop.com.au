@@ -242,6 +242,30 @@ export async function priceCart(items, userId, options = {}) {
     (sum, l) => sum + Math.round((Number(l.seller_gst_aud) || 0) * 100), 0,
   );
 
+  // Snapshot the wholesale cost onto each shop line so the Finance & Tax
+  // report can compute cost of goods sold as it stood at the time of sale,
+  // even if the supplier price changes later. Fail-safe: any problem here
+  // (table missing, RLS, network) leaves the lines without a cost and the
+  // report falls back to the current shop_product_costs row.
+  const shopIds = [...new Set(orderLines.filter((l) => l.type === 'shop').map((l) => l.id))];
+  if (shopIds.length) {
+    try {
+      const { data: costs } = await supabase
+        .from('shop_product_costs')
+        .select('product_id, wholesale_ex_gst_aud, wholesale_inc_gst_aud')
+        .in('product_id', shopIds);
+      const byId = new Map((costs || []).map((c) => [c.product_id, c]));
+      for (const line of orderLines) {
+        const c = line.type === 'shop' ? byId.get(line.id) : null;
+        if (!c) continue;
+        if (c.wholesale_ex_gst_aud != null) line.unit_cost_ex_gst_aud = Number(c.wholesale_ex_gst_aud);
+        if (c.wholesale_inc_gst_aud != null) line.unit_cost_inc_gst_aud = Number(c.wholesale_inc_gst_aud);
+      }
+    } catch (_) {
+      // cost snapshot is best-effort
+    }
+  }
+
   return {
     lineItems, orderLines, itemsCents, commissionCents,
     // Nothing is added on top of the buyer's bill any more: gstCents stays 0 so

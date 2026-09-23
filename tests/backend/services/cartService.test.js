@@ -55,6 +55,31 @@ beforeEach(() => {
 });
 
 describe('priceCart — shop items', () => {
+  it('snapshots the wholesale cost onto each shop line when a cost row exists', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    }));
+    // Second lookup: shop_product_costs for the shop ids in the cart.
+    const costBuilder = { select: vi.fn(() => costBuilder), in: vi.fn(() => Promise.resolve({ data: [{ product_id: 'p1', wholesale_ex_gst_aud: '60.00', wholesale_inc_gst_aud: '66.00' }], error: null })) };
+    mockSupabase.from.mockReturnValueOnce(costBuilder);
+
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 2 }], 'buyer-1');
+    expect(costBuilder.in).toHaveBeenCalledWith('product_id', ['p1']);
+    expect(result.orderLines[0]).toMatchObject({ type: 'shop', id: 'p1', quantity: 2, unit_cost_ex_gst_aud: 60, unit_cost_inc_gst_aud: 66 });
+  });
+
+  it('still prices the cart when the cost lookup is unavailable', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
+      error: null,
+    }));
+    // No builder queued for shop_product_costs → from() returns undefined → caught.
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
+    expect(result.orderLines[0]).not.toHaveProperty('unit_cost_ex_gst_aud');
+    expect(result.itemsCents).toBe(10000);
+  });
+
   it('prices a single active shop product with GST included in the price', async () => {
     mockSupabase.from.mockReturnValueOnce(rowBuilder({
       data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active' },
@@ -84,7 +109,7 @@ describe('priceCart — shop items', () => {
     );
 
     // Only one shop_products lookup happens because the lines merged first.
-    expect(mockSupabase.from).toHaveBeenCalledTimes(1);
+    expect(mockSupabase.from.mock.calls.filter(([table]) => table === 'shop_products')).toHaveLength(1);
     expect(result.itemsCents).toBe(5000); // 5 x $10
     const shopLine = result.orderLines.find((l) => l.type === 'shop');
     expect(shopLine.quantity).toBe(5);
