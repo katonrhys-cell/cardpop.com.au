@@ -102,21 +102,6 @@ export const PALMS_OFF_PRODUCT_COPY = {
     intro: 'Sized for a sealed booster pack, not a card. Loose packs are awkward to keep in good condition — they crease at the corners, the foil scuffs, and a bent pack is worth noticeably less than a flat one. A rigid loader keeps a pack flat and posts safely, which is the difference between selling a pack and selling a damaged one.',
     highlights: ['Sized for a sealed booster pack, not a single card', 'Keeps packs flat and stops corner creasing', 'Rigid enough to post without a bend', 'For anyone holding or reselling sealed packs'],
   },
-  'CL-35PT': {
-    metaDescription: '35pt card loaders from Palms Off Gaming — rigid protection for standard modern trading cards.',
-    intro: 'The card loader is Palms Off Gaming\'s alternative rigid protector in the same 35pt standard size — see the product photos for the loading edge and profile, which is where it differs from a top loader. Same job: rigid protection for a standard modern card.',
-    highlights: ['35pt — fits standard modern trading cards', 'Rigid protection for posting, trading and storage', 'Use with a penny sleeve so the card never touches the PVC'],
-  },
-  'CL-100PT': {
-    metaDescription: '100pt card loaders from Palms Off Gaming — rigid protection for heavy patch and relic cards.',
-    intro: 'The 100pt card loader, for heavy patch and multi-piece relic cards. Same point rating as the equivalent top loader — check the photos for the loading edge and profile, which is the difference between the two.',
-    highlights: ['100pt — for heavy patch and multi-piece relic cards', 'Rigid protection for posting, trading and storage', 'Use with a penny sleeve so the card never touches the PVC'],
-  },
-  'CL-180PT': {
-    metaDescription: '180pt card loaders from Palms Off Gaming — the largest point size, for the thickest booklet and memorabilia cards.',
-    intro: 'The 180pt card loader — the largest point size in the range, for booklets and heavily layered memorabilia. Check the photos for the loading edge and profile against the equivalent top loader.',
-    highlights: ['180pt — the largest size in the range', 'For the thickest booklet and memorabilia cards', 'Rigid protection for posting, trading and storage', 'Use with a penny sleeve so the card never touches the PVC'],
-  },
 
   // ── Magnetic Holders ──────────────────────────────────────────────────────
   'MAG-35PT': {
@@ -168,11 +153,6 @@ export const PALMS_OFF_PRODUCT_COPY = {
   },
 
   // ── Card Savers (semi-rigid grading holders) ──────────────────────────────
-  'SRGH-50': {
-    metaDescription: 'Semi-rigid grading holders from Palms Off Gaming, 50 pack — the holder PSA, BGS, CGC and ACE ask for on submission.',
-    intro: 'Fifty semi-rigid holders — the submission pack size, for a handful of cards going off to be graded rather than a standing supply. This is the format grading companies specifically ask for: firm enough to protect in transit, flexible enough that a grader can slide the card out without cutting anything.',
-    highlights: ['50 pack — sized for an occasional submission', 'The holder format PSA, BGS, CGC and ACE ask for', 'Firm in transit, but a grader can remove the card without tools', 'Check the grading company\'s current guidelines before sending'],
-  },
   'SRGH-200': {
     metaDescription: 'Semi-rigid grading holders from Palms Off Gaming, 200 pack — bulk submission supply for PSA, BGS, CGC and ACE.',
     intro: 'Two hundred semi-rigid holders — the bulk pack, for anyone submitting regularly or running a store that handles other people\'s submissions. Same holder as the 50 pack, bought at the quantity that stops you running out mid-submission.',
@@ -256,11 +236,6 @@ export const PALMS_OFF_PRODUCT_COPY = {
   },
 
   // ── Storage Boxes (Command Cases) ────────────────────────────────────────
-  'CMD-1': {
-    metaDescription: 'Palms Off Gaming Command Case — a hard case for transporting and storing cards. See the product photos for the interior layout.',
-    intro: 'The Command Case is Palms Off Gaming\'s hard carry case. The product photography shows it closed, open and from both interior angles — worth looking through before buying, since the interior layout is what determines whether it suits how you carry cards.',
-    highlights: ['Hard case for transport and storage', 'Photographed closed, open and from both interior angles', 'Also available as a 10 pack'],
-  },
   'CMD-10': {
     metaDescription: 'Palms Off Gaming Command Case, 10 pack — bulk quantity of the hard carry case, for stores and collectors kitting out a whole collection at once.',
     intro: 'Ten Command Cases. The bulk quantity, for a store carrying them as stock or anyone kitting out a whole collection at once rather than buying a case at a time.',

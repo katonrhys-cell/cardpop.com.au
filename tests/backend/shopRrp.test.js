@@ -43,10 +43,12 @@ describe('parseRrpCsv', () => {
     const text = readFileSync(new URL('../../data/shop-rrp.csv', import.meta.url), 'utf8');
     const { rows, skipped, errors } = parseRrpCsv(text);
     expect(errors).toEqual([]);
-    expect(rows.length + skipped.length).toBe(59);
-    // Filled from the September 2026 order form: 57 priced + costed, 2 blank.
-    expect(rows).toHaveLength(57);
-    expect(skipped.sort()).toEqual(['CMD-1', 'SRGH-50']);
+    expect(rows.length + skipped.length).toBe(54);
+    // Filled from the September 2026 order form: every remaining line is
+    // priced and costed (the three duplicate Card Loader lines and the two
+    // pack sizes the supplier doesn't sell were archived and removed).
+    expect(rows).toHaveLength(54);
+    expect(skipped).toEqual([]);
     expect(rows.every((r) => r.rrp > 0 && r.wholesaleEx > 0 && r.wholesaleInc >= r.wholesaleEx)).toBe(true);
     // Top Loader lines carry the form's Card Loader SKU.
     expect(rows.find((r) => r.sku === 'TL-35PT').supplierSku).toBe('CL-35PT');
