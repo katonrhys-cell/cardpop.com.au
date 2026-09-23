@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getCollectionImage } from '@/data/collectionImages.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 // Deterministic pseudo-random index derived from an id string, used to spread
 // items across brand/series buckets. A single charCodeAt(N) is out of bounds
@@ -49,8 +50,9 @@ const PublicCollectionsPage = () => {
     setError(null);
     try {
       const [officialRes, vaultRes] = await Promise.allSettled([
-        supabase.from('listings').select('*').eq('source', 'official'),
-        supabase.from('listings').select('*, profiles:seller_id(name)').neq('source', 'official')
+        // Sold listings stay visible, pilled "Sold" — same rule as every other grid.
+        supabase.from('listings').select('*').eq('source', 'official').in('status', ['active', 'sold']),
+        supabase.from('listings').select('*, profiles:seller_id(name)').neq('source', 'official').in('status', ['active', 'sold'])
       ]);
 
       const getImageUrl = (item) => {
@@ -80,6 +82,7 @@ const PublicCollectionsPage = () => {
           tradeValue: null,
           image: getImageUrl(item),
           source: 'Vault',
+          isSold: item.status === 'sold',
           ownerName: item.profiles?.name || 'Collector',
           isForSale: item.listingStatus === 'For Sale' || item.listingStatus === 'For Both',
           isForTrade: item.listingStatus === 'For Trade' || item.listingStatus === 'For Both',
@@ -110,6 +113,7 @@ const PublicCollectionsPage = () => {
           tradeValue: null,
           image: getImageUrl(item),
           source: 'Store',
+          isSold: item.status === 'sold',
           ownerName: 'Official Store',
           isForSale: true,
           isForTrade: false,
@@ -297,7 +301,8 @@ const PublicCollectionsPage = () => {
                           alt={item.name} 
                           className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 drop-shadow-md" 
                         />
-                        <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+                        <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
+                          {item.isSold && <SoldBadge />}
                           {item.source === 'Store' ? (
                             <Badge className="bg-primary text-primary-foreground font-bold shadow-sm">
                               <ShieldCheck className="w-3 h-3 mr-1.5" /> Store Listing
@@ -322,7 +327,7 @@ const PublicCollectionsPage = () => {
                           {item.isForSale && item.price > 0 && (
                             <div className="flex justify-between items-center">
                               <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Price</span>
-                              <span className="font-bold text-lg tabular-nums">${item.price.toFixed(2)}</span>
+                              <span className={`font-bold text-lg tabular-nums ${item.isSold ? 'text-muted-foreground line-through' : ''}`}>${item.price.toFixed(2)}</span>
                             </div>
                           )}
                           {item.isForTrade && (

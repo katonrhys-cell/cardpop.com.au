@@ -13,6 +13,7 @@ import RookiePill from '@/components/RookiePill.jsx';
 import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
 import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
 import { vaultItemListing } from '@/lib/vaultItemListing.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge, { GRADE_BADGE } from '@/components/GradeBadge.jsx';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
@@ -81,7 +82,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
         />
         <div className="absolute top-3 left-3 z-10">
           {isSold ? (
-            <Badge className="bg-brand-red text-white shadow-sm font-bold uppercase tracking-wider">Sold</Badge>
+            <SoldBadge />
           ) : (
             <Badge className={`shadow-sm font-bold ${badgeConfig.className}`}>
               <StatusIcon className="w-3 h-3 mr-1.5" /> {badgeConfig.label}

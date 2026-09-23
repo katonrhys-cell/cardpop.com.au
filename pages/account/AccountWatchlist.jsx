@@ -12,6 +12,7 @@ import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 // ── Auction countdown ─────────────────────────────────────────────────────────
 const useCountdown = (endAt) => {
@@ -103,9 +104,11 @@ const WatchlistRow = ({ entry, onRemove }) => {
               {vi?.card_name || 'Untitled Listing'}
             </h3>
           </Link>
+          {listing?.status === 'sold' ? <SoldBadge size="sm" className="shrink-0" /> : (
           <Badge variant="outline" className={`text-[10px] font-bold shrink-0 ${statusCfg.cls}`}>
             {statusCfg.label}
           </Badge>
+          )}
         </div>
 
         {vi?.set_name && (

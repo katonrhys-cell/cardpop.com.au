@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { useNavigate, Link } from 'react-router-dom';
@@ -26,6 +25,7 @@ import GradeBadge from '@/components/GradeBadge.jsx';
 import { publicImageUrl, getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const CONDITION_LABELS = {
   mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
@@ -90,8 +90,13 @@ const MyVaultPage = () => {
           .in('status', ['active', 'sold']);
 
         if (listings) {
+          // A relisted card has both a sold and an active row — the active
+          // one is the current truth, so it must win regardless of row order.
           listings.forEach(listing => {
-            listingMap[listing.vault_item_id] = listing;
+            const prev = listingMap[listing.vault_item_id];
+            if (!prev || (prev.status !== 'active' && listing.status === 'active')) {
+              listingMap[listing.vault_item_id] = listing;
+            }
           });
         }
       }
@@ -237,7 +242,7 @@ const MyVaultPage = () => {
           )}
           <div className="absolute top-3 left-3 z-10 pointer-events-none flex flex-col gap-1.5 items-start">
             {card.listing?.status === 'sold'
-              ? <Badge className="bg-brand-red text-white shadow-sm font-bold uppercase tracking-wider">Sold</Badge>
+              ? <SoldBadge />
               : getListingBadge(card)}
           </div>
 

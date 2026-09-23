@@ -12,6 +12,8 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { supabase } from '@/lib/supabaseClient.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 // Storage path or absolute URL → CDN-aware public URL.
 const resolveImg = (path) => publicImageUrl(path);
@@ -27,6 +29,25 @@ const ShoppingCart = () => {
   useEffect(() => {
     if (isCartOpen) setIsCheckingOut(false);
   }, [isCartOpen]);
+
+  // A marketplace listing can sell to someone else while it sits in this cart.
+  // Re-check listing statuses whenever the drawer opens so a sold one is pilled
+  // "Sold" here, not only rejected later at checkout.
+  const [soldIds, setSoldIds] = useState(() => new Set());
+  const listingIdsKey = cartItems
+    .filter((item) => item.product?.type === 'listing')
+    .map((item) => item.product.id)
+    .join(',');
+  useEffect(() => {
+    if (!isCartOpen || !listingIdsKey) return;
+    let cancelled = false;
+    supabase.from('listings').select('id, status').in('id', listingIdsKey.split(','))
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setSoldIds(new Set(data.filter((r) => r.status === 'sold').map((r) => r.id)));
+      }, () => {});
+    return () => { cancelled = true; };
+  }, [isCartOpen, listingIdsKey]);
 
   const handleCheckout = () => {
     if (cartItems.length === 0) return;
@@ -115,14 +136,16 @@ const ShoppingCart = () => {
                   // Marketplace listings are one-of-a-kind — the server charges
                   // quantity 1 regardless (cartService), so don't offer +/-.
                   const isListing = p.type === 'listing';
+                  const isSold = isListing && soldIds.has(p.id);
 
                   return (
                     <div key={itemId} className="flex gap-4 group">
                       <Link
                         to={productPath}
                         onClick={() => setIsCartOpen(false)}
-                        className="w-20 h-24 rounded-xl overflow-hidden bg-muted border border-border shrink-0 hover:opacity-90 transition-opacity"
+                        className="relative w-20 h-24 rounded-xl overflow-hidden bg-muted border border-border shrink-0 hover:opacity-90 transition-opacity"
                       >
+                        {isSold && <SoldBadge size="sm" className="absolute top-1 left-1 z-10" />}
                         {imageUrl ? (
                           <img
                             src={imageUrl}
@@ -163,7 +186,9 @@ const ShoppingCart = () => {
 
                         <div className="flex items-center justify-between mt-4">
                           {isListing ? (
-                            <span className="text-xs font-medium text-muted-foreground">Qty 1 · one of a kind</span>
+                            isSold
+                              ? <span className="text-xs font-bold text-brand-red">No longer available — remove to check out</span>
+                              : <span className="text-xs font-medium text-muted-foreground">Qty 1 · one of a kind</span>
                           ) : (
                           <div className="flex items-center border border-border rounded-lg bg-background">
                             <Button

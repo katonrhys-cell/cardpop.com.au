@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MAX_EVENTS = 16;
 
@@ -128,9 +129,11 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${ev.kind === 'sold' ? 'text-emerald-600' : 'text-primary'}`}>
-                  {ev.kind === 'sold' ? 'Sold' : 'Just listed'}
-                </span>
+                {ev.kind === 'sold' ? (
+                  <SoldBadge size="sm" />
+                ) : (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Just listed</span>
+                )}
                 {ev.at && (
                   <span className="text-[10px] text-muted-foreground whitespace-nowrap">
                     {formatDistanceToNowStrict(ev.at, { addSuffix: true })}

@@ -37,6 +37,7 @@ import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { hasStorefront } from '@/config/plans.js';
+import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -196,7 +197,9 @@ const SoleTraderStorePage = () => {
             '@type': 'Offer',
             price: Number(price).toFixed(2),
             priceCurrency: 'AUD',
-            availability: 'https://schema.org/InStock',
+            availability: (isMkt ? item.status === 'sold' : isSoldVaultItem(item))
+              ? 'https://schema.org/SoldOut'
+              : 'https://schema.org/InStock',
             ...(condition ? { itemCondition: condition } : {}),
             url,
             seller: { '@type': 'Store', name: displayName },

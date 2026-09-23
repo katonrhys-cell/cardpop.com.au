@@ -35,6 +35,7 @@ import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -531,9 +532,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
               </Badge>
 
               {isSold && (
-                <Badge className="font-bold border-none shadow-sm px-2.5 py-1 bg-brand-red text-white uppercase tracking-wider">
-                  Sold
-                </Badge>
+                <SoldBadge />
               )}
             </div>
 

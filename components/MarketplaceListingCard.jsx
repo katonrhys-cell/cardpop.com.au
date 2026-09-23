@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MarketplaceListingCard = ({ listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -107,9 +108,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
         {isSold && (
           <>
             <div className="absolute inset-0 bg-background/40 z-10 pointer-events-none" />
-            <div className="absolute top-3 left-3 z-20 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-widest bg-brand-red text-white shadow-md pointer-events-none">
-              Sold
-            </div>
+            <SoldBadge className="absolute top-3 left-3 z-20" />
           </>
         )}
         {/* Special variant badge (Auto, 1st Ed) — top right */}
