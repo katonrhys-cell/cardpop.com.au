@@ -54,3 +54,20 @@ Rules the script follows:
 The Palms Off Gaming rows (59 SKUs) were seeded as `$0` drafts with no RRP.
 Their RRPs are not in the repo or the database — take them from the brand's
 price list and enter them in the CSV.
+
+## Source: Palms Off Gaming order form (September 2026)
+
+RRPs in `data/shop-rrp.csv` come from the MSRP column of the Palms Off
+Gaming wholesale order form. Two mappings are not literal SKU matches:
+
+- **Top Loaders** — the form calls these *Card Loaders* (`CL-…`); the shop's
+  `TL-…` lines are the same products (same photo folder), so
+  `TL-35/55/75/100/130/180PT` take `CL-…` MSRPs, `TL-PACK` takes `BPL-10`,
+  `MF-TL-35PT` takes `MF-CL-35PT` and `MF-TL-PACK` takes `MF-BPL`. The
+  shop's own `CL-35/100/180PT` lines are therefore duplicates of the
+  matching `TL-…` lines.
+- **Mag Lock cases** — sold to trade as 25/20pc display cartons; the RRP
+  used is the per-unit MSRP the form notes.
+
+Not in the form at all (left blank): `CMD-1` (single Command Case — the form
+sells a 10-pack only) and `SRGH-50` (the form sells the 200-pack only).
