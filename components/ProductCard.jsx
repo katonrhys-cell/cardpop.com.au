@@ -18,6 +18,8 @@ import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { isSoldOut, isComingSoon } from '@/utils/shopStock.js';
 import { hasVariants } from '@/utils/shopVariants.js';
+import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -28,6 +30,12 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   // Coming soon wins over sold out (a pre-launch product usually has 0 stock).
   const comingSoon = isComingSoon(product);
   const soldOut = !comingSoon && isSoldOut(product);
+  // A sold marketplace listing — or a vault row carrying its listing embed
+  // (VAULT_ITEM_CARD_SELECT) — stays visible, pilled "Sold", never purchasable.
+  // Distinct from `soldOut`, which is shop stock.
+  const isSold = !soldOut && (
+    (product.source === 'marketplace' && product.status === 'sold') || isSoldVaultItem(product)
+  );
   const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
   const autoLabel = getAutographLabel(product);
@@ -94,12 +102,15 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
           </div>
         )}
 
-        {/* Condition badge — top left */}
-        {product.condition && (
-          <div className="absolute top-3 left-3 z-10">
-            <Badge variant="secondary" className="shadow-sm font-bold backdrop-blur-md bg-background/80">
-              {product.condition}
-            </Badge>
+        {/* Sold pill + condition badge — top left */}
+        {(isSold || product.condition) && (
+          <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
+            {isSold && <SoldBadge />}
+            {product.condition && (
+              <Badge variant="secondary" className="shadow-sm font-bold backdrop-blur-md bg-background/80">
+                {product.condition}
+              </Badge>
+            )}
           </div>
         )}
 
@@ -180,15 +191,20 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
                 </span>
               </div>
             ) : (
-              <span className="font-extrabold text-xl tabular-nums text-foreground">
+              <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                 ${Number(product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue ?? 0).toFixed(2)}
               </span>
             )}
+            {isSold && (
+              <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Sold</span>
+            )}
           </div>
 
-          <BnplMessage amount={product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue} className="-mt-1" />
+          {!isSold && (
+            <BnplMessage amount={product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue} className="-mt-1" />
+          )}
 
-          {comingSoon ? (
+          {isSold ? null : comingSoon ? (
             <>
               <Button
                 size="sm"

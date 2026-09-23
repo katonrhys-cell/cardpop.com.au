@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const OPTIONS = [
   {
@@ -437,7 +438,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             listingStatus === 'sold' ? (
               <div className="rounded-xl border border-brand-red/30 bg-brand-red/5 p-3 space-y-2">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-brand-red text-white font-bold uppercase tracking-wider px-2.5 py-1">Sold</Badge>
+                  <SoldBadge />
                   <span className="text-xs text-muted-foreground">Shown as sold on the marketplace — not purchasable.</span>
                 </div>
                 <Button

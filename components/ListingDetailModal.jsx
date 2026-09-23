@@ -8,6 +8,7 @@ import { Edit, Trash2, Power, History, Image as ImageIcon } from 'lucide-react';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import ListingEditForm from './ListingEditForm.jsx';
 import ModerationPanel from './ModerationPanel.jsx';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 // listings.price_aud is stored in whole dollars.
 const formatAud = (dollars) => `$${(Number(dollars) || 0).toFixed(2)}`;
@@ -38,7 +39,7 @@ const ListingDetailModal = ({ isOpen, onClose, listing, onUpdate, onDelete, onSt
               <div className="flex gap-2 mt-2">
                 {vi.set_name && <Badge variant="outline">{vi.set_name}</Badge>}
                 {isSold ? (
-                  <Badge variant="destructive">Sold</Badge>
+                  <SoldBadge />
                 ) : (
                   <Badge className="bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 border-emerald-500/20 capitalize">
                     {listing.status || 'active'}

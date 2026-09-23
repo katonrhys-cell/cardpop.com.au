@@ -16,6 +16,9 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
+import SoldBadge from '@/components/SoldBadge.jsx';
+import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
+import { VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -114,9 +117,13 @@ const InvestmentSignal = ({ change7d, change30d }) => {
 // ─── Marketplace listing card (compact) ─────────────────────────────────────
 const ListingCard = ({ listing }) => {
   const imgUrl = listing.vault_images?.[0]?.image_url || listing.image_url || listing.image || null;
+  // Vault rows carry their marketplace listing (VAULT_ITEM_LISTING_EMBED);
+  // "sold" lives only there.
+  const isSold = listing._source === 'vault' && isSoldVaultItem(listing);
   return (
     <div className="flex gap-4 bg-card border border-border rounded-2xl p-4 hover:shadow-md hover:border-primary/40 transition-all">
-      <div className="w-16 h-20 flex-shrink-0 bg-muted rounded-xl overflow-hidden">
+      <div className="relative w-16 h-20 flex-shrink-0 bg-muted rounded-xl overflow-hidden">
+        {isSold && <SoldBadge size="sm" className="absolute top-1 left-1 z-10" />}
         {imgUrl
           ? <img src={imgUrl} alt={listing.title} className="w-full h-full object-cover" />
           : <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs text-center p-1">No image</div>}
@@ -127,7 +134,7 @@ const ListingCard = ({ listing }) => {
           {listing.condition && <Badge variant="outline" className="text-xs mt-1">{listing.condition}</Badge>}
         </div>
         <div className="flex items-end justify-between mt-2">
-          <p className="text-lg font-bold text-primary">${(listing.price ?? listing.price_aud ?? listing.asking_price ?? 0).toFixed(2)}</p>
+          <p className={`text-lg font-bold ${isSold ? 'text-muted-foreground line-through' : 'text-primary'}`}>${(listing.price ?? listing.price_aud ?? listing.asking_price ?? 0).toFixed(2)}</p>
           <Button size="sm" variant="outline" className="text-xs h-7 gap-1">
             <ShoppingCart className="w-3 h-3" /> View
           </Button>
@@ -253,7 +260,7 @@ const CardAnalyticsPage = () => {
 
     Promise.all([
       supabase.from('shop_products').select('*').ilike('title', `%${term}%`).eq('status', 'active').order('price_aud').limit(6).then(r => r.data ?? []),
-      supabase.from('vault_items').select('*').ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
+      supabase.from('vault_items').select(`*, ${VAULT_ITEM_LISTING_EMBED}`).ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
       if (!cancelled) {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));

@@ -24,6 +24,7 @@ import ListingDetailModal from '@/components/ListingDetailModal.jsx';
 import ListingStatusModal from '@/components/ListingStatusModal.jsx';
 import BulkActionsBar from '@/components/BulkActionsBar.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const ListingsManagementPage = () => {
   const [listings, setListings] = useState([]);
@@ -337,7 +338,7 @@ const ListingsManagementPage = () => {
                         {listing.status === 'active' ? (
                           <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Active</Badge>
                         ) : listing.status === 'sold' ? (
-                          <Badge className="bg-brand-red/10 text-brand-red border-none">Sold</Badge>
+                          <SoldBadge size="sm" />
                         ) : listing.status === 'pending' ? (
                           <Badge className="bg-amber-500/10 text-amber-600 border-none">Pending Approval</Badge>
                         ) : (

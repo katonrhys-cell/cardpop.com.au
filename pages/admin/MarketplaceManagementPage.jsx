@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { supabase } from '@/lib/supabaseClient.js';
 import { invalidateCache } from '@/lib/queryCache.js';
 import { toast } from 'sonner';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 // Listings use a `listing_status` enum with three values. "Enable" relists a
 // card, "Archive" pulls it from the marketplace (the effective "disable"), and
@@ -26,7 +27,7 @@ const listingUrl = (l) => `/marketplace/${l.id}/${slugify(listingName(l) || 'lis
 
 const StatusBadge = ({ status }) => {
   if (status === 'active') return <Badge className="bg-emerald-500/10 text-emerald-600 border-none">Active</Badge>;
-  if (status === 'sold') return <Badge className="bg-brand-red/10 text-brand-red border-none">Sold</Badge>;
+  if (status === 'sold') return <SoldBadge size="sm" />;
   return <Badge variant="secondary" className="bg-muted text-muted-foreground border-none capitalize">{STATUS_LABELS[status] || status || 'archived'}</Badge>;
 };
 

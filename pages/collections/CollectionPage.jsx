@@ -18,6 +18,7 @@ import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import SoldBadge from '@/components/SoldBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
@@ -87,11 +88,7 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
             <ShoppingBag className="w-8 h-8" />
           </div>
         )}
-        {isSold && (
-          <div className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider text-white shadow bg-brand-red">
-            Sold
-          </div>
-        )}
+        {isSold && <SoldBadge size="sm" className="absolute top-2 left-2 z-10" />}
         {/* Grade badge overlay */}
         {grade && (
           <GradeBadge grade={grade} gradingCompany={gradingCompany} isPositioned={false} className="absolute top-2 right-2 z-10 text-[10px]" />
@@ -136,9 +133,15 @@ const HolyGrailCard = ({ card, accentHex }) => {
   const sellerId = card.owner_id;
   const avatarSrc = card.owner?.avatar_url || null;
   const source = card.source ?? 'vault';
+  // Same rule as MiniListingCard: the vault row's embedded listing is the only
+  // place "sold" lives, and it's also the right page to link to.
+  const rowListing = vaultItemListing(card);
+  const isSold = card.status === 'sold' || rowListing?.status === 'sold';
   const detailPath = source === 'marketplace'
     ? `/marketplace/${card.id}/${slugify(title)}`
-    : `/product/${source}/${card.id}/${slugify(title)}`;
+    : (rowListing
+        ? `/marketplace/${rowListing.id}/${slugify(title)}`
+        : `/product/${source}/${card.id}/${slugify(title)}`);
 
   return (
     <motion.div
@@ -149,11 +152,14 @@ const HolyGrailCard = ({ card, accentHex }) => {
       className="group relative flex flex-col rounded-2xl overflow-hidden border-2 bg-card hover:shadow-2xl transition-all duration-300"
       style={{ borderColor: `${accentHex}40` }}
     >
-      <div
-        className="absolute top-3 left-3 z-10 flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
-        style={{ background: accentHex, color: '#fff' }}
-      >
-        <Star className="w-3 h-3 fill-white" /> Holy Grail
+      <div className="absolute top-3 left-3 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
+        <div
+          className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider"
+          style={{ background: accentHex, color: '#fff' }}
+        >
+          <Star className="w-3 h-3 fill-white" /> Holy Grail
+        </div>
+        {isSold && <SoldBadge size="sm" />}
       </div>
 
       <Link to={detailPath} className="block relative aspect-[3/4] bg-muted/30 overflow-hidden">
@@ -178,7 +184,10 @@ const HolyGrailCard = ({ card, accentHex }) => {
           </h3>
         </Link>
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
-          <span className="text-xl font-extrabold tabular-nums" style={{ color: accentHex }}>
+          <span
+            className={`text-xl font-extrabold tabular-nums ${isSold ? 'line-through opacity-60' : ''}`}
+            style={{ color: isSold ? undefined : accentHex }}
+          >
             ${price.toFixed(2)}
           </span>
           {sellerId && (

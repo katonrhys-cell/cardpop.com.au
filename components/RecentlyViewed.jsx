@@ -3,14 +3,32 @@ import { Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getRecentlyViewed, clearRecentlyViewed } from '@/utils/recentlyViewed.js';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabaseClient.js';
+import SoldBadge from '@/components/SoldBadge.jsx';
 
 const RecentlyViewed = ({ className = '' }) => {
   const [recentlyViewed, setRecentlyViewed] = useState([]);
+  const [soldIds, setSoldIds] = useState(() => new Set());
   const navigate = useNavigate();
 
   useEffect(() => {
     setRecentlyViewed(getRecentlyViewed());
   }, []);
+
+  // The localStorage snapshot is taken at view time, so a listing that has sold
+  // since would still read as available. Ask for the current status of the
+  // marketplace entries (one small query) and pill the sold ones.
+  useEffect(() => {
+    const ids = recentlyViewed.filter((i) => i.type === 'marketplace').map((i) => i.id);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    supabase.from('listings').select('id, status').in('id', ids)
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        setSoldIds(new Set(data.filter((r) => r.status === 'sold').map((r) => r.id)));
+      }, () => {});
+    return () => { cancelled = true; };
+  }, [recentlyViewed]);
 
   const handleClear = () => {
     const cleared = clearRecentlyViewed();
@@ -42,7 +60,9 @@ const RecentlyViewed = ({ className = '' }) => {
       </div>
       
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-        {recentlyViewed.map((item) => (
+        {recentlyViewed.map((item) => {
+          const isSold = soldIds.has(item.id);
+          return (
           <button
             key={item.id}
             onClick={() => handleItemClick(item)}
@@ -61,16 +81,18 @@ const RecentlyViewed = ({ className = '' }) => {
                 No Image
               </div>
             )}
+            {isSold && <SoldBadge size="sm" className="absolute top-1.5 left-1.5 z-10" />}
             <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="absolute bottom-0 left-0 right-0 p-2">
                 <p className="text-white text-xs line-clamp-2 font-medium">{item.title}</p>
                 {item.price && (
-                  <p className="text-white text-xs font-bold">${item.price}</p>
+                  <p className={`text-white text-xs font-bold ${isSold ? 'line-through opacity-70' : ''}`}>${item.price}</p>
                 )}
               </div>
             </div>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
