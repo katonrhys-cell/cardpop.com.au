@@ -140,6 +140,7 @@ function validateCartItems(items) {
     if (!it || typeof it !== 'object' || Array.isArray(it)) return 'Invalid cart item.';
     if (it.type !== 'shop' && it.type !== 'listing') return 'Each cart item needs a valid type ("shop" or "listing").';
     if (typeof it.id !== 'string' || it.id.length === 0 || it.id.length > 100) return 'Each cart item needs a valid id.';
+    if (it.variantId != null && (typeof it.variantId !== 'string' || it.variantId.length === 0 || it.variantId.length > 100)) return 'Each cart item variantId must be a valid id.';
   }
   return null;
 }

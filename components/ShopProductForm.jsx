@@ -8,10 +8,21 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, X, ImagePlus } from 'lucide-react';
+import { Loader2, X, ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
+import { variantStock } from '@/utils/shopVariants.js';
+
+const COLOUR_CODES = { black: 'BLK', blue: 'BLU', clear: 'CLR', green: 'GRN', jade: 'JDE', navy: 'NAV', orange: 'ORA', pink: 'PNK', purple: 'PUR', red: 'RED', rose: 'ROS', turquoise: 'TQS', white: 'WHT', yellow: 'YEL', grey: 'GRY', gray: 'GRY', silver: 'SLV', gold: 'GLD' };
+const suggestVariantSku = (productSku, colour) => {
+  const base = normalizeSku(productSku);
+  const c = String(colour || '').trim();
+  if (!base || !c) return '';
+  const code = COLOUR_CODES[c.toLowerCase()] || c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+  return `${base}-${code}`;
+};
+const newVariant = () => ({ _key: Math.random().toString(36).slice(2), id: null, sku: '', barcode: '', colour: '', colour_hex: '', stock_quantity: '0', price_aud: '', status: 'active' });
 
 const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
@@ -44,6 +55,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   // When true, the category is a free-text value not in the shop category list
   // (e.g. legacy "Pokémon"/"NBA" products) — show the text input instead.
   const [useCustomCategory, setUseCustomCategory] = useState(false);
+  // Colour variants (shop_product_variants). Each row is a sellable unit with
+  // its own SKU, barcode and stock; the product's stock becomes their sum.
+  const [variants, setVariants] = useState([]);
+  const [removedVariantIds, setRemovedVariantIds] = useState([]);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -65,6 +80,18 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       setImages(existing.map(url => ({ isExisting: true, url })));
       setPreviewUrls(existing);
       setUseCustomCategory(!!product.category && !KNOWN_CATEGORY_NAMES.includes(product.category));
+      supabase
+        .from('shop_product_variants')
+        .select('id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, status, sort_order')
+        .eq('product_id', product.id)
+        .order('sort_order', { ascending: true })
+        .then(({ data }) => {
+          setVariants((data || []).map((v) => ({
+            _key: v.id, id: v.id, sku: v.sku || '', barcode: v.barcode || '', colour: v.colour || '', colour_hex: v.colour_hex || '',
+            stock_quantity: v.stock_quantity != null ? String(v.stock_quantity) : '0', price_aud: v.price_aud != null ? String(v.price_aud) : '', status: v.status || 'active',
+          })));
+          setRemovedVariantIds([]);
+        });
       // Cost is admin-only and in its own table; fetch it for the edit form.
       supabase
         .from('shop_product_costs')
@@ -81,6 +108,8 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         });
     } else {
       setFormData(INITIAL_STATE);
+      setVariants([]);
+      setRemovedVariantIds([]);
       setImages([]);
       setPreviewUrls([]);
       setUseCustomCategory(false);
@@ -162,6 +191,26 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (costInc === null && costEx !== null) costInc = Math.round(costEx * 1.1 * 100) / 100;
     const stock = parseInt(formData.stock_quantity, 10);
 
+    // Variants: every row needs a SKU; with more than one row each needs a
+    // colour so shoppers can tell them apart. SKUs must be unique in the form.
+    const cleanVariants = variants.map((v) => ({
+      ...v,
+      sku: normalizeSku(v.sku),
+      barcode: String(v.barcode || '').replace(/\s/g, ''),
+      colour: String(v.colour || '').trim(),
+      colour_hex: String(v.colour_hex || '').trim(),
+    }));
+    for (const v of cleanVariants) {
+      if (!v.sku) return toast.error(`Every colour variant needs a SKU (${v.colour || 'unnamed variant'})`);
+      if (!isValidSku(v.sku)) return toast.error(`Variant SKU ${v.sku} is not valid`);
+      if (cleanVariants.length > 1 && !v.colour) return toast.error(`Variant ${v.sku} needs a colour name`);
+      if (v.price_aud !== '' && (Number.isNaN(Number(v.price_aud)) || Number(v.price_aud) < 0)) return toast.error(`Variant ${v.sku} has an invalid price`);
+    }
+    const variantSkus = cleanVariants.map((v) => v.sku);
+    if (new Set(variantSkus).size !== variantSkus.length) return toast.error('Two colour variants share the same SKU');
+    const variantBarcodes = cleanVariants.map((v) => v.barcode).filter(Boolean);
+    if (new Set(variantBarcodes).size !== variantBarcodes.length) return toast.error('Two colour variants share the same barcode');
+
     setLoading(true);
     try {
       // Friendly pre-check so a duplicate SKU reads as a clear message rather
@@ -208,6 +257,35 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         if (error) throw error;
         productId = inserted?.id ?? null;
         toast.success('Product added to the shop.');
+      }
+
+      // Colour variants: upsert the rows in the form, delete the ones removed.
+      // The parent's stock_quantity / has_variants are kept by a DB trigger.
+      if (productId) {
+        if (removedVariantIds.length) {
+          const { error: delErr } = await supabase.from('shop_product_variants').delete().in('id', removedVariantIds);
+          if (delErr) toast.error(`Product saved, but removing a variant failed: ${delErr.message}`);
+        }
+        if (cleanVariants.length) {
+          const rows = cleanVariants.map((v, i) => ({
+            ...(v.id ? { id: v.id } : {}),
+            product_id: productId,
+            sku: v.sku,
+            barcode: v.barcode || null,
+            colour: v.colour || null,
+            colour_hex: v.colour_hex || null,
+            stock_quantity: Math.max(0, parseInt(v.stock_quantity, 10) || 0),
+            price_aud: v.price_aud === '' ? null : Number(v.price_aud),
+            status: v.status === 'archived' ? 'archived' : 'active',
+            sort_order: i,
+          }));
+          const { error: varErr } = await supabase.from('shop_product_variants').upsert(rows, { onConflict: 'id' });
+          if (varErr) {
+            toast.error(varErr.code === '23505'
+              ? 'Product saved, but a variant SKU or barcode is already used by another product'
+              : `Product saved, but the colour variants were not: ${varErr.message}`);
+          }
+        }
       }
 
       // Cost row: upsert when a cost was entered, remove when both cleared.
@@ -317,7 +395,14 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="shop-product-stock">Stock Quantity</Label>
-              <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+              {variants.length > 0 ? (
+                <>
+                  <Input id="shop-product-stock" type="number" value={variants.reduce((s, v) => s + variantStock(v), 0)} disabled className="bg-muted tabular-nums" />
+                  <p className="text-[11px] text-muted-foreground">Sum of the colour variants below</p>
+                </>
+              ) : (
+                <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+              )}
             </div>
           </div>
 
@@ -398,6 +483,107 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
           <div className="space-y-2">
             <Label>Description</Label>
             <Textarea value={formData.description} onChange={(e) => handleInputChange('description', e.target.value)} className="bg-background min-h-[120px]" />
+          </div>
+
+          {/* Colour variants — each is a sellable unit with its own SKU,
+              barcode and stock. Shoppers pick one on the product page. */}
+          <div className="space-y-2 pt-4 border-t border-border">
+            <div className="flex items-center justify-between gap-2">
+              <Label>Colour variants <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setVariants((prev) => [...prev, newVariant()])}
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add colour
+              </Button>
+            </div>
+            {variants.length === 0 ? (
+              <p className="text-xs text-muted-foreground">No variants — this product is sold as a single unit with the stock above. Add a colour to sell and track stock per colour (each colour gets its own SKU and barcode).</p>
+            ) : (
+              <div className="space-y-2">
+                <div className="hidden md:grid grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_auto_auto] gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1">
+                  <span>Colour</span><span>SKU</span><span>Barcode</span><span>Stock</span><span>Price</span><span>Active</span><span></span>
+                </div>
+                {variants.map((v, i) => (
+                  <div key={v._key} className="grid grid-cols-2 md:grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_auto_auto] gap-2 items-center rounded-xl border border-border p-2 bg-background/50">
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        aria-label={`Swatch for ${v.colour || 'variant'}`}
+                        value={/^#[0-9a-f]{6}$/i.test(v.colour_hex) ? v.colour_hex : '#888888'}
+                        onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, colour_hex: e.target.value } : x)))}
+                        className="h-8 w-8 rounded-md border border-border bg-transparent p-0 shrink-0"
+                      />
+                      <Input
+                        aria-label="Variant colour"
+                        placeholder="Colour"
+                        value={v.colour}
+                        onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, colour: e.target.value, sku: x.sku || suggestVariantSku(formData.sku, e.target.value) } : x)))}
+                        className="bg-background h-9"
+                      />
+                    </div>
+                    <Input
+                      aria-label="Variant SKU"
+                      placeholder="SKU"
+                      value={v.sku}
+                      onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, sku: e.target.value.toUpperCase() } : x)))}
+                      className="bg-background h-9 font-mono text-xs uppercase"
+                    />
+                    <Input
+                      aria-label="Variant barcode"
+                      placeholder="Barcode (EAN)"
+                      inputMode="numeric"
+                      value={v.barcode}
+                      onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, barcode: e.target.value } : x)))}
+                      className="bg-background h-9 font-mono text-xs"
+                    />
+                    <Input
+                      aria-label="Variant stock"
+                      type="number"
+                      min="0"
+                      value={v.stock_quantity}
+                      onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, stock_quantity: e.target.value } : x)))}
+                      className="bg-background h-9 tabular-nums"
+                    />
+                    <Input
+                      aria-label="Variant price override"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={formData.price_aud || 'Product price'}
+                      value={v.price_aud}
+                      onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, price_aud: e.target.value } : x)))}
+                      className="bg-background h-9 tabular-nums"
+                    />
+                    <label className="flex items-center gap-1.5 text-xs justify-self-center">
+                      <input
+                        type="checkbox"
+                        aria-label="Variant active"
+                        checked={v.status !== 'archived'}
+                        onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, status: e.target.checked ? 'active' : 'archived' } : x)))}
+                      />
+                      <span className="md:hidden">Active</span>
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${v.colour || 'variant'}`}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => {
+                        if (v.id) setRemovedVariantIds((prev) => [...prev, v.id]);
+                        setVariants((prev) => prev.filter((_, j) => j !== i));
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+                <p className="text-xs text-muted-foreground">Leave a variant&apos;s price blank to use the product price. Untick Active to hide a colour without deleting its history.</p>
+              </div>
+            )}
           </div>
         </div>
 

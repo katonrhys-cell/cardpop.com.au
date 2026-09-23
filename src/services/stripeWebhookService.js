@@ -484,10 +484,14 @@ async function handleCartOrder(existing, session, stripe) {
       // checking only `ok === false` would silently skip the stock decrement
       // and the oversold alert while the buyer is charged. Treat errors like
       // an oversell — flagged for manual resolution.
-      const { data: ok, error: stockErr } = await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
+      // A line that names a colour variant decrements that variant's stock
+      // (the parent's stock is the sum of its variants, kept by a trigger).
+      const { data: ok, error: stockErr } = line.variant_id
+        ? await supabase.rpc('decrement_shop_variant_stock', { p_variant_id: line.variant_id, p_qty: line.quantity || 1 })
+        : await supabase.rpc('decrement_shop_stock', { p_id: line.id, p_qty: line.quantity || 1 });
       if (stockErr || ok === false) {
         oversoldShopItems.push(line);
-        logger.error(`[STRIPE] ${stockErr ? `Stock decrement failed (${stockErr.message})` : 'Oversell'} on shop product ${line.id} (qty ${line.quantity || 1}) for order ${existing.id} — needs manual resolution`);
+        logger.error(`[STRIPE] ${stockErr ? `Stock decrement failed (${stockErr.message})` : 'Oversell'} on shop product ${line.id}${line.variant_id ? ` variant ${line.variant_id}` : ''} (qty ${line.quantity || 1}) for order ${existing.id} — needs manual resolution`);
       } else {
         fulfilledLines += 1;
       }

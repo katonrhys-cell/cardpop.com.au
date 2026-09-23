@@ -17,6 +17,7 @@ import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { isSoldOut, isComingSoon } from '@/utils/shopStock.js';
+import { hasVariants } from '@/utils/shopVariants.js';
 
 const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -225,6 +226,11 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
                 product={{ id: product.id, title: product.title || product.name || product.cardName }}
               />
             </div>
+          ) : onAddToCart && hasVariants(product) ? (
+            // Colour must be chosen on the product page — the grid can't know it.
+            <Button size="sm" className="w-full rounded-xl font-bold" asChild>
+              <Link to={detailPath}><ShoppingCart className="w-4 h-4 mr-2" /> Choose colour</Link>
+            </Button>
           ) : onAddToCart && (
             <Button
               size="sm"

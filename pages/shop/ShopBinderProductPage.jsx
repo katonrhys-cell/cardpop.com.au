@@ -7,6 +7,8 @@ import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
+import VariantPicker from '@/components/shop/VariantPicker.jsx';
+import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -29,6 +31,7 @@ const ShopBinderProductPage = () => {
   const [row, setRow] = useState(null);
   const [loading, setLoading] = useState(true);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
 
   useEffect(() => {
     if (!product) { setLoading(false); return undefined; }
@@ -36,11 +39,11 @@ const ShopBinderProductPage = () => {
     setLoading(true);
     supabase
       .from('shop_products')
-      .select('id, price_aud, retail_price_aud, stock_quantity, status')
+      .select(`id, price_aud, retail_price_aud, stock_quantity, status, ${VARIANTS_SELECT}`)
       .eq('slug', product.slug)
       .maybeSingle()
       .then(({ data }) => {
-        if (!cancelled) { setRow(data || null); setLoading(false); }
+        if (!cancelled) { setRow(data || null); setSelectedVariantId(pickDefaultVariant(data)?.id ?? null); setLoading(false); }
       });
     return () => { cancelled = true; };
   }, [product]);
@@ -54,7 +57,11 @@ const ShopBinderProductPage = () => {
   const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
-  const inStock = (row?.stock_quantity ?? 0) > 0;
+  // With colour variants the buyable unit is the chosen variant.
+  const variants = activeVariants(row);
+  const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
+  const inStock = variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0;
+  const anyVariantInStock = variants.length > 0 ? variants.some(variantInStock) : inStock;
   // The CTA flips itself. While a product has no price (or is still `draft`) it
   // is enquiry-only: the button sends people to sign up, and the page is
   // complete — and indexable — without a price. The moment a price is set and
@@ -68,20 +75,26 @@ const ShopBinderProductPage = () => {
   const related = BINDER_PRODUCTS.filter((p) => p.slug !== product.slug).slice(0, 4);
 
   const handleAddToCart = () => {
-    if (!row || !isPurchasable || !inStock) return;
+    if (!row || !isPurchasable) return;
+    if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
+    if (!inStock) return;
+    const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
+    const cartVariant = chosenVariant
+      ? toCartVariant({ id: row.id, price_aud: unitPrice, stock_quantity: row.stock_quantity }, chosenVariant)
+      : {
+          id: row.id,
+          price_in_cents: Math.round(price * 100),
+          manage_inventory: row.stock_quantity !== null,
+          inventory_quantity: row.stock_quantity,
+        };
     addToCart(
       {
         id: row.id, source: 'shop', type: 'shop',
-        title: product.title, price, image: images[0] || null,
+        title: product.title, price: unitPrice, image: images[0] || null,
       },
-      {
-        id: row.id,
-        price_in_cents: Math.round(price * 100),
-        manage_inventory: row.stock_quantity !== null,
-        inventory_quantity: row.stock_quantity,
-      },
+      cartVariant,
       1,
-      row.stock_quantity ?? 999,
+      cartVariant.inventory_quantity ?? 999,
     ).then(() => {
       toast.success('Added to cart', {
         action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
@@ -183,8 +196,8 @@ const ShopBinderProductPage = () => {
                       ${rrp.toFixed(2)}
                     </span>
                   )}
-                  <Badge variant={inStock ? 'default' : 'destructive'}>
-                    {inStock ? 'In stock' : 'Sold out'}
+                  <Badge variant={anyVariantInStock ? 'default' : 'destructive'}>
+                    {anyVariantInStock ? (variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'This colour'} sold out` : 'In stock') : 'Sold out'}
                   </Badge>
                 </>
               ) : isComingSoon ? (
@@ -210,6 +223,15 @@ const ShopBinderProductPage = () => {
             {/* Enquiry until priced, checkout after. `state` carries which
                 product was being viewed so the signup page can attribute the
                 enquiry without putting it in the URL. */}
+            {isPurchasable && variants.length > 0 && (
+              <VariantPicker
+                product={row}
+                value={selectedVariantId}
+                onChange={(v) => setSelectedVariantId(v.id)}
+                className="mt-6"
+              />
+            )}
+
             <div className="mt-6">
               {isComingSoon ? (
                 <>
@@ -226,9 +248,9 @@ const ShopBinderProductPage = () => {
                     product={{ id: row.id, title: product.title }}
                   />
                 </>
-              ) : isPurchasable && inStock ? (
-                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart}>
-                  <ShoppingCart className="w-5 h-5 mr-2" />Add to cart
+              ) : isPurchasable && anyVariantInStock ? (
+                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
+                  <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : 'Add to cart'}
                 </Button>
               ) : isPurchasable ? (
                 // Sold out: 0 stock on an otherwise live product. Offer an
@@ -269,7 +291,7 @@ const ShopBinderProductPage = () => {
 
             {/* Colour range. Each colour becomes its own product (and its own
                 page) in a later pass — until then this is informational. */}
-            {product.colours.length > 1 && (
+            {product.colours.length > 1 && variants.length === 0 && (
               <div className="mt-8">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Also available in
