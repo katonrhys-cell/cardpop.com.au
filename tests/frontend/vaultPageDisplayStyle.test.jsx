@@ -53,6 +53,13 @@ const card = (displayStyle) => ({
 const renderPage = (Page) =>
   render(<MemoryRouter><Page /></MemoryRouter>);
 
+// The mocks resolve on the microtask queue, so the grid normally appears well
+// inside waitFor's 1s default. A loaded CI runner has still missed that window
+// (Main CI run 274 attempt 1 found the loading skeleton where the card should
+// be), so give every wait in this file the same generous ceiling. It costs
+// nothing on a passing run — waitFor returns as soon as the assertion holds.
+const WAIT = { timeout: 5000 };
+
 describe.each([
   ['MyVaultPage', MyVaultPage],
   ['AccountVault', AccountVault],
@@ -72,7 +79,7 @@ describe.each([
     await waitFor(() => {
       expect(container.querySelector('.cardshowcase--holographic')).toBeTruthy();
       expect(container.querySelector('.cardshowcase__holo')).toBeTruthy();
-    });
+    }, WAIT);
   });
 
   it('keeps the flat vault image for classic cards', async () => {
@@ -80,7 +87,7 @@ describe.each([
     const { container } = renderPage(Page);
     await waitFor(() => {
       expect(container.querySelector('img[alt="Charizard"]')).toBeTruthy();
-    });
+    }, WAIT);
     expect(container.querySelector('.cardshowcase')).toBeNull();
   });
 
@@ -89,7 +96,7 @@ describe.each([
     const { container } = renderPage(Page);
     await waitFor(() => {
       expect(container.querySelector('img[alt="Charizard"]')).toBeTruthy();
-    });
+    }, WAIT);
     expect(container.querySelector('.cardshowcase')).toBeNull();
   });
 });
