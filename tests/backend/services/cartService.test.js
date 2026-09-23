@@ -359,3 +359,81 @@ describe('priceCart — listings', () => {
       .rejects.toMatchObject({ statusCode: 400 });
   });
 });
+
+// ─── colour variants ──────────────────────────────────────────────────────────
+
+describe('priceCart — colour variants', () => {
+  const VARIANTS = [
+    { id: 'v-blk', sku: 'ZB-09-BLK', colour: 'Black', barcode: '1209202001375', stock_quantity: 3, price_aud: null, status: 'active' },
+    { id: 'v-red', sku: 'ZB-09-RED', colour: 'Red', barcode: '1209202001405', stock_quantity: 0, price_aud: 47.95, status: 'active' },
+    { id: 'v-old', sku: 'ZB-09-OLD', colour: 'Olive', barcode: null, stock_quantity: 9, price_aud: null, status: 'archived' },
+  ];
+  const binder = (variants = VARIANTS) => ({
+    data: { id: 'p-zb09', title: '9-Pocket Zip Binder', price_aud: 44.95, stock_quantity: 3, status: 'active', variants },
+    error: null,
+  });
+
+  it('requires a colour when the product has variants', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder()));
+    await expect(priceCart([{ type: 'shop', id: 'p-zb09', quantity: 1 }], 'buyer-1'))
+      .rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/choose a colour/i) });
+  });
+
+  it('rejects an unknown or archived variant id', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder()));
+    await expect(priceCart([{ type: 'shop', id: 'p-zb09', quantity: 1, variantId: 'v-old' }], 'buyer-1'))
+      .rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('checks stock on the chosen variant, not the parent', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder()));
+    await expect(priceCart([{ type: 'shop', id: 'p-zb09', quantity: 1, variantId: 'v-red' }], 'buyer-1'))
+      .rejects.toMatchObject({ statusCode: 409, message: expect.stringMatching(/Red/) });
+  });
+
+  it('prices the chosen variant, carrying its identity onto the order line', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder()));
+    const result = await priceCart([{ type: 'shop', id: 'p-zb09', quantity: 2, variantId: 'v-blk' }], 'buyer-1');
+    expect(result.itemsCents).toBe(8990);
+    expect(result.orderLines[0]).toMatchObject({
+      type: 'shop', id: 'p-zb09', quantity: 2, title: '9-Pocket Zip Binder — Black',
+      variant_id: 'v-blk', variant_sku: 'ZB-09-BLK', variant_colour: 'Black', variant_barcode: '1209202001375',
+    });
+    expect(result.lineItems[0].price_data.product_data.name).toBe('9-Pocket Zip Binder — Black');
+  });
+
+  it('uses a variant price override when set', async () => {
+    const inStockRed = VARIANTS.map((v) => (v.id === 'v-red' ? { ...v, stock_quantity: 4 } : v));
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder(inStockRed)));
+    const result = await priceCart([{ type: 'shop', id: 'p-zb09', quantity: 1, variantId: 'v-red' }], 'buyer-1');
+    expect(result.itemsCents).toBe(4795);
+    expect(result.orderLines[0].unit_price_aud).toBe(47.95);
+  });
+
+  it('auto-selects the only variant when none is named', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder([VARIANTS[0]])));
+    const result = await priceCart([{ type: 'shop', id: 'p-zb09', quantity: 1 }], 'buyer-1');
+    expect(result.orderLines[0].variant_id).toBe('v-blk');
+  });
+
+  it('keeps two colours of one product as separate lines', async () => {
+    const both = VARIANTS.map((v) => ({ ...v, stock_quantity: 5 }));
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder(both)));
+    mockSupabase.from.mockReturnValueOnce(rowBuilder(binder(both)));
+    const result = await priceCart([
+      { type: 'shop', id: 'p-zb09', quantity: 1, variantId: 'v-blk' },
+      { type: 'shop', id: 'p-zb09', quantity: 1, variantId: 'v-red' },
+    ], 'buyer-1');
+    expect(result.orderLines.map((l) => l.variant_id)).toEqual(['v-blk', 'v-red']);
+  });
+
+  it('a product without variants still prices from the parent as before', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Booster Box', price_aud: 100, stock_quantity: 5, status: 'active', variants: [] },
+      error: null,
+    }));
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1, variantId: 'ignored' }], 'buyer-1');
+    expect(result.orderLines[0]).not.toHaveProperty('variant_id');
+    expect(result.itemsCents).toBe(10000);
+  });
+});

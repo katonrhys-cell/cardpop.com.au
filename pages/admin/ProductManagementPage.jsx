@@ -22,6 +22,8 @@ const ProductManagementPage = () => {
   const [products, setProducts] = useState([]);
   // Admin-only wholesale costs (shop_product_costs), keyed by product id.
   const [costs, setCosts] = useState({});
+  // Colour variants keyed by product id (for barcode/SKU search and the count).
+  const [variantsByProduct, setVariantsByProduct] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -43,6 +45,14 @@ const ProductManagementPage = () => {
         .from('shop_product_costs')
         .select('product_id, wholesale_ex_gst_aud, wholesale_inc_gst_aud, supplier_sku');
       if (isMounted.current) setCosts(Object.fromEntries((costRows || []).map((c) => [c.product_id, c])));
+      const { data: variantRows } = await supabase
+        .from('shop_product_variants')
+        .select('id, product_id, sku, barcode, colour, stock_quantity, status');
+      if (isMounted.current) {
+        const grouped = {};
+        for (const v of variantRows || []) (grouped[v.product_id] ||= []).push(v);
+        setVariantsByProduct(grouped);
+      }
     } catch (err) {
       if (isMounted.current) setError(err.message);
       toast.error("Failed to load products.");
@@ -79,11 +89,14 @@ const ProductManagementPage = () => {
     fetchProducts();
   };
 
-  const filteredProducts = products.filter(p =>
-    p.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => {
+    const term = searchTerm.toLowerCase();
+    if (!term) return true;
+    if (p.title?.toLowerCase().includes(term) || p.category?.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)) return true;
+    // Barcode scanner / colour SKU lookups land on the parent product.
+    return (variantsByProduct[p.id] || []).some((v) =>
+      v.sku?.toLowerCase().includes(term) || v.barcode?.includes(term) || v.colour?.toLowerCase().includes(term));
+  });
 
   const stats = {
     total: products.length,
@@ -137,7 +150,7 @@ const ProductManagementPage = () => {
             <Input
               name="admin-product-search"
               aria-label="Search products"
-              placeholder="Search by name, SKU or category..."
+              placeholder="Search by name, SKU, barcode, colour or category..."
               className="pl-9 h-10 rounded-xl bg-background border-border text-foreground"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -195,7 +208,12 @@ const ProductManagementPage = () => {
                 filteredProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-bold text-foreground">{product.title}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{product.sku || <span className="text-destructive">missing</span>}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {product.sku || <span className="text-destructive">missing</span>}
+                      {(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length > 0 && (
+                        <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} colours</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
                     <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">

@@ -207,7 +207,7 @@ const CheckoutPage = () => {
 
   // Typed line items the server can re-price from its own source of truth.
   const serverItems = checkoutItems
-    .map(i => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1 }))
+    .map(i => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1, ...(i.variant?.variant_id ? { variantId: i.variant.variant_id } : {}) }))
     .filter(i => i.id);
 
   // Promo code (welcome offer or partner referral code). `promoCode` is the

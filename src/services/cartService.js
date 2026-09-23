@@ -5,7 +5,7 @@ import { getPlatformSetting } from './stripeWebhookService.js';
 /**
  * Price a cart server-side.
  *
- * @param items    cart lines ({ type: 'shop' | 'listing', id, quantity })
+ * @param items    cart lines ({ type: 'shop' | 'listing', id, quantity, variantId? })
  * @param userId   buyer's id, or null for a guest
  * @param options  `waiveShipping: true` drops the flat CardPop Shop shipping
  *                 fee — used by partner codes whose perk includes free
@@ -46,7 +46,7 @@ export async function priceCart(items, userId, options = {}) {
   // overselling at decrement time.
   const merged = new Map();
   for (const raw of items) {
-    const key = `${raw?.type}:${raw?.id}`;
+    const key = `${raw?.type}:${raw?.id}:${raw?.type === 'shop' && typeof raw?.variantId === 'string' ? raw.variantId : ''}`;
     const prev = merged.get(key);
     if (!prev) {
       merged.set(key, { ...raw });
@@ -62,19 +62,35 @@ export async function priceCart(items, userId, options = {}) {
     const quantity = Math.max(1, parseInt(raw?.quantity, 10) || 1);
 
     if (type === 'shop') {
+      // Variants ride along in the same query so a product with colours costs
+      // no extra round trip (and the per-item query count stays at one).
       const { data: product, error } = await supabase
         .from('shop_products')
-        .select('id, title, price_aud, stock_quantity, status')
+        .select('id, title, price_aud, stock_quantity, status, variants:shop_product_variants(id, sku, colour, barcode, stock_quantity, price_aud, status)')
         .eq('id', id)
         .maybeSingle();
       if (error) throw error;
       if (!product || product.status !== 'active') throw httpError(404, 'A shop product in your cart is unavailable');
-      if (product.stock_quantity < quantity) throw httpError(409, `Not enough stock for ${product.title}`);
+
+      // A product with colour variants is sold per variant: the line must name
+      // one (a single-variant product is resolved automatically), stock is the
+      // variant's, and the variant may override the price.
+      const variants = (Array.isArray(product.variants) ? product.variants : []).filter((v) => v && v.status !== 'archived');
+      let variant = null;
+      if (variants.length > 0) {
+        const wanted = typeof raw?.variantId === 'string' ? raw.variantId : null;
+        variant = wanted ? variants.find((v) => v.id === wanted) : (variants.length === 1 ? variants[0] : null);
+        if (!variant) throw httpError(wanted ? 404 : 400, wanted ? `That colour of ${product.title} is unavailable` : `Please choose a colour for ${product.title}`);
+        if (variant.stock_quantity < quantity) throw httpError(409, `Not enough stock for ${product.title}${variant.colour ? ` — ${variant.colour}` : ''}`);
+      } else if (product.stock_quantity < quantity) {
+        throw httpError(409, `Not enough stock for ${product.title}`);
+      }
+      const lineTitle = variant?.colour ? `${product.title} — ${variant.colour}` : product.title;
 
       // The advertised shop price is GST-inclusive, so the buyer pays exactly
       // the ticket price — the GST is the tax component already inside it
       // (price × rate ÷ (100 + rate)), not an amount added on top.
-      const unitCents = Math.round(Number(product.price_aud) * 100);
+      const unitCents = Math.round(Number(variant?.price_aud ?? product.price_aud) * 100);
       const lineCents = unitCents * quantity;
       const lineGstCents = gstEnabled ? Math.round(lineCents * gstRate / (100 + gstRate)) : 0;
 
@@ -83,13 +99,14 @@ export async function priceCart(items, userId, options = {}) {
       includedGstCents += lineGstCents;
 
       lineItems.push({
-        price_data: { currency: 'aud', product_data: { name: product.title }, unit_amount: unitCents },
+        price_data: { currency: 'aud', product_data: { name: lineTitle }, unit_amount: unitCents },
         quantity,
       });
       orderLines.push({
-        type: 'shop', id: product.id, seller_id: null, title: product.title,
+        type: 'shop', id: product.id, seller_id: null, title: lineTitle,
         quantity, unit_price_aud: unitCents / 100, line_total_aud: lineCents / 100,
         commission_aud: 0, gst_aud: lineGstCents / 100,
+        ...(variant ? { variant_id: variant.id, variant_sku: variant.sku, variant_colour: variant.colour || null, variant_barcode: variant.barcode || null } : {}),
       });
     } else if (type === 'listing') {
       let { data: listing, error } = await supabase

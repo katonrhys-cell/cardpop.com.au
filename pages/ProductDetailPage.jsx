@@ -33,6 +33,8 @@ import CardPopLogo from '@/components/CardPopLogo.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import VariantPicker from '@/components/shop/VariantPicker.jsx';
+import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -49,6 +51,8 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   
   const [product, setProduct] = useState(null);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
+  // Chosen colour variant for shop products that have them.
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
@@ -150,7 +154,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
         if (source === 'shop') {
           const { data, error: fetchError } = await supabase
             .from('shop_products')
-            .select('*')
+            .select(`*, ${VARIANTS_SELECT}`)
             .eq('id', id)
             .in('status', PUBLIC_SHOP_STATUSES)
             .maybeSingle();
@@ -175,6 +179,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             stockQuantity: data.stock_quantity,
             listing_type: 'For Sale',
           });
+          setSelectedVariantId(pickDefaultVariant(data)?.id ?? null);
           setSeller({ business_name: OFFICIAL_STORE_NAME, is_verified: true, type: 'official', storePath: '/shop' });
           return;
         }
@@ -327,7 +332,17 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       toast.error('This item has already sold.');
       return;
     }
-    const priceInCents = Math.round((product.price || 0) * 100);
+    const shopVariants = source === 'shop' ? activeVariants(product) : [];
+    const chosenVariant = shopVariants.find((v) => v.id === selectedVariantId) || null;
+    if (shopVariants.length > 0 && !chosenVariant) {
+      toast.error('Please choose a colour first.');
+      return;
+    }
+    if (chosenVariant && !variantInStock(chosenVariant)) {
+      toast.error(`${chosenVariant.colour || 'That colour'} is sold out.`);
+      return;
+    }
+    const priceInCents = Math.round((chosenVariant ? variantPrice(product, chosenVariant) : (product.price || 0)) * 100);
     const cartProduct = {
       id: product.id,
       source,
@@ -341,13 +356,15 @@ const ProductDetailPage = ({ source: sourceProp }) => {
       grading_company: product.grading_company || product.gradingCompany || null,
       grade: product.grade || null,
     };
-    const cartVariant = {
-      id: product.id,
-      price_in_cents: priceInCents,
-      manage_inventory: product.stockQuantity !== null,
-      inventory_quantity: product.stockQuantity
-    };
-    addToCart(cartProduct, cartVariant, 1, product.stockQuantity ?? 999)
+    const cartVariant = chosenVariant
+      ? toCartVariant(product, chosenVariant)
+      : {
+          id: product.id,
+          price_in_cents: priceInCents,
+          manage_inventory: product.stockQuantity !== null,
+          inventory_quantity: product.stockQuantity
+        };
+    addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
       .then(() => {
         toast.success('Added to cart', {
           action: {
@@ -663,6 +680,15 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                   </Button>
                 ) : null}
               </div>
+            )}
+
+            {isShop && activeVariants(product).length > 0 && (
+              <VariantPicker
+                product={product}
+                value={selectedVariantId}
+                onChange={(v) => setSelectedVariantId(v.id)}
+                className="mb-6"
+              />
             )}
 
             {isShop && comingSoon ? (
