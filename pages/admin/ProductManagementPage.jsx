@@ -15,10 +15,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
+import { grossMargin } from '@/src/utils/shopRrp.js';
 
 const ProductManagementPage = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
+  // Admin-only wholesale costs (shop_product_costs), keyed by product id.
+  const [costs, setCosts] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +37,12 @@ const ProductManagementPage = () => {
       const { data, error } = await supabase.from('shop_products').select('*').order('created_at', { ascending: false }).limit(200);
       if (error) throw error;
       if (isMounted.current) setProducts(data ?? []);
+      // Costs are a separate admin-only table; a failure here (e.g. the
+      // migration not yet applied) must not take the product list down.
+      const { data: costRows } = await supabase
+        .from('shop_product_costs')
+        .select('product_id, wholesale_ex_gst_aud, wholesale_inc_gst_aud, supplier_sku');
+      if (isMounted.current) setCosts(Object.fromEntries((costRows || []).map((c) => [c.product_id, c])));
     } catch (err) {
       if (isMounted.current) setError(err.message);
       toast.error("Failed to load products.");
@@ -145,6 +154,8 @@ const ProductManagementPage = () => {
                 <TableHead className="font-semibold text-foreground">Category</TableHead>
                 <TableHead className="font-semibold text-foreground">Price</TableHead>
                 <TableHead className="font-semibold text-foreground">RRP</TableHead>
+                <TableHead className="font-semibold text-foreground">Cost (inc)</TableHead>
+                <TableHead className="font-semibold text-foreground">Margin</TableHead>
                 <TableHead className="font-semibold text-foreground">Status</TableHead>
                 <TableHead className="font-semibold text-foreground">Stock</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
@@ -159,6 +170,8 @@ const ProductManagementPage = () => {
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-16" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                     <TableCell><Skeleton className="h-6 w-24 rounded-full" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-12" /></TableCell>
                     <TableCell><Skeleton className="h-8 w-8 ml-auto" /></TableCell>
@@ -166,14 +179,14 @@ const ProductManagementPage = () => {
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-48 text-center text-muted-foreground">
                     <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
                     <p>Failed to load products</p>
                   </TableCell>
                 </TableRow>
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-48 text-center text-muted-foreground">
                     <Package className="w-10 h-10 mb-3 mx-auto opacity-40" />
                     <p>No products found</p>
                   </TableCell>
@@ -187,6 +200,18 @@ const ProductManagementPage = () => {
                     <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">
                       {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
+                    </TableCell>
+                    <TableCell className="tabular-nums">
+                      {(() => {
+                        // Ex-GST gross margin: (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
+                        const m = grossMargin(product.price_aud, costs[product.id]?.wholesale_ex_gst_aud);
+                        if (m == null) return <span className="text-muted-foreground">—</span>;
+                        const cls = m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600';
+                        return <span className={`font-semibold ${cls}`}>{(m * 100).toFixed(0)}%</span>;
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
