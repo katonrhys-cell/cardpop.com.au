@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { parseRrpCsv, planRrpUpdates, splitCsvLine, updatePatch } from '../../src/utils/shopRrp.js';
+import { parseRrpCsv, planRrpUpdates, splitCsvLine, updatePatch, planCostUpserts, grossMargin } from '../../src/utils/shopRrp.js';
 
 describe('splitCsvLine', () => {
   it('handles quoted fields with commas and escaped quotes', () => {
@@ -39,12 +39,29 @@ describe('parseRrpCsv', () => {
     ]);
   });
 
-  it('the committed template lists every SKU with a blank RRP and no errors', () => {
+  it('the committed CSV covers every Palms Off SKU and parses cleanly', () => {
     const text = readFileSync(new URL('../../data/shop-rrp.csv', import.meta.url), 'utf8');
     const { rows, skipped, errors } = parseRrpCsv(text);
     expect(errors).toEqual([]);
-    // Template ships unpriced: filling it in is the operator's job.
     expect(rows.length + skipped.length).toBe(59);
+    // Filled from the September 2026 order form: 57 priced + costed, 2 blank.
+    expect(rows).toHaveLength(57);
+    expect(skipped.sort()).toEqual(['CMD-1', 'SRGH-50']);
+    expect(rows.every((r) => r.rrp > 0 && r.wholesaleEx > 0 && r.wholesaleInc >= r.wholesaleEx)).toBe(true);
+    // Top Loader lines carry the form's Card Loader SKU.
+    expect(rows.find((r) => r.sku === 'TL-35PT').supplierSku).toBe('CL-35PT');
+  });
+
+  it('reads optional cost columns and keeps cost-only rows', () => {
+    const { rows, skipped, errors } = parseRrpCsv(
+      'sku,rrp_aud,wholesale_ex_gst_aud,wholesale_inc_gst_aud,supplier_sku\nA,10,5,5.5,\nB,,4,,b-form\nC,,,,\nD,1,x,,\n',
+    );
+    expect(errors).toEqual(['line 5: invalid wholesale_ex_gst_aud "x" for D']);
+    expect(skipped).toEqual(['C']);
+    expect(rows).toEqual([
+      { sku: 'A', rrp: 10, line: 2, wholesaleEx: 5, wholesaleInc: 5.5, supplierSku: null },
+      { sku: 'B', rrp: null, line: 3, wholesaleEx: 4, wholesaleInc: null, supplierSku: 'B-FORM' },
+    ]);
   });
 });
 
@@ -98,5 +115,40 @@ describe('updatePatch', () => {
 
     const both = updatePatch({ before: { price: 0, rrp: null }, after: { price: 41.95, rrp: 41.95 } });
     expect(both).toMatchObject({ retail_price_aud: 41.95, price_aud: 41.95 });
+  });
+});
+
+describe('planCostUpserts', () => {
+  const products = [{ id: 'p1', sku: 'A', title: 'A' }, { id: 'p2', sku: 'B', title: 'B' }];
+
+  it('derives the missing GST basis and skips rows already recorded', () => {
+    const rows = [
+      { sku: 'A', rrp: 10, wholesaleEx: 5, wholesaleInc: null, supplierSku: null },
+      { sku: 'B', rrp: null, wholesaleEx: null, wholesaleInc: 5.5, supplierSku: 'B-FORM' },
+      { sku: 'Z', rrp: 1, wholesaleEx: 1, wholesaleInc: 1.1 },
+      { sku: 'A2', rrp: 1 }, // no cost → ignored entirely
+    ];
+    const existing = [{ product_id: 'p1', wholesale_ex_gst_aud: '5.00', wholesale_inc_gst_aud: '5.50', supplier_sku: null }];
+    const { upserts, unchanged, unknown } = planCostUpserts(rows, products, existing, { supplier: 'POG', source: 'csv' });
+    expect(unchanged).toEqual(['A']);
+    expect(unknown).toEqual(['Z']);
+    expect(upserts).toHaveLength(1);
+    expect(upserts[0].record).toMatchObject({ product_id: 'p2', wholesale_ex_gst_aud: 5, wholesale_inc_gst_aud: 5.5, supplier: 'POG', supplier_sku: 'B-FORM', source: 'csv' });
+  });
+
+  it('planRrpUpdates ignores cost-only rows', () => {
+    const { updates, unknown } = planRrpUpdates([{ sku: 'B', rrp: null, wholesaleEx: 4 }], products);
+    expect(updates).toEqual([]);
+    expect(unknown).toEqual([]);
+  });
+});
+
+describe('grossMargin', () => {
+  it('computes an ex-GST margin from a GST-inclusive price', () => {
+    // $44.95 inc → $40.86 ex; cost $26.32 ex → 35.6%
+    expect(grossMargin(44.95, 26.32)).toBeCloseTo(0.356, 3);
+    expect(grossMargin(0, 5)).toBeNull();
+    expect(grossMargin(10, null)).toBeNull();
+    expect(grossMargin(5.5, 6)).toBeLessThan(0);
   });
 });

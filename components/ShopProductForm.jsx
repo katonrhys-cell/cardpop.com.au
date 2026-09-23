@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, X, ImagePlus } from 'lucide-react';
 import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
+import { grossMargin } from '@/src/utils/shopRrp.js';
 
 const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
@@ -21,6 +22,10 @@ const INITIAL_STATE = {
   description: '',
   price_aud: '',
   retail_price_aud: '',
+  // Wholesale cost lives in shop_product_costs (admin-only), not on the
+  // product row — see the migration notes. Loaded/saved separately.
+  wholesale_ex_gst_aud: '',
+  wholesale_inc_gst_aud: '',
   stock_quantity: '1',
   category: '',
   product_type: 'sealed',
@@ -60,6 +65,20 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       setImages(existing.map(url => ({ isExisting: true, url })));
       setPreviewUrls(existing);
       setUseCustomCategory(!!product.category && !KNOWN_CATEGORY_NAMES.includes(product.category));
+      // Cost is admin-only and in its own table; fetch it for the edit form.
+      supabase
+        .from('shop_product_costs')
+        .select('wholesale_ex_gst_aud, wholesale_inc_gst_aud')
+        .eq('product_id', product.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data) return;
+          setFormData((prev) => ({
+            ...prev,
+            wholesale_ex_gst_aud: data.wholesale_ex_gst_aud != null ? String(data.wholesale_ex_gst_aud) : '',
+            wholesale_inc_gst_aud: data.wholesale_inc_gst_aud != null ? String(data.wholesale_inc_gst_aud) : '',
+          }));
+        });
     } else {
       setFormData(INITIAL_STATE);
       setImages([]);
@@ -131,6 +150,16 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (rrp !== null && (Number.isNaN(rrp) || rrp < 0)) {
       return toast.error('RRP must be a valid amount, or left blank');
     }
+    // Wholesale cost (optional). Either GST basis may be entered; the other
+    // is derived at 10% GST when blank.
+    const costRaw = (k) => String(formData[k] ?? '').trim();
+    let costEx = costRaw('wholesale_ex_gst_aud') === '' ? null : Number(costRaw('wholesale_ex_gst_aud'));
+    let costInc = costRaw('wholesale_inc_gst_aud') === '' ? null : Number(costRaw('wholesale_inc_gst_aud'));
+    if ((costEx !== null && (Number.isNaN(costEx) || costEx < 0)) || (costInc !== null && (Number.isNaN(costInc) || costInc < 0))) {
+      return toast.error('Wholesale cost must be a valid amount, or left blank');
+    }
+    if (costEx === null && costInc !== null) costEx = Math.round((costInc / 1.1) * 100) / 100;
+    if (costInc === null && costEx !== null) costInc = Math.round(costEx * 1.1 * 100) / 100;
     const stock = parseInt(formData.stock_quantity, 10);
 
     setLoading(true);
@@ -162,6 +191,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         images: imageUrls,
       };
 
+      let productId = product?.id ?? null;
       if (product) {
         const { error } = await supabase
           .from('shop_products')
@@ -170,11 +200,32 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         if (error) throw error;
         toast.success('Shop product updated.');
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('shop_products')
-          .insert({ ...payload, created_by: currentUser?.id ?? null });
+          .insert({ ...payload, created_by: currentUser?.id ?? null })
+          .select('id')
+          .single();
         if (error) throw error;
+        productId = inserted?.id ?? null;
         toast.success('Product added to the shop.');
+      }
+
+      // Cost row: upsert when a cost was entered, remove when both cleared.
+      if (productId) {
+        if (costEx !== null) {
+          const { error: costErr } = await supabase
+            .from('shop_product_costs')
+            .upsert({
+              product_id: productId,
+              wholesale_ex_gst_aud: costEx,
+              wholesale_inc_gst_aud: costInc,
+              updated_at: new Date().toISOString(),
+              updated_by: currentUser?.id ?? null,
+            }, { onConflict: 'product_id' });
+          if (costErr) toast.error(`Product saved, but the wholesale cost was not: ${costErr.message}`);
+        } else if (product) {
+          await supabase.from('shop_product_costs').delete().eq('product_id', productId);
+        }
       }
 
       if (onSuccess) onSuccess();
@@ -268,6 +319,52 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <Label htmlFor="shop-product-stock">Stock Quantity</Label>
               <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
             </div>
+          </div>
+
+          {/* Wholesale cost — admin-only (shop_product_costs). Enter either
+              basis; the other is derived at 10% GST on save. */}
+          <div className="space-y-2">
+            <Label>Wholesale cost <span className="text-muted-foreground font-normal">(admin-only, optional)</span></Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Input
+                  id="shop-product-cost-ex"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="ex GST"
+                  aria-label="Wholesale cost ex GST"
+                  value={formData.wholesale_ex_gst_aud}
+                  onChange={(e) => handleInputChange('wholesale_ex_gst_aud', e.target.value)}
+                  className="bg-background tabular-nums"
+                />
+                <p className="text-[11px] text-muted-foreground">ex GST</p>
+              </div>
+              <div className="space-y-1">
+                <Input
+                  id="shop-product-cost-inc"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="inc GST"
+                  aria-label="Wholesale cost inc GST"
+                  value={formData.wholesale_inc_gst_aud}
+                  onChange={(e) => handleInputChange('wholesale_inc_gst_aud', e.target.value)}
+                  className="bg-background tabular-nums"
+                />
+                <p className="text-[11px] text-muted-foreground">inc GST</p>
+              </div>
+            </div>
+            {(() => {
+              const ex = formData.wholesale_ex_gst_aud !== '' ? Number(formData.wholesale_ex_gst_aud)
+                : formData.wholesale_inc_gst_aud !== '' ? Number(formData.wholesale_inc_gst_aud) / 1.1 : NaN;
+              const m = grossMargin(formData.price_aud, ex);
+              return m == null ? null : (
+                <p className={`text-xs font-semibold ${m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  Gross margin at this price: {(m * 100).toFixed(0)}% (ex GST)
+                </p>
+              );
+            })()}
           </div>
 
           {/* RRP: the manufacturer's recommended retail price. Shown

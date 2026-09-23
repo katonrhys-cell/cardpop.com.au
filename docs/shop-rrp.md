@@ -71,3 +71,22 @@ Gaming wholesale order form. Two mappings are not literal SKU matches:
 
 Not in the form at all (left blank): `CMD-1` (single Command Case — the form
 sells a 10-pack only) and `SRGH-50` (the form sells the 200-pack only).
+
+## Wholesale cost (admin-only)
+
+Cost price lives in `shop_product_costs` (one row per product), **not** on
+`shop_products`: the products table is publicly readable column-for-column
+through the anon key, and cost is commercially sensitive. The costs table has
+RLS with an admin-only policy and no public policy, so anonymous and
+non-admin clients get nothing.
+
+- Columns: `wholesale_ex_gst_aud`, `wholesale_inc_gst_aud` (stored as the
+  supplier quotes them), `supplier`, `supplier_sku`, `source`, `notes`.
+- Admin → Products shows **Cost (inc)** and **Margin** per row and the edit
+  form has ex/inc GST cost fields (enter either; the other is derived at 10%).
+- **Margin** is ex-GST gross margin: `(price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1)`,
+  because every selling price is GST-inclusive and CardPop remits that GST.
+- `data/shop-rrp.csv` carries the same figures in `wholesale_ex_gst_aud` /
+  `wholesale_inc_gst_aud` / `supplier_sku`; `scripts/apply-shop-rrp.mjs`
+  upserts them (`--skip-costs` to ignore). The September 2026 figures were
+  seeded by `supabase/migrations/*_shop_product_costs.sql` on merge.
