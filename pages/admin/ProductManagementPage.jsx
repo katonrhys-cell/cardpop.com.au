@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3 } from 'lucide-react';
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,10 +12,39 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
 import { grossMargin } from '@/src/utils/shopRrp.js';
+import {
+  SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
+} from '@/utils/adminProductList.js';
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active' },
+  { value: 'coming_soon', label: 'Coming soon' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'archived', label: 'Archived' },
+];
+
+// Sortable columns, in table order. `key` matches SORT_VALUES in
+// utils/adminProductList.js; numeric columns default to high → low.
+const COLUMNS = [
+  { key: 'title', label: 'Product Name' },
+  { key: 'sku', label: 'SKU' },
+  { key: 'category', label: 'Category' },
+  { key: 'price', label: 'Price', numeric: true },
+  { key: 'rrp', label: 'RRP', numeric: true },
+  { key: 'cost', label: 'Cost (inc)', numeric: true },
+  { key: 'margin', label: 'Margin', numeric: true },
+  { key: 'status', label: 'Status' },
+  { key: 'stock', label: 'Stock', numeric: true },
+];
+
+// Filter/sort/view state lives in the URL so a refresh, the back button or a
+// shared link keeps the admin where they were.
+const PARAM_DEFAULTS = { q: '', section: 'all', category: 'all', status: 'all', brand: 'all', sort: 'title', dir: 'asc', view: 'sections' };
 
 const ProductManagementPage = () => {
   const navigate = useNavigate();
@@ -26,7 +55,23 @@ const ProductManagementPage = () => {
   const [variantsByProduct, setVariantsByProduct] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const param = (k) => searchParams.get(k) || PARAM_DEFAULTS[k];
+  const setParams = (updates) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v === undefined || v === null || v === PARAM_DEFAULTS[k]) next.delete(k);
+        else next.set(k, v);
+      }
+      return next;
+    }, { replace: true });
+  };
+  const searchTerm = param('q');
+  const filters = { search: searchTerm, section: param('section'), category: param('category'), status: param('status'), brand: param('brand') };
+  const sortKey = param('sort');
+  const sortDir = param('dir');
+  const view = param('view');
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -36,7 +81,7 @@ const ProductManagementPage = () => {
     if (!isMounted.current) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('shop_products').select('*').order('created_at', { ascending: false }).limit(200);
+      const { data, error } = await supabase.from('shop_products').select('*').order('created_at', { ascending: false }).limit(1000);
       if (error) throw error;
       if (isMounted.current) setProducts(data ?? []);
       // Costs are a separate admin-only table; a failure here (e.g. the
@@ -89,14 +134,21 @@ const ProductManagementPage = () => {
     fetchProducts();
   };
 
-  const filteredProducts = products.filter(p => {
-    const term = searchTerm.toLowerCase();
-    if (!term) return true;
-    if (p.title?.toLowerCase().includes(term) || p.category?.toLowerCase().includes(term) || p.sku?.toLowerCase().includes(term)) return true;
-    // Barcode scanner / colour SKU lookups land on the parent product.
-    return (variantsByProduct[p.id] || []).some((v) =>
-      v.sku?.toLowerCase().includes(term) || v.barcode?.includes(term) || v.colour?.toLowerCase().includes(term));
-  });
+  const filteredProducts = useMemo(
+    () => sortProducts(filterProducts(products, filters, { variantsByProduct }), sortKey, sortDir, { costs }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [products, variantsByProduct, costs, searchParams],
+  );
+  const sections = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
+  const categoryChoices = useMemo(() => categoryOptions(products, filters.section), [products, filters.section]);
+  const brandChoices = useMemo(() => brandOptions(products), [products]);
+  const activeFilterCount = ['section', 'category', 'status', 'brand'].filter((k) => filters[k] !== 'all').length + (searchTerm ? 1 : 0);
+
+  const toggleSort = (col) => {
+    if (sortKey === col.key) setParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' });
+    else setParams({ sort: col.key, dir: col.numeric ? 'desc' : 'asc' });
+  };
+  const clearFilters = () => setParams({ q: null, section: null, category: null, status: null, brand: null });
 
   const stats = {
     total: products.length,
@@ -105,6 +157,58 @@ const ProductManagementPage = () => {
     comingSoon: products.filter(p => p.status === 'coming_soon').length,
     archived: products.filter(p => p.status === 'archived').length
   };
+
+  const renderRow = (product) => (
+    <TableRow key={product.id}>
+      <TableCell className="font-bold text-foreground">{product.title}</TableCell>
+      <TableCell className="font-mono text-xs text-muted-foreground">
+        {product.sku || <span className="text-destructive">missing</span>}
+        {(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length > 0 && (
+          <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} colours</span>
+        )}
+      </TableCell>
+      <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
+      <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
+      <TableCell className="tabular-nums text-muted-foreground">
+        {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
+      </TableCell>
+      <TableCell className="tabular-nums text-muted-foreground">
+        {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
+      </TableCell>
+      <TableCell className="tabular-nums">
+        {(() => {
+          // Ex-GST gross margin: (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
+          const m = grossMargin(product.price_aud, costs[product.id]?.wholesale_ex_gst_aud);
+          if (m == null) return <span className="text-muted-foreground">—</span>;
+          const cls = m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600';
+          return <span className={`font-semibold ${cls}`}>{(m * 100).toFixed(0)}%</span>;
+        })()}
+      </TableCell>
+      <TableCell>
+        <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
+          {product.status === 'coming_soon' ? 'coming soon' : product.status}
+        </Badge>
+      </TableCell>
+      <TableCell className="tabular-nums">{product.stock_quantity ?? '-'}</TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="rounded-xl">
+            <DropdownMenuItem onClick={() => handleEdit(product)} className="cursor-pointer gap-2 font-medium">
+              <Edit className="w-4 h-4" /> Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDelete(product.id)} className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 font-medium">
+              <Trash2 className="w-4 h-4" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
+    </TableRow>
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -121,31 +225,31 @@ const ProductManagementPage = () => {
       </AdminPageHeader>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+        <Card role="button" tabIndex={0} aria-pressed={filters.status === 'all'} onClick={() => setParams({ status: 'all' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'all' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'all' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-primary/10 text-primary rounded-xl"><Package className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Total Products</p><p className="text-2xl font-bold">{stats.total}</p></div>
         </Card>
-        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+        <Card role="button" tabIndex={0} aria-pressed={filters.status === 'active'} onClick={() => setParams({ status: 'active' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'active' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'active' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Active</p><p className="text-2xl font-bold">{stats.active}</p></div>
         </Card>
-        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+        <Card role="button" tabIndex={0} aria-pressed={filters.status === 'draft'} onClick={() => setParams({ status: 'draft' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'draft' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'draft' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Draft</p><p className="text-2xl font-bold">{stats.draft}</p></div>
         </Card>
-        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+        <Card role="button" tabIndex={0} aria-pressed={filters.status === 'coming_soon'} onClick={() => setParams({ status: 'coming_soon' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'coming_soon' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'coming_soon' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-brand-charcoal/10 text-brand-charcoal dark:text-foreground rounded-xl"><BarChart3 className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Coming Soon</p><p className="text-2xl font-bold">{stats.comingSoon}</p></div>
         </Card>
-        <Card className="p-5 rounded-2xl bg-card border border-border shadow-sm flex items-center gap-4">
+        <Card role="button" tabIndex={0} aria-pressed={filters.status === 'archived'} onClick={() => setParams({ status: 'archived' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'archived' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'archived' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Archived</p><p className="text-2xl font-bold">{stats.archived}</p></div>
         </Card>
       </div>
 
       <Card className="rounded-xl border border-border shadow-sm overflow-hidden bg-card">
-        <div className="p-4 border-b border-border bg-muted/20 flex gap-4">
-          <div className="relative flex-1 max-w-md">
+        <div className="p-4 border-b border-border bg-muted/20 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px] max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               name="admin-product-search"
@@ -153,8 +257,34 @@ const ProductManagementPage = () => {
               placeholder="Search by name, SKU, barcode, colour or category..."
               className="pl-9 h-10 rounded-xl bg-background border-border text-foreground"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => setParams({ q: e.target.value })}
             />
+          </div>
+          <FilterSelect label="Section" value={filters.section} onChange={(v) => setParams({ section: v, category: null })}
+            options={SECTION_NAMES.map((n) => ({ value: n, label: n }))} allLabel="All sections" />
+          <FilterSelect label="Category" value={filters.category} onChange={(v) => setParams({ category: v })}
+            options={categoryChoices.map((n) => ({ value: n, label: n }))} allLabel="All categories" />
+          <FilterSelect label="Status" value={filters.status} onChange={(v) => setParams({ status: v })}
+            options={STATUS_OPTIONS} allLabel="All statuses" />
+          <FilterSelect label="Brand" value={filters.brand} onChange={(v) => setParams({ brand: v })}
+            options={brandChoices.map((n) => ({ value: n, label: n }))} allLabel="All brands" />
+          {activeFilterCount > 0 && (
+            <Button variant="ghost" size="sm" className="gap-1 h-10 rounded-xl text-muted-foreground" onClick={clearFilters}>
+              <X className="w-4 h-4" /> Clear ({activeFilterCount})
+            </Button>
+          )}
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-sm text-muted-foreground tabular-nums">
+              {filteredProducts.length} of {products.length}
+            </span>
+            <div className="inline-flex rounded-xl border border-border bg-background p-0.5" role="group" aria-label="Table layout">
+              <Button variant={view === 'sections' ? 'secondary' : 'ghost'} size="sm" className="h-8 gap-1.5 rounded-lg" aria-pressed={view === 'sections'} onClick={() => setParams({ view: 'sections' })}>
+                <Rows3 className="w-4 h-4" /> Sections
+              </Button>
+              <Button variant={view === 'list' ? 'secondary' : 'ghost'} size="sm" className="h-8 gap-1.5 rounded-lg" aria-pressed={view === 'list'} onClick={() => setParams({ view: 'list' })}>
+                <LayoutList className="w-4 h-4" /> List
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -162,15 +292,18 @@ const ProductManagementPage = () => {
           <Table>
             <TableHeader className="bg-muted/40">
               <TableRow>
-                <TableHead className="font-semibold text-foreground">Product Name</TableHead>
-                <TableHead className="font-semibold text-foreground">SKU</TableHead>
-                <TableHead className="font-semibold text-foreground">Category</TableHead>
-                <TableHead className="font-semibold text-foreground">Price</TableHead>
-                <TableHead className="font-semibold text-foreground">RRP</TableHead>
-                <TableHead className="font-semibold text-foreground">Cost (inc)</TableHead>
-                <TableHead className="font-semibold text-foreground">Margin</TableHead>
-                <TableHead className="font-semibold text-foreground">Status</TableHead>
-                <TableHead className="font-semibold text-foreground">Stock</TableHead>
+                {COLUMNS.map((col) => {
+                  const active = sortKey === col.key;
+                  const Icon = !active ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown;
+                  return (
+                    <TableHead key={col.key} className="font-semibold text-foreground" aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                      <button type="button" onClick={() => toggleSort(col)} className="inline-flex items-center gap-1 hover:text-primary whitespace-nowrap">
+                        {col.label}
+                        <Icon className={`w-3.5 h-3.5 ${active ? 'text-primary' : 'text-muted-foreground/60'}`} />
+                      </button>
+                    </TableHead>
+                  );
+                })}
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -201,61 +334,36 @@ const ProductManagementPage = () => {
                 <TableRow>
                   <TableCell colSpan={10} className="h-48 text-center text-muted-foreground">
                     <Package className="w-10 h-10 mb-3 mx-auto opacity-40" />
-                    <p>No products found</p>
+                    <p>No products match{activeFilterCount > 0 ? ' these filters' : ''}</p>
+                    {activeFilterCount > 0 && (
+                      <Button variant="link" size="sm" onClick={clearFilters}>Clear filters</Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredProducts.map((product) => (
-                  <TableRow key={product.id}>
-                    <TableCell className="font-bold text-foreground">{product.title}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">
-                      {product.sku || <span className="text-destructive">missing</span>}
-                      {(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length > 0 && (
-                        <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} colours</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
-                    <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">
-                      {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
-                    </TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">
-                      {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {(() => {
-                        // Ex-GST gross margin: (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
-                        const m = grossMargin(product.price_aud, costs[product.id]?.wholesale_ex_gst_aud);
-                        if (m == null) return <span className="text-muted-foreground">—</span>;
-                        const cls = m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600';
-                        return <span className={`font-semibold ${cls}`}>{(m * 100).toFixed(0)}%</span>;
-                      })()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
-                        {product.status === 'coming_soon' ? 'coming soon' : product.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="tabular-nums">{product.stock_quantity ?? '-'}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-muted">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="rounded-xl">
-                          <DropdownMenuItem onClick={() => handleEdit(product)} className="cursor-pointer gap-2 font-medium">
-                            <Edit className="w-4 h-4" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(product.id)} className="cursor-pointer gap-2 text-destructive focus:bg-destructive/10 font-medium">
-                            <Trash2 className="w-4 h-4" /> Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
+                view === 'sections' ? (
+                  sections.map(({ section, count, categories }) => (
+                    <React.Fragment key={section}>
+                      <TableRow className="bg-muted/60 hover:bg-muted/60">
+                        <TableCell colSpan={10} className="py-2.5 font-bold uppercase tracking-wide text-foreground">
+                          {section} <span className="ml-1 font-semibold text-muted-foreground normal-case tracking-normal">· {count}</span>
+                        </TableCell>
+                      </TableRow>
+                      {categories.map(({ category, products: rows }) => (
+                        <React.Fragment key={`${section}/${category}`}>
+                          <TableRow className="bg-muted/20 hover:bg-muted/20">
+                            <TableCell colSpan={10} className="py-1.5 pl-6 text-xs font-semibold text-muted-foreground">
+                              {category} · {rows.length}
+                            </TableCell>
+                          </TableRow>
+                          {rows.map(renderRow)}
+                        </React.Fragment>
+                      ))}
+                    </React.Fragment>
+                  ))
+                ) : (
+                  filteredProducts.map(renderRow)
+                )
               )}
             </TableBody>
           </Table>
@@ -277,5 +385,18 @@ const ProductManagementPage = () => {
     </div>
   );
 };
+
+// Compact labelled dropdown for the filter bar; 'all' is the no-filter value.
+const FilterSelect = ({ label, value, onChange, options, allLabel }) => (
+  <Select value={value} onValueChange={onChange}>
+    <SelectTrigger aria-label={`Filter by ${label.toLowerCase()}`} className={`h-10 w-[170px] rounded-xl bg-background ${value !== 'all' ? 'border-primary text-foreground' : ''}`}>
+      <SelectValue placeholder={allLabel} />
+    </SelectTrigger>
+    <SelectContent className="rounded-xl">
+      <SelectItem value="all">{allLabel}</SelectItem>
+      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+    </SelectContent>
+  </Select>
+);
 
 export default ProductManagementPage;
