@@ -185,7 +185,10 @@ export function parseStorageObjectUrl(url) {
   const m = url.match(SUPABASE_OBJECT_URL_RE);
   if (!m) return null;
   try {
-    return { bucket: m[1], path: decodeURIComponent(m[2]) };
+    // Decode BOTH segments: getPublicUrl() re-encodes whatever it is given, so
+    // an encoded bucket (e.g. `palms%20off%20gaming%20products`) would come
+    // back double-encoded (`palms%2520off…`) and 404 as "No Image".
+    return { bucket: decodeURIComponent(m[1]), path: decodeURIComponent(m[2]) };
   } catch {
     return null; // malformed percent-encoding — treat as opaque URL
   }

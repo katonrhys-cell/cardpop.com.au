@@ -253,6 +253,14 @@ describe('parseStorageObjectUrl', () => {
     ).toEqual({ bucket: 'vault-images', path: 'u/c d.webp' });
   });
 
+  it('decodes a bucket name containing spaces so it is not double-encoded later', () => {
+    expect(
+      parseStorageObjectUrl(
+        'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/palms%20off%20gaming%20products/CARD%20LOADERS/TL-55PT_front.png'
+      )
+    ).toEqual({ bucket: 'palms off gaming products', path: 'CARD LOADERS/TL-55PT_front.png' });
+  });
+
   it('returns null for non-storage and non-Supabase URLs, paths, and non-strings', () => {
     expect(parseStorageObjectUrl('https://example.com/pic.png')).toBeNull();
     expect(
