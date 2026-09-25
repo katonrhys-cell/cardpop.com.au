@@ -209,6 +209,12 @@ export const THUMB_SUFFIX = '.thumb.webp';
 // line merely serves the full image (harmless), whereas the reverse would 404.
 export const THUMBNAILS_SINCE = 1784500000000; // 2026-07-19T23:06:40Z
 
+// Shop product photos converted by scripts/optimize-shop-images.mjs are stored
+// as `<name>.opt.webp` with a companion `<name>.opt.thumb.webp`. The script
+// writes both before any product row points at the `.opt.webp`, so the marker
+// alone proves the thumb exists — in any bucket.
+export const OPTIMIZED_SUFFIX = '.opt.webp';
+
 /** Storage path of the companion thumbnail for a full-image storage path. */
 export function thumbStoragePath(path) {
   return path.replace(/\.[^./]+$/, '') + THUMB_SUFFIX;
@@ -225,6 +231,7 @@ function uploadTimestamp(path) {
 
 function hasThumbnail(path, bucket) {
   if (typeof path !== 'string' || path.endsWith(THUMB_SUFFIX)) return false;
+  if (path.endsWith(OPTIMIZED_SUFFIX)) return true;
   // Companion `.thumb.webp` files are only ever written for card uploads in the
   // vault-images bucket (AddEditCardPage.uploadThumbnail). Other upload sites
   // (hero showcase / media library → `media`, shop products → `shop-products`,

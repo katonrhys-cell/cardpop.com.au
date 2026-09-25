@@ -12,6 +12,11 @@
 #                 Cloudflare dashboard afterwards so the smaller versions
 #                 re-migrate on next view.
 #   both        — recompress first, then pre-warm (the right order).
+#   optimize-shop-images — converts the Palms Off Gaming product photos
+#                 (print-resolution PNGs, ~2.6 MB each) into WebP (≤1600 px)
+#                 plus grid thumbnails (≤480 px) under optimized/, then points
+#                 the products at them. Originals are kept. Safe to re-run.
+#                 See scripts/optimize-shop-images.mjs.
 #
 # "Dry run" (default ON) only prints what would happen. Untick it to act.
 #
@@ -31,6 +36,7 @@ on:
           - prewarm-r2
           - recompress
           - both
+          - optimize-shop-images
         default: prewarm-r2
       dry_run:
         description: 'Dry run (print what would happen, change nothing)'
@@ -68,6 +74,10 @@ jobs:
       - name: Recompress oversized legacy images
         if: inputs.job == 'recompress' || inputs.job == 'both'
         run: node scripts/backfill-image-cache-headers.mjs ${{ inputs.dry_run == true && '--dry-run' || '' }}
+
+      - name: Optimize shop product photos
+        if: inputs.job == 'optimize-shop-images'
+        run: node scripts/optimize-shop-images.mjs ${{ inputs.dry_run == false && '--apply' || '' }}
 
       - name: Pre-warm R2 via the image CDN
         if: inputs.job == 'prewarm-r2' || inputs.job == 'both'

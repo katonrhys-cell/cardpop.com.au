@@ -328,6 +328,14 @@ describe('grid thumbnails (thumbSrc)', () => {
     expect(getCardImage('u/avatar.png').thumbSrc).toBeNull();
   });
 
+  it('emits thumbSrc for optimized shop photos in any bucket', () => {
+    const stored = 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/palms%20off%20gaming%20products/optimized/Mag%20Lock%20Cases/MAG-55PT_front.opt.webp';
+    expect(getCardImage(stored).thumbSrc).toBe(
+      'https://cdn/object/palms off gaming products/optimized/Mag Lock Cases/MAG-55PT_front.opt.thumb.webp'
+    );
+    expect(getCardImage('palms/MAG-55PT_front.png', { bucket: 'palms off gaming products' }).thumbSrc).toBeNull();
+  });
+
   it('never derives a thumb of a thumb', () => {
     expect(getCardImage(`u/${NEW_TS}.thumb.webp`).thumbSrc).toBeNull();
   });

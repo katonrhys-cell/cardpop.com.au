@@ -302,6 +302,21 @@ server-side for the slab-template route (`createThumbnailBuffer` in
 `src/utils/imageProcessor.js`), and are best-effort — a thumb failure never
 fails the upload.
 
+## Optimized shop product photos
+
+Supplier photo sets arrive at print resolution — the Palms Off Gaming range was
+288 PNGs averaging ~2.6 MB (up to 7.4 MB) with a 1-hour cache header, so one
+shop grid page pulled 100 MB+. `scripts/optimize-shop-images.mjs` (Actions →
+**Image maintenance** → `optimize-shop-images`, untick *Dry run* to act)
+converts every PNG/JPEG a `shop_products` row references in the chosen bucket
+into `optimized/<path>.opt.webp` (≤1600 px) plus `optimized/<path>.opt.thumb.webp`
+(≤480 px), both with a one-year cache header, then rewrites the rows to the
+`.opt.webp` URLs. The `.opt.webp` suffix is the thumbnail marker:
+`getCardImage` emits a `thumbSrc` for it in any bucket, so shop grids load the
+thumb. Originals are never touched or deleted, a row is only repointed once
+both of its files uploaded, and re-runs reuse existing conversions. Upload new
+supplier sets, then re-run the job.
+
 ## Related pieces in this repo
 
 - `cloudflare/image-proxy-worker.js` — the Worker source (Option A).
