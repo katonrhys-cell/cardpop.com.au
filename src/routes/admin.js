@@ -760,7 +760,10 @@ router.delete('/card-art/:id', validateRequestParams(cardArtIdSchema), async (re
 const AFFILIATE_HOST_SUFFIXES = [
   'amazon.com', 'amazon.com.au', 'amazon.co.uk', 'amazon.ca', 'amazon.de',
   'amazon.co.jp', 'amazon.in', 'amazon.fr', 'amazon.it', 'amazon.es',
-  'amzn.to', 'amzn.com', 'a.co',
+  // Short links: amzn.to / a.co, and link.amazon — the format SiteStripe's
+  // "Get link" hands out now. Without it every current Associates link was
+  // refused and products were saved with no image.
+  'amzn.to', 'amzn.com', 'a.co', 'link.amazon',
 ];
 
 const isAllowedAffiliateHost = (hostname) => {
@@ -780,6 +783,26 @@ const metaContent = (html, key) => {
     if (m && m[1]) return m[1];
   }
   return null;
+};
+
+// Amazon product pages usually carry NO og:image, so fall back to the main
+// product photo in the page markup: the landing image's data-old-hires /
+// data-a-dynamic-image attributes, then the "hiRes"/"large" entries in the
+// inline image-gallery JSON. Only https m.media-amazon.com-style image URLs
+// are accepted so a stray match can't produce junk.
+const AMAZON_IMAGE_URL = /^https:\/\/[a-z0-9.-]*(?:media-amazon\.com|ssl-images-amazon\.com|images-amazon\.com)\/images\//i;
+
+const amazonProductImage = (html) => {
+  const candidates = [];
+  const oldHires = html.match(/data-old-hires=["'](https:[^"']+)["']/i);
+  if (oldHires) candidates.push(oldHires[1]);
+  const dynamic = html.match(/data-a-dynamic-image=["']\{\s*(?:&quot;|")(https:[^"&]+)/i);
+  if (dynamic) candidates.push(dynamic[1]);
+  const hiRes = html.match(/"hiRes"\s*:\s*"(https:[^"]+)"/i);
+  if (hiRes) candidates.push(hiRes[1]);
+  const large = html.match(/"large"\s*:\s*"(https:[^"]+)"/i);
+  if (large) candidates.push(large[1]);
+  return candidates.map((u) => u.replace(/\\\//g, '/')).find((u) => AMAZON_IMAGE_URL.test(u)) || null;
 };
 
 const decodeEntities = (str) =>
@@ -875,7 +898,8 @@ router.post('/affiliate-metadata', async (req, res) => {
       metaContent(html, 'og:image') ||
       metaContent(html, 'og:image:secure_url') ||
       metaContent(html, 'twitter:image') ||
-      metaContent(html, 'twitter:image:src') || ''
+      metaContent(html, 'twitter:image:src') ||
+      amazonProductImage(html) || ''
     );
     const description = decodeEntities(
       metaContent(html, 'og:description') ||
