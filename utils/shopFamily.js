@@ -63,9 +63,21 @@ export function familyProductPath(sibling) {
   return `/product/shop/${sibling.id}/${slugify(sibling.title || 'product')}`;
 }
 
-/** Product images for a row: the `images` array, else `image_url`. */
+// The supplier's primary retail-packaging render ("…_pkg1.png", or "…_pkg.png"
+// where a line has only one). It carries the Palms Off Gaming branding, so it
+// leads the gallery rather than the plain cover shot.
+const PRIMARY_PACKAGING = /_pkg1?\.(png|jpe?g|webp)(\?|$)/i;
+
+/** Move the primary packaging shot to the front; everything else keeps its order. */
+export function packagingFirst(images) {
+  const list = Array.isArray(images) ? images : [];
+  const i = list.findIndex((url) => PRIMARY_PACKAGING.test(String(url)));
+  return i > 0 ? [list[i], ...list.slice(0, i), ...list.slice(i + 1)] : list;
+}
+
+/** Product images for a row: the `images` array (packaging first), else `image_url`. */
 export function productImages(row) {
-  if (Array.isArray(row?.images) && row.images.length) return row.images;
+  if (Array.isArray(row?.images) && row.images.length) return packagingFirst(row.images);
   return row?.image_url ? [row.image_url] : [];
 }
 

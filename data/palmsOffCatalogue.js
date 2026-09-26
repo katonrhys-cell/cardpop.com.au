@@ -306,10 +306,10 @@ const GENERATED_PRODUCTS = [
     heroColour: "Black",
     skus: ["DB-G-BLK", "DB-G-BLU", "DB-G-PNK", "DB-G-PUR", "DB-G-RED", "DB-G-TQS", "DB-G-YEL"],
     imagePaths: [
+      "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_pkg.png",
       "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_front.png",
       "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_profile.png",
       "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_buckle.png",
-      "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_pkg.png",
       "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_flat.png",
       "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_lid.png",
       "Deck Boxes/Genesis Deck Boxes/Black/DB-G-BLK_genesis-deck-box-black_open.png",
@@ -326,8 +326,8 @@ const GENERATED_PRODUCTS = [
     heroColour: "Blue",
     skus: ["PTL-N100-BLU"],
     imagePaths: [
-      "Deck Boxes/Portal Deck Boxes/Blue/PTL-N100-BLU_portal-deck-box-nexus-100-blue_hero.png",
       "Deck Boxes/Portal Deck Boxes/Blue/PTL-N100-BLU_portal-deck-box-nexus-100-blue_pkg1.png",
+      "Deck Boxes/Portal Deck Boxes/Blue/PTL-N100-BLU_portal-deck-box-nexus-100-blue_hero.png",
     ],
   },
   {
@@ -341,10 +341,10 @@ const GENERATED_PRODUCTS = [
     heroColour: "Black",
     skus: ["GCC-L-BLK", "GCC-L-PNK", "GCC-L-PUR", "GCC-L-RED", "GCC-L-YEL"],
     imagePaths: [
+      "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_pkg1.png",
       "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_front.png",
       "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_profile.png",
       "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_cards.png",
-      "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_pkg1.png",
       "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_pkg2.png",
       "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_cutout.png",
       "Graded Card Cases/GCC-Large/Black/GCC-L-BLK_collectors-series-large-graded-card-case-black_empty.png",
@@ -363,10 +363,10 @@ const GENERATED_PRODUCTS = [
     heroColour: "Black",
     skus: ["GCC-M-BLK", "GCC-M-BLU", "GCC-M-PNK", "GCC-M-PUR", "GCC-M-RED", "GCC-M-TQS", "GCC-M-YEL"],
     imagePaths: [
+      "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_pkg1.png",
       "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_front.png",
       "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_profile.png",
       "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_cards.png",
-      "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_pkg1.png",
       "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_pkg2.png",
       "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_cutout.png",
       "Graded Card Cases/GCC-Medium/Black/GCC-M-BLK_collectors-series-medium-graded-card-case-black_empty.png",
@@ -385,10 +385,10 @@ const GENERATED_PRODUCTS = [
     heroColour: "Black",
     skus: ["GCC-S-BLK", "GCC-S-BLU", "GCC-S-PNK", "GCC-S-PUR", "GCC-S-RED", "GCC-S-TQS", "GCC-S-YEL"],
     imagePaths: [
+      "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_pkg1.png",
       "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_front.png",
       "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_profile.png",
       "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_cards.png",
-      "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_pkg1.png",
       "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_pkg2.png",
       "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_cutout.png",
       "Graded Card Cases/GCC-Small/Black/GCC-S-BLK_collectors-series-small-graded-card-case-black_empty.png",
