@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, MoreHorizontal, Eye, RefreshCcw, ShoppingCart, ChevronLeft, AlertCircle, Download, RotateCcw, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Search, MoreHorizontal, Eye, RefreshCcw, ShoppingCart, ChevronLeft, AlertCircle, Download, RotateCcw, CheckCircle2, XCircle, Clock, Truck } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
+import ShipOrderDialog from '@/components/admin/ShipOrderDialog.jsx';
 
 const STATUS_BADGE = {
   pending:           'bg-muted text-muted-foreground border-border',
@@ -220,6 +221,7 @@ const OrderManagementPage = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [selectedRefund, setSelectedRefund] = useState(null);
   const [viewOrderId, setViewOrderId] = useState(null);
+  const [shipOrder, setShipOrder] = useState(null);
   const isMounted = useRef(true);
 
   const fetchOrders = useCallback(async () => {
@@ -393,6 +395,11 @@ const OrderManagementPage = () => {
                     <Badge variant="outline" className={`text-xs font-bold ${STATUS_BADGE[order.status] || 'bg-muted text-muted-foreground'}`}>
                       {order.status?.replace(/_/g, ' ') || 'pending'}
                     </Badge>
+                    {order.tracking_number && (
+                      <p className="text-[11px] font-mono text-muted-foreground mt-1" title={order.shipping_notified_at ? 'Customer emailed' : 'Customer not emailed'}>
+                        {order.tracking_number}{order.shipping_notified_at ? ' ✉' : ''}
+                      </p>
+                    )}
                   </TableCell>
                   <TableCell>
                     {order.refund_status && REFUND_BADGE[order.refund_status] ? (
@@ -413,9 +420,11 @@ const OrderManagementPage = () => {
                           <Eye className="w-4 h-4" /> View Details
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleStatusChange(order.id, 'shipped')} className="cursor-pointer gap-2 font-medium">
-                          Mark as Shipped
-                        </DropdownMenuItem>
+                        {['payment_confirmed', 'shipped'].includes(order.status) && (
+                          <DropdownMenuItem onClick={() => setShipOrder(order)} className="cursor-pointer gap-2 font-medium">
+                            <Truck className="w-4 h-4" /> {order.status === 'shipped' ? 'Update Tracking' : 'Mark as Shipped'}
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={() => handleStatusChange(order.id, 'completed')} className="cursor-pointer gap-2 font-medium">
                           Mark as Completed
                         </DropdownMenuItem>
@@ -447,6 +456,14 @@ const OrderManagementPage = () => {
           refund={selectedRefund}
           onClose={() => { setSelectedOrder(null); setSelectedRefund(null); }}
           onUpdate={fetchOrders}
+        />
+      )}
+
+      {shipOrder && (
+        <ShipOrderDialog
+          order={shipOrder}
+          onClose={() => setShipOrder(null)}
+          onShipped={(updated) => setOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
         />
       )}
 

@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Package, MapPin } from 'lucide-react';
+import { AlertCircle, Package, MapPin, Truck } from 'lucide-react';
+import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient } from '@/lib/apiServerClient.js';
 import { format } from 'date-fns';
@@ -218,6 +219,30 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
                   {order.shipping_address && <p>{order.shipping_address}</p>}
                   <p>
                     {[order.shipping_suburb, order.shipping_state, order.shipping_postcode].filter(Boolean).join(' ')}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {order.tracking_number && (
+              <div className="space-y-1.5">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5" /> Tracking
+                </p>
+                <div className="bg-muted/30 rounded-xl p-3 text-muted-foreground space-y-0.5">
+                  <p>
+                    {carrierLabel(order.tracking_carrier)}:{' '}
+                    {trackingUrl(order.tracking_carrier, order.tracking_number) ? (
+                      <a href={trackingUrl(order.tracking_carrier, order.tracking_number)} target="_blank" rel="noopener noreferrer" className="font-mono text-primary hover:underline underline-offset-2">
+                        {order.tracking_number}
+                      </a>
+                    ) : <span className="font-mono text-foreground">{order.tracking_number}</span>}
+                  </p>
+                  {order.shipped_at && <p className="text-xs">Shipped {format(new Date(order.shipped_at), 'dd MMM yyyy, h:mm a')}</p>}
+                  <p className="text-xs">
+                    {order.shipping_notified_at
+                      ? `Customer emailed ${format(new Date(order.shipping_notified_at), 'dd MMM yyyy, h:mm a')}`
+                      : 'Customer not emailed'}
                   </p>
                 </div>
               </div>

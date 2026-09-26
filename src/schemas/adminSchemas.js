@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CARRIER_IDS, isValidTrackingNumber } from '../../utils/shipmentTracking.js';
 
 export const setUserRoleSchema = z.object({
   userId: z.string().min(1, 'User ID is required'),
@@ -37,6 +38,18 @@ export const processRefundBodySchema = z.object({
   (data) => data.action !== 'reject' || (data.rejection_reason?.trim()),
   { message: 'A rejection reason is required when action is reject' }
 );
+
+export const shipOrderSchema = z.object({
+  id: z.string().uuid('Invalid order ID'),
+});
+
+export const shipOrderBodySchema = z.object({
+  carrier: z.enum(CARRIER_IDS),
+  tracking_number: z.string().refine(isValidTrackingNumber, 'Tracking number must be 4–40 letters, digits or dashes'),
+  // Email the buyer their tracking link. Defaults on; off lets an admin fix a
+  // typo'd reference without a second email.
+  notify: z.boolean().optional().default(true),
+});
 
 export const getDisputesSchema = z.object({
   // The admin filter offers the resolved terminal statuses too, and the handler

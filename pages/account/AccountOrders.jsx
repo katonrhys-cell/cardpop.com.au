@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock, Star } from 'lucide-react';
+import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock, Star, Truck } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
+import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 
 // Order states in which the buyer has something real to review — the seller
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
@@ -200,6 +201,24 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
           <p className="font-bold text-foreground">${(order.total_aud || 0).toFixed(2)}</p>
         </div>
       </div>
+
+      {/* Tracking */}
+      {order.tracking_number && (
+        <div className="flex items-center gap-2 text-xs bg-muted/30 rounded-xl p-3">
+          <Truck className="w-4 h-4 shrink-0 text-primary/70" />
+          <span className="text-muted-foreground">{carrierLabel(order.tracking_carrier)}:</span>
+          {trackingUrl(order.tracking_carrier, order.tracking_number) ? (
+            <a
+              href={trackingUrl(order.tracking_carrier, order.tracking_number)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono font-semibold text-primary hover:underline underline-offset-2"
+            >
+              {order.tracking_number}
+            </a>
+          ) : <span className="font-mono font-semibold text-foreground">{order.tracking_number}</span>}
+        </div>
+      )}
 
       {/* Seller */}
       {order.seller && (

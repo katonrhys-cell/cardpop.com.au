@@ -16,6 +16,7 @@ import {
   contactMessageEmail,
   offerReceivedEmail,
   shopEnquiryEmail,
+  orderShippedEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -142,6 +143,19 @@ export async function sendRefundProcessed({ buyerEmail, buyerName, refundAmount,
     to: buyerEmail,
     subject: 'Your CardPop refund has been processed',
     html: refundProcessedEmail({ buyerName, refundAmount, orderId }),
+  });
+}
+
+/**
+ * Tells the buyer their order has shipped, with the carrier tracking link.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber }) {
+  return send({
+    to: buyerEmail,
+    subject: `Your CardPop order ${orderRef} has shipped`,
+    html: orderShippedEmail({ buyerName, orderRef, items, carrier, trackingNumber }),
   });
 }
 

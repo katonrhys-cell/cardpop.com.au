@@ -31,9 +31,25 @@ The transactional emails and where they fire:
 | Refund issued | Seller | `src/services/refundService.js` |
 | Welcome offer (trial + discount) | New user | `src/services/welcomeOfferService.js` |
 | Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
+| Order shipped (tracking) | Buyer | `src/routes/admin.js` `POST /admin/orders/:id/ship` (see below) |
 | Sold-out shop enquiry | Admin (`noreply@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
 
 Email HTML is built by the templates in `src/emails/templates.js`.
+
+### Order shipped (tracking)
+
+Admin → Order Management → **Mark as Shipped** opens `components/admin/ShipOrderDialog.jsx`:
+pick the carrier (Australia Post by default), paste the tracking reference, and
+leave **Email the customer** ticked. It calls `POST /admin/orders/:id/ship`, which
+sets `orders.status = 'shipped'`, stores `tracking_carrier` / `tracking_number` /
+`shipped_at`, emails the buyer (guest email on the order, else `profiles.email`)
+with a **Track Your Parcel** button, drops an `order_update` notification in the
+bell, and stamps `shipping_notified_at` once the email is accepted by Resend.
+Only `payment_confirmed` or already-`shipped` orders can be shipped; re-posting on
+a shipped order is **Update Tracking** (untick the box to fix a typo without a
+second email). Carrier list and tracking links live in `utils/shipmentTracking.js`
+(StarTrack links go to the Australia Post tracker, which handles both). Buyers also
+see the tracking link on `/account/orders`.
 
 ### Offer / enquiry notifications
 
