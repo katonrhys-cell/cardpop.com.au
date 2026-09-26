@@ -1,22 +1,33 @@
 /**
- * Type + colour filters for a shop category grid (e.g. /shop/category/binders).
- *
- * Colour lines are one shop_products row per colour linked by `family_sku`
- * (see utils/shopFamily.js), so a category like Binders is ~8 product lines ×
- * ~7 colours. "Type" is the product line: the family (or the product itself
- * when it has no family), labelled with its title minus the brand prefix and
- * the " — <colour>" suffix the colour split appended.
+ * Filter chips ("facets") for shop product grids — category pages such as
+ * /shop/category/binders, the collection pages and the main /shop grid.
  *
  * Facets are computed client-side from a lightweight list of every product in
- * the category (FACET_SELECT); the grid query then filters server-side by the
- * matching ids / colour, so pagination stays accurate.
+ * the page's scope (FACET_SELECT). When any filter is active the page filters
+ * and sorts that list itself, then fetches full rows only for the ids on the
+ * current page (fetchShopProductsByIds) — so counts and pagination are exact
+ * and the request never carries more than one page of ids.
+ *
+ * Each facet only renders when it would actually narrow the grid (see
+ * `minOptions` / `worthShowing`), so a category of single products shows no
+ * Type chips, a one-brand category shows no Brand chips, and so on.
+ *
+ * "Type" is the product line: colour lines are one shop_products row per colour
+ * linked by `family_sku` (utils/shopFamily.js), labelled with the title minus
+ * the brand prefix and the " — <colour>" suffix the colour split appended.
  */
 import { sortFamily } from '@/utils/shopFamily.js';
+import { isSoldOut, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 
-/** Columns needed to build the filters. */
-export const FACET_SELECT = 'id, sku, title, brand, family_sku, colour, colour_hex';
+/** Columns needed to build, filter and sort by the facets. */
+export const FACET_SELECT =
+  'id, sku, title, brand, category, family_sku, colour, colour_hex, price_aud, retail_price_aud, stock_quantity, status, created_at';
 
 const norm = (s) => String(s || '').trim().toLowerCase();
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const natural = (a, b) => a.label.localeCompare(b.label, undefined, { numeric: true });
+
+// ─── Per-facet value extraction ─────────────────────────────────────────────
 
 /** Key grouping a product into its line: family SKU, else its own SKU/id. */
 export const typeKey = (p) => String(p?.family_sku || p?.sku || p?.id || '').toUpperCase();
@@ -24,12 +35,9 @@ export const typeKey = (p) => String(p?.family_sku || p?.sku || p?.id || '').toU
 /** Human label for a product's line. */
 export function typeLabel(p) {
   let title = String(p?.title || '').trim();
-  // Drop the " — Pink" suffix the per-colour split added.
   if (p?.colour) {
-    const suffix = new RegExp(`\\s*[—–-]\\s*${p.colour.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i');
-    title = title.replace(suffix, '');
+    title = title.replace(new RegExp(`\\s*[—–-]\\s*${escapeRe(p.colour.trim())}\\s*$`, 'i'), '');
   }
-  // Drop the brand prefix ("Palms Off Gaming …") — every card in the row shares it.
   const brand = String(p?.brand || '').trim();
   if (brand && title.toLowerCase().startsWith(brand.toLowerCase() + ' ')) {
     title = title.slice(brand.length + 1);
@@ -37,44 +45,197 @@ export function typeLabel(p) {
   return title || p?.sku || 'Other';
 }
 
+/** Pockets per page from the title ("9-Pocket Zip Binder" → '9'), else null. */
+export function pocketCount(p) {
+  const m = String(p?.title || '').match(/\b(\d{1,2})\s*-?\s*pocket\b/i);
+  return m ? String(Number(m[1])) : null;
+}
+
+export const PRICE_BANDS = [
+  { value: 'under-20', label: 'Under $20', min: 0, max: 20 },
+  { value: '20-50', label: '$20 – $50', min: 20, max: 50 },
+  { value: '50-100', label: '$50 – $100', min: 50, max: 100 },
+  { value: '100-250', label: '$100 – $250', min: 100, max: 250 },
+  { value: '250-plus', label: '$250+', min: 250, max: Infinity },
+];
+
+export function priceBand(p) {
+  const price = Number(p?.price_aud);
+  if (!Number.isFinite(price)) return null;
+  return PRICE_BANDS.find((b) => price >= b.min && price < b.max)?.value || null;
+}
+
+export const AVAILABILITY = [
+  { value: 'in-stock', label: 'In stock' },
+  { value: 'coming-soon', label: 'Coming soon' },
+  { value: 'sold-out', label: 'Sold out' },
+];
+
+export function availability(p) {
+  if (p?.status === 'coming_soon') return 'coming-soon';
+  return isSoldOut(p) ? 'sold-out' : 'in-stock';
+}
+
+/** Selling below the manufacturer RRP. */
+export const onSale = (p) => {
+  const price = Number(p?.price_aud);
+  const rrp = Number(p?.retail_price_aud);
+  return Number.isFinite(price) && Number.isFinite(rrp) && rrp > price;
+};
+
+// ─── Facet definitions ──────────────────────────────────────────────────────
+
+const fixedOrder = (list) => (options) =>
+  list.map((d) => options.find((o) => o.value === d.value)).filter(Boolean);
+
 /**
- * Type options: one per product line, with a count. Returns [] when filtering
- * by type would be pointless — fewer than two lines, or no line holds more
- * than one product (every "type" would be a single product).
+ * value(row) → option key (or null), optionLabel(row, key) → display text.
+ * `worthShowing(options)` decides whether the facet narrows anything.
  */
-export function buildTypeOptions(rows) {
-  const map = new Map();
-  for (const p of rows || []) {
-    const key = typeKey(p);
-    if (!key) continue;
-    const entry = map.get(key) || { value: key, label: typeLabel(p), count: 0 };
-    entry.count += 1;
-    map.set(key, entry);
+export const FACETS = {
+  category: {
+    label: 'Category',
+    value: (p) => norm(p.category) || null,
+    optionLabel: (p) => String(p.category).trim(),
+    order: (o) => o.sort(natural),
+  },
+  type: {
+    label: 'Type',
+    value: (p) => typeKey(p) || null,
+    optionLabel: typeLabel,
+    order: (o) => o.sort(natural),
+    // Every "type" being a single product would just list the products again.
+    worthShowing: (o) => o.length >= 2 && o.some((x) => x.count > 1),
+  },
+  pockets: {
+    label: 'Pockets per page',
+    value: pocketCount,
+    optionLabel: (p, v) => `${v}-pocket`,
+    order: (o) => o.sort((a, b) => Number(a.value) - Number(b.value)),
+  },
+  colour: {
+    label: 'Colour',
+    swatch: true,
+    value: (p) => norm(p.colour) || null,
+    optionLabel: (p) => String(p.colour).trim(),
+    order: (o) => sortFamily(o.map((x) => ({ ...x, colour: x.label }))).map(({ colour: _c, ...x }) => x),
+  },
+  brand: {
+    label: 'Brand',
+    value: (p) => norm(p.brand) || null,
+    optionLabel: (p) => String(p.brand).trim(),
+    order: (o) => o.sort(natural),
+  },
+  price: {
+    label: 'Price',
+    value: priceBand,
+    optionLabel: (p, v) => PRICE_BANDS.find((b) => b.value === v).label,
+    order: fixedOrder(PRICE_BANDS),
+  },
+  availability: {
+    label: 'Availability',
+    value: availability,
+    optionLabel: (p, v) => AVAILABILITY.find((a) => a.value === v).label,
+    order: fixedOrder(AVAILABILITY),
+  },
+  sale: {
+    label: 'Deals',
+    value: (p) => (onSale(p) ? 'on-sale' : null),
+    optionLabel: () => 'On sale',
+    order: (o) => o,
+    // A single "On sale" chip — useful only if some, but not all, are on sale.
+    worthShowing: (o, rows) => o.length === 1 && o[0].count < rows.length,
+  },
+};
+
+/** Facets category / collection pages offer, in display order. */
+export const DEFAULT_FACET_KEYS = ['type', 'pockets', 'colour', 'price', 'availability', 'brand', 'sale'];
+
+/**
+ * { facetKey: options[] } for the facets worth showing over `rows`.
+ * Each option is { value, label, count, hex? }.
+ */
+export function buildFacetOptions(rows, keys = DEFAULT_FACET_KEYS) {
+  const list = rows || [];
+  const out = {};
+  for (const key of keys) {
+    const def = FACETS[key];
+    if (!def) continue;
+    const map = new Map();
+    for (const p of list) {
+      const v = def.value(p);
+      if (!v) continue;
+      const entry = map.get(v) || { value: v, label: def.optionLabel(p, v), count: 0 };
+      entry.count += 1;
+      if (def.swatch && !entry.hex && p.colour_hex) entry.hex = p.colour_hex;
+      map.set(v, entry);
+    }
+    const options = def.order([...map.values()]);
+    const show = def.worthShowing ? def.worthShowing(options, list) : options.length >= 2;
+    if (show) out[key] = options;
   }
-  const options = [...map.values()];
-  if (options.length < 2 || !options.some((o) => o.count > 1)) return [];
-  return options.sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }));
+  return out;
 }
 
-/** Colour options (deduped case-insensitively, swatch order). [] if < 2 colours. */
-export function buildColourOptions(rows) {
-  const map = new Map();
-  for (const p of rows || []) {
-    const key = norm(p.colour);
-    if (!key) continue;
-    const entry = map.get(key) || { value: key, label: p.colour.trim(), hex: p.colour_hex || null, count: 0 };
-    entry.count += 1;
-    if (!entry.hex && p.colour_hex) entry.hex = p.colour_hex;
-    map.set(key, entry);
+// ─── Selection ──────────────────────────────────────────────────────────────
+
+const canonical = (key, value) => (key === 'type' ? String(value).toUpperCase() : norm(value));
+
+/** Read the selection from URL params, keeping only values on offer. */
+export function readSelection(params, options) {
+  const sel = {};
+  for (const [key, opts] of Object.entries(options || {})) {
+    const raw = params.get(key);
+    if (!raw) continue;
+    const v = canonical(key, raw);
+    if (opts.some((o) => o.value === v)) sel[key] = v;
   }
-  const options = sortFamily([...map.values()].map((o) => ({ ...o, colour: o.label })))
-    .map(({ colour: _c, ...o }) => o);
-  return options.length < 2 ? [] : options;
+  return sel;
 }
 
-/** Rows matching the selected type and/or colour (either may be empty). */
-export function filterFacetRows(rows, { type, colour } = {}) {
-  const t = String(type || '').toUpperCase();
-  const c = norm(colour);
-  return (rows || []).filter((p) => (!t || typeKey(p) === t) && (!c || norm(p.colour) === c));
+/** Rows matching every selected facet, optionally ignoring one (for counts). */
+export function filterFacetRows(rows, selection = {}, exceptKey = null) {
+  const active = Object.entries(selection).filter(([k, v]) => v && k !== exceptKey && FACETS[k]);
+  if (active.length === 0) return rows || [];
+  return (rows || []).filter((p) => active.every(([k, v]) => FACETS[k].value(p) === canonical(k, v)));
+}
+
+/**
+ * Per-option counts for one facet given the other selections — so choosing a
+ * colour shows which types come in it, and vice versa.
+ */
+export function facetCounts(rows, selection, key) {
+  const counts = new Map();
+  const def = FACETS[key];
+  for (const p of filterFacetRows(rows, selection, key)) {
+    const v = def.value(p);
+    if (v) counts.set(v, (counts.get(v) || 0) + 1);
+  }
+  return counts;
+}
+
+/** Case-insensitive title match, mirroring the grids' `ilike('title', %q%)`. */
+export function matchesSearch(row, term) {
+  const q = norm(term);
+  return !q || norm(row.title).includes(q);
+}
+
+/** Sort facet rows the way the grids' server queries do. */
+export function sortFacetRows(rows, sort) {
+  const price = (p) => Number(p.price_aud) || 0;
+  const time = (p) => Date.parse(p.created_at) || 0;
+  const list = [...(rows || [])];
+  if (sort === 'price_asc') return list.sort((a, b) => price(a) - price(b));
+  if (sort === 'price_desc') return list.sort((a, b) => price(b) - price(a));
+  if (sort === 'oldest') return list.sort((a, b) => time(a) - time(b));
+  return list.sort((a, b) => time(b) - time(a));
+}
+
+/** Full rows for `ids`, returned in the same order. */
+export async function fetchShopProductsByIds(supabase, ids) {
+  if (!ids?.length) return [];
+  const { data, error } = await supabase.from('shop_products').select('*').in('id', ids).in('status', PUBLIC_SHOP_STATUSES);
+  if (error) throw error;
+  const byId = new Map((data || []).map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter(Boolean);
 }

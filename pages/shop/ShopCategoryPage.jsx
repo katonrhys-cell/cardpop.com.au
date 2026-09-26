@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
@@ -17,8 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
-import { FACET_SELECT, buildTypeOptions, buildColourOptions, filterFacetRows } from '@/utils/shopFacets.js';
-import ShopCategoryFilters from '@/components/shop/ShopCategoryFilters.jsx';
+import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import { useShopFacets } from '@/hooks/useShopFacets.js';
+import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -37,29 +38,6 @@ const ShopCategoryPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const fetchRef = useRef(null);
-  const [facetRows, setFacetRows] = useState([]);
-  const [facetsLoaded, setFacetsLoaded] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
-  const typeFilter = searchParams.get('type') || '';
-  const colourFilter = searchParams.get('colour') || '';
-
-  // Type / colour live in the URL so a filtered view can be shared or reloaded.
-  const setFilter = (key, value) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      if (value) next.set(key, value); else next.delete(key);
-      return next;
-    }, { replace: true });
-  };
-  const clearFilters = () => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('type');
-      next.delete('colour');
-      return next;
-    }, { replace: true });
-  };
-
   // Accessory categories (Card Sleeves, Top Loaders, …) are defined in the shop
   // config, not the marketplace `categories` hierarchy — resolve those first so
   // each dropdown item renders a real page. Fall back to the TCG hierarchy for
@@ -69,50 +47,43 @@ const ShopCategoryPage = () => {
   const { category, subcategory, productType } = pathInfo || {};
   const categoryName = shopCategory?.name || subcategory?.name || category?.name;
 
-  // Reset to the first page whenever the category path, sort or search changes,
-  // so we never land on an out-of-range page showing zero products.
+  // Type / colour / price / availability… chips (see utils/shopFacets.js).
+  const facets = useShopFacets({
+    scope: (q) => (categoryName ? q.ilike('category', `%${escapeLike(categoryName)}%`) : q),
+    scopeKey: categoryName || '',
+    enabled: !contextLoading,
+  });
+  const selectionKey = JSON.stringify(facets.selection);
+  const filtering = facets.activeCount > 0;
+  // Only a filtered grid reads the facet rows — don't refetch the unfiltered
+  // grid just because they finished loading.
+  const filterRows = filtering ? facets.rows : null;
+
+  // Reset to the first page whenever the category path, sort, search or a
+  // filter changes, so we never land on an out-of-range page showing zero products.
   useEffect(() => {
     setPage(1);
-  }, [categorySlug, subcategorySlug, productTypeSlug, sort, searchTerm, typeFilter, colourFilter]);
-
-  // Lightweight list of every product in the category, used to build the
-  // type / colour filters. Fail-safe: any error just means no filters.
-  useEffect(() => {
-    if (contextLoading) return undefined;
-    let cancelled = false;
-    setFacetsLoaded(false);
-    (async () => {
-      try {
-        let query = supabase.from('shop_products').select(FACET_SELECT).in('status', PUBLIC_SHOP_STATUSES);
-        if (categoryName) query = query.ilike('category', `%${escapeLike(categoryName)}%`);
-        const { data, error } = await query;
-        if (!cancelled) setFacetRows(error ? [] : (data || []));
-      } catch {
-        if (!cancelled) setFacetRows([]);
-      } finally {
-        if (!cancelled) setFacetsLoaded(true);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [categoryName, contextLoading]);
-
-  const typeOptions = useMemo(() => buildTypeOptions(facetRows), [facetRows]);
-  const colourOptions = useMemo(() => buildColourOptions(facetRows), [facetRows]);
-  // Only honour a filter the category actually offers (ignores stale URLs).
-  const activeType = typeOptions.some((o) => o.value === typeFilter.toUpperCase()) ? typeFilter.toUpperCase() : '';
-  const activeColour = colourOptions.some((o) => o.value === colourFilter.toLowerCase()) ? colourFilter.toLowerCase() : '';
-  // Ids matching the chosen filters; null = no filter applied.
-  const filteredIds = useMemo(() => {
-    if (!activeType && !activeColour) return null;
-    return filterFacetRows(facetRows, { type: activeType, colour: activeColour }).map((p) => p.id);
-  }, [facetRows, activeType, activeColour]);
-  const filteredIdsKey = filteredIds ? filteredIds.join(',') : '';
+  }, [categorySlug, subcategorySlug, productTypeSlug, sort, searchTerm, selectionKey]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
         const from = (page - 1) * PER_PAGE;
+
+        // Filtered: the facet rows already hold every product in the category,
+        // so filter + sort them here and fetch full rows for this page only.
+        if (filtering) {
+          const matched = sortFacetRows(
+            filterFacetRows(facets.rows, facets.selection).filter((r) => matchesSearch(r, searchTerm)),
+            sort,
+          );
+          const pageRows = await fetchShopProductsByIds(supabase, matched.slice(from, from + PER_PAGE).map((r) => r.id));
+          setProducts(pageRows.map(p => ({ ...p, source: 'shop', type: 'shop' })));
+          setTotalItems(matched.length);
+          setTotalPages(Math.ceil(matched.length / PER_PAGE));
+          return;
+        }
 
         // Exact count: this page renders numbered page buttons (PaginationControls),
         // which need an accurate total — an estimated count would render buttons for
@@ -127,15 +98,6 @@ const ShopCategoryPage = () => {
         // subcategory/category name against it.
         if (categoryName) query = query.ilike('category', `%${escapeLike(categoryName)}%`);
         if (searchTerm) query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
-        if (filteredIds) {
-          if (filteredIds.length === 0) {
-            setProducts([]);
-            setTotalItems(0);
-            setTotalPages(0);
-            return;
-          }
-          query = query.in('id', filteredIds);
-        }
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
@@ -158,17 +120,16 @@ const ShopCategoryPage = () => {
       }
     };
 
-    // A filter in the URL can only be resolved to ids once the facets load —
-    // wait rather than flash the unfiltered grid first.
-    const waitingOnFacets = (typeFilter || colourFilter) && !facetsLoaded;
-    if (!contextLoading && !waitingOnFacets) {
+    // A filter in the URL can only be resolved once the facets load — wait
+    // rather than flash the unfiltered grid first.
+    if (!contextLoading && !facets.waiting) {
       fetchRef.current = fetchProducts;
       fetchProducts();
     }
     // Depend on stable slug strings (not the derived path objects, which get new
     // identities every render and would re-run this effect needlessly). The
-    // filtered ids are tracked by value via filteredIdsKey for the same reason.
-  }, [categoryName, page, sort, searchTerm, contextLoading, filteredIdsKey, facetsLoaded]);
+    // selection is tracked by value via selectionKey for the same reason.
+  }, [categoryName, page, sort, searchTerm, contextLoading, selectionKey, filterRows, facets.waiting]);
 
   useEffect(() => {
     const channel = supabase
@@ -346,15 +307,12 @@ const ShopCategoryPage = () => {
           </div>
         </div>
 
-        <ShopCategoryFilters
-          typeOptions={typeOptions}
-          colourOptions={colourOptions}
-          facetRows={facetRows}
-          type={activeType}
-          colour={activeColour}
-          onTypeChange={(v) => setFilter('type', v)}
-          onColourChange={(v) => setFilter('colour', v)}
-          onClear={clearFilters}
+        <ShopFilterPanel
+          options={facets.options}
+          rows={facets.rows}
+          selection={facets.selection}
+          onChange={facets.setFacet}
+          onClear={facets.clearFacets}
         />
 
         <ProductGrid items={products} loading={loading || contextLoading} isVault={false} onAddToCart={handleAddToCart} />

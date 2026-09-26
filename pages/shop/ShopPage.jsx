@@ -14,7 +14,15 @@ import ProductCard from '@/components/ProductCard.jsx';
 import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER } from '@/utils/shopStock.js';
+import { useShopFacets } from '@/hooks/useShopFacets.js';
+import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
+
+const PAGE_LIMIT = 50;
+// Across the whole catalogue, Category leads; Type/pockets only make sense
+// inside one category, so they're left to the category pages.
+const FACET_KEYS = ['category', 'price', 'availability', 'brand', 'colour', 'sale'];
 
 const ShopPage = () => {
   const [products, setProducts] = useState([]);
@@ -27,6 +35,11 @@ const ShopPage = () => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const { addToCart } = useCart();
   const fetchRef = useRef(null);
+  const facets = useShopFacets({ scopeKey: 'all', keys: FACET_KEYS });
+  const selectionKey = JSON.stringify(facets.selection);
+  // Only a filtered grid reads the facet rows — don't refetch the unfiltered
+  // grid just because they finished loading.
+  const filterRows = facets.activeCount > 0 ? facets.rows : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -35,11 +48,23 @@ const ShopPage = () => {
       setLoading(true);
       setError(null);
       try {
+        // Filtered: filter + sort the facet rows here, then fetch full rows
+        // for the first page of matches only.
+        if (filterRows) {
+          const matched = sortFacetRows(
+            filterFacetRows(filterRows, JSON.parse(selectionKey)).filter((r) => matchesSearch(r, searchTerm)),
+            sort === 'created_at_desc' ? 'newest' : sort,
+          );
+          const rows = await fetchShopProductsByIds(supabase, matched.slice(0, PAGE_LIMIT).map((r) => r.id));
+          if (!cancelled) setProducts(rows.map(p => ({ ...p, source: 'shop', type: 'shop' })));
+          return;
+        }
+
         let query = supabase
           .from('shop_products')
           .select('*')
           .in('status', PUBLIC_SHOP_STATUSES)
-          .limit(50);
+          .limit(PAGE_LIMIT);
 
         if (searchTerm) {
           query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
@@ -65,9 +90,10 @@ const ShopPage = () => {
     };
 
     fetchRef.current = run;
-    run();
+    // Hold while a filter in the URL can't be resolved yet (no unfiltered flash).
+    if (!facets.waiting) run();
     return () => { cancelled = true; };
-  }, [sort, searchTerm]);
+  }, [sort, searchTerm, selectionKey, filterRows, facets.waiting]);
 
   useEffect(() => {
     // Scoped to publicly visible products (active + coming soon) — this page
@@ -158,6 +184,14 @@ const ShopPage = () => {
           </div>
         </div>
 
+        <ShopFilterPanel
+          options={facets.options}
+          rows={facets.rows}
+          selection={facets.selection}
+          onChange={facets.setFacet}
+          onClear={facets.clearFacets}
+        />
+
         {error ? (
           <div className="text-center py-20 text-destructive bg-destructive/5 rounded-3xl border border-destructive/20">
             <p className="font-bold text-lg">{error}</p>
@@ -188,7 +222,7 @@ const ShopPage = () => {
           <div className="flex flex-col items-center justify-center py-24 bg-card rounded-[2rem] border border-border border-dashed">
             <PackageX className="w-16 h-16 text-muted-foreground opacity-50 mb-4" />
             <p className="text-xl font-bold mb-2">No products found</p>
-            <p className="text-muted-foreground">Try adjusting your search criteria.</p>
+            <p className="text-muted-foreground">Try adjusting your search or filters.</p>
           </div>
         )}
 

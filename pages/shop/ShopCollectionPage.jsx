@@ -17,6 +17,9 @@ import { publicImageUrl } from '@/utils/imageUrl.js';
 import { slugify } from '@/lib/slugify.js';
 import { isSoldOut, isComingSoon, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
+import { useShopFacets } from '@/hooks/useShopFacets.js';
+import { DEFAULT_FACET_KEYS, filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 
@@ -184,6 +187,22 @@ const ShopCollectionPage = () => {
     return () => { cancelled = true; };
   }, [config, buildGroupOr]);
 
+  // ─── Filter chips (colour, price, availability, brand…) ────────────────
+  // Scoped like the grid: the selected pill's category, else the whole group.
+  // Type (product line) only once a pill narrows to one category — across a
+  // whole group it would just list every product.
+  const facets = useShopFacets({
+    keys: activeSub ? DEFAULT_FACET_KEYS : DEFAULT_FACET_KEYS.filter((k) => k !== 'type'),
+    scope: (q) => (activeSub ? q.ilike('category', `%${activeSub}%`) : q.or(buildGroupOr())),
+    scopeKey: `${groupSlug}|${activeSub || ''}`,
+    enabled: Boolean(config),
+  });
+  const selectionKey = JSON.stringify(facets.selection);
+  const filtering = facets.activeCount > 0;
+  // Only a filtered grid reads the facet rows — don't refetch the unfiltered
+  // grid just because they finished loading.
+  const filterRows = filtering ? facets.rows : null;
+
   // ─── Main browse grid (paginated, sortable, pill-filtered) ──────────────
   const fetchIdRef = useRef(0);
   const fetchProducts = useCallback(async (nextPage = 1) => {
@@ -195,6 +214,20 @@ const ShopCollectionPage = () => {
 
     const from = (nextPage - 1) * PER_PAGE;
     try {
+      // Filtered: the facet rows hold the whole scope, so filter + sort them
+      // here and fetch full rows for just this page.
+      if (filterRows) {
+        const matched = sortFacetRows(filterFacetRows(filterRows, JSON.parse(selectionKey)), sort);
+        const pageRows = await fetchShopProductsByIds(supabase, matched.slice(from, from + PER_PAGE).map((r) => r.id));
+        if (!isCurrent()) return;
+        const mapped = pageRows.map((p) => ({ ...p, source: 'shop', type: 'shop' }));
+        setProducts(nextPage === 1 ? mapped : (prev) => [...prev, ...mapped]);
+        setTotalProducts(matched.length);
+        setHasMore(matched.length > from + PER_PAGE);
+        setPage(nextPage);
+        return;
+      }
+
       let q = supabase
         .from('shop_products')
         .select('*', { count: 'estimated' })
@@ -225,11 +258,12 @@ const ShopCollectionPage = () => {
     } finally {
       if (isCurrent()) setProductsLoading(false);
     }
-  }, [config, activeSub, sort, buildGroupOr]);
+  }, [config, activeSub, sort, buildGroupOr, filterRows, selectionKey]);
 
   useEffect(() => {
-    if (config) fetchProducts(1);
-  }, [fetchProducts, config]);
+    // Hold while a filter in the URL can't be resolved yet (no unfiltered flash).
+    if (config && !facets.waiting) fetchProducts(1);
+  }, [fetchProducts, config, facets.waiting]);
 
   const handleSubClick = (name) => {
     const next = name === activeSub ? null : name;
@@ -490,6 +524,14 @@ const ShopCollectionPage = () => {
               </Select>
             </div>
           )}
+
+          <ShopFilterPanel
+            options={facets.options}
+            rows={facets.rows}
+            selection={facets.selection}
+            onChange={facets.setFacet}
+            onClear={facets.clearFacets}
+          />
 
           {productsError ? (
             <div className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
