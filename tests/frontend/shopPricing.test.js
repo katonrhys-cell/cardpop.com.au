@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shopPriceInfo, shopSellingPrice, shopFromPriceInfo } from '@/utils/shopPricing.js';
+import { shopPriceInfo, shopSellingPrice, shopFromPriceInfo, salePriceFromPercent, salePercentBase } from '@/utils/shopPricing.js';
 
 describe('shopPriceInfo', () => {
   it('sells at the regular price with no sale, and strikes nothing through when it equals the RRP', () => {
@@ -51,5 +51,24 @@ describe('shopPriceInfo', () => {
       ],
     };
     expect(shopFromPriceInfo(product).price).toBe(9.95);
+  });
+});
+
+describe('salePriceFromPercent', () => {
+  it('rounds down to the cent so the advertised saving is met', () => {
+    expect(salePriceFromPercent(29.99, 25)).toBe(22.49);
+    expect(salePriceFromPercent(14.95, 20)).toBe(11.96);
+    expect(salePriceFromPercent(10, 10)).toBe(9);
+  });
+
+  it('rejects out-of-range input', () => {
+    for (const [b, p] of [[0, 10], [10, 0], [10, 100], [10, -5], [null, 10], [10, '']]) {
+      expect(salePriceFromPercent(b, p)).toBeNull();
+    }
+  });
+
+  it('measures against the RRP when set, else the regular price', () => {
+    expect(salePercentBase({ price_aud: 20, retail_price_aud: 29.99 })).toBe(29.99);
+    expect(salePercentBase({ price_aud: 20, retail_price_aud: '' })).toBe(20);
   });
 });

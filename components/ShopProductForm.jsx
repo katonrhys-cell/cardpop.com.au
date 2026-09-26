@@ -11,7 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, X, ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
-import { shopPriceInfo, shopSellingPrice } from '@/utils/shopPricing.js';
+import { shopPriceInfo, shopSellingPrice, salePriceFromPercent, salePercentBase } from '@/utils/shopPricing.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { variantStock } from '@/utils/shopVariants.js';
 
@@ -62,9 +62,13 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   // its own SKU, barcode and stock; the product's stock becomes their sum.
   const [variants, setVariants] = useState([]);
   const [removedVariantIds, setRemovedVariantIds] = useState([]);
+  // "% off RRP" box — a shortcut that fills in the sale price. While the admin
+  // is typing a percent we keep their exact text; otherwise it's derived.
+  const [salePct, setSalePct] = useState('');
   const fileInputRef = useRef(null);
 
   useEffect(() => {
+    setSalePct('');
     if (product) {
       setFormData({
         title: product.title || '',
@@ -503,39 +507,68 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               a SALE badge, this price, and the RRP / regular price struck
               through — and checkout charges it. Clear it to end the sale. */}
           <div className="space-y-2">
-            <Label htmlFor="shop-product-sale">Sale price ($AUD) <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <div className="flex gap-2">
-              <Input
-                id="shop-product-sale"
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Leave blank when not on sale"
-                value={formData.sale_price_aud}
-                onChange={(e) => handleInputChange('sale_price_aud', e.target.value)}
-                className="bg-background tabular-nums"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="shrink-0"
-                disabled={String(formData.sale_price_aud ?? '').trim() === ''}
-                onClick={() => handleInputChange('sale_price_aud', '')}
-              >
-                End sale
-              </Button>
-            </div>
+            <Label htmlFor="shop-product-sale">Sale <span className="text-muted-foreground font-normal">(optional — enter a % off {String(formData.retail_price_aud ?? '').trim() !== '' ? 'RRP' : 'the regular price'} or a sale price)</span></Label>
             {(() => {
+              const base = salePercentBase(formData);
               const info = shopPriceInfo({ price_aud: formData.price_aud, sale_price_aud: formData.sale_price_aud, retail_price_aud: formData.retail_price_aud });
-              if (String(formData.sale_price_aud ?? '').trim() === '') {
-                return <p className="text-[11px] text-muted-foreground">Colour variants without their own price go on sale too.</p>;
-              }
-              return info.onSale ? (
-                <p className="text-xs font-semibold text-emerald-600">
-                  Shop shows: SALE ${info.price.toFixed(2)}{info.was != null ? ` (was ${info.wasIsRrp ? 'RRP ' : ''}$${info.was.toFixed(2)}, ${info.percentOff}% off)` : ''}
-                </p>
-              ) : (
-                <p className="text-xs font-semibold text-destructive">Must be below the regular price to count as a sale.</p>
+              const hasSale = String(formData.sale_price_aud ?? '').trim() !== '';
+              const pctValue = salePct !== '' ? salePct : (info.onSale && info.percentOff != null ? String(info.percentOff) : '');
+              return (
+                <>
+                  <div className="flex gap-2">
+                    <div className="relative w-28 shrink-0">
+                      <Input
+                        id="shop-product-sale-pct"
+                        aria-label="Percent off"
+                        type="number"
+                        step="1"
+                        min="1"
+                        max="99"
+                        placeholder="% off"
+                        value={pctValue}
+                        disabled={!base}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setSalePct(v);
+                          if (v === '') { handleInputChange('sale_price_aud', ''); return; }
+                          const next = salePriceFromPercent(base, v);
+                          if (next != null) handleInputChange('sale_price_aud', next.toFixed(2));
+                        }}
+                        className="bg-background tabular-nums pr-7"
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">%</span>
+                    </div>
+                    <Input
+                      id="shop-product-sale"
+                      aria-label="Sale price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Sale price ($AUD)"
+                      value={formData.sale_price_aud}
+                      onChange={(e) => { setSalePct(''); handleInputChange('sale_price_aud', e.target.value); }}
+                      className="bg-background tabular-nums"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      disabled={!hasSale}
+                      onClick={() => { setSalePct(''); handleInputChange('sale_price_aud', ''); }}
+                    >
+                      End sale
+                    </Button>
+                  </div>
+                  {!hasSale ? (
+                    <p className="text-[11px] text-muted-foreground">Leave blank when not on sale. Colour variants without their own price go on sale too.</p>
+                  ) : info.onSale ? (
+                    <p className="text-xs font-semibold text-emerald-600">
+                      Shop shows: {info.was != null ? `${info.wasIsRrp ? 'RRP' : 'Was'} $${info.was.toFixed(2)} → ` : ''}NOW ${info.price.toFixed(2)}{info.percentOff != null ? ` · SAVE ${info.percentOff}%${info.wasIsRrp ? ' off RRP' : ''}` : ''}
+                    </p>
+                  ) : (
+                    <p className="text-xs font-semibold text-destructive">Must be below the regular price to count as a sale.</p>
+                  )}
+                </>
               );
             })()}
           </div>

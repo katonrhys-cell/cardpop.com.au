@@ -62,6 +62,24 @@ export const shopPriceInfo = (product, variant = null) => {
   };
 };
 
+/**
+ * Sale price for a "% off" discount against a base price (the RRP, else the
+ * regular price) — rounded DOWN to the cent so the advertised saving is always
+ * met ($29.99 at 25% off → $22.49). Null for a base or percent out of range.
+ */
+export const salePriceFromPercent = (base, percent) => {
+  const b = num(base);
+  const pct = num(percent);
+  if (b == null || b <= 0 || pct == null || pct <= 0 || pct >= 100) return null;
+  return Math.floor(b * (100 - pct) + 1e-6) / 100;
+};
+
+/** The base a "% off" is measured against: the RRP when set, else the regular price. */
+export const salePercentBase = (product) => {
+  const rrp = num(product?.retail_price_aud);
+  return rrp != null && rrp > 0 ? rrp : num(product?.price_aud);
+};
+
 /** What the shopper pays (AUD) for a product / variant. */
 export const shopSellingPrice = (product, variant = null) => shopPriceInfo(product, variant).price;
 
