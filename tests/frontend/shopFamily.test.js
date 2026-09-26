@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-  sortFamily, familyAsVariants, pickDefaultSibling, familyProductPath, productImages, fetchFamily,
+  sortFamily, familyAsVariants, pickDefaultSibling, familyProductPath, productImages, fetchFamily, packagingFirst,
 } from '@/utils/shopFamily.js';
 
 const S = (o) => ({ id: o.sku, title: `Zip Binder — ${o.colour}`, stock_quantity: 0, ...o });
@@ -37,6 +37,15 @@ describe('shop colour families', () => {
     expect(productImages(null)).toEqual([]);
   });
 
+  it('leads the gallery with the branded packaging shot', () => {
+    const imgs = ['b/ZB-12-BLU_x_front.png', 'b/ZB-12-BLU_x_profile.png', 'b/ZB-12-BLU_x_pkg1.png', 'b/ZB-12-BLU_x_pkg2.png'];
+    expect(productImages({ images: imgs })).toEqual([imgs[2], imgs[0], imgs[1], imgs[3]]);
+    expect(packagingFirst(['a_front.png', 'a_pkg.png'])).toEqual(['a_pkg.png', 'a_front.png']);
+    expect(packagingFirst(['a_pkg1.png', 'a_front.png'])).toEqual(['a_pkg1.png', 'a_front.png']);
+    expect(packagingFirst(['a_front.png', 'a_pkg2.png'])).toEqual(['a_front.png', 'a_pkg2.png']);
+    expect(packagingFirst(null)).toEqual([]);
+  });
+
   it('fetchFamily filters by family and status, and never throws', async () => {
     const calls = [];
     const q = {
@@ -49,5 +58,18 @@ describe('shop colour families', () => {
     expect(calls).toContainEqual(['eq', 'family_sku', 'ZB-04']);
     expect(await fetchFamily({ from: () => { throw new Error('no column'); } }, 'ZB-04')).toEqual([]);
     expect(await fetchFamily({ from: vi.fn() }, null)).toEqual([]);
+  });
+});
+
+describe('static Palms Off galleries', () => {
+  it('every binder and catalogue gallery with a packaging shot leads with it', async () => {
+    const { BINDER_PRODUCTS } = await import('@/data/shopBinderProducts.js');
+    const { PALMS_OFF_PRODUCTS } = await import('@/data/palmsOffCatalogue.js');
+    const galleries = [
+      ...BINDER_PRODUCTS.map((p) => p.imageFiles),
+      ...PALMS_OFF_PRODUCTS.map((p) => p.imagePaths),
+    ].filter(Boolean);
+    expect(galleries.length).toBeGreaterThan(BINDER_PRODUCTS.length);
+    for (const g of galleries) expect(packagingFirst(g)).toEqual(g);
   });
 });

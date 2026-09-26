@@ -6,7 +6,7 @@ import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { sanitizeSearch, tokenizeSearch, rankItems } from '@/utils/searchRanking.js';
-import { slugify } from '@/lib/slugify.js';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
@@ -83,7 +83,7 @@ async function searchShop(tokens) {
   if (error) throw error;
   return (data || []).map((p) => ({
     key: `shop-${p.id}`,
-    url: `/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+    url: shopProductPath(p),
     image: publicImageUrl(p.image_url || p.image),
     title: p.title || p.name || 'Product',
     subtitle: 'Official Store',

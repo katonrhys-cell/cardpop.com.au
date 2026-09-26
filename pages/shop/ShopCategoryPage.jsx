@@ -6,7 +6,6 @@ import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
 import { findShopCategory } from '@/utils/shopCategories.js';
 import { generateMetaTitle, generateMetaDescription, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
-import { slugify } from '@/lib/slugify.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
@@ -17,6 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import { useShopFacets } from '@/hooks/useShopFacets.js';
+import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { toast } from 'sonner';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -35,7 +38,6 @@ const ShopCategoryPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const fetchRef = useRef(null);
-
   // Accessory categories (Card Sleeves, Top Loaders, …) are defined in the shop
   // config, not the marketplace `categories` hierarchy — resolve those first so
   // each dropdown item renders a real page. Fall back to the TCG hierarchy for
@@ -45,17 +47,43 @@ const ShopCategoryPage = () => {
   const { category, subcategory, productType } = pathInfo || {};
   const categoryName = shopCategory?.name || subcategory?.name || category?.name;
 
-  // Reset to the first page whenever the category path, sort or search changes,
-  // so we never land on an out-of-range page showing zero products.
+  // Type / colour / price / availability… chips (see utils/shopFacets.js).
+  const facets = useShopFacets({
+    scope: (q) => (categoryName ? q.ilike('category', `%${escapeLike(categoryName)}%`) : q),
+    scopeKey: categoryName || '',
+    enabled: !contextLoading,
+  });
+  const selectionKey = JSON.stringify(facets.selection);
+  const filtering = facets.activeCount > 0;
+  // Only a filtered grid reads the facet rows — don't refetch the unfiltered
+  // grid just because they finished loading.
+  const filterRows = filtering ? facets.rows : null;
+
+  // Reset to the first page whenever the category path, sort, search or a
+  // filter changes, so we never land on an out-of-range page showing zero products.
   useEffect(() => {
     setPage(1);
-  }, [categorySlug, subcategorySlug, productTypeSlug, sort, searchTerm]);
+  }, [categorySlug, subcategorySlug, productTypeSlug, sort, searchTerm, selectionKey]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
         const from = (page - 1) * PER_PAGE;
+
+        // Filtered: the facet rows already hold every product in the category,
+        // so filter + sort them here and fetch full rows for this page only.
+        if (filtering) {
+          const matched = sortFacetRows(
+            filterFacetRows(facets.rows, facets.selection).filter((r) => matchesSearch(r, searchTerm)),
+            sort,
+          );
+          const pageRows = await fetchShopProductsByIds(supabase, matched.slice(from, from + PER_PAGE).map((r) => r.id));
+          setProducts(pageRows.map(p => ({ ...p, source: 'shop', type: 'shop' })));
+          setTotalItems(matched.length);
+          setTotalPages(Math.ceil(matched.length / PER_PAGE));
+          return;
+        }
 
         // Exact count: this page renders numbered page buttons (PaginationControls),
         // which need an accurate total — an estimated count would render buttons for
@@ -92,13 +120,16 @@ const ShopCategoryPage = () => {
       }
     };
 
-    if (!contextLoading) {
+    // A filter in the URL can only be resolved once the facets load — wait
+    // rather than flash the unfiltered grid first.
+    if (!contextLoading && !facets.waiting) {
       fetchRef.current = fetchProducts;
       fetchProducts();
     }
     // Depend on stable slug strings (not the derived path objects, which get new
-    // identities every render and would re-run this effect needlessly).
-  }, [categoryName, page, sort, searchTerm, contextLoading]);
+    // identities every render and would re-run this effect needlessly). The
+    // selection is tracked by value via selectionKey for the same reason.
+  }, [categoryName, page, sort, searchTerm, contextLoading, selectionKey, filterRows, facets.waiting]);
 
   useEffect(() => {
     const channel = supabase
@@ -190,7 +221,7 @@ const ShopCategoryPage = () => {
         const productSchema = {
           '@type': 'Product',
           name: p.title || p.name || 'Trading Card Supply',
-          url: `${SITE_ORIGIN}/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+          url: `${SITE_ORIGIN}${shopProductPath(p)}`,
           ...(absoluteImage(p) ? { image: absoluteImage(p) } : {}),
           offers: {
             '@type': 'Offer',
@@ -199,7 +230,7 @@ const ShopCategoryPage = () => {
             availability: (p.stock_quantity == null || p.stock_quantity > 0)
               ? 'https://schema.org/InStock'
               : 'https://schema.org/OutOfStock',
-            url: `${SITE_ORIGIN}/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+            url: `${SITE_ORIGIN}${shopProductPath(p)}`,
           },
         };
         return {
@@ -275,6 +306,14 @@ const ShopCategoryPage = () => {
             </Select>
           </div>
         </div>
+
+        <ShopFilterPanel
+          options={facets.options}
+          rows={facets.rows}
+          selection={facets.selection}
+          onChange={facets.setFacet}
+          onClear={facets.clearFacets}
+        />
 
         <ProductGrid items={products} loading={loading || contextLoading} isVault={false} onAddToCart={handleAddToCart} />
 

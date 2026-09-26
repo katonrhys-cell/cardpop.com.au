@@ -7,7 +7,14 @@ import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { useShopFacets } from '@/hooks/useShopFacets.js';
+import { filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
+
+const PAGE_LIMIT = 48;
+// Price already has its own min/max inputs in the sidebar.
+const FACET_KEYS = ['category', 'availability', 'brand', 'sale'];
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -26,6 +33,15 @@ const ShopSinglesPage = () => {
   const [sort, setSort] = useState('created_at_desc');
   const [minPrice, setMinPrice] = useState('');
   const [maxPrice, setMaxPrice] = useState('');
+  const facets = useShopFacets({
+    scope: (q) => q.eq('product_type', 'single'),
+    scopeKey: 'single',
+    keys: FACET_KEYS,
+  });
+  const selectionKey = JSON.stringify(facets.selection);
+  // Only a filtered grid reads the facet rows — don't refetch the unfiltered
+  // grid just because they finished loading.
+  const filterRows = facets.activeCount > 0 ? facets.rows : null;
 
   useEffect(() => {
     let isMounted = true;
@@ -33,12 +49,30 @@ const ShopSinglesPage = () => {
     const fetchProducts = async () => {
       setLoading(true);
       try {
+        // Filtered: filter + sort the facet rows here (price range included),
+        // then fetch full rows for the first page of matches only.
+        if (filterRows) {
+          const min = minPrice && !isNaN(minPrice) ? Number(minPrice) : -Infinity;
+          const max = maxPrice && !isNaN(maxPrice) ? Number(maxPrice) : Infinity;
+          const matched = sortFacetRows(
+            filterFacetRows(filterRows, JSON.parse(selectionKey))
+              .filter((r) => Number(r.price_aud) >= min && Number(r.price_aud) <= max),
+            sort === 'created_at_desc' ? 'newest' : sort,
+          );
+          const rows = await fetchShopProductsByIds(supabase, matched.slice(0, PAGE_LIMIT).map((r) => r.id));
+          if (isMounted) {
+            setProducts(rows.map(p => ({ ...p, source: 'shop', type: 'shop' })));
+            setTotalItems(matched.length);
+          }
+          return;
+        }
+
         let query = supabase
           .from('shop_products')
           .select('*', { count: 'estimated' })
           .in('status', PUBLIC_SHOP_STATUSES)
           .eq('product_type', 'single')
-          .limit(48);
+          .limit(PAGE_LIMIT);
 
         if (minPrice && !isNaN(minPrice)) {
           query = query.gte('price_aud', Number(minPrice));
@@ -66,7 +100,8 @@ const ShopSinglesPage = () => {
     };
 
     fetchRef.current = fetchProducts;
-    const timer = setTimeout(() => {
+    // Hold while a filter in the URL can't be resolved yet (no unfiltered flash).
+    const timer = facets.waiting ? null : setTimeout(() => {
       fetchProducts();
     }, 400);
 
@@ -74,7 +109,7 @@ const ShopSinglesPage = () => {
       isMounted = false;
       clearTimeout(timer);
     };
-  }, [sort, minPrice, maxPrice]);
+  }, [sort, minPrice, maxPrice, selectionKey, filterRows, facets.waiting]);
 
   useEffect(() => {
     // Scoped to this page's own product_type so a change to a different
@@ -119,6 +154,7 @@ const ShopSinglesPage = () => {
     // Must match a SelectItem value (and the initial state) or the Sort control
     // blanks out — '-created' matched nothing.
     setSort('created_at_desc');
+    facets.clearFacets();
   };
 
   return (
@@ -178,6 +214,16 @@ const ShopSinglesPage = () => {
                 />
               </div>
             </div>
+
+            <ShopFilterPanel
+              plain
+              className="mb-8"
+              options={facets.options}
+              rows={facets.rows}
+              selection={facets.selection}
+              onChange={facets.setFacet}
+              onClear={facets.clearFacets}
+            />
             
             <Button
               variant="outline" 

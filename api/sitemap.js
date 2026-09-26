@@ -6,6 +6,7 @@ import { BUYING_GUIDES } from '../data/buyingGuides.js';
 import { PAID_TIERS } from '../config/plans.js';
 import { BINDER_SLUGS } from '../data/shopBinderProducts.js';
 import { PALMS_OFF_PRODUCTS } from '../data/palmsOffCatalogue.js';
+import { shopProductBasePath, legacyShopProductPath } from '../utils/shopProductUrl.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -188,7 +189,7 @@ export default async function handler(req, res) {
           .limit(500),
         supabase
           .from('shop_products')
-          .select('id, title, updated_at, created_at')
+          .select('id, title, slug, category, colour, family_sku, updated_at, created_at')
           .in('status', ['active', 'coming_soon'])
           .order('created_at', { ascending: false })
           .limit(500),
@@ -294,12 +295,21 @@ export default async function handler(req, res) {
       }
     }
 
-    if (products.length > 0) {
-      parts.push('', `  <!-- Shop products (${products.length}) -->`);
-      for (const product of products) {
-        const lastmod = (product.updated_at || product.created_at || TODAY).split('T')[0];
-        const urlSlug = slugify(product.title || 'product') || 'product';
-        parts.push(xmlUrl(`${BASE_URL}/product/shop/${product.id}/${urlSlug}`, lastmod, 'weekly', '0.7'));
+    // One URL per product page at its canonical /shop/<category>/<slug>
+    // (utils/shopProductUrl.js). Colour siblings share their line's page, and
+    // catalogue pages are already listed in STATIC_PAGES, so dedupe.
+    const listed = new Set(STATIC_PAGES.map((p) => p.loc));
+    const shopUrls = [];
+    for (const product of products) {
+      const path = shopProductBasePath(product) || legacyShopProductPath(product);
+      if (listed.has(path)) continue;
+      listed.add(path);
+      shopUrls.push({ path, lastmod: (product.updated_at || product.created_at || TODAY).split('T')[0] });
+    }
+    if (shopUrls.length > 0) {
+      parts.push('', `  <!-- Shop products (${shopUrls.length}) -->`);
+      for (const { path, lastmod } of shopUrls) {
+        parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.7'));
       }
     }
 

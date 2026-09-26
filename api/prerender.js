@@ -11,6 +11,7 @@ import {
   resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
 } from '../data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
+import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -191,8 +192,16 @@ ${bodyHtml}
 // tag" in Search Console) and keep recrawling it, instead of dropping it as
 // "Not found (404)".
 const notFound = (opts) => ({ status: 404, html: htmlDoc({ robots: 'noindex, follow', ...opts }) });
-const sendDoc = (res, doc) =>
-  typeof doc === 'string' ? res.status(200).send(doc) : res.status(doc.status || 200).send(doc.html);
+// { status: 301, location } is a permanent redirect (e.g. a legacy
+// /product/shop/:id URL onto its canonical /shop/<category>/<slug>).
+const sendDoc = (res, doc) => {
+  if (typeof doc === 'string') return res.status(200).send(doc);
+  if (doc.location) {
+    res.setHeader('Location', doc.location);
+    return res.status(doc.status || 301).send('');
+  }
+  return res.status(doc.status || 200).send(doc.html);
+};
 
 async function renderLocalTraders(supabase) {
   const { data } = await supabase
@@ -610,7 +619,34 @@ async function renderListing(supabase, id, slugParam) {
   return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [product, breadcrumb], bodyHtml });
 }
 
-async function renderShopProduct(supabase, id, slugParam) {
+// `canonicalPath` is set when rendering at the canonical /shop/<category>/<slug>
+// URL. Without it this is the legacy /product/shop/:id URL, which 301s to the
+// canonical one whenever the product can be placed (utils/shopProductUrl.js).
+/**
+ * /shop/<category>/<slug> for a shop product with no catalogue page (CardPop
+ * house products etc.) — mirrors pages/shop/ShopListedProductPage.jsx. The slug
+ * is a product slug or a colour line's slug; `colour` picks the sibling.
+ * Returns null when nothing matches so the caller can 404.
+ */
+async function renderShopProductBySlug(supabase, categorySlug, productSlug, colour) {
+  const columns = 'id, slug, category, colour, family_sku, status';
+  let { data: rows } = await supabase.from('shop_products').select(columns)
+    .in('status', ['active', 'coming_soon']).eq('slug', productSlug);
+  if (!rows?.length) {
+    ({ data: rows } = await supabase.from('shop_products').select(columns)
+      .in('status', ['active', 'coming_soon'])
+      .like('slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}-%`)
+      .not('family_sku', 'is', null));
+    rows = (rows || []).filter((r) => shopLineSlug(r) === productSlug);
+  }
+  const row = (colour && rows.find((r) => r.colour && r.slug.endsWith(`-${colour}`))) || rows?.[0];
+  if (!row) return null;
+  const base = shopProductBasePath(row);
+  if (base && shopCategorySlug(row) !== categorySlug) return { status: 301, location: `${BASE_URL}${base}` };
+  return renderShopProduct(supabase, row.id, null, { canonicalPath: base });
+}
+
+async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}) {
   if (!UUID_RE.test(id)) {
     return notFound({
       title: 'CardPop Shop',
@@ -622,12 +658,17 @@ async function renderShopProduct(supabase, id, slugParam) {
 
   const { data: product } = await supabase
     .from('shop_products')
-    .select('id, title, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
+    .select('id, title, slug, family_sku, colour, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
     .eq('id', id)
     .maybeSingle();
 
+  const isPublic = product && ['active', 'coming_soon'].includes(product.status);
+  if (isPublic && !canonicalPath && shopProductBasePath(product)) {
+    return { status: 301, location: `${BASE_URL}${shopProductPath(product)}` };
+  }
+
   const slug = product?.title ? slugify(product.title) : (slugParam || 'product');
-  const canonical = `${BASE_URL}/product/shop/${id}/${slug}`;
+  const canonical = canonicalPath ? `${BASE_URL}${canonicalPath}` : `${BASE_URL}/product/shop/${id}/${slug}`;
 
   if (!product || !['active', 'coming_soon'].includes(product.status)) {
     return notFound({
@@ -639,6 +680,7 @@ async function renderShopProduct(supabase, id, slugParam) {
   }
 
   const name = product.title || 'Trading Card Product';
+  const categoryUrl = shopCategorySlug(product) ? `${BASE_URL}/shop/category/${shopCategorySlug(product)}` : null;
   const image = absUrl(product.images?.[0] || product.image_url);
   const price = product.price_aud;
   const inStock = product.stock_quantity == null || product.stock_quantity > 0;
@@ -672,12 +714,13 @@ async function renderShopProduct(supabase, id, slugParam) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
       { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
-      { '@type': 'ListItem', position: 3, name, item: canonical },
+      ...(categoryUrl ? [{ '@type': 'ListItem', position: 3, name: product.category, item: categoryUrl }] : []),
+      { '@type': 'ListItem', position: categoryUrl ? 4 : 3, name, item: canonical },
     ],
   };
 
   const bodyHtml = `<main>
-  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${esc(name)}</nav>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${categoryUrl ? `<a href="${categoryUrl}">${esc(product.category)}</a> / ` : ''}${esc(name)}</nav>
   <h1>${esc(name)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
   ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>` : ''}
@@ -1009,12 +1052,12 @@ async function renderLanding(supabase, path) {
 
   let items = [];
   if (cfg.source === 'shop') {
-    let q = supabase.from('shop_products').select('id, title, price_aud, images, image_url').in('status', ['active', 'coming_soon']);
+    let q = supabase.from('shop_products').select('id, title, slug, category, colour, family_sku, price_aud, images, image_url').in('status', ['active', 'coming_soon']);
     if (cfg.productType) q = q.eq('product_type', cfg.productType);
     const { data } = await q.order('created_at', { ascending: false }).limit(50);
     items = (data || []).map(p => ({
       name: p.title || 'Product',
-      url: `${BASE_URL}/product/shop/${p.id}/${slugify(p.title || 'product')}`,
+      url: `${BASE_URL}${shopProductPath(p)}`,
       price: p.price_aud,
       image: absUrl(p.images?.[0] || p.image_url),
     }));
@@ -2903,7 +2946,7 @@ async function renderShopCollection(supabase, rawSlug) {
   const orClause = cfg.subs.map((s) => `category.ilike.%${s.name}%`).join(',');
   const { data } = await supabase
     .from('shop_products')
-    .select('id, title, price_aud, images, image_url')
+    .select('id, title, slug, category, colour, family_sku, price_aud, images, image_url')
     .eq('status', 'active')
     .or(orClause)
     .order('created_at', { ascending: false })
@@ -2939,7 +2982,7 @@ async function renderShopCollection(supabase, rawSlug) {
         '@type': 'ListItem',
         position: i + 1,
         name: p.title || 'Product',
-        url: `${BASE_URL}/product/shop/${p.id}/${slugify(p.title || 'product')}`,
+        url: `${BASE_URL}${shopProductPath(p)}`,
       })),
     });
   }
@@ -2950,7 +2993,7 @@ async function renderShopCollection(supabase, rawSlug) {
 
   const productsHtml = products.map((p) => {
     const name = p.title || 'Product';
-    return `    <li><a href="${BASE_URL}/product/shop/${esc(p.id)}/${esc(slugify(name))}">${esc(name)}</a>`
+    return `    <li><a href="${BASE_URL}${esc(shopProductPath(p))}">${esc(name)}</a>`
       + `${p.price_aud > 0 ? ` — A$${esc(Number(p.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');
 
@@ -3225,6 +3268,13 @@ export default async function handler(req, res) {
         return sendDoc(res, await renderPalmsOffProduct(
           supabase, safeDecode(shopTypeProductMatch[1]), prod));
       }
+      // Any other shop product at the same URL shape (binders are handled
+      // below, after their catalogue gets first claim).
+      const cat = safeDecode(shopTypeProductMatch[1]);
+      if (cat !== 'binders') {
+        const doc = await renderShopProductBySlug(supabase, cat, prod, req.query.colour);
+        if (doc) return sendDoc(res, doc);
+      }
     }
 
     // Palms Off Gaming binders. Must be tested BEFORE the single-segment
@@ -3236,7 +3286,12 @@ export default async function handler(req, res) {
 
     const binderMatch = rawPath.match(/^\/shop\/binders\/([^/?#]+)/);
     if (binderMatch) {
-      return sendDoc(res, await renderBinderProduct(supabase, safeDecode(binderMatch[1])));
+      const binderSlug = safeDecode(binderMatch[1]);
+      if (!resolveBinderProduct(binderSlug)) {
+        const doc = await renderShopProductBySlug(supabase, 'binders', binderSlug, req.query.colour);
+        if (doc) return sendDoc(res, doc);
+      }
+      return sendDoc(res, await renderBinderProduct(supabase, binderSlug));
     }
 
     // Shop supply collection pages: /shop/<group> (single segment). The exact

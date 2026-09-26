@@ -4,7 +4,7 @@ import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } fro
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
-import NotFoundPage from '@/pages/NotFoundPage.jsx';
+import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
@@ -38,7 +38,9 @@ const ShopBinderProductPage = () => {
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
 
-  if (!product) return <NotFoundPage />;
+  // Not a catalogue binder (e.g. a CardPop house binder): same URL shape,
+  // generic product page.
+  if (!product) return <ShopListedProductPage categorySlug="binders" productSlug={productSlug} />;
 
   const canonical = `${SITE_ORIGIN}/shop/binders/${product.slug}`;
   // A chosen colour shows its own photos; the catalogue's are the fallback.
