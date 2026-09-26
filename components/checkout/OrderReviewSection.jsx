@@ -26,9 +26,6 @@ const OrderReviewSection = ({
   gst = 0,
   gstIncluded = 0,
   shipping = 0,
-  // Fee a promo code's free-shipping perk took off — shown struck through so
-  // the final review states the saving rather than an unexplained "Free".
-  shippingWaived = 0,
   discount = 0,
   total = 0,
 }) => {
@@ -113,11 +110,6 @@ const OrderReviewSection = ({
             <span className="text-foreground">
               {shipping > 0 ? (
                 `$${Number(shipping).toFixed(2)}`
-              ) : shippingWaived > 0 ? (
-                <>
-                  <span className="line-through text-muted-foreground mr-1.5">${Number(shippingWaived).toFixed(2)}</span>
-                  <span className="text-green-600 font-semibold">Free</span>
-                </>
               ) : (
                 'Free'
               )}

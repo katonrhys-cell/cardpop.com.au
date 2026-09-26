@@ -179,7 +179,7 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
       }
     }
 
-    const priced = await priceCart(items, userId, { waiveShipping: !!partner?.free_shipping });
+    const priced = await priceCart(items, userId);
 
     // Preview the promo discount without creating any Stripe objects. Codes in
     // the POP-XXXX-XXXX shape are personal welcome offers; anything else is a
@@ -201,9 +201,7 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
         }
       } else if (partner) {
         discountCents = partnerDiscountCents(partner, priced.orderLines);
-        // Free shipping alone is worth applying the code for, so only tell the
-        // buyer it did nothing when it bought them neither.
-        if (discountCents <= 0 && priced.shippingWaivedCents <= 0) {
+        if (discountCents <= 0) {
           promoError = 'This code applies to CardPop Shop items only.';
         }
       }
@@ -225,10 +223,6 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
       sellerGstAud: priced.sellerGstCents / 100,
       shippingAud: priced.shippingCents / 100,
       processingAud: priced.processingCents / 100,
-      // A shipping fee was due and waived by the applied code — the UI shows the
-      // saving and keeps treating the code as applied even when the % off is $0.
-      freeShipping: priced.shippingWaivedCents > 0,
-      shippingWaivedAud: priced.shippingWaivedCents / 100,
       discountAud: (discountCents + walletAppliedCents) / 100,
       walletBalanceAud: walletBalanceCents / 100,
       walletAppliedAud: walletAppliedCents / 100,
@@ -320,18 +314,15 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
-    // Resolve a partner referral code before pricing: an approved partner whose
-    // perk includes free shipping waives the cart's shipping fee, so priceCart
-    // has to know before it builds the Stripe line items (the fee is a line on
-    // the session, not something a coupon can take off afterwards). An invalid
-    // code throws here exactly as it did when it was validated further down.
+    // Resolve a partner referral code up front. An invalid code throws here
+    // exactly as it did when it was validated further down.
     const promoCodeText = typeof promoCode === 'string' ? promoCode.trim() : '';
     const partner = userId && promoCodeText && !isWelcomeCodeFormat(promoCodeText)
       ? await validatePartnerCode(userId, promoCodeText)
       : null;
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, sellerGstCents, shippingCents, shippingWaivedCents, processingCents, grandCents } =
-      await priceCart(items, userId, { waiveShipping: !!partner?.free_shipping });
+    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, sellerGstCents, shippingCents, processingCents, grandCents } =
+      await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
     const velocity = await checkPurchaseVelocity({ userId, guestEmail: userId ? null : email, orderValueAud: grandCents / 100 });
@@ -383,10 +374,6 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
           partnerId: partner.id,
           partnerCode: partner.code,
           partnerDiscountCents: String(discountCents),
-          // Recorded so the waived fee is auditable from the session alone —
-          // the order's shipping_aud is 0 either way, which can't tell a waiver
-          // apart from a cart that never owed shipping.
-          ...(shippingWaivedCents > 0 ? { partnerFreeShippingCents: String(shippingWaivedCents) } : {}),
         };
       }
     } else if (useWalletBalance) {

@@ -204,8 +204,7 @@ const AccountPartner = () => {
           </div>
           <p className="text-xs text-muted-foreground break-all">{referralLink}</p>
           <p className="text-sm text-muted-foreground">
-            Customers using your code get {Number(partner.discount_pct)}% off CardPop Shop orders
-            {partner.free_shipping ? ' plus free shipping' : ''}, and you earn{' '}
+            Customers using your code get {Number(partner.discount_pct)}% off CardPop Shop orders, and you earn{' '}
             {Number(partner.commission_pct)}% of each referred sale.
           </p>
         </CardContent>
