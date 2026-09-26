@@ -24,8 +24,11 @@ export const variantPrice = (product, variant) => {
 export const variantStock = (variant) => Math.max(0, parseInt(variant?.stock_quantity, 10) || 0);
 export const variantInStock = (variant) => variantStock(variant) > 0;
 
-/** Human label for a variant: its colour, else its SKU. */
-export const variantLabel = (variant) => variant?.colour || variant?.sku || 'Standard';
+/**
+ * Shopper-facing label for a variant: its colour, else "Standard". Never the
+ * SKU — SKUs are internal (admin/stock) identifiers, not storefront copy.
+ */
+export const variantLabel = (variant) => variant?.colour || 'Standard';
 
 /**
  * Default selection: the first in-stock variant, else the first variant, else
