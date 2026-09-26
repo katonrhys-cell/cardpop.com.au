@@ -410,7 +410,7 @@ const ShopAffiliateProductsAdminPage = () => {
             <div className="space-y-2">
               <Label htmlFor="image_url" className="text-sm font-bold">Image URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Input id="image_url" name="image_url" value={formData.image_url} onChange={handleInputChange} placeholder="https://.../product.jpg" className="h-11 rounded-xl bg-background border-border" />
-              <p className="text-xs text-muted-foreground">Direct link to the product image (e.g. from the Amazon listing).</p>
+              <p className="text-xs text-muted-foreground">Direct link to the product image. <strong>Without one the shop shows a blank placeholder.</strong> If Fetch details can't get it, open the Amazon listing, right-click the main photo → <em>Copy Image Address</em> (an <code>m.media-amazon.com</code> link) and paste it here.</p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">

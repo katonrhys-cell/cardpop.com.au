@@ -42,6 +42,9 @@ const computeDiscount = (originalLabel, saleLabel) => {
 const ShopAffiliateSection = ({ category = null, title = 'Amazon Super Steals', limit = 8 }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Ids whose external image failed to load (hotlink blocked, URL rotated) —
+  // those fall back to the placeholder icon instead of a broken image.
+  const [failedImages, setFailedImages] = useState(() => new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -121,12 +124,13 @@ const ShopAffiliateSection = ({ category = null, title = 'Amazon Super Steals', 
                 className="relative aspect-square bg-white flex items-center justify-center overflow-hidden"
                 aria-label={product.title}
               >
-                {product.image_url ? (
+                {product.image_url && !failedImages.has(product.id) ? (
                   <img
                     src={product.image_url}
                     alt={product.title}
                     loading="lazy"
                     referrerPolicy="no-referrer"
+                    onError={() => setFailedImages((prev) => new Set(prev).add(product.id))}
                     className="w-full h-full object-contain p-4 transition-transform duration-300 group-hover:scale-105"
                   />
                 ) : (
