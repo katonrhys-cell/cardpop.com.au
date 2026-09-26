@@ -639,7 +639,7 @@ describe('POST /calculate-cart', () => {
     error: null,
   });
 
-  it("waives the shipping fee for a partner code carrying the free-shipping perk", async () => {
+  it('charges the shipping fee even for a partner row still flagged free_shipping', async () => {
     partnerRow();
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
@@ -652,19 +652,15 @@ describe('POST /calculate-cart', () => {
       promoCode: 'CREATOR10',
     });
     expect(res.status).toBe(200);
-    // The $9.95 fee was due (subtotal under the $100 threshold) and waived.
-    expect(res.body.shippingAud).toBe(0);
-    expect(res.body.freeShipping).toBe(true);
-    expect(res.body.shippingWaivedAud).toBe(9.95);
-    // $50 + $0 shipping + $1.33 processing. The waiver shrinks the subtotal the
-    // fee is priced on, so the buyer isn't charged processing on a fee they
-    // didn't pay.
-    expect(res.body.totalAud).toBe(51.33);
-    // 0% off but free shipping — the code did something, so no "does nothing" error.
-    expect(res.body.promoError).toBeNull();
+    // The perk is retired: shipping under the threshold is mandatory.
+    expect(res.body.shippingAud).toBe(9.95);
+    expect(res.body).not.toHaveProperty('freeShipping');
+    expect(res.body.totalAud).toBe(61.47);
+    // 0% off and no shipping waiver — the code saves the buyer nothing.
+    expect(res.body.promoError).toBe('This code applies to CardPop Shop items only.');
   });
 
-  it('still charges shipping for a partner code without the free-shipping perk', async () => {
+  it('charges shipping alongside a partner code discount', async () => {
     partnerRow({ free_shipping: false, discount_pct: 10 });
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
@@ -678,14 +674,12 @@ describe('POST /calculate-cart', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.shippingAud).toBe(9.95);
-    expect(res.body.freeShipping).toBe(false);
-    expect(res.body.shippingWaivedAud).toBe(0);
     // $50 + $9.95 shipping + $1.52 processing − $5 (10% of the shop subtotal).
     expect(res.body.discountAud).toBe(5);
     expect(res.body.totalAud).toBe(56.47);
   });
 
-  it("reports free shipping as no saving when the order already shipped free", async () => {
+  it('reports a 0%-off partner code as doing nothing on an order that ships free', async () => {
     partnerRow();
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
@@ -698,10 +692,8 @@ describe('POST /calculate-cart', () => {
       promoCode: 'CREATOR10',
     });
     expect(res.status).toBe(200);
-    // Already over the threshold — the perk waived nothing, so it claims nothing,
-    // and a 0%-off code that saved the buyer nothing says so.
-    expect(res.body.freeShipping).toBe(false);
-    expect(res.body.shippingWaivedAud).toBe(0);
+    // Already over the threshold, and a 0%-off code that saved the buyer
+    // nothing says so.
     expect(res.body.promoError).toBe('This code applies to CardPop Shop items only.');
     expect(res.body.totalAud).toBe(204.24);
   });

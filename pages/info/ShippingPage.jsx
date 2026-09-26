@@ -12,17 +12,17 @@ const ShippingPage = () => {
       <SEOHead title="Shipping Information | CardPop" description="Learn about CardPop's shipping policies, rates and delivery times for Australian orders." />
       
       <h2>Domestic Shipping (Australia)</h2>
-      <p>We offer several shipping options within Australia to ensure your cards arrive safely and securely.</p>
-      
+      <p>CardPop Shop orders ship tracked within Australia.</p>
+
       <ul>
-        <li><strong>Standard Tracked:</strong> $8.95 (3-5 business days)</li>
-        <li><strong>Express Tracked:</strong> $12.95 (1-2 business days)</li>
-        <li><strong>Signature Required:</strong> Additional $2.95 (Recommended for high-value items)</li>
+        <li><strong>Orders under $100:</strong> $15 flat-rate shipping, charged once per order</li>
+        <li><strong>Orders of $100 or more:</strong> Free shipping</li>
       </ul>
-      
+      <p>The $100 threshold is based on the CardPop Shop items in your cart. Marketplace cards bought from other sellers ship at the postage price each seller sets, shown on the listing. All prices include GST.</p>
+
       <h2>International Shipping</h2>
-      <p>We currently ship to New Zealand, USA, Canada, and the UK. International shipping rates are calculated at checkout based on weight and destination.</p>
-      
+      <p>We currently ship to Australian addresses only.</p>
+
       <h2>Packaging Standards</h2>
       <p>All single cards are shipped in a penny sleeve, top loader, and team bag, secured between rigid cardboard to prevent bending during transit. Graded cards are shipped in protective sleeves with bubble wrap.</p>
       

@@ -7,15 +7,9 @@ import { getPlatformSetting } from './stripeWebhookService.js';
  *
  * @param items    cart lines ({ type: 'shop' | 'listing', id, quantity, variantId? })
  * @param userId   buyer's id, or null for a guest
- * @param options  `waiveShipping: true` drops the flat CardPop Shop shipping
- *                 fee — used by partner codes whose perk includes free
- *                 shipping. Seller postage on marketplace listings is money
- *                 owed to the seller and is never waived. The waived amount
- *                 comes back as `shippingWaivedCents` so the UI can show it.
  */
-export async function priceCart(items, userId, options = {}) {
+export async function priceCart(items, userId) {
   const httpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
-  const waiveShipping = options?.waiveShipping === true;
 
   const gstEnabled = await getPlatformSetting('gst_enabled', true);
   const gstRate = Number(await getPlatformSetting('gst_rate_pct', 10));
@@ -171,23 +165,16 @@ export async function priceCart(items, userId, options = {}) {
   // rate of 0 (or no shop items) means nothing is charged, and a threshold of 0
   // means there's no free tier. The rate is treated as GST-inclusive (AUD
   // consumer prices are), so no extra GST line is added on top of it.
-  // Defaults ($10 flat, free over $50) match the seeded platform_settings so the
+  // Defaults ($15 flat, free from $100) match the seeded platform_settings so the
   // shipping rule still holds if those rows haven't been provisioned yet; an
   // explicit admin value (including 0 to disable) always wins.
-  const shipRateCents = Math.round(Number(await getPlatformSetting('default_shipping_rate_aud', 10)) * 100);
-  const freeThresholdCents = Math.round(Number(await getPlatformSetting('free_shipping_threshold_aud', 50)) * 100);
+  const shipRateCents = Math.round(Number(await getPlatformSetting('default_shipping_rate_aud', 15)) * 100);
+  const freeThresholdCents = Math.round(Number(await getPlatformSetting('free_shipping_threshold_aud', 100)) * 100);
+  // The fee is mandatory below the threshold — no promo or partner code waives it.
   let shippingCents = 0;
-  // What a free-shipping perk actually saved the buyer — 0 unless a fee was both
-  // due and waived, so an order that was already shipping-free (marketplace-only
-  // cart, or over the threshold) never claims a saving it didn't make.
-  let shippingWaivedCents = 0;
   if (shopItemsCents > 0 && shipRateCents > 0) {
     const qualifiesForFree = freeThresholdCents > 0 && shopItemsCents >= freeThresholdCents;
     shippingCents = qualifiesForFree ? 0 : shipRateCents;
-    if (waiveShipping && shippingCents > 0) {
-      shippingWaivedCents = shippingCents;
-      shippingCents = 0;
-    }
   }
   // The shipping fee is GST-inclusive too, so its tax component is part of the
   // reported GST (not an extra charge) — mirrors how the item prices are treated.
@@ -289,7 +276,7 @@ export async function priceCart(items, userId, options = {}) {
     // every caller that reported an "added GST" line reports none.
     gstCents,
     includedGstCents, sellerGstCents, platformGstCents,
-    shippingCents, shippingWaivedCents, processingCents,
+    shippingCents, processingCents,
     grandCents: preFeeCents + processingCents,
   };
 }

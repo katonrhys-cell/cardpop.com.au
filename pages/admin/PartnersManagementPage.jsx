@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
@@ -61,7 +60,7 @@ const PartnerRow = ({ partner, profile, earnings, onApproveClick, onReject, onPa
           {partner.status === 'approved' && (
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 text-sm">
               <code className="rounded-lg border border-border bg-muted/40 px-2.5 py-1 font-mono tracking-widest">{partner.code}</code>
-              <span>{Number(partner.discount_pct)}% off · {Number(partner.commission_pct)}% commission{partner.free_shipping ? ' · free shipping' : ''}</span>
+              <span>{Number(partner.discount_pct)}% off · {Number(partner.commission_pct)}% commission</span>
               <span className="text-muted-foreground inline-flex items-center gap-1">
                 <MousePointerClick className="w-3.5 h-3.5" /> {partner.clicks} clicks
               </span>
@@ -115,7 +114,7 @@ const PartnersManagementPage = () => {
 
   // Approval dialog state — also used to edit an approved partner's rates.
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ code: '', discountPct: '10', commissionPct: '5', freeShipping: false });
+  const [form, setForm] = useState({ code: '', discountPct: '10', commissionPct: '5' });
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -174,7 +173,6 @@ const PartnersManagementPage = () => {
       code: partner.code || partner.preferred_code || '',
       discountPct: String(Number(partner.discount_pct ?? 10)),
       commissionPct: String(Number(partner.commission_pct ?? 5)),
-      freeShipping: !!partner.free_shipping,
     });
   };
 
@@ -203,7 +201,9 @@ const PartnersManagementPage = () => {
         code,
         discount_pct: discountPct,
         commission_pct: commissionPct,
-        free_shipping: form.freeShipping,
+        // Retired perk: shop shipping is mandatory under the threshold, so
+        // saving a partner also clears any flag left from before.
+        free_shipping: false,
         approved_at: editing.approved_at || new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
@@ -349,13 +349,6 @@ const PartnersManagementPage = () => {
                 />
               </div>
             </div>
-            <label className="flex items-center justify-between gap-3 text-sm font-medium cursor-pointer">
-              Free shipping on referred shop orders
-              <Switch
-                checked={form.freeShipping}
-                onCheckedChange={(v) => setForm((f) => ({ ...f, freeShipping: v }))}
-              />
-            </label>
           </div>
 
           <DialogFooter>

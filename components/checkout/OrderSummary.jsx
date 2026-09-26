@@ -13,7 +13,7 @@ const LineItem = ({ label, value, bold }) => (
   </div>
 );
 
-const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processingFee = 0, gst = 0, gstIncluded = 0, shipping = 0, shippingWaived = 0, discount = 0, total = 0, onEditCart, onNext }) => {
+const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processingFee = 0, gst = 0, gstIncluded = 0, shipping = 0, discount = 0, total = 0, onEditCart, onNext }) => {
   return (
     <div className="space-y-4">
       <Card className="border-border shadow-sm">
@@ -52,19 +52,12 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processing
                 what each charge is for. */}
             {processingFee > 0 && <LineItem label="Payment processing" value={processingFee} />}
             {/* Shipping always shows so buyers see the cost (or that it's free)
-                on every order — $10 flat on CardPop Shop items, free over $50.
-                `shippingWaived` is the fee a promo code's free-shipping perk
-                took off, struck through so the saving is visible. */}
+                on every order — $15 flat on CardPop Shop items, free from $100. */}
             <div className="flex justify-between text-sm text-muted-foreground">
               <span>Shipping</span>
               <span className="text-foreground">
                 {shipping > 0 ? (
                   `$${Number(shipping).toFixed(2)}`
-                ) : shippingWaived > 0 ? (
-                  <>
-                    <span className="line-through text-muted-foreground mr-1.5">${Number(shippingWaived).toFixed(2)}</span>
-                    <span className="text-green-600 font-semibold">Free</span>
-                  </>
                 ) : (
                   'Free'
                 )}
