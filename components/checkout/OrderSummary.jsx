@@ -52,7 +52,7 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processing
                 what each charge is for. */}
             {processingFee > 0 && <LineItem label="Payment processing" value={processingFee} />}
             {/* Shipping always shows so buyers see the cost (or that it's free)
-                on every order — $10 flat on CardPop Shop items, free over $50.
+                on every order — $15 flat on CardPop Shop items, free from $100.
                 `shippingWaived` is the fee a promo code's free-shipping perk
                 took off, struck through so the saving is visible. */}
             <div className="flex justify-between text-sm text-muted-foreground">

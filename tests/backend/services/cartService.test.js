@@ -150,6 +150,23 @@ describe('priceCart — shop items', () => {
 });
 
 describe('priceCart — shipping', () => {
+  it('falls back to $15 flat under $100, free from $100, when the settings rows are missing', async () => {
+    mockGetPlatformSetting.mockImplementation((key, fallback) =>
+      Promise.resolve({ gst_enabled: true, gst_rate_pct: 10 }[key] ?? fallback));
+    const shopRow = (price) => rowBuilder({
+      data: { id: 'p1', title: 'Box', price_aud: price, stock_quantity: 5, status: 'active' },
+      error: null,
+    });
+
+    mockSupabase.from.mockReturnValueOnce(shopRow(99.99));
+    const under = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
+    expect(under.shippingCents).toBe(1500);
+
+    mockSupabase.from.mockReturnValueOnce(shopRow(100));
+    const atThreshold = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
+    expect(atThreshold.shippingCents).toBe(0);
+  });
+
   it('charges the flat shipping rate on shop items below the free threshold', async () => {
     setPlatformSettings({ default_shipping_rate_aud: 9.95, free_shipping_threshold_aud: 200 });
     mockSupabase.from.mockReturnValueOnce(rowBuilder({

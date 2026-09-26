@@ -171,11 +171,11 @@ export async function priceCart(items, userId, options = {}) {
   // rate of 0 (or no shop items) means nothing is charged, and a threshold of 0
   // means there's no free tier. The rate is treated as GST-inclusive (AUD
   // consumer prices are), so no extra GST line is added on top of it.
-  // Defaults ($10 flat, free over $50) match the seeded platform_settings so the
+  // Defaults ($15 flat, free from $100) match the seeded platform_settings so the
   // shipping rule still holds if those rows haven't been provisioned yet; an
   // explicit admin value (including 0 to disable) always wins.
-  const shipRateCents = Math.round(Number(await getPlatformSetting('default_shipping_rate_aud', 10)) * 100);
-  const freeThresholdCents = Math.round(Number(await getPlatformSetting('free_shipping_threshold_aud', 50)) * 100);
+  const shipRateCents = Math.round(Number(await getPlatformSetting('default_shipping_rate_aud', 15)) * 100);
+  const freeThresholdCents = Math.round(Number(await getPlatformSetting('free_shipping_threshold_aud', 100)) * 100);
   let shippingCents = 0;
   // What a free-shipping perk actually saved the buyer — 0 unless a fee was both
   // due and waived, so an order that was already shipping-free (marketplace-only
