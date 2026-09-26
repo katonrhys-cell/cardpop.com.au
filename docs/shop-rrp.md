@@ -9,19 +9,28 @@ product that isn't priced yet.
 
 `sale_price_aud` (on `shop_products` and `shop_product_variants`,
 migration `20260926004139_shop_sale_price.sql`) puts an item on sale. It only
-counts when it is above $0 and **below** the regular price (`price_aud`); then
-the shop shows a **SALE** badge (with % off), the sale price in red, and the
-higher of the RRP / regular price struck through — and checkout charges the
-sale price. Clear it (Admin → Products → edit → **End sale**) and the item goes
-back to its regular price.
+counts when it is above $0 and **below** the regular price (`price_aud`).
+
+Rollout is in two phases so the schema is live before anything reads it:
+
+1. **Backend (shipped):** the columns, the pricing rule in
+   `utils/shopPricing.js` (`shopPriceInfo`, `shopSellingPrice`), and the admin
+   side — Admin → Products → edit has a **Sale price** field (with a preview
+   and an **End sale** button) and a per-colour **Sale** column; the product
+   list flags on-sale rows and computes margin at the sale price. Sale prices
+   can be entered now; **shoppers don't see them and checkout doesn't charge
+   them yet.**
+2. **Storefront + checkout (next):** the shop shows a **SALE** badge (with %
+   off), the sale price, and the higher of the RRP / regular price struck
+   through; `src/services/cartService.js` charges the sale price through the
+   same `utils/shopPricing.js` rule, so display and charge can't drift. Ship
+   only after phase 1's migration is confirmed applied in production.
+
+Rules:
 
 - A colour variant with its own price uses its own sale price; a variant that
   inherits the product price also inherits the product's sale price, so one
   product-level sale covers every colour.
-- The rule lives in one place, `utils/shopPricing.js` (`shopPriceInfo`,
-  `shopSellingPrice`), used by the storefront, the admin list and margin,
-  prerendered SEO data, and the server cart (`src/services/cartService.js`)
-  — so the displayed price and the Stripe charge can't drift apart.
 - The admin form refuses a sale price at or above the regular price: a "sale"
   with no genuine saving is misleading pricing under the Australian Consumer
   Law. The struck-through "was" price is only ever the real RRP or regular

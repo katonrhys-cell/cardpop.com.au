@@ -11,7 +11,6 @@ import {
   resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
 } from '../data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
-import { shopSellingPrice } from '../utils/shopPricing.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -623,7 +622,7 @@ async function renderShopProduct(supabase, id, slugParam) {
 
   const { data: product } = await supabase
     .from('shop_products')
-    .select('id, title, description, price_aud, sale_price_aud, retail_price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
+    .select('id, title, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
     .eq('id', id)
     .maybeSingle();
 
@@ -641,7 +640,7 @@ async function renderShopProduct(supabase, id, slugParam) {
 
   const name = product.title || 'Trading Card Product';
   const image = absUrl(product.images?.[0] || product.image_url);
-  const price = shopSellingPrice(product);
+  const price = product.price_aud;
   const inStock = product.stock_quantity == null || product.stock_quantity > 0;
   const description = product.description
     || `${name}${product.category ? ` — ${product.category}` : ''} available from the CardPop official store. Fast shipping across Australia.`;
@@ -764,11 +763,11 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   const images = binderImages(product);
   const { data: row } = await supabaseClient
     .from('shop_products')
-    .select('price_aud, sale_price_aud, retail_price_aud, stock_quantity, status')
+    .select('price_aud, retail_price_aud, stock_quantity, status')
     .eq('slug', product.slug)
     .maybeSingle();
 
-  const price = row?.price_aud != null && Number(row.price_aud) > 0 ? shopSellingPrice(row) : null;
+  const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
   const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
@@ -885,11 +884,11 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   const images = palmsOffImages(product);
   const { data: row } = await supabaseClient
     .from('shop_products')
-    .select('price_aud, sale_price_aud, retail_price_aud, stock_quantity, status')
+    .select('price_aud, retail_price_aud, stock_quantity, status')
     .eq('slug', product.slug)
     .maybeSingle();
 
-  const price = row && row.price_aud != null && Number(row.price_aud) > 0 ? shopSellingPrice(row) : null;
+  const price = row && row.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
   const rrp = row && row.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
@@ -1010,13 +1009,13 @@ async function renderLanding(supabase, path) {
 
   let items = [];
   if (cfg.source === 'shop') {
-    let q = supabase.from('shop_products').select('id, title, price_aud, sale_price_aud, images, image_url').in('status', ['active', 'coming_soon']);
+    let q = supabase.from('shop_products').select('id, title, price_aud, images, image_url').in('status', ['active', 'coming_soon']);
     if (cfg.productType) q = q.eq('product_type', cfg.productType);
     const { data } = await q.order('created_at', { ascending: false }).limit(50);
     items = (data || []).map(p => ({
       name: p.title || 'Product',
       url: `${BASE_URL}/product/shop/${p.id}/${slugify(p.title || 'product')}`,
-      price: shopSellingPrice(p),
+      price: p.price_aud,
       image: absUrl(p.images?.[0] || p.image_url),
     }));
   } else {
@@ -2904,7 +2903,7 @@ async function renderShopCollection(supabase, rawSlug) {
   const orClause = cfg.subs.map((s) => `category.ilike.%${s.name}%`).join(',');
   const { data } = await supabase
     .from('shop_products')
-    .select('id, title, price_aud, sale_price_aud, images, image_url')
+    .select('id, title, price_aud, images, image_url')
     .eq('status', 'active')
     .or(orClause)
     .order('created_at', { ascending: false })
@@ -2952,7 +2951,7 @@ async function renderShopCollection(supabase, rawSlug) {
   const productsHtml = products.map((p) => {
     const name = p.title || 'Product';
     return `    <li><a href="${BASE_URL}/product/shop/${esc(p.id)}/${esc(slugify(name))}">${esc(name)}</a>`
-      + `${p.price_aud > 0 ? ` — A$${esc(shopSellingPrice(p).toFixed(2))}` : ''}</li>`;
+      + `${p.price_aud > 0 ? ` — A$${esc(Number(p.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');
 
   const bodyHtml = `<main>

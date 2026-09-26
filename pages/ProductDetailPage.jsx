@@ -34,8 +34,6 @@ import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import SaleBadge from '@/components/shop/SaleBadge.jsx';
-import { shopPriceInfo, shopSellingPrice } from '@/utils/shopPricing.js';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
@@ -177,8 +175,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           setProduct({
             ...data,
             name: data.title,
-            // What the shopper pays — sale price applied (utils/shopPricing.js).
-            price: shopSellingPrice(data),
+            price: data.price_aud ?? 0,
             images,
             stockQuantity: data.stock_quantity,
             listing_type: 'For Sale',
@@ -434,11 +431,6 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const isSold = !isShop && product.status === 'sold';
   const comingSoon = isShop && product.status === 'coming_soon';
   const outOfStock = isShop && !comingSoon && product.stockQuantity !== null && product.stockQuantity <= 0;
-  // Shop price for the chosen colour (or the product): sale price, and the
-  // RRP / regular price struck through when it's genuinely higher.
-  const shopPrice = isShop
-    ? shopPriceInfo(product, activeVariants(product).find((v) => v.id === selectedVariantId) || null)
-    : null;
   // Expression of Interest: no fixed price — the seller published a target
   // range and buyers negotiate through offers.
   const isEOI = !isShop && product.listing_type === 'Expression of Interest';
@@ -608,21 +600,14 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                 <>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>
                   <div className="flex items-end gap-3">
-                    <span className={`text-4xl font-extrabold tabular-nums tracking-tight ${shopPrice?.onSale ? 'text-brand-red' : 'text-foreground'}`}>
-                      ${(shopPrice ? shopPrice.price : (product.price || 0)).toFixed(2)}
+                    <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
+                      ${(product.price || 0).toFixed(2)}
                     </span>
-                    {shopPrice ? (
-                      shopPrice.was != null && (
-                        <span className="text-lg text-muted-foreground line-through pb-1 tabular-nums">
-                          {shopPrice.wasIsRrp ? 'RRP ' : ''}${shopPrice.was.toFixed(2)}
-                        </span>
-                      )
-                    ) : product.retail_price_aud && Number(product.price || 0) < Number(product.retail_price_aud) && (
+                    {product.retail_price_aud && Number(product.price || 0) < Number(product.retail_price_aud) && (
                       <span className="text-lg text-muted-foreground line-through pb-1">
                         ${Number(product.retail_price_aud).toFixed(2)}
                       </span>
                     )}
-                    {shopPrice?.onSale && <SaleBadge percentOff={shopPrice.percentOff} className="mb-1.5" />}
                     {isShop && <span className="text-sm font-medium text-muted-foreground pb-1">+ Shipping</span>}
                     {/* Seller-set postage on marketplace listings — surfaced next
                         to the price so the checkout shipping line is never a
@@ -635,7 +620,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
                       </span>
                     )}
                   </div>
-                  <BnplMessage amount={shopPrice ? shopPrice.price : product.price} className="mt-2" />
+                  <BnplMessage amount={product.price} className="mt-2" />
                   {/* Market context beside the price — the number buyers actually
                       decide on. Links down to the full eBay market section. */}
                   {!isShop && (

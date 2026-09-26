@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { shopPriceInfo, shopSellingPrice, shopFromPriceInfo } from '@/utils/shopPricing.js';
-import { variantPrice, toCartVariant } from '@/utils/shopVariants.js';
 
 describe('shopPriceInfo', () => {
   it('sells at the regular price with no sale, and strikes nothing through when it equals the RRP', () => {
@@ -52,15 +51,5 @@ describe('shopPriceInfo', () => {
       ],
     };
     expect(shopFromPriceInfo(product).price).toBe(9.95);
-  });
-});
-
-describe('cart pricing uses the sale price', () => {
-  it('variantPrice and toCartVariant charge the sale price', () => {
-    const product = { id: 'p', price_aud: 14.95, sale_price_aud: 11.95, stock_quantity: 5 };
-    const variant = { id: 'v', sku: 'X', stock_quantity: 3, price_aud: null };
-    expect(variantPrice(product, variant)).toBe(11.95);
-    expect(toCartVariant(product, variant).price_in_cents).toBe(1195);
-    expect(toCartVariant(product, null).price_in_cents).toBe(1195);
   });
 });

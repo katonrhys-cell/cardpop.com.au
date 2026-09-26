@@ -18,7 +18,6 @@ import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { toast } from 'sonner';
-import { shopSellingPrice } from '@/utils/shopPricing.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 const PER_PAGE = 16;
@@ -115,7 +114,7 @@ const ShopCategoryPage = () => {
   const handleAddToCart = (product) => {
     // Build the cart product/variant from the real shop_products columns
     // (title / price_aud / stock_quantity), mirroring the other shop pages.
-    const priceInCents = Math.round((shopSellingPrice(product) || 0) * 100);
+    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
     const cartProduct = {
       id: product.id,
       source: 'shop',
@@ -187,7 +186,7 @@ const ShopCategoryPage = () => {
       '@type': 'ItemList',
       numberOfItems: totalItems,
       itemListElement: products.map((p, i) => {
-        const price = shopSellingPrice(p);
+        const price = Number(p.price_aud ?? 0);
         const productSchema = {
           '@type': 'Product',
           name: p.title || p.name || 'Trading Card Supply',
