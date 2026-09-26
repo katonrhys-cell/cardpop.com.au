@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { shopSellingPrice } from '@/utils/shopPricing.js';
 
 const ShopSealedBoxesPage = () => {
   const { addToCart } = useCart();
@@ -92,7 +93,7 @@ const ShopSealedBoxesPage = () => {
   const handleAddToCart = (product) => {
     // Build a proper cart product/variant from the real shop_products columns
     // (price_aud / stock_quantity), mirroring the product detail page.
-    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
+    const priceInCents = Math.round((shopSellingPrice(product) || 0) * 100);
     const cartProduct = {
       id: product.id,
       source: 'shop',

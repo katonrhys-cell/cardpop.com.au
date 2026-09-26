@@ -5,6 +5,28 @@ product; `price_aud` stays the selling price. The shop shows the RRP
 struck-through when it is above the selling price, and as "RRP $X" on a
 product that isn't priced yet.
 
+## Sale prices
+
+`sale_price_aud` (on `shop_products` and `shop_product_variants`,
+migration `20260926004139_shop_sale_price.sql`) puts an item on sale. It only
+counts when it is above $0 and **below** the regular price (`price_aud`); then
+the shop shows a **SALE** badge (with % off), the sale price in red, and the
+higher of the RRP / regular price struck through — and checkout charges the
+sale price. Clear it (Admin → Products → edit → **End sale**) and the item goes
+back to its regular price.
+
+- A colour variant with its own price uses its own sale price; a variant that
+  inherits the product price also inherits the product's sale price, so one
+  product-level sale covers every colour.
+- The rule lives in one place, `utils/shopPricing.js` (`shopPriceInfo`,
+  `shopSellingPrice`), used by the storefront, the admin list and margin,
+  prerendered SEO data, and the server cart (`src/services/cartService.js`)
+  — so the displayed price and the Stripe charge can't drift apart.
+- The admin form refuses a sale price at or above the regular price: a "sale"
+  with no genuine saving is misleading pricing under the Australian Consumer
+  Law. The struck-through "was" price is only ever the real RRP or regular
+  price.
+
 Migration: `supabase/migrations/20260922095027_shop_products_retail_price.sql`
 (idempotent — the column already existed in production outside migration
 control; this brings it into the repo).

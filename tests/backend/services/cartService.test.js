@@ -97,6 +97,44 @@ describe('priceCart — shop items', () => {
     expect(result.grandCents).toBe(10000);
   });
 
+  it('charges the sale price when one is set below the regular price', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Sleeves', price_aud: 14.95, sale_price_aud: 11.95, retail_price_aud: 14.95, stock_quantity: 5, status: 'active' },
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 2 }], 'buyer-1');
+
+    expect(result.itemsCents).toBe(2390);
+    expect(result.orderLines[0]).toMatchObject({ unit_price_aud: 11.95, line_total_aud: 23.9 });
+  });
+
+  it('ignores a sale price that is not below the regular price', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: { id: 'p1', title: 'Sleeves', price_aud: 14.95, sale_price_aud: 19.95, stock_quantity: 5, status: 'active' },
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p1', quantity: 1 }], 'buyer-1');
+
+    expect(result.itemsCents).toBe(1495);
+  });
+
+  it('applies the product sale to a colour variant that inherits the product price', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: {
+        id: 'p1', title: 'Sleeves', price_aud: 14.95, sale_price_aud: 11.95, stock_quantity: 5, status: 'active',
+        variants: [{ id: 'v1', sku: 'S-RED', colour: 'Red', stock_quantity: 5, price_aud: null, sale_price_aud: null, status: 'active' }],
+      },
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p1', variantId: 'v1', quantity: 1 }], 'buyer-1');
+
+    expect(result.itemsCents).toBe(1195);
+    expect(result.orderLines[0]).toMatchObject({ variant_id: 'v1', unit_price_aud: 11.95 });
+  });
+
   it('merges duplicate shop lines into one line with summed quantity', async () => {
     mockSupabase.from.mockReturnValueOnce(rowBuilder({
       data: { id: 'p1', title: 'Single', price_aud: 10, stock_quantity: 10, status: 'active' },

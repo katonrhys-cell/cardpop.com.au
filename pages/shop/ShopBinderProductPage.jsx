@@ -8,8 +8,10 @@ import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock } from '@/utils/shopVariants.js';
 import { Badge } from '@/components/ui/badge';
+import SaleBadge from '@/components/shop/SaleBadge.jsx';
+import { shopPriceInfo } from '@/utils/shopPricing.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
@@ -39,7 +41,7 @@ const ShopBinderProductPage = () => {
     setLoading(true);
     supabase
       .from('shop_products')
-      .select(`id, price_aud, retail_price_aud, stock_quantity, status, ${VARIANTS_SELECT}`)
+      .select(`id, price_aud, sale_price_aud, retail_price_aud, stock_quantity, status, ${VARIANTS_SELECT}`)
       .eq('slug', product.slug)
       .maybeSingle()
       .then(({ data }) => {
@@ -60,6 +62,9 @@ const ShopBinderProductPage = () => {
   // With colour variants the buyable unit is the chosen variant.
   const variants = activeVariants(row);
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
+  // What the shopper pays for the chosen colour (or the product), sale
+  // applied — the same rule the server cart charges with.
+  const priceInfo = shopPriceInfo(row, chosenVariant);
   const inStock = variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0;
   const anyVariantInStock = variants.length > 0 ? variants.some(variantInStock) : inStock;
   // The CTA flips itself. While a product has no price (or is still `draft`) it
@@ -78,12 +83,12 @@ const ShopBinderProductPage = () => {
     if (!row || !isPurchasable) return;
     if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
     if (!inStock) return;
-    const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
+    const unitPrice = priceInfo.price;
     const cartVariant = chosenVariant
       ? toCartVariant({ id: row.id, price_aud: unitPrice, stock_quantity: row.stock_quantity }, chosenVariant)
       : {
           id: row.id,
-          price_in_cents: Math.round(price * 100),
+          price_in_cents: Math.round(unitPrice * 100),
           manage_inventory: row.stock_quantity !== null,
           inventory_quantity: row.stock_quantity,
         };
@@ -118,7 +123,7 @@ const ShopBinderProductPage = () => {
         '@type': 'Offer',
         url: canonical,
         priceCurrency: 'AUD',
-        price: price.toFixed(2),
+        price: priceInfo.price.toFixed(2),
         availability: inStock
           ? 'https://schema.org/InStock'
           : 'https://schema.org/OutOfStock',
@@ -188,12 +193,13 @@ const ShopBinderProductPage = () => {
                 <Skeleton className="h-9 w-28" />
               ) : isPurchasable ? (
                 <>
-                  <span className="text-3xl font-extrabold tabular-nums text-foreground">
-                    ${price.toFixed(2)}
+                  {priceInfo.onSale && <SaleBadge percentOff={priceInfo.percentOff} />}
+                  <span className={`text-3xl font-extrabold tabular-nums ${priceInfo.onSale ? 'text-brand-red' : 'text-foreground'}`}>
+                    ${priceInfo.price.toFixed(2)}
                   </span>
-                  {rrp != null && rrp > price && (
+                  {priceInfo.was != null && (
                     <span className="text-lg text-muted-foreground line-through tabular-nums">
-                      ${rrp.toFixed(2)}
+                      {priceInfo.wasIsRrp ? 'RRP ' : ''}${priceInfo.was.toFixed(2)}
                     </span>
                   )}
                   <Badge variant={anyVariantInStock ? 'default' : 'destructive'}>

@@ -12,6 +12,7 @@ import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { shopSellingPrice } from '@/utils/shopPricing.js';
 
 // How many hits to show per content type. The page favours breadth ("did the
 // site have anything?"), so a handful of the *best* matches per source beats a
@@ -87,7 +88,7 @@ async function searchShop(tokens) {
     image: publicImageUrl(p.image_url || p.image),
     title: p.title || p.name || 'Product',
     subtitle: 'Official Store',
-    meta: fmtPrice(p.price_aud),
+    meta: fmtPrice(shopSellingPrice(p)),
     _title: p.title || p.name || '',
     _haystack: p.title || p.name || '',
   }));

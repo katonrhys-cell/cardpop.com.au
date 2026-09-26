@@ -15,6 +15,7 @@ import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER } from '@/utils/shopStock.js';
 import { toast } from 'sonner';
+import { shopSellingPrice } from '@/utils/shopPricing.js';
 
 const ShopPage = () => {
   const [products, setProducts] = useState([]);
@@ -88,7 +89,7 @@ const ShopPage = () => {
     // using the real shop_products columns (price_aud / stock_quantity). The grid
     // previously passed no variant, so the cart fell back to the raw row (no
     // price_in_cents → $0) and read stockQuantity (camelCase, always undefined).
-    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
+    const priceInCents = Math.round((shopSellingPrice(product) || 0) * 100);
     const cartProduct = {
       id: product.id,
       source: 'shop',

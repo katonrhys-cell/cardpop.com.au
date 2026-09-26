@@ -20,6 +20,8 @@ import { isSoldOut, isComingSoon } from '@/utils/shopStock.js';
 import { hasVariants } from '@/utils/shopVariants.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
+import SaleBadge from '@/components/shop/SaleBadge.jsx';
+import { shopPriceInfo } from '@/utils/shopPricing.js';
 
 const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -36,6 +38,10 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const isSold = !soldOut && (
     (product.source === 'marketplace' && product.status === 'sold') || isSoldVaultItem(product)
   );
+  // Shop products price through the shared sale rule (utils/shopPricing.js):
+  // a genuine sale price wins, with the RRP / regular price struck through.
+  const shopPrice = product.source === 'shop' ? shopPriceInfo(product) : null;
+  const onSale = !!shopPrice?.onSale && !soldOut;
   const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
   const autoLabel = getAutographLabel(product);
@@ -103,9 +109,10 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
         )}
 
         {/* Sold pill + condition badge — top left */}
-        {(isSold || product.condition) && (
+        {(isSold || onSale || product.condition) && (
           <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
             {isSold && <SoldBadge />}
+            {onSale && <SaleBadge percentOff={shopPrice.percentOff} />}
             {product.condition && (
               <Badge variant="secondary" className="shadow-sm font-bold backdrop-blur-md bg-background/80">
                 {product.condition}
@@ -181,7 +188,18 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between gap-2">
-            {product.retail_price_aud && Number(product.price ?? product.price_aud) < Number(product.retail_price_aud) ? (
+            {shopPrice ? (
+              <div className="flex items-baseline gap-2">
+                <span className={`font-extrabold text-xl tabular-nums ${onSale ? 'text-brand-red' : 'text-foreground'}`}>
+                  ${shopPrice.price.toFixed(2)}
+                </span>
+                {shopPrice.was != null && (
+                  <span className="text-sm text-muted-foreground line-through tabular-nums">
+                    {shopPrice.wasIsRrp ? 'RRP ' : ''}${shopPrice.was.toFixed(2)}
+                  </span>
+                )}
+              </div>
+            ) : product.retail_price_aud && Number(product.price ?? product.price_aud) < Number(product.retail_price_aud) ? (
               <div className="flex items-baseline gap-2">
                 <span className="font-extrabold text-xl tabular-nums text-foreground">
                   ${Number(product.price ?? product.price_aud ?? 0).toFixed(2)}
@@ -201,7 +219,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
           </div>
 
           {!isSold && (
-            <BnplMessage amount={product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue} className="-mt-1" />
+            <BnplMessage amount={shopPrice ? shopPrice.price : (product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue)} className="-mt-1" />
           )}
 
           {isSold ? null : comingSoon ? (

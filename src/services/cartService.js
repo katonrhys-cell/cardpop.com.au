@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabaseClient.js';
 import { calculateBreakdown, calculateProcessingFee, calculateGst, gstInsideCents } from './commissionService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
+import { shopSellingPrice } from '../../utils/shopPricing.js';
 
 /**
  * Price a cart server-side.
@@ -66,7 +67,7 @@ export async function priceCart(items, userId, options = {}) {
       // no extra round trip (and the per-item query count stays at one).
       const { data: product, error } = await supabase
         .from('shop_products')
-        .select('id, title, price_aud, stock_quantity, status, variants:shop_product_variants(id, sku, colour, barcode, stock_quantity, price_aud, status)')
+        .select('id, title, price_aud, sale_price_aud, retail_price_aud, stock_quantity, status, variants:shop_product_variants(id, sku, colour, barcode, stock_quantity, price_aud, sale_price_aud, status)')
         .eq('id', id)
         .maybeSingle();
       if (error) throw error;
@@ -89,8 +90,10 @@ export async function priceCart(items, userId, options = {}) {
 
       // The advertised shop price is GST-inclusive, so the buyer pays exactly
       // the ticket price — the GST is the tax component already inside it
-      // (price × rate ÷ (100 + rate)), not an amount added on top.
-      const unitCents = Math.round(Number(variant?.price_aud ?? product.price_aud) * 100);
+      // (price × rate ÷ (100 + rate)), not an amount added on top. A sale price
+      // applies here through the same rule the storefront displays with
+      // (utils/shopPricing.js), so the charge always matches the ticket.
+      const unitCents = Math.round(shopSellingPrice(product, variant) * 100);
       const lineCents = unitCents * quantity;
       const lineGstCents = gstEnabled ? Math.round(lineCents * gstRate / (100 + gstRate)) : 0;
 

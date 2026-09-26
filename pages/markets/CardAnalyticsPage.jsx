@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import { VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
+import { shopSellingPrice } from '@/utils/shopPricing.js';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -263,7 +264,7 @@ const CardAnalyticsPage = () => {
       supabase.from('vault_items').select(`*, ${VAULT_ITEM_LISTING_EMBED}`).ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
       if (!cancelled) {
-        setListings(shop.map(i => ({ ...i, _source: 'shop' })));
+        setListings(shop.map(i => ({ ...i, price: shopSellingPrice(i), _source: 'shop' })));
         setVaultItems(vault.map(i => ({ ...i, _source: 'vault' })));
       }
     }).finally(() => {

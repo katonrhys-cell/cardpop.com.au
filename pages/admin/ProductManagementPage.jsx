@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { shopPriceInfo, shopSellingPrice } from '@/utils/shopPricing.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3 } from 'lucide-react';
@@ -168,7 +169,14 @@ const ProductManagementPage = () => {
         )}
       </TableCell>
       <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
-      <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
+      <TableCell className="tabular-nums">
+        {shopPriceInfo(product).onSale ? (
+          <span className="flex flex-col leading-tight">
+            <span className="font-semibold text-brand-red">${shopSellingPrice(product).toFixed(2)} <span className="text-[10px] font-extrabold uppercase tracking-wider">Sale</span></span>
+            <span className="text-xs text-muted-foreground line-through">${Number(product.price_aud ?? 0).toFixed(2)}</span>
+          </span>
+        ) : `$${Number(product.price_aud ?? 0).toFixed(2)}`}
+      </TableCell>
       <TableCell className="tabular-nums text-muted-foreground">
         {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
       </TableCell>
@@ -177,8 +185,9 @@ const ProductManagementPage = () => {
       </TableCell>
       <TableCell className="tabular-nums">
         {(() => {
-          // Ex-GST gross margin: (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
-          const m = grossMargin(product.price_aud, costs[product.id]?.wholesale_ex_gst_aud);
+          // Ex-GST gross margin at the price actually charged (sale applied):
+          // (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
+          const m = grossMargin(shopSellingPrice(product), costs[product.id]?.wholesale_ex_gst_aud);
           if (m == null) return <span className="text-muted-foreground">—</span>;
           const cls = m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600';
           return <span className={`font-semibold ${cls}`}>{(m * 100).toFixed(0)}%</span>;

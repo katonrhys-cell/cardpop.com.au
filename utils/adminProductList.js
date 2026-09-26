@@ -8,6 +8,7 @@
 // isn't in the taxonomy lands in a trailing "Other" section so it can't hide.
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
+import { shopSellingPrice } from '@/utils/shopPricing.js';
 
 export const OTHER_SECTION = 'Other';
 export const UNCATEGORISED = 'Uncategorised';
@@ -40,10 +41,10 @@ const SORT_VALUES = {
   title: (p) => String(p.title || '').toLowerCase(),
   sku: (p) => String(p.sku || '').toLowerCase(),
   category: (p) => categoryLabel(p).toLowerCase(),
-  price: (p) => numberOrNull(p.price_aud),
+  price: (p) => (numberOrNull(p.price_aud) == null ? null : shopSellingPrice(p)),
   rrp: (p) => numberOrNull(p.retail_price_aud),
   cost: (p, ctx) => numberOrNull(ctx.costs?.[p.id]?.wholesale_inc_gst_aud),
-  margin: (p, ctx) => grossMargin(p.price_aud, ctx.costs?.[p.id]?.wholesale_ex_gst_aud),
+  margin: (p, ctx) => grossMargin(shopSellingPrice(p), ctx.costs?.[p.id]?.wholesale_ex_gst_aud),
   status: (p) => STATUS_ORDER[p.status] ?? 99,
   stock: (p) => numberOrNull(p.stock_quantity),
 };

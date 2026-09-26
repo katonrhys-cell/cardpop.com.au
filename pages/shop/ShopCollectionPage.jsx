@@ -19,6 +19,7 @@ import { isSoldOut, isComingSoon, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
+import { shopPriceInfo, shopSellingPrice } from '@/utils/shopPricing.js';
 
 // ─── Hero floating icon animation (matches CollectionPage) ───────────────────
 const floatVariants = {
@@ -45,7 +46,7 @@ const CardSkeleton = () => (
 const MiniProductCard = ({ product, accentHex }) => {
   const imgPath = product.images?.[0] || product.image_url || product.card_image || null;
   const imgSrc = imgPath ? publicImageUrl(imgPath) : null;
-  const price = Number(product.price_aud ?? product.price ?? 0);
+  const { price, was } = shopPriceInfo(product);
   const title = product.title || 'Product';
   const detailPath = `/product/shop/${product.id}/${slugify(title)}`;
   const comingSoon = isComingSoon(product);
@@ -89,6 +90,9 @@ const MiniProductCard = ({ product, accentHex }) => {
         </p>
         <p className="text-base font-extrabold tabular-nums mt-auto" style={{ color: accentHex }}>
           ${price.toFixed(2)}
+          {was != null && (
+            <span className="ml-1.5 text-xs font-medium text-muted-foreground line-through">${was.toFixed(2)}</span>
+          )}
         </p>
       </div>
     </Link>
@@ -240,7 +244,7 @@ const ShopCollectionPage = () => {
   };
 
   const handleAddToCart = (product) => {
-    const priceInCents = Math.round((Number(product.price_aud) || 0) * 100);
+    const priceInCents = Math.round((shopSellingPrice(product) || 0) * 100);
     const cartProduct = {
       id: product.id,
       source: 'shop',

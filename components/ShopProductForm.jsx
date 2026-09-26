@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, X, ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
+import { shopPriceInfo, shopSellingPrice } from '@/utils/shopPricing.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { variantStock } from '@/utils/shopVariants.js';
 
@@ -22,7 +23,7 @@ const suggestVariantSku = (productSku, colour) => {
   const code = COLOUR_CODES[c.toLowerCase()] || c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
   return `${base}-${code}`;
 };
-const newVariant = () => ({ _key: Math.random().toString(36).slice(2), id: null, sku: '', barcode: '', colour: '', colour_hex: '', stock_quantity: '0', price_aud: '', status: 'active' });
+const newVariant = () => ({ _key: Math.random().toString(36).slice(2), id: null, sku: '', barcode: '', colour: '', colour_hex: '', stock_quantity: '0', price_aud: '', sale_price_aud: '', status: 'active' });
 
 const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
@@ -33,6 +34,8 @@ const INITIAL_STATE = {
   description: '',
   price_aud: '',
   retail_price_aud: '',
+  // Optional sale price — applies only when below price_aud (utils/shopPricing.js).
+  sale_price_aud: '',
   // Wholesale cost lives in shop_product_costs (admin-only), not on the
   // product row — see the migration notes. Loaded/saved separately.
   wholesale_ex_gst_aud: '',
@@ -69,6 +72,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         description: product.description || '',
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
         retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
+        sale_price_aud: product.sale_price_aud != null ? String(product.sale_price_aud) : '',
         stock_quantity: product.stock_quantity != null ? String(product.stock_quantity) : '0',
         category: product.category || '',
         product_type: product.product_type || 'sealed',
@@ -82,13 +86,13 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       setUseCustomCategory(!!product.category && !KNOWN_CATEGORY_NAMES.includes(product.category));
       supabase
         .from('shop_product_variants')
-        .select('id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, status, sort_order')
+        .select('id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, sale_price_aud, status, sort_order')
         .eq('product_id', product.id)
         .order('sort_order', { ascending: true })
         .then(({ data }) => {
           setVariants((data || []).map((v) => ({
             _key: v.id, id: v.id, sku: v.sku || '', barcode: v.barcode || '', colour: v.colour || '', colour_hex: v.colour_hex || '',
-            stock_quantity: v.stock_quantity != null ? String(v.stock_quantity) : '0', price_aud: v.price_aud != null ? String(v.price_aud) : '', status: v.status || 'active',
+            stock_quantity: v.stock_quantity != null ? String(v.stock_quantity) : '0', price_aud: v.price_aud != null ? String(v.price_aud) : '', sale_price_aud: v.sale_price_aud != null ? String(v.sale_price_aud) : '', status: v.status || 'active',
           })));
           setRemovedVariantIds([]);
         });
@@ -179,6 +183,13 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (rrp !== null && (Number.isNaN(rrp) || rrp < 0)) {
       return toast.error('RRP must be a valid amount, or left blank');
     }
+    // Sale price is optional; when given it must be above zero and below the
+    // regular price, or the shop would advertise a "sale" with no saving.
+    const saleRaw = String(formData.sale_price_aud ?? '').trim();
+    const salePrice = saleRaw === '' ? null : Number(saleRaw);
+    if (salePrice !== null && (Number.isNaN(salePrice) || salePrice <= 0 || salePrice >= price)) {
+      return toast.error('Sale price must be above $0 and below the regular price, or left blank');
+    }
     // Wholesale cost (optional). Either GST basis may be entered; the other
     // is derived at 10% GST when blank.
     const costRaw = (k) => String(formData[k] ?? '').trim();
@@ -205,6 +216,11 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       if (!isValidSku(v.sku)) return toast.error(`Variant SKU ${v.sku} is not valid`);
       if (cleanVariants.length > 1 && !v.colour) return toast.error(`Variant ${v.sku} needs a colour name`);
       if (v.price_aud !== '' && (Number.isNaN(Number(v.price_aud)) || Number(v.price_aud) < 0)) return toast.error(`Variant ${v.sku} has an invalid price`);
+      if (String(v.sale_price_aud ?? '').trim() !== '') {
+        const vSale = Number(v.sale_price_aud);
+        const vRegular = v.price_aud !== '' ? Number(v.price_aud) : price;
+        if (Number.isNaN(vSale) || vSale <= 0 || vSale >= vRegular) return toast.error(`Variant ${v.sku}: sale price must be above $0 and below its regular price`);
+      }
     }
     const variantSkus = cleanVariants.map((v) => v.sku);
     if (new Set(variantSkus).size !== variantSkus.length) return toast.error('Two colour variants share the same SKU');
@@ -232,6 +248,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         description: formData.description.trim() || null,
         price_aud: price,
         retail_price_aud: rrp,
+        sale_price_aud: salePrice,
         stock_quantity: Number.isNaN(stock) ? 0 : Math.max(0, stock),
         category: formData.category.trim() || null,
         product_type: formData.product_type || null,
@@ -276,6 +293,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
             colour_hex: v.colour_hex || null,
             stock_quantity: Math.max(0, parseInt(v.stock_quantity, 10) || 0),
             price_aud: v.price_aud === '' ? null : Number(v.price_aud),
+            sale_price_aud: String(v.sale_price_aud ?? '').trim() === '' ? null : Number(v.sale_price_aud),
             status: v.status === 'archived' ? 'archived' : 'active',
             sort_order: i,
           }));
@@ -390,7 +408,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="shop-product-price">Price ($AUD) <span className="text-destructive">*</span></Label>
+              <Label htmlFor="shop-product-price">Regular price ($AUD) <span className="text-destructive">*</span></Label>
               <Input id="shop-product-price" required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
@@ -443,7 +461,8 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
             {(() => {
               const ex = formData.wholesale_ex_gst_aud !== '' ? Number(formData.wholesale_ex_gst_aud)
                 : formData.wholesale_inc_gst_aud !== '' ? Number(formData.wholesale_inc_gst_aud) / 1.1 : NaN;
-              const m = grossMargin(formData.price_aud, ex);
+              // Margin at what the shopper actually pays — the sale price when set.
+              const m = grossMargin(shopSellingPrice({ price_aud: formData.price_aud, sale_price_aud: formData.sale_price_aud }), ex);
               return m == null ? null : (
                 <p className={`text-xs font-semibold ${m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600'}`}>
                   Gross margin at this price: {(m * 100).toFixed(0)}% (ex GST)
@@ -480,6 +499,47 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
             </div>
           </div>
 
+          {/* Sale price: when set (and below the regular price) the shop shows
+              a SALE badge, this price, and the RRP / regular price struck
+              through — and checkout charges it. Clear it to end the sale. */}
+          <div className="space-y-2">
+            <Label htmlFor="shop-product-sale">Sale price ($AUD) <span className="text-muted-foreground font-normal">(optional)</span></Label>
+            <div className="flex gap-2">
+              <Input
+                id="shop-product-sale"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Leave blank when not on sale"
+                value={formData.sale_price_aud}
+                onChange={(e) => handleInputChange('sale_price_aud', e.target.value)}
+                className="bg-background tabular-nums"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="shrink-0"
+                disabled={String(formData.sale_price_aud ?? '').trim() === ''}
+                onClick={() => handleInputChange('sale_price_aud', '')}
+              >
+                End sale
+              </Button>
+            </div>
+            {(() => {
+              const info = shopPriceInfo({ price_aud: formData.price_aud, sale_price_aud: formData.sale_price_aud, retail_price_aud: formData.retail_price_aud });
+              if (String(formData.sale_price_aud ?? '').trim() === '') {
+                return <p className="text-[11px] text-muted-foreground">Colour variants without their own price go on sale too.</p>;
+              }
+              return info.onSale ? (
+                <p className="text-xs font-semibold text-emerald-600">
+                  Shop shows: SALE ${info.price.toFixed(2)}{info.was != null ? ` (was ${info.wasIsRrp ? 'RRP ' : ''}$${info.was.toFixed(2)}, ${info.percentOff}% off)` : ''}
+                </p>
+              ) : (
+                <p className="text-xs font-semibold text-destructive">Must be below the regular price to count as a sale.</p>
+              );
+            })()}
+          </div>
+
           <div className="space-y-2">
             <Label>Description</Label>
             <Textarea value={formData.description} onChange={(e) => handleInputChange('description', e.target.value)} className="bg-background min-h-[120px]" />
@@ -503,11 +563,11 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <p className="text-xs text-muted-foreground">No variants — this product is sold as a single unit with the stock above. Add a colour to sell and track stock per colour (each colour gets its own SKU and barcode).</p>
             ) : (
               <div className="space-y-2">
-                <div className="hidden md:grid grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_auto_auto] gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1">
-                  <span>Colour</span><span>SKU</span><span>Barcode</span><span>Stock</span><span>Price</span><span>Active</span><span></span>
+                <div className="hidden md:grid grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_0.8fr_auto_auto] gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1">
+                  <span>Colour</span><span>SKU</span><span>Barcode</span><span>Stock</span><span>Price</span><span>Sale</span><span>Active</span><span></span>
                 </div>
                 {variants.map((v, i) => (
-                  <div key={v._key} className="grid grid-cols-2 md:grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_auto_auto] gap-2 items-center rounded-xl border border-border p-2 bg-background/50">
+                  <div key={v._key} className="grid grid-cols-2 md:grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_0.8fr_auto_auto] gap-2 items-center rounded-xl border border-border p-2 bg-background/50">
                     <div className="flex items-center gap-1.5">
                       <input
                         type="color"
@@ -555,6 +615,16 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                       placeholder={formData.price_aud || 'Product price'}
                       value={v.price_aud}
                       onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, price_aud: e.target.value } : x)))}
+                      className="bg-background h-9 tabular-nums"
+                    />
+                    <Input
+                      aria-label="Variant sale price"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder={v.price_aud === '' && formData.sale_price_aud ? formData.sale_price_aud : 'Sale'}
+                      value={v.sale_price_aud}
+                      onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, sale_price_aud: e.target.value } : x)))}
                       className="bg-background h-9 tabular-nums"
                     />
                     <label className="flex items-center gap-1.5 text-xs justify-self-center">

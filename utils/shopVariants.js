@@ -7,6 +7,8 @@
  * variants behaves as a single unit, exactly as before variants existed.
  */
 
+import { shopSellingPrice } from './shopPricing.js';
+
 export const activeVariants = (product) =>
   (Array.isArray(product?.variants) ? product.variants : [])
     .filter((v) => v && v.status !== 'archived')
@@ -14,12 +16,12 @@ export const activeVariants = (product) =>
 
 export const hasVariants = (product) => activeVariants(product).length > 0 || product?.has_variants === true;
 
-/** Variant-aware unit price (AUD): the variant override, else the product price. */
-export const variantPrice = (product, variant) => {
-  const v = variant?.price_aud != null ? Number(variant.price_aud) : null;
-  const p = Number(product?.price_aud ?? product?.price ?? 0);
-  return Number.isFinite(v) ? v : p;
-};
+/**
+ * Variant-aware unit price (AUD) the shopper pays: the variant's own price
+ * (and sale price) when it overrides, else the product's — sale applied. See
+ * utils/shopPricing.js.
+ */
+export const variantPrice = (product, variant) => shopSellingPrice(product, variant);
 
 export const variantStock = (variant) => Math.max(0, parseInt(variant?.stock_quantity, 10) || 0);
 export const variantInStock = (variant) => variantStock(variant) > 0;
@@ -64,4 +66,4 @@ export const toCartVariant = (product, variant) => {
 };
 
 /** Embedded select fragment for Supabase queries that need variants. */
-export const VARIANTS_SELECT = 'variants:shop_product_variants(id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, status, sort_order)';
+export const VARIANTS_SELECT = 'variants:shop_product_variants(id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, sale_price_aud, status, sort_order)';
