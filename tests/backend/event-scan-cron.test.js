@@ -7,6 +7,13 @@ vi.mock('../../src/utils/logger.js', () => ({
 const mockRunEventScan = vi.hoisted(() => vi.fn());
 vi.mock('../../src/utils/eventScanner.js', () => ({ runEventScan: mockRunEventScan }));
 
+const mockRunDueWatches = vi.hoisted(() => vi.fn());
+const mockScanEventSource = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/eventSourceWatcher.js', () => ({
+  runDueEventSourceScans: mockRunDueWatches,
+  scanEventSource: mockScanEventSource,
+}));
+
 const mockGetUser = vi.hoisted(() => vi.fn());
 const mockProfileLookup = vi.hoisted(() => vi.fn());
 const mockRunsLookup = vi.hoisted(() => vi.fn());
@@ -43,10 +50,12 @@ function mockRes() {
   return res;
 }
 
-const call = (authorization) => {
+const call = (authorization, query) => {
   const res = mockRes();
-  return handler({ headers: authorization ? { authorization } : {} }, res).then(() => res);
+  return handler({ headers: authorization ? { authorization } : {}, query }, res).then(() => res);
 };
+
+const EVENT_ID = '11111111-2222-3333-4444-555555555555';
 
 const originalSecret = process.env.CRON_SECRET;
 
@@ -57,6 +66,8 @@ beforeEach(() => {
   mockGetUser.mockResolvedValue({ data: { user: null }, error: null });
   mockProfileLookup.mockReturnValue({ data: null, error: null });
   mockRunsLookup.mockReturnValue({ data: [], error: null });
+  mockRunDueWatches.mockResolvedValue({ due: 1, scanned: 1, results: [] });
+  mockScanEventSource.mockResolvedValue({ eventId: EVENT_ID, status: 'updated' });
 });
 
 afterEach(() => {
@@ -148,5 +159,63 @@ describe('POST /cron/event-scan', () => {
 
     expect(res.statusCode).toBe(502);
     expect(JSON.stringify(res.body)).not.toContain('ANTHROPIC_API_KEY');
+  });
+});
+
+describe('/cron/event-scan?mode=watches', () => {
+  const asAdmin = () => mockGetUser.mockResolvedValue({
+    data: { user: { id: 'admin-1', app_metadata: { is_admin: true } } },
+    error: null,
+  });
+
+  it('runs the due event-website re-scans for the daily cron, not discovery', async () => {
+    const res = await call('Bearer super-secret', { mode: 'watches' });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockRunDueWatches).toHaveBeenCalledTimes(1);
+    expect(mockRunEventScan).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unauthenticated re-scan', async () => {
+    const res = await call(undefined, { mode: 'watches', event: EVENT_ID });
+
+    expect(res.statusCode).toBe(401);
+    expect(mockScanEventSource).not.toHaveBeenCalled();
+  });
+
+  it('lets an admin scan one event now, bypassing the unchanged-page shortcut', async () => {
+    asAdmin();
+
+    const res = await call('Bearer admin-access-token', { mode: 'watches', event: EVENT_ID });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockScanEventSource).toHaveBeenCalledWith(EVENT_ID, { force: true });
+  });
+
+  it('is not blocked by an in-flight discovery run', async () => {
+    asAdmin();
+    mockRunsLookup.mockReturnValue({ data: [{ id: 'run-in-flight' }], error: null });
+
+    const res = await call('Bearer admin-access-token', { mode: 'watches', event: EVENT_ID });
+
+    expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects a malformed event id', async () => {
+    asAdmin();
+
+    const res = await call('Bearer admin-access-token', { mode: 'watches', event: 'not-a-uuid' });
+
+    expect(res.statusCode).toBe(400);
+    expect(mockScanEventSource).not.toHaveBeenCalled();
+  });
+
+  it('answers 409 while the same page is already being scanned', async () => {
+    asAdmin();
+    mockScanEventSource.mockResolvedValue({ eventId: EVENT_ID, status: 'busy' });
+
+    const res = await call('Bearer admin-access-token', { mode: 'watches', event: EVENT_ID });
+
+    expect(res.statusCode).toBe(409);
   });
 });

@@ -201,6 +201,50 @@ date word (`upcoming`, `dates`, `tickets`) added.
 
 ---
 
+## Weekly re-scan of an event's website
+
+The discovery scan above finds events we don't have. This is its counterpart for
+events we **do** have: in Admin → Event Management → edit an event → **Organiser**
+tab, the **Website to scrape** field (`events.source_url`) takes the organiser's
+event page, with **Re-scan weekly for updates** on by default.
+
+- **On save** the page is scanned straight away (the form calls
+  `/cron/event-scan?mode=watches&event=<id>` — the 300s function — without
+  waiting on it, and toasts the result when it lands).
+- **Then every 7 days.** A daily GitHub Actions job (`cron-event-watch.yml`,
+  02:43 AEST) calls `/cron/event-scan?mode=watches`, which scans every watch
+  whose `next_scan_at` has passed (up to 10 per run, 240s budget — anything left
+  over is still due the next day) and pushes each one out another week. A failed
+  scan retries the next day.
+- **Scan now** in the form re-scans on demand (and skips the unchanged-page
+  shortcut so you get a real answer).
+
+What a scan may do to a live event is deliberately narrow:
+
+| Found on the page | What happens |
+|---|---|
+| A detail the event has **no value for yet** (ticket link, end time, venue, organiser contact, descriptions, SEO copy, tags…) | **Saved automatically.** It's new information and nothing is overwritten. |
+| A **different** date, time, venue/address, entry or presale fee, ticket link or capacity | **Queued** in the form under "Changes found on the website" with ✓ Apply / ✕ Dismiss (and Apply all / Dismiss all). Never written without you — the extractor can misread a page, and your hand corrections must not be reverted next week. |
+| A dismissed value again | Ignored. It's only re-proposed if the page later says something *different*. |
+| Prose that's merely reworded | Ignored — descriptions/SEO copy are fill-only, since the model rephrases them every run. |
+
+Applying an entry fee also flips the event's Free/paid switch to match.
+
+Cost control: the page's readable text is hashed (`content_hash`), and a page
+that hasn't changed since the last scan skips the model call entirely — most
+weeks, most pages cost nothing but a fetch. A scan also stops itself for good
+once the event's end date has passed. The page is fetched through the same
+SSRF-safe fetcher and extracted with the same prompt/schema as discovery.
+
+State lives in `event_source_watches` (one row per event, admin read-only under
+RLS, written by the service-role backend). The admin routes are
+`PUT /event-scan/watches/:eventId` (`{ enabled }` — follows the event's current
+`source_url`; a new or changed URL resets the comparison state and schedules an
+immediate scan), `POST /event-scan/watches/:eventId/apply` and `/dismiss`
+(`{ fields: [...] }`). The engine is `src/utils/eventSourceWatcher.js`.
+
+---
+
 ## Environment
 
 | Variable | Effect if unset |
@@ -222,9 +266,11 @@ nothing new needs to be added to Vercel if that's already running.
 | `event_scan_runs` | One row per run: counts, `warnings` (jsonb), `error`, `trigger`, `triggered_by` |
 | `event_scan_candidates` | Every URL ever considered, unique on `url`, with `status` and `reason` |
 
+| `event_source_watches` | Per-event weekly re-scan of `events.source_url`: `next_scan_at`, `last_status`/`last_message`, `content_hash`, `pending_changes`, `dismissed_changes`, `filled_fields` |
+
 Plus two columns on `events`: `auto_discovered` (boolean) and `discovered_at`.
 
-All three tables are RLS-enabled with **admin read only** — the backend writes
+All four tables are RLS-enabled with **admin read only** — the backend writes
 them with the service-role key, so no write policies exist at all. Source edits
 go through `/event-scan/sources` on the API rather than direct client writes.
 
@@ -260,5 +306,6 @@ the same URL.
 
 - `docs/blog-automation.md` — the other nightly Claude job, same cron pattern
 - `src/utils/eventScanner.js` — the engine
+- `src/utils/eventSourceWatcher.js` — the per-event weekly re-scan
 - `api/event-scan.js` — the cron/admin entrypoint
 - `src/routes/event-scraper.js` — the manual, one-URL admin scraper this reuses

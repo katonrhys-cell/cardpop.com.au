@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { apiServerClient } from '@/lib/apiServerClient.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
+import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -114,6 +115,19 @@ const TagInput = ({ value = [], onChange, placeholder }) => {
   );
 };
 
+const NUMBER_FIELDS = ['entry_fee_aud', 'presale_fee_aud', 'capacity'];
+const isBlankFormValue = (v) => v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
+
+// DB row value → the shape the form state holds (numbers as strings, HH:MM times).
+const toFormValue = (field, value) => {
+  if (Array.isArray(INITIAL_STATE[field])) return value || [];
+  if (typeof INITIAL_STATE[field] === 'boolean') return Boolean(value);
+  if (value === null || value === undefined) return '';
+  if (NUMBER_FIELDS.includes(field)) return String(value);
+  if (field === 'start_time' || field === 'end_time') return String(value).slice(0, 5);
+  return value;
+};
+
 const CharCount = ({ value = '', max, warn = 0.85 }) => {
   const len = value.length;
   const overWarn = len > max * warn;
@@ -138,9 +152,42 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [imagePreview, setImagePreview] = useState(null);
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const fileInputRef = useRef(null);
+  // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
+  // existing watch's on/off state replaces the default once it loads.
+  const [rescanWeekly, setRescanWeekly] = useState(true);
+  const [existingWatch, setExistingWatch] = useState(null);
+
+  const handleWatchLoaded = useCallback((watch) => {
+    setExistingWatch(watch);
+    setRescanWeekly(watch ? watch.is_active : true);
+  }, []);
+
+  // A scan or an applied change wrote to the event while the form is open —
+  // pull it into the form so the next Save doesn't write the old values back.
+  // An applied change replaces the field; a scan only ever fills blanks.
+  const handleWatchEventChanged = useCallback(async (applied) => {
+    let row = applied;
+    if (!row) {
+      if (!event?.id) return;
+      ({ data: row } = await supabase.from('events').select('*').eq('id', event.id).maybeSingle());
+      if (!row) return;
+    }
+    setFormData(prev => {
+      const next = { ...prev };
+      for (const [field, value] of Object.entries(row)) {
+        if (!(field in INITIAL_STATE) || field === 'status' || field === 'source_url') continue;
+        if (!applied && !isBlankFormValue(prev[field])) continue;
+        next[field] = toFormValue(field, value);
+      }
+      return next;
+    });
+    if (onSaved) onSaved();
+  }, [event?.id, onSaved]);
 
   useEffect(() => {
     if (!isOpen) return;
+    setRescanWeekly(true);
+    setExistingWatch(null);
 
     // Guards the async scraped-image fetch below: if the modal closes or the
     // form is reset before it resolves, we must not resurrect the image.
@@ -297,6 +344,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
     setLoading(true);
     try {
+      let savedId = event?.id ?? null;
       let image_url = event?.image_url ?? null;
 
       if (imageFile) {
@@ -374,6 +422,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
           ({ data: inserted, error } = await supabase.from('events').insert(payload).select('id').single());
         }
         if (error) throw error;
+        savedId = inserted?.id ?? null;
         toast.success(isUserMode
           ? 'Event submitted! Our team will review it before it appears on the calendar.'
           : 'Event created successfully');
@@ -388,6 +437,27 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               body: JSON.stringify({ eventId: inserted.id }),
             })
             .catch(() => {});
+        }
+      }
+
+      // Weekly re-scan of the website to scrape. The event is already saved, so
+      // a problem here is reported but doesn't fail the save.
+      if (!isUserMode && savedId) {
+        const wantsWatch = rescanWeekly && Boolean(payload.source_url);
+        if (wantsWatch || existingWatch) {
+          try {
+            const { scanNow } = await syncEventSourceWatch(savedId, wantsWatch);
+            if (scanNow) {
+              toast.info('Scanning the event website for new details — this can take a minute.');
+              // Not awaited: the scan runs on the 300s function and the form
+              // shouldn't sit open waiting for it. Refresh the list when done.
+              runEventSourceScan(savedId)
+                .then((result) => { toastScanResult(result); if (onSaved) onSaved(); })
+                .catch((err) => toast.error(err.message || 'Website scan failed.'));
+            }
+          } catch (err) {
+            toast.error(err.message || 'Failed to set up the weekly re-scan.');
+          }
         }
       }
 
@@ -640,6 +710,20 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Label htmlFor="website_url" className="font-bold">Event Website</Label>
                     <Input id="website_url" name="website_url" type="url" value={formData.website_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
                   </div>
+                  {!isUserMode && (
+                    <div className="sm:col-span-2">
+                      <EventSourceWatchPanel
+                        eventId={event?.id ?? null}
+                        url={formData.source_url}
+                        onUrlChange={v => set('source_url', v)}
+                        enabled={rescanWeekly}
+                        onEnabledChange={setRescanWeekly}
+                        onWatchLoaded={handleWatchLoaded}
+                        onEventChanged={handleWatchEventChanged}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="ticket_url" className="font-bold">Tickets / Registration URL</Label>
                     <Input id="ticket_url" name="ticket_url" type="url" value={formData.ticket_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
@@ -732,7 +816,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <TagInput value={formData.tags} onChange={v => set('tags', v)} placeholder="Add tags and press Enter..." />
                 </div>
 
-                {formData.source_url && (
+                {isUserMode && formData.source_url && (
                   <div className="space-y-2">
                     <Label htmlFor="source_url" className="font-bold text-muted-foreground">Scraped From</Label>
                     <Input id="source_url" name="source_url" value={formData.source_url} onChange={handleChange} className={`${inputCls} text-muted-foreground`} disabled={loading} />

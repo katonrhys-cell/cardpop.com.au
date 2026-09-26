@@ -1,6 +1,6 @@
 # Scheduled jobs
 
-CardPop's four recurring backend jobs are driven by **GitHub Actions**, not
+CardPop's five recurring backend jobs are driven by **GitHub Actions**, not
 Vercel Cron. `vercel.json` has no `crons` block.
 
 | Job | Endpoint | Schedule (UTC) | Local | Workflow |
@@ -9,6 +9,7 @@ Vercel Cron. `vercel.json` has no `crons` block.
 | Reconcile pending payments | `/api/stripe/reconcile-pending` | `15 */2 * * *` | every 2 hours | `cron-reconcile-pending.yml` |
 | Blog article generation | `/cron/blog-generate` | `7 21 * * *` | 07:07 AEST daily | `cron-blog-generate.yml` |
 | Event scan | `/cron/event-scan` | `7 17 * * 0` | 03:07 AEST Monday | `cron-event-scan.yml` |
+| Event website re-scan | `/cron/event-scan?mode=watches` | `43 16 * * *` | 02:43 AEST daily | `cron-event-watch.yml` |
 
 Each caller workflow is a dozen lines that delegate to the reusable runner
 `.github/workflows/cron-job.yml`, which makes one authenticated `GET` and fails
