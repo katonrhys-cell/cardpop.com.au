@@ -72,7 +72,8 @@ export function filterProducts(products, filters = {}, ctx = {}) {
     if (on(filters.category) && categoryLabel(p) !== filters.category) return false;
     if (on(filters.brand) && (String(p.brand || '').trim() || 'CardPop') !== filters.brand) return false;
     if (!term) return true;
-    if ([p.title, p.category, p.sku, p.brand].some((f) => f?.toLowerCase().includes(term))) return true;
+    if ([p.title, p.category, p.sku, p.brand, p.colour, p.family_sku].some((f) => f?.toLowerCase().includes(term))) return true;
+    if (p.barcode?.includes(term)) return true;
     // Barcode scanner / colour SKU lookups land on the parent product.
     return (ctx.variantsByProduct?.[p.id] || []).some((v) =>
       v.sku?.toLowerCase().includes(term) || v.barcode?.includes(term) || v.colour?.toLowerCase().includes(term));

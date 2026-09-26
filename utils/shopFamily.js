@@ -1,0 +1,88 @@
+/**
+ * Colour families: one shop product per colour, linked by `family_sku`.
+ *
+ * Multi-colour lines (Palms Off Gaming binders, deck sleeves, cases…) are
+ * stored as a separate shop_products row per colour SKU, so each colour gets
+ * its own grid card, price, stock and photos. Siblings share `family_sku` (the
+ * line SKU, e.g. 'ZB-04'); product pages load the family and show the colours
+ * as a picker that switches between the sibling products.
+ *
+ * This replaces shop_product_variants for these lines — see
+ * docs/shop-variants.md for when to use which.
+ */
+import { slugify } from '@/lib/slugify.js';
+
+/** Columns a colour picker needs from each sibling. */
+export const FAMILY_SELECT =
+  'id, sku, title, slug, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
+
+// Display order for swatches: neutrals, then round the colour wheel. Colours
+// not listed sort alphabetically after these.
+const COLOUR_ORDER = [
+  'black', 'white', 'clear', 'grey', 'gray', 'silver', 'navy', 'blue', 'turquoise', 'jade', 'green',
+  'yellow', 'orange', 'red', 'rose', 'pink', 'purple',
+];
+
+const colourRank = (colour) => {
+  const i = COLOUR_ORDER.indexOf(String(colour || '').trim().toLowerCase());
+  return i === -1 ? COLOUR_ORDER.length : i;
+};
+
+/** Siblings in swatch order (stable, colour-less rows last). */
+export function sortFamily(siblings) {
+  return [...(siblings || [])].sort((a, b) =>
+    colourRank(a.colour) - colourRank(b.colour)
+    || String(a.colour || '').localeCompare(String(b.colour || ''))
+    || String(a.sku || '').localeCompare(String(b.sku || '')));
+}
+
+/**
+ * Siblings shaped like shop_product_variants rows, so the existing
+ * VariantPicker can draw them. Each option's `id` is the sibling PRODUCT id.
+ */
+export function familyAsVariants(siblings) {
+  return sortFamily(siblings).map((s, i) => ({
+    id: s.id,
+    sku: s.sku,
+    colour: s.colour || null,
+    colour_hex: s.colour_hex || null,
+    stock_quantity: s.stock_quantity ?? 0,
+    status: 'active',
+    sort_order: i,
+  }));
+}
+
+/** Default sibling to show: the first in stock, else the first in swatch order. */
+export function pickDefaultSibling(siblings) {
+  const sorted = sortFamily(siblings);
+  return sorted.find((s) => (s.stock_quantity ?? 0) > 0) || sorted[0] || null;
+}
+
+/** /product/shop page for a sibling (same shape ProductCard links to). */
+export function familyProductPath(sibling) {
+  return `/product/shop/${sibling.id}/${slugify(sibling.title || 'product')}`;
+}
+
+/** Product images for a row: the `images` array, else `image_url`. */
+export function productImages(row) {
+  if (Array.isArray(row?.images) && row.images.length) return row.images;
+  return row?.image_url ? [row.image_url] : [];
+}
+
+/**
+ * Load a family's publicly visible siblings. Never throws: any error (e.g. the
+ * family_sku column not migrated yet) resolves to [] so pages fall back to
+ * their single-product behaviour.
+ */
+export async function fetchFamily(supabase, familySku, statuses) {
+  if (!familySku) return [];
+  try {
+    let query = supabase.from('shop_products').select(FAMILY_SELECT).eq('family_sku', familySku);
+    if (statuses?.length) query = query.in('status', statuses);
+    const { data, error } = await query;
+    if (error) return [];
+    return sortFamily(data || []);
+  } catch {
+    return [];
+  }
+}

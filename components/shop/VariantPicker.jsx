@@ -7,9 +7,11 @@ import { activeVariants, variantInStock, variantLabel, variantStock } from '@/ut
  * disabled so the shopper can see the range (and enquire), not just what's
  * left. Renders nothing for a product with no variants.
  *
- * Props: product (with `variants`), value (selected variant id), onChange(variant).
+ * Props: product (with `variants`), value (selected variant id), onChange(variant),
+ * showAvailability (default true) — pass false where nothing is buyable yet
+ * (e.g. Coming soon), so zero stock doesn't strike every colour through.
  */
-const VariantPicker = ({ product, value, onChange, className = '' }) => {
+const VariantPicker = ({ product, value, onChange, className = '', showAvailability = true }) => {
   const list = activeVariants(product);
   if (list.length === 0) return null;
   const selected = list.find((v) => v.id === value) || null;
@@ -23,7 +25,7 @@ const VariantPicker = ({ product, value, onChange, className = '' }) => {
         {selected && (
           <span className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{variantLabel(selected)}</span>
-            {variantInStock(selected)
+            {!showAvailability ? null : variantInStock(selected)
               ? (variantStock(selected) <= 5 ? ` · only ${variantStock(selected)} left` : ' · in stock')
               : ' · sold out'}
           </span>
@@ -31,7 +33,7 @@ const VariantPicker = ({ product, value, onChange, className = '' }) => {
       </div>
       <div role="radiogroup" aria-label="Colour" className="mt-3 flex flex-wrap gap-2">
         {list.map((v) => {
-          const inStock = variantInStock(v);
+          const inStock = !showAvailability || variantInStock(v);
           const isSelected = v.id === value;
           return (
             <button

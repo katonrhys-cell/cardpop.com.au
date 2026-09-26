@@ -1,4 +1,45 @@
-# Shop colour variants & barcodes
+# Shop colours: colour families & colour variants
+
+There are two ways to sell a line in several colours:
+
+- **Colour family (the default for Palms Off Gaming)** — one `shop_products`
+  row **per colour**, linked by `family_sku`. Each colour has its own grid card,
+  price, RRP, stock, barcode, wholesale cost (`shop_product_costs`) and photos.
+  Use this when colours should be listed and priced individually.
+- **Colour variants** — one product with a `shop_product_variants` row per
+  colour (below). One grid card; colours share the product's price unless a
+  variant overrides it.
+
+## Colour families
+
+| Column on `shop_products` | Meaning |
+|---|---|
+| `family_sku` | the line SKU shared by every colour, e.g. `ZB-04` |
+| `colour`, `colour_hex` | this product's colour name and optional swatch |
+| `barcode` | the EAN printed on the packaging |
+
+- **Shop grids** list every colour as its own product (they're ordinary rows).
+- **Product pages** load the family (`utils/shopFamily.js`) and show the
+  siblings as colour chips. On `/product/shop/:id` a chip opens that colour's
+  page; on the catalogue-driven line pages (`/shop/<category>/<line>`,
+  `/shop/binders/<line>`, via `hooks/useShopLine.js`) a chip swaps price,
+  stock, photos and the product added to the cart in place.
+- **Admin** → Products → edit → *Colour family*: set the same family SKU on each
+  colour product, plus its colour, swatch and barcode. Price each one
+  separately. Search finds colours, family SKUs and barcodes.
+- Checkout needs nothing special — each colour is a plain product.
+
+`20260926024651_split_palms_off_colours_into_products.sql` converted the 17
+multi-colour Palms Off lines (153 colours) from variants into families: each
+active colour variant became a product (title `<line> — <Colour>`, slug
+`<line-slug>-<colour>`, the variant's SKU/barcode/stock, its price override or
+the line price, the line's cost, and the photos in storage whose file name
+starts with `<COLOUR SKU>_`, falling back to the line's photos), then the
+combined line rows and their variants were archived (kept for order history).
+Single-version lines lost their one colourless "variant" (it only duplicated
+the product and drew a one-chip picker); its barcode moved onto the product.
+
+## Colour variants
 
 Most Palms Off Gaming lines come in several colours, each with its own SKU and
 EAN barcode. `shop_product_variants` holds one row per sellable unit (colour)

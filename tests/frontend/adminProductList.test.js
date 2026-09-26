@@ -48,6 +48,13 @@ describe('filterProducts', () => {
     const variantsByProduct = { 'ZB-09': [{ sku: 'ZB-09-RED', barcode: '9351234567890', colour: 'Red' }] };
     expect(skus(filterProducts(products, { search: '9351234567890' }, { variantsByProduct }))).toEqual(['ZB-09']);
   });
+
+  it('searches colour, family SKU and product barcode on colour products', () => {
+    const colourRows = [P({ sku: 'ZB-04-PNK', title: 'Zip Binder — Pink', category: 'Binders', family_sku: 'ZB-04', colour: 'Pink', barcode: '1209202001474' })];
+    expect(filterProducts(colourRows, { search: 'pink' })).toHaveLength(1);
+    expect(filterProducts(colourRows, { search: 'zb-04' })).toHaveLength(1);
+    expect(filterProducts(colourRows, { search: '1209202001474' })).toHaveLength(1);
+  });
 });
 
 describe('sortProducts', () => {

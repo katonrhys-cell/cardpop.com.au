@@ -38,6 +38,11 @@ const INITIAL_STATE = {
   wholesale_ex_gst_aud: '',
   wholesale_inc_gst_aud: '',
   stock_quantity: '1',
+  // Colour family (one product per colour): siblings share family_sku.
+  family_sku: '',
+  colour: '',
+  colour_hex: '',
+  barcode: '',
   category: '',
   product_type: 'sealed',
   status: 'active',
@@ -70,6 +75,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
         retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
         stock_quantity: product.stock_quantity != null ? String(product.stock_quantity) : '0',
+        family_sku: product.family_sku || '',
+        colour: product.colour || '',
+        colour_hex: product.colour_hex || '',
+        barcode: product.barcode || '',
         category: product.category || '',
         product_type: product.product_type || 'sealed',
         status: product.status || 'active',
@@ -239,6 +248,18 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         image_url: imageUrls[0] || null,
         images: imageUrls,
       };
+      // Colour-family fields. Sent once the columns exist (an edited row that
+      // carries them) or when filled in, so saving never trips over a column
+      // that a pending migration hasn't added yet.
+      const familyFields = {
+        family_sku: normalizeSku(formData.family_sku) || null,
+        colour: formData.colour.trim() || null,
+        colour_hex: /^#[0-9a-f]{6}$/i.test(formData.colour_hex.trim()) ? formData.colour_hex.trim() : null,
+        barcode: formData.barcode.replace(/\s+/g, '') || null,
+      };
+      if ((product && 'family_sku' in product) || Object.values(familyFields).some((v) => v != null)) {
+        Object.assign(payload, familyFields);
+      }
 
       let productId = product?.id ?? null;
       if (product) {
@@ -477,6 +498,41 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               >
                 Use RRP as price
               </Button>
+            </div>
+          </div>
+
+          {/* Colour family: each colour is its own product (own price, stock,
+              photos and grid card). Give siblings the same family SKU — the
+              line SKU, e.g. ZB-04 — and product pages offer them as a colour
+              picker that switches between them. */}
+          <div className="space-y-3 pt-4 border-t border-border">
+            <div>
+              <Label>Colour family <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                For one product per colour. Products sharing a family SKU are linked on their product pages so shoppers can flick between colours.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="shop-product-family" className="text-xs">Family SKU</Label>
+                <Input id="shop-product-family" placeholder="e.g. ZB-04" value={formData.family_sku}
+                  onChange={(e) => handleInputChange('family_sku', e.target.value.toUpperCase())} className="bg-background font-mono" />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="shop-product-colour" className="text-xs">Colour</Label>
+                <div className="flex gap-2">
+                  <Input id="shop-product-colour" placeholder="e.g. Pink" value={formData.colour}
+                    onChange={(e) => handleInputChange('colour', e.target.value)} className="bg-background" />
+                  <input type="color" aria-label="Swatch colour" value={/^#[0-9a-f]{6}$/i.test(formData.colour_hex) ? formData.colour_hex : '#cccccc'}
+                    onChange={(e) => handleInputChange('colour_hex', e.target.value)}
+                    className="h-10 w-12 shrink-0 cursor-pointer rounded-md border border-border bg-background p-1" />
+                </div>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="shop-product-barcode" className="text-xs">Barcode (EAN)</Label>
+                <Input id="shop-product-barcode" inputMode="numeric" placeholder="Printed on the packaging" value={formData.barcode}
+                  onChange={(e) => handleInputChange('barcode', e.target.value)} className="bg-background font-mono" />
+              </div>
             </div>
           </div>
 
