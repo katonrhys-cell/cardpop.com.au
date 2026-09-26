@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { Star, ShieldCheck, ZoomIn, ShoppingCart, PackageX, MessageSquare, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,7 +47,9 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const titleSlug = slugify(product.name || product.cardName || product.title || 'card');
   const detailPath = product.source === 'marketplace'
     ? `/marketplace/${product.id}/${titleSlug}`
-    : `/product/${product.source || 'vault'}/${product.id}/${titleSlug}`;
+    : product.source === 'shop'
+      ? shopProductPath(product)
+      : `/product/${product.source || 'vault'}/${product.id}/${titleSlug}`;
   const gradingCompany = product.grading_company || product.gradingCompany || '';
   const isGraded = gradingCompany && gradingCompany !== 'raw' && product.grade;
   // Vault listings render through the Card Showcase Engine (their chosen display

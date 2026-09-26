@@ -6,7 +6,6 @@ import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
 import { findShopCategory } from '@/utils/shopCategories.js';
 import { generateMetaTitle, generateMetaDescription, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
-import { slugify } from '@/lib/slugify.js';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductGrid from '@/components/ProductGrid.jsx';
@@ -20,6 +19,7 @@ import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { toast } from 'sonner';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -221,7 +221,7 @@ const ShopCategoryPage = () => {
         const productSchema = {
           '@type': 'Product',
           name: p.title || p.name || 'Trading Card Supply',
-          url: `${SITE_ORIGIN}/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+          url: `${SITE_ORIGIN}${shopProductPath(p)}`,
           ...(absoluteImage(p) ? { image: absoluteImage(p) } : {}),
           offers: {
             '@type': 'Offer',
@@ -230,7 +230,7 @@ const ShopCategoryPage = () => {
             availability: (p.stock_quantity == null || p.stock_quantity > 0)
               ? 'https://schema.org/InStock'
               : 'https://schema.org/OutOfStock',
-            url: `${SITE_ORIGIN}/product/shop/${p.id}/${slugify(p.title || p.name || 'product')}`,
+            url: `${SITE_ORIGIN}${shopProductPath(p)}`,
           },
         };
         return {

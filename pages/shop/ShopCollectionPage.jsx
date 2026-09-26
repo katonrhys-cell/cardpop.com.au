@@ -14,12 +14,12 @@ import { supabase } from '@/lib/supabaseClient.js';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import { resolveShopCollection } from '@/data/shopCollectionConfigs.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
-import { slugify } from '@/lib/slugify.js';
 import { isSoldOut, isComingSoon, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { DEFAULT_FACET_KEYS, filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { toast } from 'sonner';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 
@@ -50,7 +50,7 @@ const MiniProductCard = ({ product, accentHex }) => {
   const imgSrc = imgPath ? publicImageUrl(imgPath) : null;
   const price = Number(product.price_aud ?? product.price ?? 0);
   const title = product.title || 'Product';
-  const detailPath = `/product/shop/${product.id}/${slugify(title)}`;
+  const detailPath = shopProductPath(product);
   const comingSoon = isComingSoon(product);
   const soldOut = !comingSoon && isSoldOut(product);
 

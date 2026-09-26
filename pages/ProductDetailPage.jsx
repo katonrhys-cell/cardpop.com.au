@@ -37,15 +37,22 @@ import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFamily.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
+import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
+import { findShopCategory } from '@/utils/shopCategories.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
 
 // `source` can come from the route param (/product/:source/:id/:slug?) or be
 // fixed by the mounting route (/marketplace/:id/:slug? passes source="marketplace").
-const ProductDetailPage = ({ source: sourceProp }) => {
-  const { source: sourceParam, id } = useParams();
+// Shop products are normally mounted at their canonical /shop/<category>/<slug>
+// URL (pages/shop/ShopListedProductPage.jsx), which passes `id` and
+// `canonicalPath`; reached through the legacy /product/shop/:id URL instead,
+// the page redirects there.
+const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) => {
+  const { source: sourceParam, id: idParam } = useParams();
   const source = sourceProp || sourceParam;
+  const id = idProp || idParam;
   const navigate = useNavigate();
   const { addToCart, setIsCartOpen } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
@@ -168,6 +175,12 @@ const ProductDetailPage = ({ source: sourceProp }) => {
           if (!data) {
             setError('Product not found or unavailable.');
             setLoading(false);
+            return;
+          }
+
+          // Legacy /product/shop/:id link → the canonical /shop/<category>/<slug>.
+          if (!canonicalPath && shopProductBasePath(data)) {
+            navigate(shopProductPath(data), { replace: true });
             return;
           }
 
@@ -297,7 +310,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
     fetchProduct();
     return () => { isMounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- currentUser/isAdmin/authLoading are tracked via their vault-scoped projections above
-  }, [id, source, vaultAuthPending, vaultViewerId, vaultIsAdmin, navigate]);
+  }, [id, source, vaultAuthPending, vaultViewerId, vaultIsAdmin, navigate, canonicalPath]);
 
   // Shop colour family: the other colours of this product line, each its own
   // product. Picking one navigates to that colour's page.
@@ -443,6 +456,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   }
 
   const isShop = source === 'shop';
+  const shopCategory = isShop ? findShopCategory(shopCategorySlug(product)) : null;
   const isSold = !isShop && product.status === 'sold';
   const comingSoon = isShop && product.status === 'coming_soon';
   const outOfStock = isShop && !comingSoon && product.stockQuantity !== null && product.stockQuantity <= 0;
@@ -487,7 +501,9 @@ const ProductDetailPage = ({ source: sourceProp }) => {
             // Marketplace listings canonicalise to /marketplace/:id/:slug — the
             // URL form the sitemap and bot prerenderer advertise.
             ? `/marketplace/${id}/${product.slug || slugify(product.name || 'listing')}`
-            : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
+            : source === 'shop'
+              ? (canonicalPath || shopProductBasePath(product) || legacyShopProductPath(product))
+              : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
         />
 
         {/* Breadcrumb gives a reliable upward path for visitors who land here
@@ -501,6 +517,7 @@ const ProductDetailPage = ({ source: sourceProp }) => {
               : source === 'vault'
                 ? { label: 'My Vault', path: '/vault' }
                 : { label: 'Marketplace', path: '/marketplace' },
+            ...(shopCategory ? [{ label: shopCategory.name, path: `/shop/category/${shopCategory.slug}` }] : []),
             { label: product.name },
           ]}
         />

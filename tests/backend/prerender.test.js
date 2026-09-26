@@ -15,6 +15,8 @@ vi.mock('@supabase/supabase-js', () => {
       in: vi.fn(() => b),
       gt: vi.fn(() => b),
       gte: vi.fn(() => b),
+      like: vi.fn(() => b),
+      not: vi.fn(() => b),
       order: vi.fn(() => b),
       limit: vi.fn(() => b),
       maybeSingle: vi.fn(() => Promise.resolve(state.result)),
@@ -218,6 +220,56 @@ describe('prerender shop products', () => {
     expect(status).toBe(404);
     expect(body).toContain('noindex');
     expect(body).toContain('Product Unavailable');
+  });
+
+  it('301s a legacy /product/shop/:id URL onto /shop/<category>/<slug>', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Penny Sleeves 100 Pack', slug: 'penny-sleeves-100-pack',
+      category: 'Penny Sleeves', price_aud: 4.95, stock_quantity: 10, status: 'active',
+    } };
+    const { status, headers } = await run('/product/shop/' + UUID + '/penny-sleeves-100-pack');
+    expect(status).toBe(301);
+    expect(headers.Location).toBe('https://cardpop.com.au/shop/penny-sleeves/penny-sleeves-100-pack');
+  });
+
+  it('301s a colour sibling onto its line page with the colour preselected', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Zip Binder — Blue', slug: 'palms-off-gaming-stealth-12-pocket-zip-binder-blue',
+      family_sku: 'STL-12', colour: 'Blue', category: 'Binders', status: 'coming_soon',
+    } };
+    const { status, headers } = await run('/product/shop/' + UUID);
+    expect(status).toBe(301);
+    expect(headers.Location).toBe('https://cardpop.com.au/shop/binders/palms-off-gaming-stealth-12-pocket-zip-binder?colour=blue');
+  });
+
+  it('renders a house product at /shop/<category>/<slug> with that canonical', async () => {
+    state.listResult = { data: [{ id: UUID, slug: 'penny-sleeves-100-pack', category: 'Penny Sleeves', status: 'active' }] };
+    state.result = { data: {
+      id: UUID, title: 'Penny Sleeves 100 Pack', slug: 'penny-sleeves-100-pack',
+      category: 'Penny Sleeves', price_aud: 4.95, stock_quantity: 10, status: 'active',
+    } };
+    const { status, body } = await run('/shop/penny-sleeves/penny-sleeves-100-pack');
+    expect(status).toBe(200);
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/shop/penny-sleeves/penny-sleeves-100-pack"');
+    expect(body).toContain('/shop/category/penny-sleeves');
+  });
+
+  it('301s a house product reached under the wrong category', async () => {
+    state.listResult = { data: [{ id: UUID, slug: 'penny-sleeves-100-pack', category: 'Penny Sleeves', status: 'active' }] };
+    const { status, headers } = await run('/shop/top-loaders/penny-sleeves-100-pack');
+    expect(status).toBe(301);
+    expect(headers.Location).toBe('https://cardpop.com.au/shop/penny-sleeves/penny-sleeves-100-pack');
+  });
+
+  it('serves a house binder at /shop/binders/<slug>', async () => {
+    state.listResult = { data: [{ id: UUID, slug: 'binder-12-pocket-premium', category: 'Binders', status: 'active' }] };
+    state.result = { data: {
+      id: UUID, title: 'Binder 12 Pocket Premium', slug: 'binder-12-pocket-premium',
+      category: 'Binders', price_aud: 39.95, stock_quantity: 3, status: 'active',
+    } };
+    const { status, body } = await run('/shop/binders/binder-12-pocket-premium');
+    expect(status).toBe(200);
+    expect(body).toContain('https://cardpop.com.au/shop/binders/binder-12-pocket-premium');
   });
 });
 

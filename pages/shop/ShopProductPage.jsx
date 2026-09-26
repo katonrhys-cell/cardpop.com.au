@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate, useLocation } from 'react-router-dom';
 import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
+import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
@@ -35,6 +36,7 @@ const SITE_ORIGIN = 'https://cardpop.com.au';
  */
 const ShopProductPage = () => {
   const { categorySlug, productSlug } = useParams();
+  const { search } = useLocation();
   const { addToCart, setIsCartOpen } = useCart();
   const product = resolvePalmsOffProduct(productSlug);
   const category = resolvePalmsOffCategory(categorySlug);
@@ -50,10 +52,16 @@ const ShopProductPage = () => {
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
 
-  // A real product reached through the wrong category is a 404, not a redirect:
-  // two URLs resolving to one page is the duplicate-content problem this whole
-  // structure exists to avoid.
-  if (!validPair) return <NotFoundPage />;
+  // Not a catalogue product: any other shop product (e.g. CardPop house
+  // products) is served at the same /shop/<category>/<slug> shape.
+  if (!product) return <ShopListedProductPage categorySlug={categorySlug} productSlug={productSlug} />;
+  // A real product reached through the wrong category redirects to its one
+  // canonical URL — two URLs serving one page is duplicate content.
+  if (!validPair) {
+    return resolvePalmsOffCategory(product.categorySlug)
+      ? <Navigate to={`/shop/${product.categorySlug}/${product.slug}${search}`} replace />
+      : <NotFoundPage />;
+  }
 
   const canonical = `${SITE_ORIGIN}/shop/${category.slug}/${product.slug}`;
   // A chosen colour shows its own photos; the catalogue's are the fallback.

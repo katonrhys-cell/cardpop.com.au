@@ -10,11 +10,11 @@
  * This replaces shop_product_variants for these lines — see
  * docs/shop-variants.md for when to use which.
  */
-import { slugify } from '@/lib/slugify.js';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 
 /** Columns a colour picker needs from each sibling. */
 export const FAMILY_SELECT =
-  'id, sku, title, slug, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
+  'id, sku, title, slug, category, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
 
 // Display order for swatches: neutrals, then round the colour wheel. Colours
 // not listed sort alphabetically after these.
@@ -58,9 +58,9 @@ export function pickDefaultSibling(siblings) {
   return sorted.find((s) => (s.stock_quantity ?? 0) > 0) || sorted[0] || null;
 }
 
-/** /product/shop page for a sibling (same shape ProductCard links to). */
+/** Page for a sibling — its line's canonical page with the colour preselected. */
 export function familyProductPath(sibling) {
-  return `/product/shop/${sibling.id}/${slugify(sibling.title || 'product')}`;
+  return shopProductPath(sibling);
 }
 
 // The supplier's primary retail-packaging render ("…_pkg1.png", or "…_pkg.png"
