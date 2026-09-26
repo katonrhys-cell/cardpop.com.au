@@ -8,6 +8,7 @@ const mockSupabase = vi.hoisted(() => ({
 }));
 const mockIsAdminUser = vi.hoisted(() => vi.fn());
 const mockPayoutSeller = vi.hoisted(() => vi.fn());
+const mockSendOrderShipped = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: { transfers: { create: vi.fn() } } }));
@@ -18,6 +19,7 @@ vi.mock('../../src/services/refundAmounts.js', async (importOriginal) => ({
   ...(await importOriginal()),
   getRefundRetentionPct: vi.fn(async () => 50),
 }));
+vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: mockSendOrderShipped }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -425,5 +427,86 @@ describe('PATCH /business-profiles/:id', () => {
   it('rejects an invalid storefront_status', async () => {
     const res = await request(app).patch('/admin/business-profiles/b1').send({ storefront_status: 'live' });
     expect(res.status).toBe(400);
+  });
+});
+
+// ─── POST /orders/:id/ship ─────────────────────────────────────────────────────
+
+describe('POST /orders/:id/ship', () => {
+  const ORDER_ID = '11111111-2222-4333-8444-555555555555';
+  const paidOrder = {
+    id: ORDER_ID, status: 'payment_confirmed', buyer_id: 'buyer-1', buyer_email: null,
+    shipping_name: 'Sam Buyer', order_items: [{ title: 'Charizard Holo' }], shipped_at: null,
+  };
+
+  it('marks the order shipped, stores tracking and emails the buyer', async () => {
+    const update = makeBuilder({ data: { id: ORDER_ID, status: 'shipped', tracking_carrier: 'auspost', tracking_number: '33ABC1234567' }, error: null });
+    const notifyUpdate = makeBuilder();
+    const notification = makeBuilder();
+    queueFrom(
+      makeBuilder({ data: paidOrder, error: null }), // read order
+      update,                                          // status + tracking
+      makeBuilder({ data: { email: 'sam@example.com', display_name: 'Sam' }, error: null }), // buyer profile
+      notifyUpdate,                                    // shipping_notified_at
+      notification,                                    // bell notification
+      makeBuilder(),                                   // audit log
+    );
+    mockSendOrderShipped.mockResolvedValue(true);
+
+    const res = await request(app).post(`/admin/orders/${ORDER_ID}/ship`)
+      .send({ carrier: 'auspost', tracking_number: '33ab 1234 567' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.emailed).toBe(true);
+    expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'shipped', tracking_carrier: 'auspost', tracking_number: '33AB1234567',
+    }));
+    expect(mockSendOrderShipped).toHaveBeenCalledWith(expect.objectContaining({
+      buyerEmail: 'sam@example.com', buyerName: 'Sam Buyer', orderRef: '11111111',
+      items: ['Charizard Holo'], carrier: 'auspost', trackingNumber: '33AB1234567',
+    }));
+    expect(notifyUpdate.update).toHaveBeenCalledWith({ shipping_notified_at: expect.any(String) });
+    expect(notification.insert).toHaveBeenCalledWith(expect.objectContaining({ user_id: 'buyer-1', related_id: ORDER_ID }));
+  });
+
+  it('uses the guest email on the order and skips the email when notify is false', async () => {
+    queueFrom(
+      makeBuilder({ data: { ...paidOrder, buyer_id: null, buyer_email: 'guest@example.com' }, error: null }),
+      makeBuilder({ data: { id: ORDER_ID, status: 'shipped' }, error: null }),
+      makeBuilder(),
+    );
+    const res = await request(app).post(`/admin/orders/${ORDER_ID}/ship`)
+      .send({ carrier: 'sendle', tracking_number: 'SXYZ123', notify: false });
+    expect(res.status).toBe(200);
+    expect(res.body.emailed).toBe(false);
+    expect(mockSendOrderShipped).not.toHaveBeenCalled();
+  });
+
+  it('reports when the email could not be sent but keeps the shipment', async () => {
+    queueFrom(
+      makeBuilder({ data: { ...paidOrder, buyer_id: null, buyer_email: 'guest@example.com' }, error: null }),
+      makeBuilder({ data: { id: ORDER_ID, status: 'shipped' }, error: null }),
+      makeBuilder(),
+    );
+    mockSendOrderShipped.mockResolvedValue(false);
+    const res = await request(app).post(`/admin/orders/${ORDER_ID}/ship`)
+      .send({ carrier: 'auspost', tracking_number: '33ABC1234567' });
+    expect(res.status).toBe(200);
+    expect(res.body.emailed).toBe(false);
+    expect(res.body.emailError).toMatch(/could not be sent/);
+  });
+
+  it('refuses an order that is not paid', async () => {
+    queueFrom(makeBuilder({ data: { ...paidOrder, status: 'pending' }, error: null }));
+    const res = await request(app).post(`/admin/orders/${ORDER_ID}/ship`)
+      .send({ carrier: 'auspost', tracking_number: '33ABC1234567' });
+    expect(res.status).toBe(409);
+  });
+
+  it('validates the carrier and tracking number', async () => {
+    const r1 = await request(app).post(`/admin/orders/${ORDER_ID}/ship`).send({ carrier: 'pigeon', tracking_number: '33ABC1234567' });
+    const r2 = await request(app).post(`/admin/orders/${ORDER_ID}/ship`).send({ carrier: 'auspost', tracking_number: '<b>' });
+    expect([r1.status, r2.status]).toEqual([400, 400]);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 });

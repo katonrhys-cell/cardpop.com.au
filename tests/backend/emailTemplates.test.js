@@ -7,6 +7,7 @@ import {
   orderAdminNoticeEmail,
   offerReceivedEmail,
   shopEnquiryEmail,
+  orderShippedEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -102,5 +103,22 @@ describe('shopEnquiryEmail', () => {
   it('notes when no message was included', () => {
     const html = shopEnquiryEmail({ productTitle: 'Binder', productId: 'x', name: 'Ash', email: 'a@b.co', message: '' });
     expect(html).toContain('No message was included');
+  });
+});
+
+describe('orderShippedEmail', () => {
+  it('links the Australia Post tracking page and escapes item titles', () => {
+    const html = orderShippedEmail({
+      buyerName: 'Sam', orderRef: 'ABCD1234', items: [XSS], carrier: 'auspost', trackingNumber: '33ab 1234',
+    });
+    expect(html).toContain('https://auspost.com.au/mypost/track/details/33AB1234');
+    expect(html).toContain('Track Your Parcel');
+    expect(html).not.toContain(XSS);
+  });
+
+  it('falls back to the order list for a carrier with no tracking page', () => {
+    const html = orderShippedEmail({ buyerName: 'Sam', orderRef: 'ABCD1234', carrier: 'other', trackingNumber: 'ZZ99' });
+    expect(html).toContain('https://cardpop.com.au/account/orders');
+    expect(html).toContain('ZZ99');
   });
 });

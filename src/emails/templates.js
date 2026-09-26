@@ -1,3 +1,5 @@
+import { trackingUrl, carrierLabel, normalizeTrackingNumber } from '../../utils/shipmentTracking.js';
+
 /**
  * Shared HTML email template builder matching CardPop brand.
  *
@@ -501,5 +503,42 @@ ${quoted}
     'https://cardpop.com.au/account/offers',
     'View Offer',
     'You are receiving this because someone made an offer on your CardPop listing.',
+  );
+}
+
+// ─── Order shipped (buyer) ────────────────────────────────────────────────────
+
+/**
+ * Sent to the buyer when an admin marks their order shipped with a tracking
+ * reference. The button goes straight to the carrier's tracking page (guest
+ * buyers have no account to log into); with no carrier link it falls back to
+ * the order list. Item titles are seller-supplied, so they go through `esc`.
+ */
+export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, trackingNumber }) {
+  const url = trackingUrl(carrier, trackingNumber);
+  const number = normalizeTrackingNumber(trackingNumber);
+  const rows = [['Order', esc(orderRef)]];
+  if (items.length) rows.push(['Items', items.map(esc).join(', ')]);
+  rows.push(['Carrier', esc(carrierLabel(carrier))]);
+  rows.push([
+    'Tracking number',
+    url ? `<a href="${esc(url)}" style="color:#E63946;text-decoration:none;font-family:monospace;">${esc(number)}</a>` : `<span style="font-family:monospace;">${esc(number)}</span>`,
+    true,
+  ]);
+
+  const body = `<p>Good news — your order is on its way.</p>
+${summaryTable(rows)}
+<p>${url
+    ? `Tracking can take up to 24 hours to show the first scan. You can follow your parcel any time with the button below${carrier === 'auspost' ? ' or in the Australia Post app' : ''}.`
+    : `Use the tracking number above on ${esc(carrierLabel(carrier))}'s website to follow your parcel.`}</p>`;
+
+  return cpEmail(
+    `Your CardPop order has shipped — tracking ${esc(number)}.`,
+    'Your Order Has Shipped',
+    `Hi ${esc(buyerName || 'there')},`,
+    body,
+    url ? esc(url) : 'https://cardpop.com.au/account/orders',
+    url ? 'Track Your Parcel' : 'View Your Orders',
+    'You are receiving this because you placed an order on CardPop.',
   );
 }
