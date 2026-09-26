@@ -35,6 +35,7 @@ import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFamily.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
@@ -54,6 +55,8 @@ const ProductDetailPage = ({ source: sourceProp }) => {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   // Chosen colour variant for shop products that have them.
   const [selectedVariantId, setSelectedVariantId] = useState(null);
+  // Colour siblings (one shop product per colour, linked by family_sku).
+  const [family, setFamily] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [seller, setSeller] = useState(null);
@@ -295,6 +298,18 @@ const ProductDetailPage = ({ source: sourceProp }) => {
     return () => { isMounted = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- currentUser/isAdmin/authLoading are tracked via their vault-scoped projections above
   }, [id, source, vaultAuthPending, vaultViewerId, vaultIsAdmin, navigate]);
+
+  // Shop colour family: the other colours of this product line, each its own
+  // product. Picking one navigates to that colour's page.
+  const familySku = source === 'shop' ? product?.family_sku : null;
+  useEffect(() => {
+    let cancelled = false;
+    if (!familySku) { setFamily([]); return undefined; }
+    fetchFamily(supabase, familySku, PUBLIC_SHOP_STATUSES).then((rows) => {
+      if (!cancelled) setFamily(rows);
+    });
+    return () => { cancelled = true; };
+  }, [familySku]);
 
   useEffect(() => {
     // For a marketplace listing, `id` is the listings.id — the vault_item's
@@ -681,11 +696,26 @@ const ProductDetailPage = ({ source: sourceProp }) => {
               </div>
             )}
 
+            {isShop && family.length > 1 && (
+              <VariantPicker
+                product={{ variants: familyAsVariants(family) }}
+                value={product.id}
+                onChange={(v) => {
+                  if (v.id === product.id) return;
+                  const sibling = family.find((f) => f.id === v.id);
+                  if (sibling) navigate(familyProductPath(sibling));
+                }}
+                showAvailability={!comingSoon}
+                className="mb-6"
+              />
+            )}
+
             {isShop && activeVariants(product).length > 0 && (
               <VariantPicker
                 product={product}
                 value={selectedVariantId}
                 onChange={(v) => setSelectedVariantId(v.id)}
+                showAvailability={!comingSoon}
                 className="mb-6"
               />
             )}

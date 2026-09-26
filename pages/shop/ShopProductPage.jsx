@@ -8,10 +8,11 @@ import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { familyAsVariants, productImages } from '@/utils/shopFamily.js';
+import useShopLine from '@/hooks/useShopLine.js';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import {
@@ -38,27 +39,16 @@ const ShopProductPage = () => {
   const product = resolvePalmsOffProduct(productSlug);
   const category = resolvePalmsOffCategory(categorySlug);
 
-  const [row, setRow] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [enquiryOpen, setEnquiryOpen] = useState(false);
-  const [selectedVariantId, setSelectedVariantId] = useState(null);
-
   const validPair = Boolean(product && category && product.categorySlug === category.slug);
 
-  useEffect(() => {
-    if (!validPair) { setLoading(false); return undefined; }
-    let cancelled = false;
-    setLoading(true);
-    supabase
-      .from('shop_products')
-      .select(`id, price_aud, retail_price_aud, stock_quantity, status, ${VARIANTS_SELECT}`)
-      .eq('slug', product.slug)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) { setRow(data || null); setSelectedVariantId(pickDefaultVariant(data)?.id ?? null); setLoading(false); }
-      });
-    return () => { cancelled = true; };
-  }, [validPair, product]);
+  // Colour families (one product per colour) come back as `family`, with
+  // `row` = the chosen colour; otherwise `row` is the single product row.
+  const { row, family, selectedId, setSelectedId, loading } = useShopLine({
+    slug: product?.slug, sku: product?.sku, enabled: validPair,
+  });
+  const [enquiryOpen, setEnquiryOpen] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState(null);
+  useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
 
   // A real product reached through the wrong category is a 404, not a redirect:
   // two URLs resolving to one page is the duplicate-content problem this whole
@@ -66,7 +56,9 @@ const ShopProductPage = () => {
   if (!validPair) return <NotFoundPage />;
 
   const canonical = `${SITE_ORIGIN}/shop/${category.slug}/${product.slug}`;
-  const images = palmsOffImages(product);
+  // A chosen colour shows its own photos; the catalogue's are the fallback.
+  const images = family.length > 0 && productImages(row).length > 0 ? productImages(row) : palmsOffImages(product);
+  const lineTitle = (family.length > 0 && row?.title) || product.title;
   const specs = palmsOffSpecs(product);
   const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
   const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
@@ -103,7 +95,7 @@ const ShopProductPage = () => {
     addToCart(
       {
         id: row.id, source: 'shop', type: 'shop',
-        title: product.title, price: unitPrice, image: images[0] || null,
+        title: lineTitle, price: unitPrice, image: images[0] || null,
       },
       cartVariant,
       1,
@@ -187,7 +179,7 @@ const ShopProductPage = () => {
         ]} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          <div><ProductImageCarousel images={images} /></div>
+          <div><ProductImageCarousel key={row?.id || 'line'} images={images} /></div>
 
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -234,6 +226,25 @@ const ShopProductPage = () => {
               {intro}
             </p>
 
+            {family.length > 1 && (
+
+              <VariantPicker
+
+                product={{ variants: familyAsVariants(family) }}
+
+                value={selectedId}
+
+                onChange={(v) => setSelectedId(v.id)}
+
+                showAvailability={!isComingSoon}
+
+                className="mt-6"
+
+              />
+
+            )}
+
+
             {isPurchasable && variants.length > 0 && (
               <VariantPicker
                 product={row}
@@ -256,7 +267,7 @@ const ShopProductPage = () => {
                     open={enquiryOpen}
                     onOpenChange={setEnquiryOpen}
                     reason="coming_soon"
-                    product={{ id: row.id, title: product.title }}
+                    product={{ id: row.id, title: lineTitle }}
                   />
                 </>
               ) : isPurchasable && anyVariantInStock ? (
@@ -281,7 +292,7 @@ const ShopProductPage = () => {
                   <ShopEnquiryDialog
                     open={enquiryOpen}
                     onOpenChange={setEnquiryOpen}
-                    product={{ id: row.id, title: product.title }}
+                    product={{ id: row.id, title: lineTitle }}
                   />
                 </>
               ) : (

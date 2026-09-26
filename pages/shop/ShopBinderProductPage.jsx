@@ -8,10 +8,11 @@ import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { familyAsVariants, productImages } from '@/utils/shopFamily.js';
+import useShopLine from '@/hooks/useShopLine.js';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import {
@@ -28,30 +29,21 @@ const ShopBinderProductPage = () => {
   // The DB row carries the commercial fields only (price, stock, status). All
   // copy, specs and imagery come from data/shopBinderProducts.js so the page
   // renders identically for the SPA, the prerenderer and the sitemap.
-  const [row, setRow] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Colour families (one product per colour) come back as `family`, with
+  // `row` = the chosen colour; otherwise `row` is the single product row.
+  const { row, family, selectedId, setSelectedId, loading } = useShopLine({
+    slug: product?.slug, sku: product?.sku, enabled: !!product,
+  });
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
-
-  useEffect(() => {
-    if (!product) { setLoading(false); return undefined; }
-    let cancelled = false;
-    setLoading(true);
-    supabase
-      .from('shop_products')
-      .select(`id, price_aud, retail_price_aud, stock_quantity, status, ${VARIANTS_SELECT}`)
-      .eq('slug', product.slug)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled) { setRow(data || null); setSelectedVariantId(pickDefaultVariant(data)?.id ?? null); setLoading(false); }
-      });
-    return () => { cancelled = true; };
-  }, [product]);
+  useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
 
   if (!product) return <NotFoundPage />;
 
   const canonical = `${SITE_ORIGIN}/shop/binders/${product.slug}`;
-  const images = binderImages(product);
+  // A chosen colour shows its own photos; the catalogue's are the fallback.
+  const images = family.length > 0 && productImages(row).length > 0 ? productImages(row) : binderImages(product);
+  const lineTitle = (family.length > 0 && row?.title) || product.title;
   const specs = binderSpecs(product);
   const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
   const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
@@ -90,7 +82,7 @@ const ShopBinderProductPage = () => {
     addToCart(
       {
         id: row.id, source: 'shop', type: 'shop',
-        title: product.title, price: unitPrice, image: images[0] || null,
+        title: lineTitle, price: unitPrice, image: images[0] || null,
       },
       cartVariant,
       1,
@@ -171,7 +163,7 @@ const ShopBinderProductPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* ── Gallery ─────────────────────────────────────────────────── */}
           <div>
-            <ProductImageCarousel images={images} />
+            <ProductImageCarousel key={row?.id || 'line'} images={images} />
           </div>
 
           {/* ── Buy box ─────────────────────────────────────────────────── */}
@@ -223,6 +215,16 @@ const ShopBinderProductPage = () => {
             {/* Enquiry until priced, checkout after. `state` carries which
                 product was being viewed so the signup page can attribute the
                 enquiry without putting it in the URL. */}
+            {family.length > 1 && (
+              <VariantPicker
+                product={{ variants: familyAsVariants(family) }}
+                value={selectedId}
+                onChange={(v) => setSelectedId(v.id)}
+                showAvailability={!isComingSoon}
+                className="mt-6"
+              />
+            )}
+
             {isPurchasable && variants.length > 0 && (
               <VariantPicker
                 product={row}
@@ -245,7 +247,7 @@ const ShopBinderProductPage = () => {
                     open={enquiryOpen}
                     onOpenChange={setEnquiryOpen}
                     reason="coming_soon"
-                    product={{ id: row.id, title: product.title }}
+                    product={{ id: row.id, title: lineTitle }}
                   />
                 </>
               ) : isPurchasable && anyVariantInStock ? (
@@ -270,7 +272,7 @@ const ShopBinderProductPage = () => {
                   <ShopEnquiryDialog
                     open={enquiryOpen}
                     onOpenChange={setEnquiryOpen}
-                    product={{ id: row.id, title: product.title }}
+                    product={{ id: row.id, title: lineTitle }}
                   />
                 </>
               ) : (
