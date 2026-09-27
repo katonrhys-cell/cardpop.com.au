@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { runEventScan } from '../src/utils/eventScanner.js';
+import { runDueEventSourceScans, scanEventSource } from '../src/utils/eventSourceWatcher.js';
 import supabase from '../src/utils/supabaseClient.js';
 import logger from '../src/utils/logger.js';
 import { decodeAal } from '../src/middleware/requireAal2.js';
@@ -21,11 +22,21 @@ import { decodeAal } from '../src/middleware/requireAal2.js';
 //     Supabase access token. It calls this path directly rather than going
 //     through /hcgi/api so the request gets the 300s budget — proxying it
 //     through the 40s API function would time out mid-run.
+//
+// Two jobs, picked by query string:
+//   • (none)                      — the weekly discovery scan.
+//   • ?mode=watches               — the daily re-scan of every event website
+//                                   that has come due (docs/event-scanning.md).
+//   • ?mode=watches&event=<uuid>  — re-scan one event's website now; what the
+//                                   admin event form calls straight after a
+//                                   website is added, and its "Scan now".
 
 // A manual run started within this window blocks another one. Two concurrent
 // scans would double-spend on the model and race each other to insert the same
 // draft, and an impatient double-click is the likeliest way to cause it.
 const CONCURRENT_RUN_WINDOW_MS = 10 * 60 * 1000;
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const timingSafeEqualStr = (a, b) => {
   const ab = Buffer.from(String(a));
@@ -96,7 +107,32 @@ export default async function handler(req, res) {
     }
     trigger = 'manual';
     triggeredBy = adminId;
+  }
 
+  const query = req.query || {};
+  if (query.mode === 'watches') {
+    try {
+      if (query.event) {
+        if (!UUID_RE.test(String(query.event))) {
+          return res.status(400).json({ error: 'event must be an event id.' });
+        }
+        // Scan-on-save and "Scan now" want a real answer, so skip the
+        // unchanged-page shortcut; the per-watch lock still stops a double scan.
+        const result = await scanEventSource(String(query.event), { force: trigger === 'manual' });
+        logger.info(`[EVENT_WATCH] ${JSON.stringify(result)}`);
+        const code = result.status === 'busy' ? 409 : result.status === 'missing' ? 404 : 200;
+        return res.status(code).json(result);
+      }
+      const summary = await runDueEventSourceScans();
+      logger.info(`[EVENT_WATCH] ${JSON.stringify({ ...summary, results: undefined })}`);
+      return res.status(200).json(summary);
+    } catch (error) {
+      logger.error(`[EVENT_WATCH] ${error.message}`);
+      return res.status(502).json({ error: 'Event website re-scan failed.' });
+    }
+  }
+
+  if (trigger === 'manual') {
     if (await hasRunInFlight()) {
       return res.status(409).json({ error: 'A scan is already running. Wait for it to finish before starting another.' });
     }
