@@ -17,6 +17,17 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 
+// An Amazon product/listing page (…/dp/<ASIN>, /gp/product/…) rather than a
+// direct image file — pasting one into Image URL leaves the shop card blank.
+const isAmazonListingUrl = (value) => {
+  try {
+    const u = new URL(String(value || '').trim());
+    return /(^|\.)amazon\./i.test(u.hostname) && /\/(dp|gp\/product)\//i.test(u.pathname);
+  } catch {
+    return false;
+  }
+};
+
 // Mirror the storefront's discount maths so the admin sees the same "% off"
 // the customer will (parses the first number out of each free-text price).
 const parsePrice = (label) => {
@@ -129,24 +140,50 @@ const ShopAffiliateProductsAdminPage = () => {
   // Pre-fill title / image / description from the pasted affiliate link's Open
   // Graph tags (best effort — Amazon may block the fetch, in which case the
   // admin just fills the fields by hand). Prices stay manual.
+  //
+  // Admins often paste the Amazon *listing* URL into Image URL (it can't render
+  // as an <img>). When they do, it's also a perfectly good page to read the
+  // photo from, so it's tried whenever the affiliate link yields no image.
+  const fetchMetadata = async (url) => {
+    const res = await apiServerClient.fetch('/admin/affiliate-metadata', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not fetch product details.');
+    return data;
+  };
+
   const handleFetchDetails = async () => {
     const url = formData.affiliate_url.trim();
     if (!url) { toast.error('Paste the affiliate URL first'); return; }
+    const listingUrl = isAmazonListingUrl(formData.image_url) ? formData.image_url.trim() : null;
 
     setIsFetchingMeta(true);
     try {
-      const res = await apiServerClient.fetch('/admin/affiliate-metadata', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not fetch product details.');
+      let data = {};
+      let affiliateError = null;
+      try {
+        data = await fetchMetadata(url);
+      } catch (err) {
+        if (!listingUrl) throw err;
+        affiliateError = err;
+      }
+      if (!data.image && listingUrl) {
+        try {
+          const fromListing = await fetchMetadata(listingUrl);
+          data = { ...fromListing, ...Object.fromEntries(Object.entries(data).filter(([, v]) => v)) };
+        } catch (err) {
+          throw affiliateError || err;
+        }
+      }
 
       setFormData(prev => ({
         ...prev,
         title: data.title || prev.title,
-        image_url: data.image || prev.image_url,
+        // Never keep a listing URL in the image field — it would render blank.
+        image_url: data.image || (isAmazonListingUrl(prev.image_url) ? '' : prev.image_url),
         description: data.description || prev.description,
       }));
 
@@ -167,6 +204,10 @@ const ShopAffiliateProductsAdminPage = () => {
     e.preventDefault();
     if (!formData.title.trim()) { toast.error('Title is required'); return; }
     if (!formData.affiliate_url.trim()) { toast.error('Affiliate URL is required'); return; }
+    if (isAmazonListingUrl(formData.image_url)) {
+      toast.error('Image URL is an Amazon page, not a photo. Click Fetch details, or paste the photo address (m.media-amazon.com/images/…).');
+      return;
+    }
 
     setIsSubmitting(true);
     const payload = {

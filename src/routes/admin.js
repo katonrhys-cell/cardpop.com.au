@@ -862,9 +862,16 @@ const AFFILIATE_HOST_SUFFIXES = [
   'amzn.to', 'amzn.com', 'a.co', 'link.amazon',
 ];
 
+// Beyond the explicit list, accept any host on Amazon's own domains: every
+// amazon.<cc> / amazon.co.<cc> / amazon.com.<cc> storefront, the .amazon brand
+// TLD, and amzn.<tld>. Short links bounce through intermediate Amazon hosts
+// (regional storefronts, redirect services) that an exact list keeps missing.
+const AMAZON_OWNED_HOST = /(?:^|\.)(?:amazon(?:\.(?:com|(?:com?\.)?[a-z]{2}))?|amzn\.[a-z]{2,3})$/;
+
 const isAllowedAffiliateHost = (hostname) => {
   const host = String(hostname || '').toLowerCase();
-  return AFFILIATE_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`));
+  return AFFILIATE_HOST_SUFFIXES.some((suffix) => host === suffix || host.endsWith(`.${suffix}`))
+    || AMAZON_OWNED_HOST.test(host);
 };
 
 // Pull the content of the first matching <meta property/name="..."> tag.
@@ -921,7 +928,7 @@ router.post('/affiliate-metadata', async (req, res) => {
     return res.status(400).json({ error: 'Only https:// links are supported.' });
   }
   if (!isAllowedAffiliateHost(parsed.hostname)) {
-    return res.status(400).json({ error: 'Only Amazon affiliate links can be auto-filled right now.' });
+    return res.status(400).json({ error: `Only Amazon affiliate links can be auto-filled right now (got ${parsed.hostname}).` });
   }
 
   const controller = new AbortController();
@@ -943,7 +950,8 @@ router.post('/affiliate-metadata', async (req, res) => {
         return res.status(400).json({ error: 'Only https:// links are supported.' });
       }
       if (!isAllowedAffiliateHost(current.hostname)) {
-        return res.status(400).json({ error: 'Only Amazon affiliate links can be auto-filled right now.' });
+        // Name the host so an unexpected redirect target is diagnosable from the toast.
+        return res.status(400).json({ error: `The link redirected to ${current.hostname}, which can't be auto-filled. Enter the details manually.` });
       }
       assertNotLiteralPrivateAddress(current.toString());
 
