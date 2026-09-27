@@ -140,25 +140,22 @@ const ShopPage = () => {
     <div className="min-h-screen bg-background flex flex-col font-sans">
       <SEOHead title="The Shop | CardPop" description="Shop official CardPop sealed products, singles and accessories. Fast shipping across Australia." />
 
-      <section className="bg-card border-b border-border py-20 text-center">
-        <div className="container-default">
-          <ShoppingBag className="w-12 h-12 text-primary mx-auto mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">The Card Shop</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.
-          </p>
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-8 md:pt-10 w-full">
+        <div className="flex items-center gap-3 mb-1.5">
+          <ShoppingBag className="w-7 h-7 text-primary shrink-0" aria-hidden="true" />
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">The Card Shop</h1>
         </div>
-      </section>
-
-      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-12 w-full">
-        <h2 className="text-2xl font-bold mb-6">Shop by Category</h2>
+        <p className="text-muted-foreground mb-5">
+          Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.
+        </p>
+        <h2 className="sr-only">Shop by Category</h2>
         <ShopCategoryBrowse />
       </section>
 
-      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12 w-full">
-        <h2 className="text-2xl font-bold mb-6">All Products</h2>
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
-          <div className="relative w-full sm:max-w-md">
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-8 pb-12 w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+          <h2 className="text-xl font-bold sm:mr-auto">All Products</h2>
+          <div className="relative w-full sm:w-72 lg:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               name="shop-search"
@@ -166,22 +163,20 @@ const ShopPage = () => {
               placeholder="Search products..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-9 h-11 rounded-xl bg-card border-border"
+              className="pl-9 h-10 rounded-xl bg-card border-border"
             />
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger aria-label="Sort products" className="w-full sm:w-[200px] h-11 rounded-xl bg-card border-border">
-                <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="created_at_desc">Newest Arrivals</SelectItem>
-                <SelectItem value="price_asc">Price: Low to High</SelectItem>
-                <SelectItem value="price_desc">Price: High to Low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={sort} onValueChange={setSort}>
+            <SelectTrigger aria-label="Sort products" className="w-full sm:w-[190px] h-10 rounded-xl bg-card border-border">
+              <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="created_at_desc">Newest Arrivals</SelectItem>
+              <SelectItem value="price_asc">Price: Low to High</SelectItem>
+              <SelectItem value="price_desc">Price: High to Low</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <ShopFilterPanel
@@ -198,7 +193,7 @@ const ShopPage = () => {
             <Button variant="outline" className="mt-4" onClick={() => fetchRef.current?.()}>Retry</Button>
           </div>
         ) : loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
             {Array(8).fill(0).map((_, i) => (
               <div key={i} className="space-y-4">
                 <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
@@ -208,7 +203,7 @@ const ShopPage = () => {
             ))}
           </div>
         ) : products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
             {products.map((product, i) => (
               <ProductCard
                 key={product.id}
