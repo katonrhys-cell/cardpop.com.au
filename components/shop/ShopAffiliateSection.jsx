@@ -187,7 +187,7 @@ const ShopAffiliateSection = ({ category = null, title = 'Amazon Super Steals', 
       )}
 
       {!loading && (
-        <p className="text-xs text-muted-foreground mt-6 flex items-start gap-1.5 max-w-3xl">
+        <p className="text-xs text-muted-foreground mt-6 flex items-start gap-1.5 w-full">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span>
             CardPop is a participant in the Amazon Services LLC Associates Program, an affiliate
