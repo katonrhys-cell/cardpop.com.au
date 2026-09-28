@@ -18,8 +18,10 @@ import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import createUserScopedClient from '../utils/userScopedSupabase.js';
 import { supabase } from '../utils/supabaseClient.js';
-import { sendOfferReceived } from '../utils/emailService.js';
+import { sendOfferReceived, sendOfferPlaced, sendOfferAdminNotice } from '../utils/emailService.js';
+import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import logger from './../utils/logger.js';
+import { listingTakesOffers, OFFER_WINDOW_HOURS } from '../../utils/offerEligibility.js';
 
 const router = express.Router();
 
@@ -28,6 +30,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Matches the modal's own cap. A message longer than this is a mistake or an
 // abuse attempt, not an offer note.
 const MAX_MESSAGE_LENGTH = 1000;
+
+// Every offer is copied to this inbox on top of the admin accounts and the
+// configured alerts inbox (getAdminNotificationEmails), so it can never be
+// dropped by a settings change.
+export const OFFER_ADMIN_EMAIL = 'admin@cardpop.com.au';
+
+
+const LISTING_URL = (id) => `https://cardpop.com.au/product/marketplace/${id}`;
 
 const displayName = (profile) =>
   profile?.display_name || profile?.username || null;
@@ -44,7 +54,7 @@ async function loadOfferContext(offer) {
   const [{ data: listing }, { data: profiles }] = await Promise.all([
     supabase
       .from('listings')
-      .select('listing_type, vault_item:vault_items(card_name)')
+      .select('listing_type, price_aud, vault_item:vault_items(card_name)')
       .eq('id', offer.listing_id)
       .maybeSingle(),
     supabase
@@ -57,14 +67,21 @@ async function loadOfferContext(offer) {
   return {
     sellerEmail: byId[offer.seller_id]?.email ?? null,
     sellerName: displayName(byId[offer.seller_id]),
+    buyerEmail: byId[offer.buyer_id]?.email ?? null,
     buyerName: displayName(byId[offer.buyer_id]),
+    askingPriceAud: listing?.price_aud ?? null,
     cardName: listing?.vault_item?.card_name ?? null,
     listingType: listing?.listing_type ?? null,
   };
 }
 
 // POST /offers — make an offer on a listing.
-// Body: { listingId, amountAud, message?, sellerId? }
+// Body: { listingId, amountAud, acknowledgedBinding: true, message?, sellerId? }
+//
+// An offer is BINDING: if the seller accepts inside the 48-hour window the
+// buyer has agreed to buy at that price. The buyer must confirm that
+// (acknowledgedBinding) and it is recorded on the row as
+// binding_acknowledged_at, which the insert trigger requires.
 //
 // The seller is ALWAYS derived from the listing row on the server. The body's
 // sellerId used to be written verbatim, and nothing (here or in RLS) tied it
@@ -77,7 +94,7 @@ async function loadOfferContext(offer) {
 router.post('/', authMiddleware, async (req, res) => {
   const token = (req.headers.authorization || '').slice(7);
   const buyerId = req.user.id;
-  const { listingId, sellerId, amountAud, message } = req.body || {};
+  const { listingId, sellerId, amountAud, message, acknowledgedBinding } = req.body || {};
 
   if (!UUID_RE.test(String(listingId ?? ''))) {
     return res.status(400).json({ error: 'A valid listingId is required' });
@@ -88,6 +105,9 @@ router.post('/', authMiddleware, async (req, res) => {
   const amount = Number(amountAud);
   if (!Number.isFinite(amount) || amount <= 0) {
     return res.status(400).json({ error: 'A valid offer amount is required' });
+  }
+  if (acknowledgedBinding !== true) {
+    return res.status(400).json({ error: `Please confirm you understand this offer is binding for ${OFFER_WINDOW_HOURS} hours unless you withdraw it` });
   }
   const note = typeof message === 'string' ? message.trim() : '';
   if (note.length > MAX_MESSAGE_LENGTH) {
@@ -108,12 +128,7 @@ router.post('/', authMiddleware, async (req, res) => {
   if (!listing || listing.status !== 'active' || !listing.seller_id) {
     return res.status(404).json({ error: 'Listing not found or no longer active' });
   }
-  // Offers are open on buy-now listings unless the seller switched Accept
-  // Offers off, and always on Expression of Interest (it's offers-only).
-  // Trade-only and auction listings don't take cash offers.
-  const offersOpen = listing.listing_type === 'expression_of_interest'
-    || ((listing.listing_type ?? 'fixed') === 'fixed' && listing.accepts_offers !== false);
-  if (!offersOpen) {
+  if (!listingTakesOffers(listing)) {
     return res.status(400).json({ error: "This listing isn't accepting offers" });
   }
   const resolvedSellerId = listing.seller_id;
@@ -126,17 +141,26 @@ router.post('/', authMiddleware, async (req, res) => {
 
   // The write itself, as the caller. RLS rejects a buyer_id that isn't them.
   const userClient = createUserScopedClient(token);
-  const { data: offer, error } = await userClient
+  const row = {
+    listing_id: listingId,
+    buyer_id: buyerId,
+    seller_id: resolvedSellerId,
+    amount_aud: amount,
+    message: note || null,
+    binding_acknowledged_at: new Date().toISOString(),
+  };
+  const insertOffer = (payload) => userClient
     .from('offers')
-    .insert({
-      listing_id: listingId,
-      buyer_id: buyerId,
-      seller_id: resolvedSellerId,
-      amount_aud: amount,
-      message: note || null,
-    })
+    .insert(payload)
     .select('id, listing_id, buyer_id, seller_id, amount_aud, message, status, expires_at, created_at')
     .single();
+  let { data: offer, error } = await insertOffer(row);
+  // Vercel can deploy before `supabase db push` adds the column — the old
+  // schema doesn't require it, so save the offer without it rather than fail.
+  if (error && /binding_acknowledged_at/.test(error.message || '') && /column/i.test(error.message || '')) {
+    const { binding_acknowledged_at: _dropped, ...withoutAck } = row;
+    ({ data: offer, error } = await insertOffer(withoutAck));
+  }
 
   if (error) {
     logger.error(`[OFFERS] insert failed for buyer ${buyerId}: ${error.message}`);
@@ -144,33 +168,94 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 
   // Committed. From here nothing may turn a successful offer into a failure —
-  // the in-app notification is already written by the trigger.
-  let emailed = false;
-  try {
-    const ctx = await loadOfferContext(offer);
-    if (ctx.sellerEmail) {
-      emailed = await sendOfferReceived({
-        sellerEmail: ctx.sellerEmail,
-        sellerName: ctx.sellerName,
-        buyerName: ctx.buyerName,
-        cardName: ctx.cardName,
-        listingType: ctx.listingType,
-        amountAud: offer.amount_aud,
-        message: offer.message,
-        expiresAt: offer.expires_at
-          ? new Date(offer.expires_at).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'medium', timeStyle: 'short' })
-          : null,
-      });
-    } else {
-      logger.warn(`[OFFERS] no email on file for seller ${offer.seller_id} — offer ${offer.id} notified in-app only`);
-    }
-  } catch (err) {
-    logger.error(`[OFFERS] seller email failed for offer ${offer.id}: ${err.message}`);
-  }
-
-  // `emailed` is reported so the admin diagnostics endpoint and the tests can
-  // assert on it; the buyer's UI only cares that the offer landed.
-  return res.status(201).json({ offer, emailed });
+  // the in-app notifications (seller + every admin) are already written by the
+  // on_offer_created trigger.
+  const result = await notifyOfferMade(offer);
+  // The flags are reported so the tests can assert on them; the buyer's UI
+  // only cares that the offer landed.
+  return res.status(201).json({ offer, ...result });
 });
+
+const formatExpiry = (ts) => (ts
+  ? new Date(ts).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'medium', timeStyle: 'short' })
+  : null);
+
+/**
+ * The three emails for a new offer — seller, buyer confirmation, admins — each
+ * best-effort and independent, so one bounce never costs the others.
+ */
+async function notifyOfferMade(offer) {
+  let ctx;
+  try {
+    ctx = await loadOfferContext(offer);
+  } catch (err) {
+    logger.error(`[OFFERS] context lookup failed for offer ${offer.id}: ${err.message}`);
+    ctx = {};
+  }
+  const expiresAt = formatExpiry(offer.expires_at);
+  const listingUrl = LISTING_URL(offer.listing_id);
+
+  const seller = async () => {
+    if (!ctx.sellerEmail) {
+      logger.warn(`[OFFERS] no email on file for seller ${offer.seller_id} — offer ${offer.id} notified in-app only`);
+      return false;
+    }
+    return sendOfferReceived({
+      sellerEmail: ctx.sellerEmail,
+      sellerName: ctx.sellerName,
+      buyerName: ctx.buyerName,
+      cardName: ctx.cardName,
+      listingType: ctx.listingType,
+      amountAud: offer.amount_aud,
+      message: offer.message,
+      expiresAt,
+    });
+  };
+  const buyer = async () => {
+    if (!ctx.buyerEmail) return false;
+    return sendOfferPlaced({
+      buyerEmail: ctx.buyerEmail,
+      buyerName: ctx.buyerName,
+      cardName: ctx.cardName,
+      amountAud: offer.amount_aud,
+      askingPriceAud: ctx.askingPriceAud,
+      expiresAt,
+      listingUrl,
+    });
+  };
+  const admin = async () => {
+    const configured = await getAdminNotificationEmails().catch(() => []);
+    const seen = new Set();
+    const to = [OFFER_ADMIN_EMAIL, ...configured].filter((addr) => {
+      const key = String(addr || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return sendOfferAdminNotice({
+      to,
+      offerId: offer.id,
+      cardName: ctx.cardName,
+      amountAud: offer.amount_aud,
+      askingPriceAud: ctx.askingPriceAud,
+      buyerName: ctx.buyerName,
+      buyerEmail: ctx.buyerEmail,
+      sellerName: ctx.sellerName,
+      sellerEmail: ctx.sellerEmail,
+      message: offer.message,
+      expiresAt,
+      listingUrl,
+    });
+  };
+
+  const [emailed, buyerEmailed, adminEmailed] = await Promise.all(
+    [['seller', seller], ['buyer', buyer], ['admin', admin]].map(([who, fn]) =>
+      fn().then(Boolean).catch((err) => {
+        logger.error(`[OFFERS] ${who} email failed for offer ${offer.id}: ${err.message}`);
+        return false;
+      })),
+  );
+  return { emailed, buyerEmailed, adminEmailed };
+}
 
 export default router;

@@ -20,7 +20,7 @@ import { invalidReturnUrl } from '../utils/returnUrl.js';
 export async function resolveOfferPrice({ offerId, listingId, userId, listingSellerId }) {
   const { data: offer } = await supabase
     .from('offers')
-    .select('amount_aud, counter_amount_aud, status, buyer_id, seller_id, listing_id')
+    .select('amount_aud, counter_amount_aud, status, buyer_id, seller_id, listing_id, expires_at')
     .eq('id', offerId)
     .maybeSingle();
 
@@ -45,6 +45,14 @@ export async function resolveOfferPrice({ offerId, listingId, userId, listingSel
   // accepted the buyer's amount) and 'countered' (seller proposed a price).
   if (!['accepted', 'countered'].includes(offer.status)) {
     return { error: 'Offer is no longer valid' };
+  }
+  // A counter is the seller's proposal with its own 48-hour window (reset by
+  // the offers_enforce_lifecycle trigger when the seller counters). Paying is
+  // how the buyer accepts it, so a lapsed counter can't be paid — the sweep
+  // may not have flipped it to 'expired' yet. An 'accepted' offer has no
+  // deadline: both sides have agreed and the buyer is bound to pay.
+  if (offer.status === 'countered' && offer.expires_at && new Date(offer.expires_at) <= new Date()) {
+    return { error: 'This counter offer has expired' };
   }
   // counter_amount_aud is only ever written by the seller on the single
   // pending -> countered transition (enforced by offers_prevent_price_tamper),

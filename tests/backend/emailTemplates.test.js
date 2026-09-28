@@ -6,6 +6,8 @@ import {
   eventSubmittedEmail,
   orderAdminNoticeEmail,
   offerReceivedEmail,
+  offerPlacedEmail,
+  offerAdminNoticeEmail,
   shopEnquiryEmail,
   orderShippedEmail,
 } from '../../src/emails/templates.js';
@@ -120,5 +122,67 @@ describe('orderShippedEmail', () => {
     const html = orderShippedEmail({ buyerName: 'Sam', orderRef: 'ABCD1234', carrier: 'other', trackingNumber: 'ZZ99' });
     expect(html).toContain('https://cardpop.com.au/account/orders');
     expect(html).toContain('ZZ99');
+  });
+});
+
+describe('offerReceivedEmail — binding terms', () => {
+  it('tells the seller the buyer is bound and the offer lapses after 48 hours', () => {
+    const html = offerReceivedEmail({ sellerName: 'Kat', cardName: 'A card', amountAud: 10 });
+    expect(html).toMatch(/buyer is bound/);
+    expect(html).toContain('48 hours');
+  });
+
+  it('uses the expression-of-interest wording for the raw enum the route passes', () => {
+    const html = offerReceivedEmail({ cardName: 'A card', amountAud: 10, listingType: 'expression_of_interest' });
+    expect(html).toContain('expressed interest');
+    const fixed = offerReceivedEmail({ cardName: 'A card', amountAud: 10, listingType: 'fixed' });
+    expect(fixed).toContain('You have a new offer');
+  });
+});
+
+describe('offerPlacedEmail (buyer)', () => {
+  const base = {
+    buyerName: 'Ash', cardName: 'Kevin Durant RC', amountAud: 4500, askingPriceAud: 4999.99,
+    expiresAt: '30 Sep 2026, 5:12 pm', listingUrl: 'https://cardpop.com.au/product/marketplace/abc',
+  };
+
+  it('spells out that the offer is binding, for 48 hours, and how to withdraw', () => {
+    const html = offerPlacedEmail(base);
+    expect(html).toContain('This offer is binding');
+    expect(html).toContain('48 hours');
+    expect(html).toMatch(/withdraw it any time <em>before<\/em> the seller accepts/);
+    expect(html).toContain('Binding until');
+    expect(html).toContain('30 Sep 2026, 5:12 pm');
+    expect(html).toContain('$4500.00');
+    expect(html).toContain('$4999.99');
+    expect(html).toContain('https://cardpop.com.au/account/offers');
+    expect(html).toContain(base.listingUrl);
+  });
+
+  it('escapes seller-controlled card names', () => {
+    const html = offerPlacedEmail({ ...base, cardName: XSS, buyerName: XSS });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
+  });
+});
+
+describe('offerAdminNoticeEmail (admin)', () => {
+  const base = {
+    offerId: '44444444-4444-4444-8444-444444444444', cardName: 'Kevin Durant RC', amountAud: 4500,
+    askingPriceAud: 4999.99, buyerName: 'Ash', buyerEmail: 'buyer@example.com', sellerName: 'Kat',
+    sellerEmail: 'seller@example.com', message: 'Quick sale?', expiresAt: '30 Sep 2026, 5:12 pm',
+    listingUrl: 'https://cardpop.com.au/product/marketplace/abc',
+  };
+
+  it('gives the admin everything needed to follow the offer', () => {
+    const html = offerAdminNoticeEmail(base);
+    for (const bit of ['#44444444', 'Kevin Durant RC', '$4500.00', '$4999.99', 'buyer@example.com', 'seller@example.com', 'Quick sale?', '30 Sep 2026, 5:12 pm', base.listingUrl]) {
+      expect(html).toContain(bit);
+    }
+    expect(html).toMatch(/bound by the offer/);
+  });
+
+  it('escapes buyer/seller-controlled strings', () => {
+    const html = offerAdminNoticeEmail({ ...base, cardName: XSS, buyerName: XSS, sellerName: XSS, message: XSS });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
   });
 });

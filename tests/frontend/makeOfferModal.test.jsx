@@ -59,6 +59,7 @@ describe('MakeOfferModal — fixed-price listing', () => {
     render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
 
     await user.type(screen.getByLabelText(/your offer amount/i), '90');
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
@@ -77,6 +78,7 @@ describe('MakeOfferModal — fixed-price listing', () => {
     render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
 
     await user.type(screen.getByLabelText(/your offer amount/i), '90');
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Listing is no longer active'));
@@ -111,6 +113,7 @@ describe('MakeOfferModal — expression-of-interest listing', () => {
     render(<MakeOfferModal isOpen onClose={vi.fn()} listing={eoiListing} />);
 
     await user.click(screen.getByRole('button', { name: /middle/i }));
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
@@ -125,9 +128,67 @@ describe('MakeOfferModal — expression-of-interest listing', () => {
     render(<MakeOfferModal isOpen onClose={vi.fn()} listing={eoiListing} />);
 
     await user.type(screen.getByLabelText(/your offer amount/i), '500');
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
     await user.click(screen.getByRole('button', { name: /send offer/i }));
 
     expect(toast.error).toHaveBeenCalledWith('Offer amount seems unusually high');
     expect(mockApiFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('MakeOfferModal — binding offer', () => {
+  it('explains the 48-hour binding terms before the buyer sends', () => {
+    render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
+    expect(screen.getByText(/offers are binding/i)).toBeInTheDocument();
+    expect(screen.getByText(/committed to buy/i)).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /binding for 48 hours unless I withdraw it/i })).toBeInTheDocument();
+  });
+
+  it('keeps Send disabled until the buyer ticks the binding acknowledgement', async () => {
+    const user = userEvent.setup();
+    render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
+    await user.type(screen.getByLabelText(/your offer amount/i), '90');
+
+    const send = screen.getByRole('button', { name: /send offer/i });
+    expect(send).toBeDisabled();
+    await user.click(send);
+    expect(mockApiFetch).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
+    expect(send).toBeEnabled();
+  });
+
+  it('sends acknowledgedBinding: true with the offer', async () => {
+    const user = userEvent.setup();
+    render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
+    await user.type(screen.getByLabelText(/your offer amount/i), '90');
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
+    await user.click(screen.getByRole('button', { name: /send offer/i }));
+
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
+    expect(offerBody()).toMatchObject({ acknowledgedBinding: true, amountAud: 90 });
+  });
+
+  it('confirms the offer is binding, with its expiry, and how to withdraw', async () => {
+    mockApiFetch.mockResolvedValue({ ok: true, json: async () => ({ offer: { id: 'offer-1', expires_at: '2026-09-30T07:12:00.000Z' } }) });
+    const user = userEvent.setup();
+    render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
+    await user.type(screen.getByLabelText(/your offer amount/i), '90');
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
+    await user.click(screen.getByRole('button', { name: /send offer/i }));
+
+    expect(await screen.findByText(/offer sent/i)).toBeInTheDocument();
+    expect(screen.getByText(/binding until/i)).toHaveTextContent(/30 Sep/);
+    expect(screen.getByText(/withdraw it from my offers before they accept/i)).toBeInTheDocument();
+  });
+
+  it('allows any positive amount well below asking', async () => {
+    const user = userEvent.setup();
+    render(<MakeOfferModal isOpen onClose={vi.fn()} listing={fixedListing} />);
+    await user.type(screen.getByLabelText(/your offer amount/i), '5');
+    await user.click(screen.getByRole('checkbox', { name: /binding/i }));
+    await user.click(screen.getByRole('button', { name: /send offer/i }));
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledTimes(1));
+    expect(offerBody().amountAud).toBe(5);
   });
 });

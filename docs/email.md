@@ -31,6 +31,8 @@ The transactional emails and where they fire:
 | Refund issued | Seller | `src/services/refundService.js` |
 | Welcome offer (trial + discount) | New user | `src/services/welcomeOfferService.js` |
 | Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
+| Offer placed — binding confirmation | Buyer | `src/routes/offers.js` |
+| Offer made — admin alert | `admin@cardpop.com.au` + every admin + alerts inbox | `src/routes/offers.js` |
 | Order shipped (tracking) | Buyer | `src/routes/admin.js` `POST /admin/orders/:id/ship` (see below) |
 | Sold-out shop enquiry | Admin (`noreply@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
 
@@ -68,6 +70,31 @@ one never silences the other:
   best-effort: the response carries `emailed: true|false`, and a Resend outage
   logs but never fails the buyer's offer.
 
+**Admins see every offer**, the same two ways: the `on_offer_created`
+trigger also writes an `offer_received` bell notification for every
+`is_admin` profile that isn't a party to the offer (linking to the listing),
+and the route emails `admin@cardpop.com.au` — always, hard-coded as
+`OFFER_ADMIN_EMAIL` — plus every admin account's email and the configured
+alerts inbox (`getAdminNotificationEmails()`), deduped. The **buyer** gets a
+confirmation email spelling out the binding terms. The three emails are sent
+independently; the response reports `emailed` (seller), `buyerEmailed` and
+`adminEmailed`.
+
+**Offers are binding.** The buyer must tick "I understand this offer is
+binding for 48 hours unless I withdraw it" (`acknowledgedBinding: true`, stored
+as `offers.binding_acknowledged_at`; the route 400s and the insert trigger
+refuses without it). The database — not the client — owns the lifecycle
+(`supabase/migrations/20260928071648_binding_offers_lifecycle.sql`): every new
+offer is forced to `pending` with `expires_at = now() + 48h`; once that passes
+it can't be accepted or countered; a seller's counter gets a fresh 48 hours
+for the buyer; the buyer can withdraw a `pending` offer but not an accepted
+one; and pg_cron runs `expire_stale_offers()` every 15 minutes (both parties
+get an "Offer expired" notification, and the seller one for a withdrawal).
+Which listings take offers is `utils/offerEligibility.js` (buy-now unless the
+seller switched Accept Offers off, EOI always; never trade-only or auctions),
+mirrored by the insert trigger. `tests/db/run-offer-migrations.sh` exercises
+all of this against a real Postgres.
+
 The route is the only writer of `offers` rows. If another one is ever added,
 it must send the email too — the trigger will cover the bell by itself, but
 there is no database-level hook for the email. (Hanging it off the
@@ -80,7 +107,8 @@ which is also why web push for notifications is currently inert.)
 **Verifying it end to end** — `scripts/verify-offer-notification.mjs` drives the
 real path: it signs in as a test buyer, posts a real offer through the live
 endpoint, reads the seller's notification row back out of the database, and
-reports whether Resend accepted the email.
+reports whether Resend accepted the email. It also checks the 48-hour window,
+the `admin@cardpop.com.au` bell notification, and the admin + buyer emails.
 
 ```bash
 SUPABASE_SERVICE_ROLE_KEY=... TEST_BUYER_EMAIL=... TEST_BUYER_PASSWORD=... \

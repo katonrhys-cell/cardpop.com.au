@@ -4,8 +4,18 @@ import request from 'supertest';
 
 // The Resend send. Stubbed so tests never hit the network.
 const mockSendOfferReceived = vi.hoisted(() => vi.fn());
+const mockSendOfferPlaced = vi.hoisted(() => vi.fn());
+const mockSendOfferAdminNotice = vi.hoisted(() => vi.fn());
 vi.mock('../../src/utils/emailService.js', () => ({
   sendOfferReceived: mockSendOfferReceived,
+  sendOfferPlaced: mockSendOfferPlaced,
+  sendOfferAdminNotice: mockSendOfferAdminNotice,
+}));
+
+// Admin recipients: every admin account + the configured alerts inbox.
+const mockAdminEmails = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/adminNotificationRecipient.js', () => ({
+  getAdminNotificationEmails: mockAdminEmails,
 }));
 
 // authMiddleware validates the bearer token via supabase.auth.getUser.
@@ -45,7 +55,7 @@ const SELLER = '22222222-2222-4222-8222-222222222222';
 const LISTING = '33333333-3333-4333-8333-333333333333';
 const OFFER = '44444444-4444-4444-8444-444444444444';
 
-const VALID = { listingId: LISTING, sellerId: SELLER, amountAud: 600, message: 'Would you take $600?' };
+const VALID = { listingId: LISTING, sellerId: SELLER, amountAud: 600, message: 'Would you take $600?', acknowledgedBinding: true };
 
 const post = (body) => request(app).post('/').set('Authorization', 'Bearer tok').send(body);
 
@@ -75,6 +85,9 @@ beforeEach(() => {
     ],
   });
   mockSendOfferReceived.mockResolvedValue(true);
+  mockSendOfferPlaced.mockResolvedValue(true);
+  mockSendOfferAdminNotice.mockResolvedValue(true);
+  mockAdminEmails.mockResolvedValue(['admin@cardpop.com.au', 'katon@example.com', 'notifications@cardpop.com.au']);
 });
 
 // ─── auth ─────────────────────────────────────────────────────────────────────
@@ -162,6 +175,7 @@ describe('POST /offers — the offer row', () => {
       seller_id: SELLER,
       amount_aud: 600,
       message: 'Would you take $600?',
+      binding_acknowledged_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/),
     });
   });
 
@@ -230,5 +244,155 @@ describe('POST /offers — seller email', () => {
     const res = await post(VALID);
     expect(res.status).toBe(201);
     expect(res.body.offer.id).toBe(OFFER);
+  });
+});
+
+// ─── binding acknowledgement ─────────────────────────────────────────────────
+
+describe('POST /offers — binding acknowledgement', () => {
+  it.each([
+    ['missing', undefined],
+    ['false', false],
+    ['a truthy non-boolean', 'yes'],
+  ])('refuses an offer whose binding acknowledgement is %s', async (_label, value) => {
+    const res = await post({ ...VALID, acknowledgedBinding: value });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/binding/i);
+    expect(mockInsert).not.toHaveBeenCalled();
+    expect(mockSendOfferAdminNotice).not.toHaveBeenCalled();
+  });
+
+  // Vercel can go live before `supabase db push` adds the column.
+  it('retries without binding_acknowledged_at when the column does not exist yet', async () => {
+    mockInsertSingle
+      .mockResolvedValueOnce({ data: null, error: { message: 'column "binding_acknowledged_at" of relation "offers" does not exist' } })
+      .mockResolvedValueOnce({ data: createdOffer, error: null });
+    const res = await post(VALID);
+    expect(res.status).toBe(201);
+    expect(mockInsert).toHaveBeenCalledTimes(2);
+    expect(mockInsert.mock.calls[1][0]).not.toHaveProperty('binding_acknowledged_at');
+  });
+
+  it('does not retry on an unrelated database refusal', async () => {
+    mockInsertSingle.mockResolvedValueOnce({ data: null, error: { message: 'Offers must be acknowledged as binding' } });
+    const res = await post(VALID);
+    expect(res.status).toBe(400);
+    expect(mockInsert).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── which listings take offers ──────────────────────────────────────────────
+
+describe('POST /offers — listing eligibility', () => {
+  const listing = (extra) => ({ data: { id: LISTING, seller_id: SELLER, status: 'active', ...extra } });
+
+  it.each([
+    ['fixed, offers on', { listing_type: 'fixed', accepts_offers: true }],
+    ['fixed, flag not yet backfilled (null)', { listing_type: 'fixed', accepts_offers: null }],
+    ['expression of interest, flag off', { listing_type: 'expression_of_interest', accepts_offers: false }],
+  ])('accepts an offer on a %s listing', async (_label, extra) => {
+    mockListing.mockResolvedValueOnce(listing(extra));
+    expect((await post(VALID)).status).toBe(201);
+  });
+
+  it.each([
+    ['fixed, seller switched offers off', { listing_type: 'fixed', accepts_offers: false }],
+    ['trade-only', { listing_type: 'trade', accepts_offers: true }],
+    ['auction', { listing_type: 'auction', accepts_offers: true }],
+  ])('refuses an offer on a %s listing', async (_label, extra) => {
+    mockListing.mockResolvedValueOnce(listing(extra));
+    const res = await post(VALID);
+    expect(res.status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+});
+
+// ─── buyer confirmation email ────────────────────────────────────────────────
+
+describe('POST /offers — buyer confirmation email', () => {
+  it('emails the buyer their binding terms with the expiry and listing link', async () => {
+    const res = await post(VALID);
+    expect(res.status).toBe(201);
+    expect(res.body.buyerEmailed).toBe(true);
+    expect(mockSendOfferPlaced).toHaveBeenCalledWith(expect.objectContaining({
+      buyerEmail: 'buyer@example.com',
+      buyerName: 'Ash',
+      cardName: 'Nikola Jokic',
+      amountAud: 600,
+      expiresAt: expect.stringMatching(/2026/),
+      listingUrl: `https://cardpop.com.au/product/marketplace/${LISTING}`,
+    }));
+  });
+
+  it('skips the buyer email (without failing) when the buyer has no email on file', async () => {
+    mockProfiles.mockResolvedValue({ data: [{ id: SELLER, email: 'seller@example.com', display_name: 'Kat' }] });
+    const res = await post(VALID);
+    expect(res.status).toBe(201);
+    expect(res.body.buyerEmailed).toBe(false);
+    expect(mockSendOfferPlaced).not.toHaveBeenCalled();
+    expect(mockSendOfferAdminNotice).toHaveBeenCalled();
+  });
+});
+
+// ─── admin email ─────────────────────────────────────────────────────────────
+
+describe('POST /offers — admin email', () => {
+  it('emails admin@cardpop.com.au (and every other admin recipient) about every offer', async () => {
+    const res = await post(VALID);
+    expect(res.status).toBe(201);
+    expect(res.body.adminEmailed).toBe(true);
+    expect(mockSendOfferAdminNotice).toHaveBeenCalledTimes(1);
+    const args = mockSendOfferAdminNotice.mock.calls[0][0];
+    expect(args.to).toEqual(['admin@cardpop.com.au', 'katon@example.com', 'notifications@cardpop.com.au']);
+    expect(args).toMatchObject({
+      offerId: OFFER,
+      cardName: 'Nikola Jokic',
+      amountAud: 600,
+      buyerName: 'Ash',
+      buyerEmail: 'buyer@example.com',
+      sellerName: 'Kat',
+      sellerEmail: 'seller@example.com',
+      message: 'Would you take $600?',
+      listingUrl: `https://cardpop.com.au/product/marketplace/${LISTING}`,
+    });
+  });
+
+  it('always includes admin@cardpop.com.au even if no admin recipients resolve, deduped case-insensitively', async () => {
+    mockAdminEmails.mockResolvedValueOnce(['ADMIN@cardpop.com.au', 'ops@example.com']);
+    await post(VALID);
+    expect(mockSendOfferAdminNotice.mock.calls[0][0].to).toEqual(['admin@cardpop.com.au', 'ops@example.com']);
+
+    mockAdminEmails.mockRejectedValueOnce(new Error('db down'));
+    await post(VALID);
+    expect(mockSendOfferAdminNotice.mock.calls[1][0].to).toEqual(['admin@cardpop.com.au']);
+  });
+
+  it('emails the admin for offers on fixed-price listings too, not only EOI', async () => {
+    mockListing.mockResolvedValue({ data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'fixed', accepts_offers: true, price_aud: 4999.99, vault_item: { card_name: 'Kevin Durant' } } });
+    await post(VALID);
+    expect(mockSendOfferAdminNotice).toHaveBeenCalledWith(expect.objectContaining({ cardName: 'Kevin Durant', askingPriceAud: 4999.99 }));
+  });
+
+  it('keeps each email independent — an admin email failure costs neither the seller nor buyer email', async () => {
+    mockSendOfferAdminNotice.mockRejectedValue(new Error('Resend is down'));
+    const res = await post(VALID);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ emailed: true, buyerEmailed: true, adminEmailed: false });
+  });
+
+  it('still emails the admin when the seller email fails', async () => {
+    mockSendOfferReceived.mockRejectedValue(new Error('bounce'));
+    const res = await post(VALID);
+    expect(res.status).toBe(201);
+    expect(res.body).toMatchObject({ emailed: false, adminEmailed: true });
+  });
+
+  it('sends no email of any kind when the insert is refused', async () => {
+    mockInsertSingle.mockResolvedValue({ data: null, error: { message: 'This listing is not accepting offers' } });
+    const res = await post(VALID);
+    expect(res.status).toBe(400);
+    expect(mockSendOfferReceived).not.toHaveBeenCalled();
+    expect(mockSendOfferPlaced).not.toHaveBeenCalled();
+    expect(mockSendOfferAdminNotice).not.toHaveBeenCalled();
   });
 });

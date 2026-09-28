@@ -494,7 +494,7 @@ export function offerReceivedEmail({ sellerName, buyerName, cardName, amountAud,
     : 'You have a new offer on one of your listings.'}</p>
 ${summaryTable(rows)}
 ${quoted}
-<p>Head to your offers page to accept, decline or counter. Offers expire automatically if you don't respond in time.</p>`;
+<p>Head to your offers page to accept, decline or counter. The buyer is bound by this offer until they withdraw it — if you accept, they have agreed to buy at this price. It expires automatically 48 hours after it was made if you don't respond.</p>`;
 
   return cpEmail(
     `New offer of ${money(amountAud)} on ${esc(cardName || 'your listing')}`,
@@ -504,6 +504,68 @@ ${quoted}
     'https://cardpop.com.au/account/offers',
     'View Offer',
     'You are receiving this because someone made an offer on your CardPop listing.',
+  );
+}
+
+// ─── Offer placed (buyer confirmation) ───────────────────────────────────────
+
+/**
+ * Sent to the buyer the moment their offer lands. The point is the binding
+ * terms, in writing: if the seller accepts inside the 48-hour window the buyer
+ * has committed to buy at that price, and the only way out before then is to
+ * withdraw it from My Offers.
+ */
+export function offerPlacedEmail({ buyerName, cardName, amountAud, askingPriceAud, expiresAt, listingUrl }) {
+  const rows = [
+    ['Card', esc(cardName || 'A CardPop listing')],
+    ['Your offer', `${money(amountAud)} AUD`, true],
+  ];
+  if (Number(askingPriceAud) > 0) rows.push(['Asking price', `${money(askingPriceAud)} AUD`]);
+  if (expiresAt) rows.push(['Binding until', esc(expiresAt)]);
+
+  const body = `<p>Your offer has been sent to the seller.</p>
+${summaryTable(rows)}
+<p><strong>This offer is binding.</strong> If the seller accepts it within 48 hours, you have agreed to buy the card at this price and will be asked to complete payment. You can withdraw it any time <em>before</em> the seller accepts from My Offers. If the seller doesn't respond, it expires automatically after 48 hours and you are no longer bound by it.</p>
+${listingUrl ? `<p style="font-size:13px;color:#6B7280;">Listing: <a href="${esc(listingUrl)}" style="color:#E63946;">${esc(listingUrl)}</a></p>` : ''}`;
+
+  return cpEmail(
+    `Your ${money(amountAud)} offer on ${esc(cardName || 'a listing')} is binding for 48 hours unless you withdraw it.`,
+    'Offer Sent',
+    `Hi ${esc(buyerName || 'there')},`,
+    body,
+    'https://cardpop.com.au/account/offers',
+    'View or Withdraw Offer',
+    'You are receiving this because you made an offer on CardPop.',
+  );
+}
+
+// ─── Offer made (admin alert) ────────────────────────────────────────────────
+
+/** Admin heads-up for every offer made on the marketplace. */
+export function offerAdminNoticeEmail({ offerId, cardName, amountAud, askingPriceAud, buyerName, buyerEmail, sellerName, sellerEmail, message, expiresAt, listingUrl }) {
+  const rows = [
+    ['Offer', `#${esc(String(offerId || '').slice(0, 8).toUpperCase() || '—')}`],
+    ['Card', esc(cardName || '—')],
+    ['Amount', `${money(amountAud)} AUD`, true],
+  ];
+  if (Number(askingPriceAud) > 0) rows.push(['Asking price', `${money(askingPriceAud)} AUD`]);
+  rows.push(['Buyer', [buyerName, buyerEmail].filter(Boolean).map(esc).join(' · ') || '—']);
+  rows.push(['Seller', [sellerName, sellerEmail].filter(Boolean).map(esc).join(' · ') || '—']);
+  if (expiresAt) rows.push(['Expires', esc(expiresAt)]);
+
+  const quoted = message
+    ? `<p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#111827;">Buyer's message</p>
+<div style="background:#F9FAFB;border-left:3px solid #E63946;border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">${esc(message)}</div>`
+    : '';
+
+  return cpEmail(
+    `Offer of ${money(amountAud)} on ${esc(cardName || 'a listing')}`,
+    'New Marketplace Offer',
+    'An offer was just made on CardPop',
+    `${summaryTable(rows)}\n${quoted}<p>The seller has 48 hours to accept, decline or counter. The buyer is bound by the offer until they withdraw it or it expires.</p>`,
+    listingUrl || 'https://cardpop.com.au/admin/all-listings',
+    'View Listing',
+    'You received this because you are a CardPop admin.',
   );
 }
 

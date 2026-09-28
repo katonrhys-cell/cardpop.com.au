@@ -21,5 +21,5 @@ alter table public.listings
 update public.listings
 set accepts_offers = true
 where listing_type = 'fixed'
-  and status in ('active', 'pending')
+  and status in ('active', 'draft')
   and accepts_offers is distinct from true;
