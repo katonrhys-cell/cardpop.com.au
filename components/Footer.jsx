@@ -14,7 +14,7 @@ const DiscordIcon = ({ className }) => (
 const SOCIAL_LINKS = [
   { label: 'Discord', href: 'https://discord.gg/cardpop', Icon: DiscordIcon },
   { label: 'Twitter / X', href: 'https://twitter.com/cardpopau', Icon: Twitter },
-  { label: 'Instagram', href: 'https://instagram.com/cardpopau', Icon: Instagram },
+  { label: 'Instagram', href: 'https://www.instagram.com/cardpop_aus/', Icon: Instagram },
   { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591488466915', Icon: Facebook },
   { label: 'YouTube', href: 'https://youtube.com/@cardpopau', Icon: Youtube },
 ];
