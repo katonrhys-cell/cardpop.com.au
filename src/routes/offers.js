@@ -98,7 +98,7 @@ router.post('/', authMiddleware, async (req, res) => {
   // public data, and this read must not depend on what the caller can see).
   const { data: listing, error: listingError } = await supabase
     .from('listings')
-    .select('id, seller_id, status')
+    .select('id, seller_id, status, listing_type, accepts_offers')
     .eq('id', listingId)
     .maybeSingle();
   if (listingError) {
@@ -107,6 +107,14 @@ router.post('/', authMiddleware, async (req, res) => {
   }
   if (!listing || listing.status !== 'active' || !listing.seller_id) {
     return res.status(404).json({ error: 'Listing not found or no longer active' });
+  }
+  // Offers are open on buy-now listings unless the seller switched Accept
+  // Offers off, and always on Expression of Interest (it's offers-only).
+  // Trade-only and auction listings don't take cash offers.
+  const offersOpen = listing.listing_type === 'expression_of_interest'
+    || ((listing.listing_type ?? 'fixed') === 'fixed' && listing.accepts_offers !== false);
+  if (!offersOpen) {
+    return res.status(400).json({ error: "This listing isn't accepting offers" });
   }
   const resolvedSellerId = listing.seller_id;
   if (sellerId != null && sellerId !== resolvedSellerId) {

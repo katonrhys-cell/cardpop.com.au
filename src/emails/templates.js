@@ -475,7 +475,8 @@ ${summaryTable([
  * like every other user-controlled value in these templates.
  */
 export function offerReceivedEmail({ sellerName, buyerName, cardName, amountAud, message, listingType, expiresAt }) {
-  const isEOI = listingType === 'Expression of Interest';
+  // The route passes the raw listings.listing_type enum; accept the UI label too.
+  const isEOI = listingType === 'expression_of_interest' || listingType === 'Expression of Interest';
   const rows = [
     ['Card', esc(cardName || 'Your listing')],
     ['Offer', `${money(amountAud)} AUD`, true],

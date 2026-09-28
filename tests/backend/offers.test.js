@@ -66,7 +66,7 @@ beforeEach(() => {
   mockGetUser.mockResolvedValue({ data: { user: { id: BUYER } }, error: null });
   mockInsertSingle.mockResolvedValue({ data: createdOffer, error: null });
   mockListing.mockResolvedValue({
-    data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'Expression of Interest', vault_item: { card_name: 'Nikola Jokic' } },
+    data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'expression_of_interest', vault_item: { card_name: 'Nikola Jokic' } },
   });
   mockProfiles.mockResolvedValue({
     data: [
@@ -119,6 +119,20 @@ describe('POST /offers — validation', () => {
     expect(res.body.error).toMatch(/does not match/);
     expect(mockInsert).not.toHaveBeenCalled();
     expect(mockSendOfferReceived).not.toHaveBeenCalled();
+  });
+
+  it('accepts offers on a buy-now listing by default', async () => {
+    mockListing.mockResolvedValue({ data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'fixed', accepts_offers: true } });
+    expect((await post(VALID)).status).toBe(201);
+    expect(mockInsert).toHaveBeenCalled();
+  });
+
+  it('rejects an offer when the seller switched Accept Offers off, or the listing is trade-only', async () => {
+    mockListing.mockResolvedValueOnce({ data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'fixed', accepts_offers: false } });
+    expect((await post(VALID)).status).toBe(400);
+    mockListing.mockResolvedValueOnce({ data: { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'trade', accepts_offers: true } });
+    expect((await post(VALID)).status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 
   it('rejects an offer on an inactive or unknown listing', async () => {
@@ -183,7 +197,7 @@ describe('POST /offers — seller email', () => {
       sellerName: 'Kat',
       buyerName: 'Ash',
       cardName: 'Nikola Jokic',
-      listingType: 'Expression of Interest',
+      listingType: 'expression_of_interest',
       amountAud: 600,
       message: 'Would you take $600?',
     }));

@@ -223,11 +223,13 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           // the marketplace "Make Offer" filter picks it up.
           price_min_aud: selected.needsRange ? Number(rangeMin) : null,
           price_max_aud: selected.needsRange ? Number(rangeMax) : null,
-          // Always write the flag (like accepts_trade) — a conditional spread
-          // left accepts_offers=true behind when an EOI listing was switched to
-          // For Sale/Trade, so it kept showing under the marketplace "Make Offer"
-          // filter and accepted offers the seller never opted into.
-          accepts_offers: !!selected.needsRange,
+          // EOI is offers-only, so force the flag on. Every other type leaves
+          // it alone: a new row takes the column default (true — buy-now
+          // listings take offers alongside Buy Now), and an existing row keeps
+          // whatever the seller chose under Account → Listings → Accept Offers.
+          // Trade-only listings are excluded from offers by listing_type, not
+          // this flag.
+          ...(selected.needsRange ? { accepts_offers: true } : {}),
           trade_wants: selected.needsTrade ? (tradeWants.trim() || null) : null,
           listed_at: new Date().toISOString(),
         };

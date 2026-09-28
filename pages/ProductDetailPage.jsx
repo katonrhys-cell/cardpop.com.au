@@ -153,6 +153,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             set: vi?.set_name || vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
             listing_type: displayListingType,
+            // The raw enum — 'For Sale' covers both fixed and auction.
+            db_listing_type: listing.listing_type,
             owner_id: listing.seller_id,
           });
 
@@ -463,7 +465,11 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Expression of Interest: no fixed price — the seller published a target
   // range and buyers negotiate through offers.
   const isEOI = !isShop && product.listing_type === 'Expression of Interest';
-  const canOffer = !isShop && !isSold && source === 'marketplace' && (isEOI || product.accepts_offers);
+  // Buy-now listings take offers alongside Buy Now unless the seller turned
+  // Accept Offers off (the column defaults on). Trade-only listings don't.
+  const isBuyNow = product.db_listing_type === 'fixed';
+  const canOffer = !isShop && !isSold && source === 'marketplace'
+    && (isEOI || (isBuyNow && product.accepts_offers !== false));
   
   const statusBadge = isShop 
     ? (comingSoon

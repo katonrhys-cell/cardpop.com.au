@@ -66,7 +66,9 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
         ? Math.min(200, Math.max(0, Number(pricing.shippingCost) || 0))
         : 0,
       // Expression of Interest: no fixed price — publish the seller's target
-      // range and open the listing to offers.
+      // range and open the listing to offers. Other types omit the flag: new
+      // rows take the column default (offers on), existing rows keep the
+      // seller's Accept Offers choice.
       price_min_aud: isEOI ? (Number(pricing.offerMin) || null) : null,
       price_max_aud: isEOI ? (Number(pricing.offerMax) || null) : null,
       ...(isEOI ? { accepts_offers: true } : {}),
