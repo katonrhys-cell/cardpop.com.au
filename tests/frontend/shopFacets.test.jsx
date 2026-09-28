@@ -141,14 +141,18 @@ describe('ShopFilterPanel', () => {
 
   it('selects a type and a colour', () => {
     const { onChange } = setup();
+    fireEvent.click(screen.getByRole('button', { name: /^Type/ }));
     fireEvent.click(screen.getByRole('radio', { name: /12-Pocket Zip/ }));
     expect(onChange).toHaveBeenCalledWith('type', 'ZB-12');
+    fireEvent.click(screen.getByRole('button', { name: /^Colour/ }));
     fireEvent.click(screen.getByRole('radio', { name: /Pink/ }));
     expect(onChange).toHaveBeenCalledWith('colour', 'pink');
   });
 
   it('disables options the other selections rule out', () => {
     setup({ type: 'ZB-04' });
+    expect(screen.getByRole('button', { name: /^Type/ })).toHaveTextContent('4-Pocket');
+    fireEvent.click(screen.getByRole('button', { name: /^Colour/ }));
     expect(screen.getByRole('radio', { name: /Blue/ })).toBeDisabled();
     expect(screen.getByRole('radio', { name: /Pink/ })).not.toBeDisabled();
   });
