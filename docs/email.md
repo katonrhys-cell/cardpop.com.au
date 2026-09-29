@@ -33,6 +33,7 @@ The transactional emails and where they fire:
 | Offer received (enquiry) | Seller | `src/routes/offers.js` (see below) |
 | Offer placed — binding confirmation | Buyer | `src/routes/offers.js` |
 | Offer made — admin alert | `admin@cardpop.com.au` + every admin + alerts inbox | `src/routes/offers.js` |
+| Offer response — accepted (pay by …), countered, declined, counter accepted/declined, withdrawn | The other party (both, for an accepted counter) | `src/routes/offers.js` → `PATCH /offers/:id` |
 | Order shipped (tracking) | Buyer | `src/routes/admin.js` `POST /admin/orders/:id/ship` (see below) |
 | Sold-out shop enquiry | Admin (`noreply@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
 
@@ -94,6 +95,23 @@ Which listings take offers is `utils/offerEligibility.js` (buy-now unless the
 seller switched Accept Offers off, EOI always; never trade-only or auctions),
 mirrored by the insert trigger. `tests/db/run-offer-migrations.sh` exercises
 all of this against a real Postgres.
+
+**Responses** go through `PATCH /offers/:id` with an `action` — the seller's
+`accept` / `decline` / `counter`, the buyer's `accept_counter` /
+`decline_counter` / `withdraw` — which writes with the caller-scoped client (RLS
+and the lifecycle trigger still decide what's allowed) and then emails the other
+side via `sendOfferUpdate` (`offerUpdateEmail` in `src/emails/templates.js`).
+An accepted offer gives the buyer **48 hours to pay** (`payment_due_at`, set by
+the trigger — never by the client); the accept email states the deadline, the
+Stripe webhook stamps `paid_at`, and `resolveOfferPrice()` refuses checkout once
+the window closes. `expire_stale_offers()` lapses unpaid accepted offers and the
+`notify_on_offer_updated` trigger bells the buyer, the seller and every admin
+("Accepted offer went unpaid"). There is no reminder email before the deadline:
+pg_cron can't send mail, so that would need a backend job.
+
+Admins see every offer at **Admin → Offers** (`/admin/offers`, backed by the
+admin-gated `GET /admin/offers`, since offers RLS only lets the two parties read
+a row). Admin bell notifications for offers link there.
 
 The route is the only writer of `offers` rows. If another one is ever added,
 it must send the email too — the trigger will cover the bell by itself, but

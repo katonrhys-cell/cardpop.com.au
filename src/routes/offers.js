@@ -18,7 +18,7 @@ import express from 'express';
 import { authMiddleware } from '../middleware/auth.js';
 import createUserScopedClient from '../utils/userScopedSupabase.js';
 import { supabase } from '../utils/supabaseClient.js';
-import { sendOfferReceived, sendOfferPlaced, sendOfferAdminNotice } from '../utils/emailService.js';
+import { sendOfferReceived, sendOfferPlaced, sendOfferAdminNotice, sendOfferUpdate } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import logger from './../utils/logger.js';
 import { listingTakesOffers, OFFER_WINDOW_HOURS } from '../../utils/offerEligibility.js';
@@ -256,6 +256,139 @@ async function notifyOfferMade(offer) {
       })),
   );
   return { emailed, buyerEmailed, adminEmailed };
+}
+
+// ─── Responding to an offer ──────────────────────────────────────────────────
+
+// Each response is one status move, made by one side. RLS
+// (offers_update_access) and the offers_enforce_lifecycle trigger are still
+// the enforcement point — this table only picks the move, words the errors and
+// decides who gets emailed.
+export const OFFER_ACTIONS = {
+  accept: { role: 'seller', from: 'pending', to: 'accepted', email: [['buyer', 'accepted']] },
+  decline: { role: 'seller', from: 'pending', to: 'declined', email: [['buyer', 'declined']] },
+  counter: { role: 'seller', from: 'pending', to: 'countered', email: [['buyer', 'countered']] },
+  accept_counter: { role: 'buyer', from: 'countered', to: 'accepted', email: [['seller', 'counter_accepted'], ['buyer', 'counter_accepted']] },
+  decline_counter: { role: 'buyer', from: 'countered', to: 'declined', email: [['seller', 'counter_declined']] },
+  withdraw: { role: 'buyer', from: 'pending', to: 'withdrawn', email: [['seller', 'withdrawn']] },
+};
+
+const OFFER_FIELDS = 'id, listing_id, buyer_id, seller_id, amount_aud, counter_amount_aud, counter_message, message, status, expires_at, payment_due_at, paid_at, created_at';
+
+// PATCH /offers/:id — { action, counterAmountAud?, counterMessage? }
+router.patch('/:id', authMiddleware, async (req, res) => {
+  const token = (req.headers.authorization || '').slice(7);
+  const userId = req.user.id;
+  const offerId = req.params.id;
+  const { action, counterAmountAud, counterMessage } = req.body || {};
+  const move = Object.hasOwn(OFFER_ACTIONS, action) ? OFFER_ACTIONS[action] : null;
+
+  if (!UUID_RE.test(String(offerId))) {
+    return res.status(400).json({ error: 'A valid offer id is required' });
+  }
+  if (!move) {
+    return res.status(400).json({ error: `action must be one of: ${Object.keys(OFFER_ACTIONS).join(', ')}` });
+  }
+
+  const payload = { status: move.to };
+  if (action === 'counter') {
+    const counter = Number(counterAmountAud);
+    if (!Number.isFinite(counter) || counter <= 0) {
+      return res.status(400).json({ error: 'A valid counter amount is required' });
+    }
+    const note = typeof counterMessage === 'string' ? counterMessage.trim() : '';
+    if (note.length > MAX_MESSAGE_LENGTH) {
+      return res.status(400).json({ error: 'Message is too long' });
+    }
+    payload.counter_amount_aud = Math.round(counter * 100) / 100;
+    payload.counter_message = note || null;
+  }
+
+  const { data: current, error: readError } = await supabase
+    .from('offers')
+    .select(OFFER_FIELDS)
+    .eq('id', offerId)
+    .maybeSingle();
+  if (readError) {
+    logger.error(`[OFFERS] lookup failed for offer ${offerId}: ${readError.message}`);
+    return res.status(500).json({ error: 'Failed to update offer' });
+  }
+  const ownerColumn = move.role === 'seller' ? 'seller_id' : 'buyer_id';
+  // Same answer for "doesn't exist" and "not yours", so ids can't be probed.
+  if (!current || current[ownerColumn] !== userId) {
+    return res.status(404).json({ error: 'Offer not found' });
+  }
+  if (current.status !== move.from) {
+    return res.status(409).json({ error: `This offer is ${current.status} and can no longer be changed that way` });
+  }
+
+  const userClient = createUserScopedClient(token);
+  const { data: offer, error } = await userClient
+    .from('offers')
+    .update(payload)
+    .eq('id', offerId)
+    .eq(ownerColumn, userId)
+    .eq('status', move.from)
+    .select(OFFER_FIELDS)
+    .maybeSingle();
+
+  if (error) {
+    if (/expired/i.test(error.message || '')) {
+      return res.status(409).json({ error: 'This offer has expired' });
+    }
+    logger.error(`[OFFERS] ${action} failed for offer ${offerId}: ${error.message}`);
+    return res.status(400).json({ error: error.message || 'Failed to update offer' });
+  }
+  if (!offer) {
+    // Lost a race (the other side acted first, or the sweep expired it).
+    return res.status(409).json({ error: 'This offer changed before your response was saved — refresh and try again' });
+  }
+
+  const emailed = await notifyOfferResponse(offer, move);
+  return res.json({ offer, emailed });
+});
+
+/**
+ * Emails for a response, best-effort: the move is committed and the other
+ * side's bell notification is already written by notify_on_offer_updated.
+ * Returns { buyer?: boolean, seller?: boolean }.
+ */
+async function notifyOfferResponse(offer, move) {
+  let ctx;
+  try {
+    ctx = await loadOfferContext(offer);
+  } catch (err) {
+    logger.error(`[OFFERS] context lookup failed for offer ${offer.id}: ${err.message}`);
+    ctx = {};
+  }
+  const deadlineFor = (kind) => formatExpiry(kind === 'countered' ? offer.expires_at : offer.payment_due_at);
+
+  const results = await Promise.all(move.email.map(async ([audience, kind]) => {
+    const to = audience === 'buyer' ? ctx.buyerEmail : ctx.sellerEmail;
+    if (!to) {
+      logger.warn(`[OFFERS] no email on file for the ${audience} of offer ${offer.id} — notified in-app only`);
+      return [audience, false];
+    }
+    try {
+      const sent = await sendOfferUpdate({
+        to,
+        kind,
+        audience,
+        recipientName: audience === 'buyer' ? ctx.buyerName : ctx.sellerName,
+        cardName: ctx.cardName,
+        amountAud: offer.amount_aud,
+        counterAmountAud: offer.counter_amount_aud,
+        counterMessage: offer.counter_message,
+        deadline: deadlineFor(kind),
+        listingUrl: LISTING_URL(offer.listing_id),
+      });
+      return [audience, Boolean(sent)];
+    } catch (err) {
+      logger.error(`[OFFERS] ${kind} email to the ${audience} failed for offer ${offer.id}: ${err.message}`);
+      return [audience, false];
+    }
+  }));
+  return Object.fromEntries(results);
 }
 
 export default router;

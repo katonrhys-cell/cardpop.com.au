@@ -20,7 +20,7 @@ import { invalidReturnUrl } from '../utils/returnUrl.js';
 export async function resolveOfferPrice({ offerId, listingId, userId, listingSellerId }) {
   const { data: offer } = await supabase
     .from('offers')
-    .select('amount_aud, counter_amount_aud, status, buyer_id, seller_id, listing_id, expires_at')
+    .select('amount_aud, counter_amount_aud, status, buyer_id, seller_id, listing_id, expires_at, payment_due_at, paid_at')
     .eq('id', offerId)
     .maybeSingle();
 
@@ -50,9 +50,19 @@ export async function resolveOfferPrice({ offerId, listingId, userId, listingSel
   // the offers_enforce_lifecycle trigger when the seller counters). Paying is
   // how the buyer accepts it, so a lapsed counter can't be paid — the sweep
   // may not have flipped it to 'expired' yet. An 'accepted' offer has no
-  // deadline: both sides have agreed and the buyer is bound to pay.
+  // deadline of its own: accepting it starts the payment window below.
   if (offer.status === 'countered' && offer.expires_at && new Date(offer.expires_at) <= new Date()) {
     return { error: 'This counter offer has expired' };
+  }
+  // An accepted offer must be paid within its 48-hour payment window
+  // (payment_due_at, set by offers_enforce_lifecycle on acceptance). Past it
+  // the deal has lapsed — the expire_stale_offers() sweep may not have flipped
+  // the row yet — and the seller is free to sell elsewhere.
+  if (offer.paid_at) {
+    return { error: 'This offer has already been paid for' };
+  }
+  if (offer.status === 'accepted' && offer.payment_due_at && new Date(offer.payment_due_at) <= new Date()) {
+    return { error: 'The payment window for this offer has closed' };
   }
   // counter_amount_aud is only ever written by the seller on the single
   // pending -> countered transition (enforced by offers_prevent_price_tamper),

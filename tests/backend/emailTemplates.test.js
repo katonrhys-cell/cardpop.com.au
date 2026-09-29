@@ -8,6 +8,7 @@ import {
   offerReceivedEmail,
   offerPlacedEmail,
   offerAdminNoticeEmail,
+  offerUpdateEmail,
   shopEnquiryEmail,
   orderShippedEmail,
 } from '../../src/emails/templates.js';
@@ -184,5 +185,56 @@ describe('offerAdminNoticeEmail (admin)', () => {
   it('escapes buyer/seller-controlled strings', () => {
     const html = offerAdminNoticeEmail({ ...base, cardName: XSS, buyerName: XSS, sellerName: XSS, message: XSS });
     expect(html).not.toContain('<a href="https://evil.example">click</a>');
+  });
+});
+
+describe('offerUpdateEmail (responses)', () => {
+  const base = { recipientName: 'Ash', cardName: 'Kevin Durant RC', amountAud: 4000, deadline: '1 Oct 2026, 9:00 am', listingUrl: 'https://cardpop.com.au/product/marketplace/abc' };
+
+  it('accepted → tells the buyer they are committed and must pay by the deadline', () => {
+    const html = offerUpdateEmail({ ...base, kind: 'accepted', audience: 'buyer' });
+    expect(html).toContain('the seller accepted your offer');
+    expect(html).toContain('$4000.00');
+    expect(html).toContain('Pay by');
+    expect(html).toContain('1 Oct 2026, 9:00 am');
+    expect(html).toMatch(/committed to buy/);
+    expect(html).toMatch(/deal lapses/);
+    expect(html).toContain('Pay Now');
+  });
+
+  it('counter_accepted → buyer pays the counter price; seller is told the buyer has 48 hours', () => {
+    const buyer = offerUpdateEmail({ ...base, kind: 'counter_accepted', audience: 'buyer', counterAmountAud: 4500 });
+    expect(buyer).toContain('$4500.00');
+    expect(buyer).toContain('You accepted the seller');
+    expect(buyer).toContain('Pay Now');
+    const seller = offerUpdateEmail({ ...base, kind: 'counter_accepted', audience: 'seller', recipientName: 'Kat', counterAmountAud: 4500 });
+    expect(seller).toContain('Buyer must pay by');
+    expect(seller).toContain('$4500.00');
+    expect(seller).not.toContain('Pay Now');
+  });
+
+  it('countered → shows both amounts, the message and the respond-by time', () => {
+    const html = offerUpdateEmail({ ...base, kind: 'countered', audience: 'buyer', counterAmountAud: 4500, counterMessage: 'Meet me at 45' });
+    expect(html).toContain('$4000.00');
+    expect(html).toContain('$4500.00');
+    expect(html).toContain('Meet me at 45');
+    expect(html).toContain('Respond by');
+  });
+
+  it.each([
+    ['declined', 'buyer', /no longer bound/],
+    ['counter_declined', 'seller', /declined your counter/],
+    ['withdrawn', 'seller', /withdrew their offer/],
+  ])('%s → %s copy', (kind, audience, text) => {
+    expect(offerUpdateEmail({ ...base, kind, audience, counterAmountAud: 4500 })).toMatch(text);
+  });
+
+  it('escapes user-controlled strings', () => {
+    const html = offerUpdateEmail({ ...base, kind: 'countered', audience: 'buyer', counterAmountAud: 1, cardName: XSS, recipientName: XSS, counterMessage: XSS });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
+  });
+
+  it('throws on an unknown kind rather than sending a blank email', () => {
+    expect(() => offerUpdateEmail({ ...base, kind: 'nope', audience: 'buyer' })).toThrow(/Unknown offer email kind/);
   });
 });

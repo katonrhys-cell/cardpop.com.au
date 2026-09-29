@@ -23,3 +23,22 @@ export function listingTakesOffers(listing) {
   // Trade-only and auction listings never take cash offers.
   return (listing.listing_type ?? 'fixed') === 'fixed' && listing.accepts_offers !== false;
 }
+
+const isPast = (ts, now) => Boolean(ts) && new Date(ts) <= now;
+
+/**
+ * The state an offer is really in right now. The expire_stale_offers() sweep
+ * only runs every 15 minutes, so a row can still say 'pending' / 'countered'
+ * past expires_at, or 'accepted' past its payment window (payment_due_at),
+ * for a few minutes — show those as expired, never as live. A paid offer
+ * (paid_at, stamped by the Stripe webhook) is 'paid'.
+ *
+ * @returns {'pending'|'countered'|'accepted'|'paid'|'declined'|'expired'|'withdrawn'}
+ */
+export function offerDisplayStatus(offer, now = new Date()) {
+  if (!offer) return 'expired';
+  if (offer.paid_at) return 'paid';
+  if ((offer.status === 'pending' || offer.status === 'countered') && isPast(offer.expires_at, now)) return 'expired';
+  if (offer.status === 'accepted' && isPast(offer.payment_due_at, now)) return 'expired';
+  return offer.status;
+}
