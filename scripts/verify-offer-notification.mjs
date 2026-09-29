@@ -15,7 +15,10 @@
  *   2. whether the on_offer_created trigger wrote the seller's in-app
  *      notification (read back from the database),
  *   3. whether the seller email was accepted by Resend, and which address it
- *      went to.
+ *      went to,
+ *   4. whether every admin (including admin@cardpop.com.au) got the in-app
+ *      notification, and whether the admin + buyer confirmation emails were
+ *      accepted by Resend.
  *
  * Nothing here is mocked, so a pass means a real seller would be reached. It
  * writes a real offer, so use --cleanup (or decline it in the UI) afterwards.
@@ -33,6 +36,9 @@
 
 import process from 'node:process';
 import { createClient } from '@supabase/supabase-js';
+import { listingTakesOffers } from '../utils/offerEligibility.js';
+
+const ADMIN_EMAIL = 'admin@cardpop.com.au';
 
 const arg = (name, fallback = null) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -95,7 +101,7 @@ async function main() {
   if (listingId) {
     const { data } = await admin
       .from('listings')
-      .select('id, seller_id, listing_type, status, vault_item:vault_items(card_name)')
+      .select('id, seller_id, listing_type, status, accepts_offers, vault_item:vault_items(card_name)')
       .eq('id', listingId)
       .maybeSingle();
     listing = data;
@@ -104,15 +110,19 @@ async function main() {
       bad('that listing belongs to the test buyer — offers on your own listing are rejected');
       process.exit(1);
     }
+    if (!listingTakesOffers(listing)) {
+      bad('that listing does not take offers (trade-only, auction, inactive, or the seller switched offers off)');
+      process.exit(1);
+    }
   } else {
     const { data } = await admin
       .from('listings')
-      .select('id, seller_id, listing_type, status, vault_item:vault_items(card_name)')
+      .select('id, seller_id, listing_type, status, accepts_offers, vault_item:vault_items(card_name)')
       .eq('status', 'active')
       .neq('seller_id', buyerId)
       .order('created_at', { ascending: false })
-      .limit(1);
-    listing = data?.[0];
+      .limit(50);
+    listing = (data ?? []).find(listingTakesOffers);
     if (!listing) { bad('no active listing owned by anyone else — pass --listing <uuid>'); process.exit(1); }
   }
   ok(`listing ${listing.id} — "${listing.vault_item?.card_name ?? 'unnamed'}" (${listing.listing_type})`);
@@ -140,6 +150,7 @@ async function main() {
       sellerId: listing.seller_id,
       amountAud: AMOUNT,
       message: 'Automated delivery check from verify-offer-notification.mjs — please ignore.',
+      acknowledgedBinding: true,
     }),
   });
   const body = await res.json().catch(() => ({}));
@@ -147,7 +158,10 @@ async function main() {
     bad(`POST /offers returned ${res.status}: ${body.error ?? '(no body)'}`);
     process.exit(1);
   }
-  ok(`offer ${body.offer.id} created for $${Number(body.offer.amount_aud).toFixed(2)}`);
+  ok(`offer ${body.offer.id} created for $${Number(body.offer.amount_aud).toFixed(2)}, binding until ${body.offer.expires_at}`);
+  const hoursOpen = (new Date(body.offer.expires_at) - new Date(body.offer.created_at)) / 3600000;
+  if (Math.abs(hoursOpen - 48) > 0.1) bad(`expected a 48-hour window, got ${hoursOpen.toFixed(2)}h — is the binding_offers_lifecycle migration applied?`);
+  else ok('48-hour binding window stamped by the database');
 
   // ── 4. The in-app notification (written by the database trigger) ──────────
   step('4. Checking the seller’s in-app notification');
@@ -184,19 +198,48 @@ async function main() {
     bad('the endpoint reported emailed=false — check RESEND_API_KEY on the server and the function logs');
   }
 
-  // ── 6. Cleanup ────────────────────────────────────────────────────────────
+  // ── 6. Admin + buyer ──────────────────────────────────────────────────────
+  step('6. Checking the admin notification and emails');
+  const { data: adminProfile } = await admin
+    .from('profiles')
+    .select('id, is_admin')
+    .ilike('email', ADMIN_EMAIL)
+    .maybeSingle();
+  let adminNotified = false;
+  if (!adminProfile?.is_admin) {
+    bad(`${ADMIN_EMAIL} is not an admin profile — it gets the email but no bell notification`);
+  } else if ([listing.seller_id, buyerId].includes(adminProfile.id)) {
+    ok(`${ADMIN_EMAIL} is a party to this offer — covered by the seller notification`);
+    adminNotified = true;
+  } else {
+    const { data } = await admin
+      .from('notifications')
+      .select('id, title, link')
+      .eq('user_id', adminProfile.id)
+      .eq('related_id', body.offer.id)
+      .limit(1);
+    adminNotified = Boolean(data?.[0]);
+    if (adminNotified) ok(`${ADMIN_EMAIL} bell: "${data[0].title}" → ${data[0].link}`);
+    else bad(`no notification for ${ADMIN_EMAIL} — is the binding_offers_lifecycle migration applied?`);
+  }
+  if (body.adminEmailed) ok(`Resend accepted the admin email (includes ${ADMIN_EMAIL})`);
+  else bad('the endpoint reported adminEmailed=false — check RESEND_API_KEY and the function logs');
+  if (body.buyerEmailed) ok('Resend accepted the buyer’s binding-offer confirmation');
+  else bad('the endpoint reported buyerEmailed=false');
+
+  // ── 7. Cleanup ────────────────────────────────────────────────────────────
   if (flag('cleanup')) {
-    step('6. Cleaning up');
+    step('7. Cleaning up');
+    await admin.from('notifications').delete().eq('related_id', body.offer.id);
     await admin.from('offers').delete().eq('id', body.offer.id);
-    if (notification) await admin.from('notifications').delete().eq('id', notification.id);
-    ok('test offer and notification removed');
+    ok('test offer and its notifications removed');
   } else {
     console.log('\nLeaving the test offer in place. Re-run with --cleanup to remove it,');
     console.log('or decline it from the seller’s /account/offers page.');
   }
 
-  const passed = Boolean(notification) && Boolean(body.emailed);
-  console.log(`\n${passed ? 'PASS' : 'INCOMPLETE'} — notification: ${notification ? 'yes' : 'no'}, email: ${body.emailed ? 'yes' : 'no'}`);
+  const passed = Boolean(notification) && Boolean(body.emailed) && adminNotified && Boolean(body.adminEmailed);
+  console.log(`\n${passed ? 'PASS' : 'INCOMPLETE'} — seller bell: ${notification ? 'yes' : 'no'}, seller email: ${body.emailed ? 'yes' : 'no'}, admin bell: ${adminNotified ? 'yes' : 'no'}, admin email: ${body.adminEmailed ? 'yes' : 'no'}, buyer email: ${body.buyerEmailed ? 'yes' : 'no'}`);
   process.exit(passed ? 0 : 1);
 }
 

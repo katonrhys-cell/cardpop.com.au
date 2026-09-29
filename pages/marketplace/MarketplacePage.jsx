@@ -489,7 +489,7 @@ const MarketplacePage = () => {
         if (filterMode === 'Auction')   query = query.eq('listing_type', 'auction');
         else if (filterMode === 'BuyNow') query = query.eq('listing_type', 'fixed');
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
-        else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true);
+        else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true).neq('listing_type', 'trade');
 
         if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });

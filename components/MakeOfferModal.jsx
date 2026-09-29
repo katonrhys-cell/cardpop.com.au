@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Tag, DollarSign, MessageSquare, Clock, ChevronRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { Tag, DollarSign, MessageSquare, Clock, ChevronRight, Loader2, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { apiServerClient } from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
@@ -16,6 +17,9 @@ const QUICK_PERCENTAGES = [
   { label: '80%', pct: 0.8 },
 ];
 
+const formatExpiry = (ts) =>
+  new Date(ts).toLocaleString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+
 const MakeOfferModal = ({ isOpen, onClose, listing }) => {
   const { currentUser, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -23,6 +27,9 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
   const [message, setMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // The buyer must explicitly agree the offer is binding before it can be sent.
+  const [acknowledged, setAcknowledged] = useState(false);
+  const [expiresAt, setExpiresAt] = useState(null);
 
   const listingPrice = listing?.price_aud || 0;
   // Expression-of-interest listings have no fixed price — the seller publishes
@@ -42,6 +49,8 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
     setAmount('');
     setMessage('');
     setSubmitted(false);
+    setAcknowledged(false);
+    setExpiresAt(null);
     onClose();
   };
 
@@ -57,6 +66,10 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
     }
     if (numericAmount <= 0) {
       toast.error('Please enter a valid offer amount');
+      return;
+    }
+    if (!acknowledged) {
+      toast.error('Please confirm you understand your offer is binding');
       return;
     }
     const sanityCap = isRange ? (rangeMax ?? rangeMin) : listingPrice;
@@ -80,12 +93,15 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
           sellerId: listing.seller_id,
           amountAud: numericAmount,
           message: message.trim() || null,
+          acknowledgedBinding: true,
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Failed to submit offer. Please try again.');
       }
+      const body = await res.json().catch(() => ({}));
+      setExpiresAt(body?.offer?.expires_at ?? null);
       setSubmitted(true);
     } catch (err) {
       toast.error(err.message || 'Failed to submit offer. Please try again.');
@@ -109,9 +125,15 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
                 You'll be notified when they respond.
               </p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-500/10 px-3 py-2 rounded-lg">
-              <Clock className="w-3.5 h-3.5 shrink-0" />
-              Expires in 48 hours if not accepted
+            <div className="text-left text-xs text-amber-700 bg-amber-500/10 px-3 py-2.5 rounded-lg space-y-1">
+              <p className="flex items-center gap-1.5 font-bold">
+                <Clock className="w-3.5 h-3.5 shrink-0" />
+                Binding until {expiresAt ? formatExpiry(expiresAt) : '48 hours from now'}
+              </p>
+              <p>
+                If the seller accepts, you've agreed to buy at this price. Changed your mind?
+                Withdraw it from My Offers before they accept.
+              </p>
             </div>
             <div className="flex gap-3 w-full mt-2">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={handleClose}>Close</Button>
@@ -231,10 +253,27 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
                 />
               </div>
 
-              {/* Expiry notice */}
-              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/40 px-3 py-2.5 rounded-xl">
-                <Clock className="w-3.5 h-3.5 shrink-0" />
-                Offers expire in 48 hours. Seller will accept, decline, or counter.
+              {/* Binding terms — the buyer must tick this before sending. */}
+              <div className="rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 space-y-2.5">
+                <p className="flex items-center gap-1.5 text-sm font-bold text-foreground">
+                  <ShieldAlert className="w-4 h-4 text-primary shrink-0" /> Offers are binding
+                </p>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc pl-5">
+                  <li>Your offer stays open for <strong className="text-foreground">48 hours</strong>. The seller can accept, decline or counter.</li>
+                  <li>If the seller accepts, you are <strong className="text-foreground">committed to buy</strong> at your offer price.</li>
+                  <li>You can withdraw it from My Offers any time <strong className="text-foreground">before</strong> the seller accepts.</li>
+                </ul>
+                <label htmlFor="offer-binding" className="flex items-start gap-2.5 cursor-pointer pt-0.5">
+                  <Checkbox
+                    id="offer-binding"
+                    checked={acknowledged}
+                    onCheckedChange={(v) => setAcknowledged(v === true)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-xs font-medium text-foreground leading-snug">
+                    I understand this offer is binding for 48 hours unless I withdraw it before the seller accepts.
+                  </span>
+                </label>
               </div>
             </div>
 
@@ -246,7 +285,7 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
               <Button
                 className="flex-1 rounded-xl gap-2 font-bold"
                 onClick={handleSubmit}
-                disabled={submitting || numericAmount <= 0}
+                disabled={submitting || numericAmount <= 0 || !acknowledged}
               >
                 {submitting ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>

@@ -29,12 +29,17 @@ const formatCurrency = (val) => `$${(Number(val) || 0).toFixed(2)}`;
 const formatDate = (ts) =>
   ts ? new Date(ts).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-// Nothing flips a stale row to 'expired' in the database, so derive it: a
-// pending offer past its expires_at is expired for every display and action
-// decision on this page (otherwise a week-old "48-hour" offer still shows
-// Accept/Decline buttons).
+const formatDateTime = (ts) =>
+  ts ? new Date(ts).toLocaleString('en-AU', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : '—';
+
+// The expire_stale_offers() sweep flips overdue rows to 'expired' every 15
+// minutes, and the offers_enforce_lifecycle trigger already refuses to accept
+// or counter one — so derive it here too, and a pending offer (or a seller's
+// counter) past its expires_at never shows live Accept/Counter buttons in the
+// gap before the sweep runs.
 const effectiveStatus = (offer) =>
-  offer.status === 'pending' && offer.expires_at && new Date(offer.expires_at) <= new Date()
+  (offer.status === 'pending' || offer.status === 'countered')
+    && offer.expires_at && new Date(offer.expires_at) <= new Date()
     ? 'expired'
     : offer.status;
 
@@ -59,9 +64,10 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
             {statusCfg.label}
           </Badge>
           <span className="text-xs text-muted-foreground">{formatDate(offer.created_at)}</span>
-          {offer.expires_at && isPending && (
+          {offer.expires_at && (isPending || status === 'countered') && (
             <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
-              <Clock className="w-3 h-3" /> Expires {formatDate(offer.expires_at)}
+              <Clock className="w-3 h-3" />
+              {isPending && !isReceived ? 'Binding until ' : 'Expires '}{formatDateTime(offer.expires_at)}
             </span>
           )}
         </div>
@@ -83,6 +89,17 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
 
         {offer.message && (
           <p className="text-sm text-muted-foreground italic mt-1">"{offer.message}"</p>
+        )}
+
+        {isPending && !isReceived && (
+          <p className="text-xs text-muted-foreground mt-2">
+            You're committed to buy at this price if the seller accepts. Withdraw it before then if you've changed your mind.
+          </p>
+        )}
+        {status === 'accepted' && !isReceived && listingActive && (
+          <p className="text-xs text-muted-foreground mt-2">
+            The seller accepted your offer — you've agreed to buy at {formatCurrency(agreedAmount)}. Please complete payment.
+          </p>
         )}
 
         {status === 'countered' && offer.counter_amount_aud && (
@@ -437,6 +454,10 @@ const AccountOffers = () => {
               />
             </div>
           </div>
+          <p className="px-6 pb-4 -mt-1 text-xs text-muted-foreground flex items-start gap-1.5">
+            <Clock className="w-3.5 h-3.5 shrink-0 mt-px" />
+            Your counter is binding: the buyer has 48 hours to accept it, and if they do, you've agreed to sell at this price.
+          </p>
           <DialogFooter className="px-6 pb-6 gap-2">
             <Button variant="outline" onClick={() => setCounterOffer(null)} disabled={counterSaving} className="rounded-xl flex-1">Cancel</Button>
             <Button onClick={handleCounter} disabled={counterSaving || !counterAmount} className="rounded-xl flex-1 font-bold gap-2">

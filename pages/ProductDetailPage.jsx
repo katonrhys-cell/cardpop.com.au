@@ -39,6 +39,7 @@ import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFa
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
 import { findShopCategory } from '@/utils/shopCategories.js';
+import { listingTakesOffers } from '@/utils/offerEligibility.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -153,6 +154,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             set: vi?.set_name || vi?.card_set || vi?.era || vi?.collection || null,
             category: listing.category,
             listing_type: displayListingType,
+            // The raw enum — 'For Sale' covers both fixed and auction.
+            db_listing_type: listing.listing_type,
             owner_id: listing.seller_id,
           });
 
@@ -463,7 +466,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Expression of Interest: no fixed price — the seller published a target
   // range and buyers negotiate through offers.
   const isEOI = !isShop && product.listing_type === 'Expression of Interest';
-  const canOffer = !isShop && !isSold && source === 'marketplace' && (isEOI || product.accepts_offers);
+  // Buy-now listings take offers alongside Buy Now unless the seller turned
+  // Accept Offers off; EOI always does; trade-only and auctions never.
+  const canOffer = !isShop && !isSold && source === 'marketplace'
+    && listingTakesOffers({ listing_type: product.db_listing_type, accepts_offers: product.accepts_offers });
   
   const statusBadge = isShop 
     ? (comingSoon

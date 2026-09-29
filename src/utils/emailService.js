@@ -15,6 +15,8 @@ import {
   orderAdminNoticeEmail,
   contactMessageEmail,
   offerReceivedEmail,
+  offerPlacedEmail,
+  offerAdminNoticeEmail,
   shopEnquiryEmail,
   orderShippedEmail,
 } from '../emails/templates.js';
@@ -172,6 +174,33 @@ export async function sendOfferReceived({ sellerEmail, sellerName, buyerName, ca
     to: sellerEmail,
     subject: `New offer on ${cardName || 'your listing'} — $${Number(amountAud || 0).toFixed(2)} AUD`,
     html: offerReceivedEmail({ sellerName, buyerName, cardName, amountAud, message, listingType, expiresAt }),
+  });
+}
+
+/**
+ * Buyer confirmation that their offer landed, spelling out that it is binding
+ * for 48 hours unless withdrawn.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOfferPlaced({ buyerEmail, buyerName, cardName, amountAud, askingPriceAud, expiresAt, listingUrl }) {
+  return send({
+    to: buyerEmail,
+    subject: `Your $${Number(amountAud || 0).toFixed(2)} offer on ${cardName || 'a listing'} has been sent`,
+    html: offerPlacedEmail({ buyerName, cardName, amountAud, askingPriceAud, expiresAt, listingUrl }),
+  });
+}
+
+/**
+ * Admin heads-up for every marketplace offer. `to` may be an array.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOfferAdminNotice({ to, ...details }) {
+  return send({
+    to,
+    subject: `New offer — $${Number(details.amountAud || 0).toFixed(2)} AUD on ${details.cardName || 'a listing'}`,
+    html: offerAdminNoticeEmail(details),
   });
 }
 
