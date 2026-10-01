@@ -28,6 +28,25 @@ const colourRank = (colour) => {
   return i === -1 ? COLOUR_ORDER.length : i;
 };
 
+/** Colour names in swatch order (duplicates and blanks dropped). */
+export function sortColourNames(names) {
+  const seen = new Set();
+  return (names || [])
+    .map((n) => String(n || '').trim())
+    .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()))
+    .sort((a, b) => colourRank(a) - colourRank(b) || a.localeCompare(b));
+}
+
+/**
+ * "Black, White and Clear" — the colour range as a sentence fragment, for
+ * crawlable copy that doesn't repeat the picker chips.
+ */
+export function colourListText(names) {
+  const list = sortColourNames(names);
+  if (list.length <= 1) return list.join('');
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
 /** Siblings in swatch order (stable, colour-less rows last). */
 export function sortFamily(siblings) {
   return [...(siblings || [])].sort((a, b) =>

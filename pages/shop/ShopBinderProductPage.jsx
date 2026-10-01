@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
-import { familyAsVariants, productImages } from '@/utils/shopFamily.js';
+import { colourListText, familyAsVariants, productImages } from '@/utils/shopFamily.js';
+import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -293,9 +294,19 @@ const ShopBinderProductPage = () => {
               )}
             </div>
 
-            {/* Colour range. Each colour becomes its own product (and its own
-                page) in a later pass — until then this is informational. */}
-            {product.colours.length > 1 && variants.length === 0 && (
+            {product.colours.length > 1 && variants.length === 0 && (family.length > 1 ? (
+              // The picker above already shows every colour as a chip, so the
+              // range is written out once as prose instead of a second chip
+              // row — still crawlable, no visual duplicate.
+              <div className="mt-8">
+                <h2 className="text-lg font-bold text-foreground">Colour range</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  The {product.title} comes in {product.colours.length} colours: {colourListText(product.colours.map((c) => c.name))}.
+                  Pick a colour above to see its own photos and availability — handy for
+                  colour-coding decks, games or collections at a glance.
+                </p>
+              </div>
+            ) : (
               <div className="mt-8">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Also available in
@@ -306,17 +317,13 @@ const ShopBinderProductPage = () => {
                       key={colour.name}
                       className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm"
                     >
-                      <span
-                        className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
-                        style={{ backgroundColor: colour.hex }}
-                        aria-hidden="true"
-                      />
+                      <ColourSwatch name={colour.name} hex={colour.hex} />
                       {colour.name}
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
+            ))}
 
             {/* ── Highlights ────────────────────────────────────────────── */}
             <div className="mt-8">

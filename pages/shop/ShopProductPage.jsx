@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
-import { familyAsVariants, productImages } from '@/utils/shopFamily.js';
+import { colourListText, familyAsVariants, productImages, sortColourNames } from '@/utils/shopFamily.js';
+import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -319,20 +320,33 @@ const ShopProductPage = () => {
               )}
             </div>
 
-            {product.colours.length > 1 && variants.length === 0 && (
+            {product.colours.length > 1 && variants.length === 0 && (family.length > 1 ? (
+              // The picker above already shows every colour as a chip, so the
+              // range is written out once as prose instead of a second chip
+              // row — still crawlable, no visual duplicate.
+              <div className="mt-8">
+                <h2 className="text-lg font-bold text-foreground">Colour range</h2>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                  The {product.title} comes in {product.colours.length} colours: {colourListText(product.colours)}.
+                  Pick a colour above to see its own photos and availability — handy for
+                  colour-coding decks, games or collections at a glance.
+                </p>
+              </div>
+            ) : (
               <div className="mt-8">
                 <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
                   Available in {product.colours.length} colours
                 </h2>
                 <ul className="mt-3 flex flex-wrap gap-2">
-                  {product.colours.map((colour) => (
-                    <li key={colour} className="rounded-full border border-border bg-card px-3 py-1.5 text-sm">
+                  {sortColourNames(product.colours).map((colour) => (
+                    <li key={colour} className="flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-sm">
+                      <ColourSwatch name={colour} />
                       {colour}
                     </li>
                   ))}
                 </ul>
               </div>
-            )}
+            ))}
 
             {highlights.length > 0 && (
               <div className="mt-8">

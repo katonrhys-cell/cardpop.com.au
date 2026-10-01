@@ -23,6 +23,7 @@
  */
 
 import { BINDER_PRODUCT_COPY } from './shopBinderProductCopy.js';
+import { colourHex } from '../utils/colourSwatch.js';
 
 // The bucket name contains spaces, so every path segment has to be encoded.
 // encodeURIComponent would eat the "/" separators, hence the per-segment map.
@@ -36,20 +37,7 @@ export const binderImageUrl = (storagePath) => {
   return `${SUPABASE_PUBLIC_BASE}/${encoded}`;
 };
 
-// Colour swatches for the "also available in" row. Hexes are display-only
-// approximations of the render colours — they tint a dot, nothing more.
-const SWATCH = {
-  Black: '#1B1B1D',
-  Blue: '#2E6FD9',
-  Navy: '#1E2A4A',
-  Pink: '#E56BA3',
-  Purple: '#7A4FB5',
-  Red: '#C8202F',
-  Turquoise: '#2FB3AE',
-  Yellow: '#E8B93B',
-};
-
-const colours = (...names) => names.map((name) => ({ name, hex: SWATCH[name] }));
+const colours = (...names) => names.map((name) => ({ name, hex: colourHex(name) }));
 
 // Shared spec rows. Every Collector's Series binder is built the same way, so
 // the differences between products are the pocket count and the loading edge —
