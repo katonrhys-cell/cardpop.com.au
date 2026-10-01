@@ -525,8 +525,8 @@ export const PALMS_OFF_PRODUCT_COPY = {
     ],
   },
   "GCC-L": {
-    metaDescription: "Palms Off Gaming Collector's Series Large Graded Card Case: the biggest slab carry case in the series, for whole graded collections. Five colours.",
-    intro: "The large Collector's Series case is the one for moving a graded collection all at once. It is the biggest of the three sizes, a hard carry case sized around slabs so a full run of graded cards can travel to a show table, a new house or a buyer without being stacked loose in a box. Five colours are available.",
+    metaDescription: "Palms Off Gaming Collector's Series Large Graded Card Case: the biggest slab carry case in the series, for whole graded collections. Seven colours.",
+    intro: "The large Collector's Series case is the one for moving a graded collection all at once. It is the biggest of the three sizes, a hard carry case sized around slabs so a full run of graded cards can travel to a show table, a new house or a buyer without being stacked loose in a box. Seven colours are available.",
     details: [
       "Once a collection reaches a certain size, carrying slabs in several small containers becomes its own problem: something gets left behind or packed loosely. A single large case keeps everything in one place, separated, and easy to count before you leave and again when you arrive.",
       "It suits sellers running a table at a card show, collectors moving house, and anyone handing over a large graded purchase in person. It also works as home storage when shelves are not an option. If you only take a few cards out at a time, the small or medium case will be easier to carry.",
@@ -537,7 +537,7 @@ export const PALMS_OFF_PRODUCT_COPY = {
       "Largest of three sizes: for a whole graded collection",
       "Good for show tables, moving house and big handovers",
       "Keeps a large run of slabs in one organised place",
-      "Five colours",
+      "Seven colours",
     ],
     specs: [
       { label: "Size", value: "Large" },

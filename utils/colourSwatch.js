@@ -36,6 +36,37 @@ const CLEAR_BACKGROUND = {
   backgroundPosition: '0 0, 3px 3px',
 };
 
+// Display order for swatches: neutrals, then round the colour wheel. Colours
+// not listed sort alphabetically after these.
+export const COLOUR_ORDER = [
+  'black', 'white', 'clear', 'grey', 'gray', 'silver', 'navy', 'blue', 'turquoise', 'jade', 'green',
+  'yellow', 'orange', 'red', 'rose', 'pink', 'purple',
+];
+
+export const colourRank = (colour) => {
+  const i = COLOUR_ORDER.indexOf(String(colour || '').trim().toLowerCase());
+  return i === -1 ? COLOUR_ORDER.length : i;
+};
+
+/** Colour names in swatch order (duplicates and blanks dropped). */
+export function sortColourNames(names) {
+  const seen = new Set();
+  return (names || [])
+    .map((n) => String(n || '').trim())
+    .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()))
+    .sort((a, b) => colourRank(a) - colourRank(b) || a.localeCompare(b));
+}
+
+/**
+ * "Black, White and Clear" — the colour range as a sentence fragment, for
+ * crawlable copy that doesn't repeat the picker chips.
+ */
+export function colourListText(names) {
+  const list = sortColourNames(names);
+  if (list.length <= 1) return list.join('');
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
+
 const norm = (name) => String(name || '').trim().toLowerCase();
 
 const isClear = (name) => ['clear', 'transparent'].includes(norm(name));
@@ -49,7 +80,7 @@ export function colourHex(name, hex) {
 
 /** Inline style for a swatch dot, or null when the colour is unknown. */
 export function swatchStyle(name, hex) {
-  if (!String(hex || '').trim() && isClear(name)) return CLEAR_BACKGROUND;
+  if (isClear(name)) return CLEAR_BACKGROUND;
   const resolved = colourHex(name, hex);
   return resolved ? { backgroundColor: resolved } : null;
 }

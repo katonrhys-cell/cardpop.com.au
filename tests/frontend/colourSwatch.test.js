@@ -32,3 +32,20 @@ describe('colour range copy', () => {
     expect(colourListText(['Red'])).toBe('Red');
   });
 });
+
+describe('colour data stays consistent', () => {
+  it('draws Clear as see-through even if a hex was saved for it', () => {
+    expect(swatchStyle('Clear', '#FFFFFF')).toHaveProperty('backgroundImage');
+  });
+
+  it('every catalogue colour name has a swatch', async () => {
+    const { PALMS_OFF_PRODUCTS } = await import('@/data/palmsOffCatalogue.js');
+    const { BINDER_PRODUCTS } = await import('@/data/shopBinderProducts.js');
+    const names = [
+      ...PALMS_OFF_PRODUCTS.flatMap((p) => p.colours || []),
+      ...BINDER_PRODUCTS.flatMap((p) => p.colours.map((c) => c.name)),
+    ];
+    expect(names.length).toBeGreaterThan(0);
+    for (const name of names) expect(swatchStyle(name, null), name).not.toBeNull();
+  });
+});

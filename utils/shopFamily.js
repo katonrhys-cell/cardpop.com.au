@@ -11,41 +11,13 @@
  * docs/shop-variants.md for when to use which.
  */
 import { shopProductPath } from '@/utils/shopProductUrl.js';
+import { colourRank } from '@/utils/colourSwatch.js';
+
+export { colourListText, sortColourNames } from '@/utils/colourSwatch.js';
 
 /** Columns a colour picker needs from each sibling. */
 export const FAMILY_SELECT =
   'id, sku, title, slug, category, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
-
-// Display order for swatches: neutrals, then round the colour wheel. Colours
-// not listed sort alphabetically after these.
-const COLOUR_ORDER = [
-  'black', 'white', 'clear', 'grey', 'gray', 'silver', 'navy', 'blue', 'turquoise', 'jade', 'green',
-  'yellow', 'orange', 'red', 'rose', 'pink', 'purple',
-];
-
-const colourRank = (colour) => {
-  const i = COLOUR_ORDER.indexOf(String(colour || '').trim().toLowerCase());
-  return i === -1 ? COLOUR_ORDER.length : i;
-};
-
-/** Colour names in swatch order (duplicates and blanks dropped). */
-export function sortColourNames(names) {
-  const seen = new Set();
-  return (names || [])
-    .map((n) => String(n || '').trim())
-    .filter((n) => n && !seen.has(n.toLowerCase()) && seen.add(n.toLowerCase()))
-    .sort((a, b) => colourRank(a) - colourRank(b) || a.localeCompare(b));
-}
-
-/**
- * "Black, White and Clear" — the colour range as a sentence fragment, for
- * crawlable copy that doesn't repeat the picker chips.
- */
-export function colourListText(names) {
-  const list = sortColourNames(names);
-  if (list.length <= 1) return list.join('');
-  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
-}
 
 /** Siblings in swatch order (stable, colour-less rows last). */
 export function sortFamily(siblings) {
