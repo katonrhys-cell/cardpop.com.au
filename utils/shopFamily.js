@@ -11,22 +11,13 @@
  * docs/shop-variants.md for when to use which.
  */
 import { shopProductPath } from '@/utils/shopProductUrl.js';
+import { colourRank } from '@/utils/colourSwatch.js';
+
+export { colourListText, sortColourNames } from '@/utils/colourSwatch.js';
 
 /** Columns a colour picker needs from each sibling. */
 export const FAMILY_SELECT =
   'id, sku, title, slug, category, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
-
-// Display order for swatches: neutrals, then round the colour wheel. Colours
-// not listed sort alphabetically after these.
-const COLOUR_ORDER = [
-  'black', 'white', 'clear', 'grey', 'gray', 'silver', 'navy', 'blue', 'turquoise', 'jade', 'green',
-  'yellow', 'orange', 'red', 'rose', 'pink', 'purple',
-];
-
-const colourRank = (colour) => {
-  const i = COLOUR_ORDER.indexOf(String(colour || '').trim().toLowerCase());
-  return i === -1 ? COLOUR_ORDER.length : i;
-};
 
 /** Siblings in swatch order (stable, colour-less rows last). */
 export function sortFamily(siblings) {

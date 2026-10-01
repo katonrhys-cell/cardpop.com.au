@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { FACETS, facetCounts } from '@/utils/shopFacets.js';
+import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 
 const chipClass = (selected, disabled) => [
   'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors whitespace-nowrap',
@@ -17,13 +18,7 @@ const rowClass = (selected, disabled) => [
   disabled ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : '',
 ].join(' ');
 
-const Swatch = ({ option }) => (
-  <span
-    className="h-3.5 w-3.5 shrink-0 rounded-full ring-1 ring-black/10 dark:ring-white/20"
-    style={{ backgroundColor: option.hex || option.value }}
-    aria-hidden="true"
-  />
-);
+const Swatch = ({ option }) => <ColourSwatch name={option.label || option.value} hex={option.hex} />;
 
 // The option buttons of one facet. `list` renders them as dropdown rows (the
 // filter bar), otherwise as wrapping chips (the `plain` sidebar variant).

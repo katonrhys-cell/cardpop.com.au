@@ -23,6 +23,7 @@
  */
 
 import { BINDER_PRODUCT_COPY } from './shopBinderProductCopy.js';
+import { colourHex } from '../utils/colourSwatch.js';
 
 // The bucket name contains spaces, so every path segment has to be encoded.
 // encodeURIComponent would eat the "/" separators, hence the per-segment map.
@@ -36,20 +37,7 @@ export const binderImageUrl = (storagePath) => {
   return `${SUPABASE_PUBLIC_BASE}/${encoded}`;
 };
 
-// Colour swatches for the "also available in" row. Hexes are display-only
-// approximations of the render colours — they tint a dot, nothing more.
-const SWATCH = {
-  Black: '#1B1B1D',
-  Blue: '#2E6FD9',
-  Navy: '#1E2A4A',
-  Pink: '#E56BA3',
-  Purple: '#7A4FB5',
-  Red: '#C8202F',
-  Turquoise: '#2FB3AE',
-  Yellow: '#E8B93B',
-};
-
-const colours = (...names) => names.map((name) => ({ name, hex: SWATCH[name] }));
+const colours = (...names) => names.map((name) => ({ name, hex: colourHex(name) }));
 
 // Shared spec rows. Every Collector's Series binder is built the same way, so
 // the differences between products are the pocket count and the loading edge —
@@ -72,7 +60,7 @@ const BINDER_ROWS = [
     pocketsPerPage: 4,
     holds: 'raw cards',
     heroColour: 'Black',
-    colours: colours('Black', 'Blue', 'Navy', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
+    colours: colours('Black', 'Blue', 'Green', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
     imageFolder: 'BINDERS/Collectors series 4 pocket/Black',
     imageFiles: [
       'ZB-04-BLK_collectors-series-4-pocket-zip-binder-black_pkg1.png',
@@ -127,7 +115,7 @@ const BINDER_ROWS = [
     pocketsPerPage: 9,
     holds: 'raw cards',
     heroColour: 'Black',
-    colours: colours('Black', 'Blue', 'Navy', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
+    colours: colours('Black', 'Blue', 'Green', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
     imageFolder: 'BINDERS/Collectors series 9 pocket/Black',
     imageFiles: [
       'ZB-09-BLK_collectors-series-9-pocket-zip-binder-black_pkg1.png',
@@ -182,7 +170,7 @@ const BINDER_ROWS = [
     pocketsPerPage: 12,
     holds: 'raw cards',
     heroColour: 'Black',
-    colours: colours('Black', 'Blue', 'Navy', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
+    colours: colours('Black', 'Blue', 'Green', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
     imageFolder: 'BINDERS/Collectors series 12 pocket/Black',
     imageFiles: [
       'ZB-12-BLK_collectors-series-12-pocket-zip-binder-black_pkg1.png',
@@ -239,7 +227,7 @@ const BINDER_ROWS = [
     pocketsPerPage: 4,
     holds: 'cards in top loaders',
     heroColour: 'Black',
-    colours: colours('Black', 'Blue', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
+    colours: colours('Black', 'Blue', 'Green', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
     imageFolder: 'BINDERS/Collectors series 4 Pocket Top Loader Binder/TOP-04-BLK',
     imageFiles: [
       'TOP-04-BLK_collectors-series-4-pocket-top-loader-zip-binder-black_pkg1.png',
@@ -255,7 +243,7 @@ const BINDER_ROWS = [
     ],
     metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Top Loader Zip Binder | CardPop",
     metaDescription:
-      'A zip binder with pockets cut for 35pt top loaders, four to a page — store cards already in loaders without taking them out. Seven colours, shipped Australia-wide from CardPop.',
+      'A zip binder with pockets cut for 35pt top loaders, four to a page — store cards already in loaders without taking them out. Eight colours, shipped Australia-wide from CardPop.',
     intro:
       "Most binders force a choice: leave a card in its top loader and have nowhere to file it, or pull it out of the loader to fit a page. This binder removes the choice. The pockets are cut to take a standard 35pt top loader whole, four to a page, so the card never leaves the protection it is already in. It is the natural home for a trade binder, for cards waiting on a grading submission, or for anything valuable enough that you would rather not handle it twice.",
     highlights: [
@@ -264,7 +252,7 @@ const BINDER_ROWS = [
       'Full-perimeter metal zip keeps the pages sealed in transit',
       'Padded textured PU leather cover with a polyester felt inner lining',
       'Ideal for trade binders, grading queues and high-value singles',
-      'Available in seven colours',
+      'Available in eight colours',
     ],
     faqs: [
       {
@@ -294,7 +282,7 @@ const BINDER_ROWS = [
     pocketsPerPage: 9,
     holds: 'cards in top loaders',
     heroColour: 'Black',
-    colours: colours('Black', 'Blue', 'Navy', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
+    colours: colours('Black', 'Blue', 'Green', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
     imageFolder: 'BINDERS/Collectors series Top Loader Binder 9 Pocket/Black',
     imageFiles: [
       'TOP-09-BLK_collectors-series-9-pocket-top-loader-zip-binder-black_pkg1.png',
@@ -401,7 +389,7 @@ const BINDER_ROWS = [
     pocketsPerPage: 12,
     holds: 'raw cards',
     heroColour: 'Black',
-    colours: colours('Black', 'Blue', 'Pink', 'Purple', 'Red', 'Yellow'),
+    colours: colours('Black', 'Blue', 'Pink', 'Purple', 'Red', 'Turquoise', 'Yellow'),
     imageFolder: 'BINDERS/Stealth 12 pocket/Black STEALTH 12 - STL-12-BLK 3D Renders',
     imageFiles: [
       'STL-12-BLK_stealth-12-pocket-zip-binder-black_pkg1.png',
@@ -416,7 +404,7 @@ const BINDER_ROWS = [
     ],
     metaTitle: 'Palms Off Gaming Stealth 12-Pocket Zip Binder | CardPop Australia',
     metaDescription:
-      'The Stealth 12-pocket zip binder from Palms Off Gaming — maximum capacity in an understated finish, with side-loading archival pockets and a full metal zip. Six colours.',
+      'The Stealth 12-pocket zip binder from Palms Off Gaming — maximum capacity in an understated finish, with side-loading archival pockets and a full metal zip. Seven colours.',
     intro:
       'Twelve pockets in the Stealth finish is the highest-capacity, lowest-profile binder Palms Off Gaming makes. It holds a third more per page than a nine-pocket binder and looks like nothing in particular from the outside — a useful combination for bulk storage, trade stock, or any collection that is better off not advertising itself.',
     highlights: [
@@ -425,7 +413,7 @@ const BINDER_ROWS = [
       'Full-perimeter metal zip keeps the pages sealed in transit',
       'Acid-free, PVC-free archival pockets that will not haze or leach into card surfaces',
       'Sized for standard trading cards — Pokémon, One Piece, Magic, Yu-Gi-Oh and sports',
-      'Available in six colours',
+      'Available in seven colours',
     ],
     faqs: [
       {

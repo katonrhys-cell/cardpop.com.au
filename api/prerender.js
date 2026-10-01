@@ -12,6 +12,7 @@ import {
 } from '../data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
+import { colourListText } from '../utils/colourSwatch.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -1014,7 +1015,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   ${category.choosing ? `<h2>Choosing the right one</h2><p>${esc(category.choosing)}</p>` : ''}
   ${product.details?.length > 0 ? `<h2>About the ${esc(product.shortTitle)}</h2>
   ${product.details.map((p) => `<p>${esc(p)}</p>`).join('\n  ')}` : ''}
-  ${product.colours.length > 1 ? `<h2>Available in ${product.colours.length} colours</h2><p>${esc(product.colours.join(', '))}</p>` : ''}
+  ${product.colours.length > 1 ? `<h2>Colour range</h2><p>The ${esc(product.title)} comes in ${product.colours.length} colours: ${esc(colourListText(product.colours))}.</p>` : ''}
   <h2>Specifications</h2>
   <dl>
     ${palmsOffSpecs(product).map((sp) => `<dt>${esc(sp.label)}</dt><dd>${esc(sp.value)}</dd>`).join('\n    ')}

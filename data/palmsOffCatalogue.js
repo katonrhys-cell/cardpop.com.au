@@ -322,7 +322,7 @@ const GENERATED_PRODUCTS = [
     shortTitle: "Portal Deck Box Nexus 100",
     categorySlug: "deck-boxes",
     categoryName: "Deck Boxes",
-    colours: ["Blue"],
+    colours: ["Black", "Blue", "Pink", "Purple", "Red", "Turquoise", "Yellow"],
     heroColour: "Blue",
     skus: ["PTL-N100-BLU"],
     imagePaths: [
@@ -337,7 +337,7 @@ const GENERATED_PRODUCTS = [
     shortTitle: "Collector's Series Large Graded Card Case",
     categorySlug: "graded-card-cases",
     categoryName: "Graded Card Cases",
-    colours: ["Black", "Pink", "Purple", "Red", "Yellow"],
+    colours: ["Black", "Blue", "Pink", "Purple", "Red", "Turquoise", "Yellow"],
     heroColour: "Black",
     skus: ["GCC-L-BLK", "GCC-L-PNK", "GCC-L-PUR", "GCC-L-RED", "GCC-L-YEL"],
     imagePaths: [

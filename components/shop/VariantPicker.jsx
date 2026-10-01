@@ -1,5 +1,6 @@
 import React from 'react';
 import { Check } from 'lucide-react';
+import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import { activeVariants, variantInStock, variantLabel, variantStock } from '@/utils/shopVariants.js';
 
 /**
@@ -49,9 +50,7 @@ const VariantPicker = ({ product, value, onChange, className = '', showAvailabil
                 inStock ? '' : 'opacity-60 line-through decoration-muted-foreground',
               ].join(' ')}
             >
-              {v.colour_hex && (
-                <span className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10" style={{ backgroundColor: v.colour_hex }} aria-hidden="true" />
-              )}
+              <ColourSwatch name={v.colour} hex={v.colour_hex} />
               {variantLabel(v)}
               {isSelected && <Check className="w-3.5 h-3.5 text-primary" aria-hidden="true" />}
             </button>
