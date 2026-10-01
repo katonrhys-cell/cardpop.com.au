@@ -22,6 +22,8 @@
  * are listed verbatim rather than rebuilt from a pattern.
  */
 
+import { BINDER_PRODUCT_COPY } from './shopBinderProductCopy.js';
+
 // The bucket name contains spaces, so every path segment has to be encoded.
 // encodeURIComponent would eat the "/" separators, hence the per-segment map.
 export const BINDER_IMAGE_BUCKET = 'palms off gaming products';
@@ -59,7 +61,7 @@ const collectorsSeriesBuild = [
   { label: 'Pocket material', value: 'Acid-free and PVC-free, archival safe' },
 ];
 
-export const BINDER_PRODUCTS = [
+const BINDER_ROWS = [
   // ── Collector's Series zip binders (side-loading, raw cards) ───────────────
   {
     slug: 'palms-off-gaming-collectors-series-4-pocket-zip-binder',
@@ -503,6 +505,8 @@ export const binderSpecs = (product) => [
     : []),
   { label: 'Holds', value: product.holds },
   ...(product.range === "Collector's Series" && product.sku !== 'RB-BLK' ? collectorsSeriesBuild : []),
+  // Per-binder rows confirmed against a published listing for that exact binder.
+  ...(product.specs || []),
   { label: 'Colours available', value: product.colours.map((c) => c.name).join(', ') },
   { label: 'SKU', value: product.sku },
 ];
@@ -534,6 +538,13 @@ export const binderImageAlt = (product, file) => {
   const detail = VIEW_ALT[view] || 'product photo';
   return `${product.title} in ${product.heroColour} — ${detail}`;
 };
+
+// Merge the researched long-form copy (details, verified spec rows) onto the
+// rows above, keyed by SKU.
+export const BINDER_PRODUCTS = BINDER_ROWS.map((product) => ({
+  ...product,
+  ...(BINDER_PRODUCT_COPY[product.sku] || {}),
+}));
 
 const BY_SLUG = Object.fromEntries(BINDER_PRODUCTS.map((p) => [p.slug, p]));
 

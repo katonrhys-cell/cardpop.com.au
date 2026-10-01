@@ -357,6 +357,17 @@ const ShopProductPage = () => {
           </div>
         </div>
 
+        {product.details?.length > 0 && (
+          <section className="mt-14 max-w-3xl">
+            <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
+            <div className="mt-4 space-y-4">
+              {product.details.map((paragraph) => (
+                <p key={paragraph.slice(0, 40)} className="text-base leading-relaxed text-muted-foreground">{paragraph}</p>
+              ))}
+            </div>
+          </section>
+        )}
+
         <section className="mt-14 max-w-3xl">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>
           <dl className="mt-4 divide-y divide-border rounded-2xl border border-border overflow-hidden">

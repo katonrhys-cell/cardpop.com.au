@@ -205,6 +205,18 @@ describe('prerender shop products', () => {
     expect(body).toContain('/product/shop/' + UUID + '/pokemon-scarlet-violet-booster-box');
   });
 
+  it('renders each description paragraph and uses the first as the meta description', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Penny Sleeves - 100 Pack', price_aud: 4, stock_quantity: 5,
+      description: 'Soft sleeves for everyday storage.\n\nSlide the card in head first.\n\nPair with a top loader.',
+      product_type: 'supplies', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/penny-sleeves');
+    expect(body).toContain('<p>Soft sleeves for everyday storage.</p>');
+    expect(body).toContain('<p>Pair with a top loader.</p>');
+    expect(body).toContain('<meta name="description" content="Soft sleeves for everyday storage."');
+  });
+
   it('marks a zero-stock product OutOfStock', async () => {
     state.result = { data: {
       id: UUID, title: 'Sold Out Box', price_aud: 50, stock_quantity: 0,
@@ -787,8 +799,11 @@ describe('Palms Off Gaming per-product copy', () => {
     const product = PALMS_OFF_PRODUCTS.find((p) => p.sku === 'TL-35PT');
     state.result = { data: null };
     const { body } = await run(`/shop/${product.categorySlug}/${product.slug}`);
-    expect(body).toContain('35pt is the thickness of an ordinary modern trading card');
+    expect(body).toContain('These are the top loaders for ordinary cards');
     expect(body).toContain('Why collectors pick this one');
+    // The long-form About section and the verified spec rows render too.
+    expect(body).toContain(`<h2>About the ${product.shortTitle}</h2>`);
+    expect(body).toContain('<dt>Internal size</dt><dd>70 × 98 mm</dd>');
     // The type-level intro must not also appear — one page, one description.
     expect(body).not.toContain('A top loader is the rigid sleeve that turns a card');
   });
@@ -805,6 +820,7 @@ describe('Palms Off Gaming per-product copy', () => {
     const product = PALMS_OFF_PRODUCTS.find((p) => p.sku === 'MAG-180PT');
     state.result = { data: null };
     const { body } = await run(`/shop/${product.categorySlug}/${product.slug}`);
-    expect(body).toContain('the largest one-touch in the range');
+    expect(body).toContain(`<meta name="description" content="${product.metaDescription}"`);
+    expect(body).toContain(`"description":"${product.metaDescription}"`);
   });
 });

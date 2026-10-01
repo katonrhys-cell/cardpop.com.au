@@ -501,7 +501,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-8 md:py-12">
         <SEOHead
           title={`${product.name} | CardPop`}
-          description={product.description || `${product.name} — available on CardPop Australia's trading card marketplace.`}
+          description={product.description?.split(/\n\s*\n/)[0] || `${product.name} — available on CardPop Australia's trading card marketplace.`}
           ogImage={product.images?.[0] || undefined}
           canonicalUrl={source === 'marketplace'
             // Marketplace listings canonicalise to /marketplace/:id/:slug — the
@@ -894,7 +894,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             <div className="space-y-4 pt-6 border-t border-border">
               <h3 className="font-bold text-lg text-foreground">Description</h3>
               {product.description ? (
-                <div className="prose prose-sm dark:prose-invert text-muted-foreground leading-relaxed max-w-none">
+                <div className="prose prose-sm dark:prose-invert text-muted-foreground leading-relaxed max-w-none whitespace-pre-line">
                   {product.description}
                 </div>
               ) : (

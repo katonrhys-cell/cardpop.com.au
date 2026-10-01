@@ -91,6 +91,12 @@ const toText = (html = '', max = 300) => {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 };
 
+// Plain-text paragraphs of a stored description (blank-line separated).
+const descriptionParagraphs = (text) => String(text || '')
+  .split(/\n\s*\n/)
+  .map((p) => toText(p, 2000))
+  .filter(Boolean);
+
 const isoDate = (d) => (d ? new Date(d).toISOString() : undefined);
 
 // Decode a single path segment without throwing. A malformed %-escape (e.g.
@@ -692,7 +698,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     '@type': 'Product',
     name,
     ...(image ? { image } : {}),
-    description: toText(description, 500),
+    description: toText(description, 1000),
     ...(product.category ? { category: product.category } : {}),
     brand: { '@type': 'Brand', name: 'CardPop' },
     ...(price > 0
@@ -725,10 +731,13 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
   ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>` : ''}
   ${product.category ? `<p>${esc(product.category)}</p>` : ''}
-  ${product.description ? `<p>${esc(toText(product.description, 600))}</p>` : ''}
+  ${descriptionParagraphs(product.description).map((p) => `<p>${esc(p)}</p>`).join('\n  ')}
 </main>`;
 
-  return htmlDoc({ title: `${name} | CardPop`, description: toText(description, 300), canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
+  // The first paragraph of a shop description is written to stand alone as the
+  // meta description; the rest is page body only.
+  const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
+  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -876,6 +885,8 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   <ul>
     ${product.highlights.map((h) => `<li>${esc(h)}</li>`).join('\n    ')}
   </ul>
+  ${product.details?.length > 0 ? `<h2>About the ${esc(product.shortTitle)}</h2>
+  ${product.details.map((p) => `<p>${esc(p)}</p>`).join('\n  ')}` : ''}
   <h2>Specifications</h2>
   <dl>
     ${binderSpecs(product).map((s) => `<dt>${esc(s.label)}</dt><dd>${esc(s.value)}</dd>`).join('\n    ')}
@@ -1001,6 +1012,8 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     ${highlights.map((h) => `<li>${esc(h)}</li>`).join('\n    ')}
   </ul>` : ''}
   ${category.choosing ? `<h2>Choosing the right one</h2><p>${esc(category.choosing)}</p>` : ''}
+  ${product.details?.length > 0 ? `<h2>About the ${esc(product.shortTitle)}</h2>
+  ${product.details.map((p) => `<p>${esc(p)}</p>`).join('\n  ')}` : ''}
   ${product.colours.length > 1 ? `<h2>Available in ${product.colours.length} colours</h2><p>${esc(product.colours.join(', '))}</p>` : ''}
   <h2>Specifications</h2>
   <dl>
