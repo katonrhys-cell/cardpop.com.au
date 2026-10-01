@@ -9,7 +9,7 @@ import { installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.
 import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
 import { GA_MEASUREMENT_ID, installGtag } from '@/lib/analytics.js';
-import { loadAdsenseScript } from '@/lib/adsense.js';
+import { scheduleAdsenseLoad } from '@/lib/adsense.js';
 import '@/index.css';
 import '@/global.css';
 
@@ -241,7 +241,7 @@ if (typeof window !== 'undefined') {
   // as a static <script> for the document <head>, but the `strict-dynamic` CSP
   // blocks markup-inserted third-party scripts — injecting it from here makes
   // it trusted transitively (same reasoning as the Cloudflare beacon). Loading
-  // it on every page, rather than only where an <ins> slot mounts, is what site
+  // it on every content page, rather than only where an <ins> slot mounts, is what site
   // verification and Auto ads need. See lib/adsense.js.
   //
   // Deliberately NOT part of loadThirdPartyScripts() below: those tags wait for
@@ -251,15 +251,10 @@ if (typeof window !== 'undefined') {
   // snippet was never in the DOM Google actually saw, leaving the site stuck on
   // "Getting ready" (ad code not found) no matter how long we waited. Idle with a
   // 5s timeout still keeps it off the critical path for real visitors.
-  const loadAds = () => {
-    if (!import.meta.env.PROD || !analyticsEnabled) return;
-    try { loadAdsenseScript(); } catch { /* ads are non-critical */ }
-  };
-  if ('requestIdleCallback' in window) {
-    window.requestIdleCallback(loadAds, { timeout: 5000 });
-  } else {
-    window.setTimeout(loadAds, 1500);
-  }
+  //
+  // Only on screens with publisher content — never on sign-in, account,
+  // checkout or admin pages (see isAdEligiblePath in lib/adsense.js).
+  if (analyticsEnabled) scheduleAdsenseLoad(window.location.pathname);
 
   // Analytics/affiliate tags wait for the first user interaction (or a few
   // seconds after `load` as a fallback for users who never touch the page).
