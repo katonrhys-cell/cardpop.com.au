@@ -30,9 +30,9 @@ export const PALMS_OFF_CATEGORIES = {
     intro:
       'Sleeves are the layer that takes the wear so the card does not. Palms Off Gaming\'s Blackout range is an opaque-backed deck sleeve made for play and for storage — the solid back hides any marking or wear on the sleeve itself from showing through, which is what keeps a sleeved deck legal and a sleeved collection consistent. The Premium Over Sleeves are the outer half of a double-sleeve: they go over an already-sleeved card so the inner sleeve, and the card in it, never touch a table.',
     choosing:
-      'Two decisions. **Size** — standard sleeves fit Pokémon, Magic, One Piece, Lorcana and sports cards; Japanese mini sleeves fit Japanese Pokémon and Yu-Gi-Oh, which are noticeably smaller. **Finish** — gloss shuffles faster and shows colour more vividly, matte reduces glare and grips slightly, which most players prefer for long sessions.',
+      'Two decisions. **Size** — standard sleeves fit Pokémon, Magic, One Piece, Lorcana and sports cards; Japanese mini sleeves fit Yu-Gi-Oh, which is noticeably smaller. Japanese-language Pokémon cards are standard size, so they take standard sleeves. **Finish** — gloss shuffles faster and shows colour more vividly, matte reduces glare and grips slightly, which most players prefer for long sessions.',
     faqs: [
-      { q: 'What is the difference between standard and Japanese mini size?', a: 'Japanese mini cards are smaller than standard trading cards, so they need their own sleeve size. Japanese Pokémon and Yu-Gi-Oh are mini size; English Pokémon, Magic, One Piece, Lorcana and sports cards are standard.' },
+      { q: 'What is the difference between standard and Japanese mini size?', a: 'Japanese mini (often called Yu-Gi-Oh size) is cut for 59 × 86 mm cards, smaller than the 63 × 88 mm standard, so those cards need their own sleeve size. Yu-Gi-Oh is mini size. Pokémon (English and Japanese), Magic, One Piece, Lorcana and sports cards are standard.' },
       { q: 'Should I choose matte or gloss?', a: 'Matte reduces glare and has slightly more grip, which most players prefer for long sessions and for photographing cards. Gloss shuffles faster and shows colour more vividly. Neither protects better than the other.' },
       { q: 'What is an over sleeve for?', a: 'Double-sleeving. The card goes in an inner sleeve first, then the whole thing goes into an over sleeve. The card is then sealed on all sides and the inner sleeve takes no handling at all — standard practice for anything valuable that still sees play.' },
     ],
@@ -134,7 +134,7 @@ export const PALMS_OFF_CATEGORIES = {
     intro:
       'An inner sleeve is the first layer, sized to the card rather than to a sleeve — snug enough that the card does not shift inside it, thin enough that the whole thing still fits into a normal deck sleeve on top. That is what double-sleeving is: an inner sleeve for the fit, an outer sleeve for the handling. For anything valuable that still gets played or shuffled, it is the difference between wear landing on a sleeve and wear landing on the card.',
     choosing:
-      'Two decisions. **Size** — standard fits Pokémon, Magic, One Piece, Lorcana and sports cards; Japanese mini fits Japanese Pokémon and Yu-Gi-Oh. **Loading edge** — a side-loading inner sleeve pairs with a top-loading outer sleeve so the two openings sit at right angles, which seals the card completely.',
+      'Two decisions. **Size** — standard fits Pokémon, Magic, One Piece, Lorcana and sports cards; Japanese mini fits Yu-Gi-Oh (Japanese Pokémon cards are standard size). **Loading edge** — a side-loading inner sleeve pairs with a top-loading outer sleeve so the two openings sit at right angles, which seals the card completely.',
     faqs: [
       { q: 'Why double-sleeve at all?', a: 'The inner sleeve holds the card snugly and never gets handled; the outer sleeve takes all the shuffling and table contact. Wear ends up on a sleeve you can replace rather than on the card.' },
       { q: 'Which way up does an inner sleeve go?', a: 'Upside down relative to the outer sleeve, so the two openings do not line up. With a side-loading inner sleeve the openings are already at right angles, which achieves the same thing more reliably.' },
@@ -161,7 +161,7 @@ export const PALMS_OFF_CATEGORIES = {
     blurb: 'Penny sleeves in standard and Japanese mini sizes.',
     intro:
       'The penny sleeve is the first and cheapest layer of protection, and the one that does the most work per cent spent. A card in a soft sleeve can go into a top loader, a binder pocket or a storage box without its surface ever touching anything rigid. If you buy one accessory in bulk, it is this.',
-    choosing: 'Standard fits Pokémon, Magic, One Piece, Lorcana and sports cards. Japanese mini fits Japanese Pokémon and Yu-Gi-Oh.',
+    choosing: 'Standard fits Pokémon (English and Japanese), Magic, One Piece, Lorcana and sports cards. Japanese mini fits Yu-Gi-Oh.',
     faqs: [
       { q: 'Are they acid-free?', a: 'Soft sleeves are intended as the contact layer against a card face. Check the product page for the material specification on this line.' },
       { q: 'Which way up does the card go?', a: 'Face down, back of the card toward the sleeve opening, so the front is fully covered. When double-sleeving, the inner sleeve goes on upside down relative to the outer one so the two openings do not line up.' },
@@ -208,9 +208,9 @@ export const PALMS_OFF_CATEGORIES = {
   'storage-boxes': {
     name: 'Storage Boxes',
     heading: 'Palms Off Gaming Command Cases',
-    blurb: 'Hard cases for transporting and displaying cards.',
+    blurb: 'Sliding acrylic cases for displaying a single card.',
     intro:
-      'The Command Case is Palms Off Gaming\'s hard carry case. See the product photos for the interior layout and closure.',
+      'The Command Case is Palms Off Gaming\'s two-piece sliding acrylic case for one sleeved card, such as a Commander or a Star Wars: Unlimited leader, so it can sit on the table during play without being handled.',
     choosing: 'Available individually and as a 10 pack.',
     faqs: [],
   },

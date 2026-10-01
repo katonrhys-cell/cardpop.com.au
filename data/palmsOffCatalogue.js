@@ -872,12 +872,14 @@ export const palmsOffImageAlt = (product, path) => {
   return `${product.title}${colour} — ${view}`;
 };
 
-/** Spec rows. Only facts derived from the catalogue — nothing inferred about
- *  materials or dimensions. */
+/** Spec rows. Facts derived from the catalogue, then any per-product rows from
+ *  data/palmsOffProductCopy.js — those are limited to specs confirmed against a
+ *  published listing for that exact product, never inferred. */
 export const palmsOffSpecs = (product) => [
   { label: 'Brand', value: 'Palms Off Gaming' },
   { label: 'Type', value: product.categoryName },
   { label: 'SKU', value: product.skus.length > 1 ? `${product.sku} (${product.skus.length} variants)` : product.sku },
+  ...(product.specs || []),
   ...(product.colours.length > 0
     ? [{ label: 'Colours available', value: product.colours.join(', ') }]
     : []),
