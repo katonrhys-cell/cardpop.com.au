@@ -20,6 +20,7 @@ import Header from '@/components/Header.jsx';
 const Footer = lazy(() => import('@/components/Footer.jsx'));
 import ScrollToTop from '@/components/ScrollToTop.jsx';
 import AnalyticsPageViews from '@/components/AnalyticsPageViews.jsx';
+import AdsenseRouteLoader from '@/components/AdsenseRouteLoader.jsx';
 import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
@@ -273,6 +274,7 @@ const App = () => {
               <Router>
                 <ScrollToTop />
                 <AnalyticsPageViews />
+                <AdsenseRouteLoader />
                 <ReferralCapture />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>

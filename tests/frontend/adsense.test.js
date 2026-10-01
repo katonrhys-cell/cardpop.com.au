@@ -52,3 +52,19 @@ describe('loadAdsenseScript', () => {
     await expect(pending).resolves.toBeUndefined();
   });
 });
+
+describe('isAdEligiblePath', () => {
+  it('allows ads on public content pages', async () => {
+    const { isAdEligiblePath } = await freshLoader();
+    for (const path of ['/', '/blog/how-to-grade', '/events/sydney-show', '/shop', '/prices/pokemon', '/vaulted']) {
+      expect(isAdEligiblePath(path), path).toBe(true);
+    }
+  });
+
+  it('keeps ads off screens without publisher content', async () => {
+    const { isAdEligiblePath } = await freshLoader();
+    for (const path of ['/login', '/signup/', '/account/orders', '/admin', '/checkout', '/checkout-success', '/vault/add', '/search', '/launch', '/messaging', '/card-shops/add']) {
+      expect(isAdEligiblePath(path), path).toBe(false);
+    }
+  });
+});
