@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import EventScraperPanel from '@/components/EventScraperPanel.jsx';
 import EventScanPanel from '@/components/EventScanPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
+import EventRsvpListDialog from '@/components/admin/EventRsvpListDialog.jsx';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const STATUS_STYLES = {
@@ -47,6 +48,7 @@ const EventsManagementPage = () => {
   const [filter, setFilter] = useState('all');
   const [editingEvent, setEditingEvent] = useState(null);
   const [scrapedData, setScrapedData] = useState(null);
+  const [rsvpEvent, setRsvpEvent] = useState(null);
 
   useEffect(() => {
     fetchEvents();
@@ -270,6 +272,16 @@ const EventsManagementPage = () => {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setRsvpEvent(event)}
+                          className="rounded-lg shadow-sm"
+                          title="Attendees & vendors"
+                          aria-label={`Attendees and vendors for ${event.title}`}
+                        >
+                          <Users className="w-4 h-4" />
+                        </Button>
                         <Button variant="outline" size="sm" onClick={() => handleOpenModal(event)} className="rounded-lg shadow-sm">
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -300,6 +312,8 @@ const EventsManagementPage = () => {
         onClose={() => setIsScraperOpen(false)}
         onSaved={handleScraperSuccess}
       />
+
+      <EventRsvpListDialog event={rsvpEvent} onClose={() => setRsvpEvent(null)} />
 
       <EventScanPanel
         isOpen={isScanOpen}
