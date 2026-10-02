@@ -420,6 +420,26 @@ describe('GET /session/:sessionId', () => {
     expect(res.body.status).toBe('paid');
     expect(res.body.customerEmail).toBe('buyer@example.com');
     expect(res.body.items).toHaveLength(1);
+    expect(res.body.deliveryCountry).toBeNull();
+    expect(res.body.hasPreorder).toBe(false);
+  });
+
+  // Feeds the Google Customer Reviews opt-in on the success page.
+  it('returns the shipping country and flags pre-order lines', async () => {
+    mockStripe.checkout.sessions.retrieve.mockResolvedValue({
+      id: 'cs_2',
+      payment_status: 'paid',
+      amount_total: 5000,
+      customer_details: { email: 'buyer@example.com' },
+      collected_information: { shipping_details: { address: { country: 'AU' } } },
+      line_items: {
+        data: [{ description: 'Binder — Black (Pre-order — Late November)', quantity: 1, price: { unit_amount: 5000, currency: 'aud' } }],
+      },
+    });
+    const res = await request(app).get('/session/cs_2');
+    expect(res.status).toBe(200);
+    expect(res.body.deliveryCountry).toBe('AU');
+    expect(res.body.hasPreorder).toBe(true);
   });
 
   // The success page proves payment completed, so the route also fulfils the
