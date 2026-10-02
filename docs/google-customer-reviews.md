@@ -17,6 +17,10 @@ them a survey after delivery.
 | `delivery_country` | the session's shipping country, falling back to `AU` (checkout is Australia-only) |
 | `estimated_delivery_date` | today + **5 business days**, matching the page's "3 – 5 Business Days" (`GCR_DELIVERY_BUSINESS_DAYS`) |
 | `products` (optional) | not sent — marketplace cards have no GTIN |
+| `opt_in_style` (optional) | `CENTER_DIALOG` (Google's default, set explicitly — the corners hold toasts and the badge) |
+| language (`window.___gcfg.lang`) | `en-AU`, set before `platform.js` loads |
+
+`delivery_country` must be ISO 3166-1 alpha-2 and never `ZZ` — `normaliseDeliveryCountry()` falls back to `AU` for anything else. An email that isn't `name@domain.tld`-shaped skips the opt-in rather than sending Google a value it rejects.
 
 **Pre-orders are skipped.** `GET /stripe/session/:id` returns `hasPreorder`
 (a line named `… (Pre-order — <eta>)` by `cartService`); a pre-order ships weeks

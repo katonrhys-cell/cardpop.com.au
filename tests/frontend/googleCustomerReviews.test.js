@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   estimatedDeliveryDate,
   isBadgeEligiblePath,
+  normaliseDeliveryCountry,
   renderSurveyOptIn,
 } from '@/lib/googleCustomerReviews.js';
 
@@ -42,5 +43,18 @@ describe('renderSurveyOptIn', () => {
   it('does nothing off a production build', () => {
     expect(renderSurveyOptIn({ orderId: 'cs_test_1', email: 'a@b.com' })).toBe(false);
     expect(document.querySelector('script[src*="apis.google.com"]')).toBeNull();
+  });
+});
+
+describe('normaliseDeliveryCountry', () => {
+  it('passes a valid ISO alpha-2 code through, upper-cased', () => {
+    expect(normaliseDeliveryCountry('AU')).toBe('AU');
+    expect(normaliseDeliveryCountry(' nz ')).toBe('NZ');
+  });
+
+  it('falls back to AU for missing, malformed or "ZZ" codes', () => {
+    for (const bad of [null, undefined, '', 'AUS', 'A', '12', 'zz']) {
+      expect(normaliseDeliveryCountry(bad)).toBe('AU');
+    }
   });
 });
