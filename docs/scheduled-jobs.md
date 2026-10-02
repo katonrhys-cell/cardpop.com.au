@@ -10,6 +10,7 @@ Vercel Cron. `vercel.json` has no `crons` block.
 | Blog article generation | `/cron/blog-generate` | `7 21 * * *` | 07:07 AEST daily | `cron-blog-generate.yml` |
 | Event scan | `/cron/event-scan` | `7 17 * * 0` | 03:07 AEST Monday | `cron-event-scan.yml` |
 | Event website re-scan | `/cron/event-scan?mode=watches` | `43 16 * * *` | 02:43 AEST daily | `cron-event-watch.yml` |
+| Supplier price watch | `/api/shop-supplier-watch/run` | `17 20 * * *` | 06:17 AEST daily (each product weekly) | `cron-supplier-price-watch.yml` |
 
 Each caller workflow is a dozen lines that delegate to the reusable runner
 `.github/workflows/cron-job.yml`, which makes one authenticated `GET` and fails

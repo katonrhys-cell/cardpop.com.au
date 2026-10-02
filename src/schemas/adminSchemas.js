@@ -55,6 +55,10 @@ export const shipOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID'),
 });
 
+export const shopProductIdSchema = z.object({
+  id: z.string().uuid('Invalid product ID'),
+});
+
 export const shipOrderBodySchema = z.object({
   carrier: z.enum(CARRIER_IDS),
   tracking_number: z.string().refine(isValidTrackingNumber, 'Tracking number must be 4–40 letters, digits or dashes'),
