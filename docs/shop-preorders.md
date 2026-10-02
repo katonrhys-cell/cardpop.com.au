@@ -30,6 +30,21 @@ every priced `coming_soon` line to `preorder` and gave every Palms Off line
 `active`, `draft` or `archived` kept their status. To change the estimate for
 one product, edit it in Admin → Products.
 
+## Magnetic Metal Slab Case (35pt)
+
+Migration `20261002130410_metal_slab_case_preorder.sql` adds the CardPop
+Magnetic Metal Slab Case as a pre-order in eight colours (Black, Silver, Gold,
+Red, Blue, Orange, Purple, Green). Each colour is its own product
+(`CP-METAL-SLAB-35PT-<code>`), linked by `family_sku = 'CP-METAL-SLAB-35PT'`,
+in **Graded Card Protectors** at $14.95 (RRP $19.95), estimate "Ships in 2–3
+weeks". Page: `/shop/graded-card-protectors/magnetic-metal-slab-case-35pt`.
+
+The photos are studio renders served from `public/images/shop/metal-slab-case/`,
+drawn by `scripts/render-metal-slab-images.mjs` (re-run it to change a colour
+or add one; pass `CHROMIUM_PATH` if Playwright's bundled browser isn't
+installed). Replace them with real photographs in Admin → Products once stock
+arrives. A colour the supplier doesn't actually stock should be archived there.
+
 ## What the buyer sees
 
 | Where | What |
