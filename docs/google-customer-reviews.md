@@ -26,7 +26,13 @@ Google's checklist items, as they apply here:
 - Cart and checkout on the same domain — yes (`cardpop.com.au`; Stripe-hosted
   payment returns to `/checkout-success` on our domain).
 - Confirmation page on our own domain — yes.
-- `<!DOCTYPE html>` on every page — yes (`index.html`; the SPA serves it for every route).
+- `<!DOCTYPE html>` as the very first bytes of every page, with nothing (not even
+  a blank line) before it — `index.html` (served for every SPA route) and
+  `api/prerender.js`. `index.html` used to open with a blank line; that was removed
+  and `tests/frontend/indexDoctype.test.js` now guards it.
+- HTTPS only — yes. Every card checkout (cart, embedded, buy-now/offer) returns
+  to `/checkout-success`; nothing covers the opt-in dialog there (the badge is
+  not started on that page).
 
 ## Badge (optional)
 
