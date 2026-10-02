@@ -18,6 +18,7 @@ import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
 import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import { orderPreorderLines } from '@/utils/shopStock.js';
+import { computeRefundAmounts } from '@/utils/refundAmounts.js';
 
 // Order states in which the buyer has something real to review — the seller
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
@@ -59,8 +60,10 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const retainedFee = Math.round((order.platform_fee_aud || 0) * 0.5 * 100) / 100;
-  const refundAmount = Math.round(((order.total_aud || 0) - retainedFee) * 100) / 100;
+  // Same arithmetic the server quotes, approves and sends to Stripe. CardPop
+  // Shop orders come back in full (no restocking fee); marketplace orders keep
+  // 50% of the platform fee and the payment-processing fee.
+  const { shopOrder, retainedCommission, processingFee, retainedFee, refundAmount } = computeRefundAmounts(order);
 
   const handleSubmit = async () => {
     if (!reason) { toast.error('Please select a reason'); return; }
@@ -105,17 +108,27 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
               <span className="text-muted-foreground">Amount you paid</span>
               <span className="font-bold">${(order.total_aud || 0).toFixed(2)} AUD</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Platform fee retained (50%)</span>
-              <span className="font-medium text-amber-700">−${retainedFee.toFixed(2)} AUD</span>
-            </div>
+            {retainedCommission > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Platform fee retained (50%)</span>
+                <span className="font-medium text-amber-700">−${retainedCommission.toFixed(2)} AUD</span>
+              </div>
+            )}
+            {processingFee > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Payment processing fee</span>
+                <span className="font-medium text-amber-700">−${processingFee.toFixed(2)} AUD</span>
+              </div>
+            )}
             <div className="h-px bg-border" />
             <div className="flex justify-between">
               <span className="font-semibold text-foreground">You'll receive back</span>
               <span className="font-bold text-emerald-600">${refundAmount.toFixed(2)} AUD</span>
             </div>
             <p className="text-xs text-muted-foreground pt-1">
-              CardPop retains 50% of the platform fee (${retainedFee.toFixed(2)}) to cover payment processing costs.
+              {shopOrder
+                ? 'CardPop Shop orders are refunded in full — no restocking fee. '
+                : `CardPop retains $${retainedFee.toFixed(2)} in fees: 50% of the platform fee, plus any payment processing fee, which our payment provider doesn't return. `}
               Refunds take 5–10 business days to appear on your statement.
             </p>
           </div>
@@ -160,6 +173,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
 const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
+  const refundQuote = computeRefundAmounts(order);
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
   const daysSince   = differenceInDays(new Date(), new Date(order.created_at));
@@ -259,7 +273,9 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
           <span>
-            50% of the platform fee (${Math.round((order.platform_fee_aud || 0) * 0.5 * 100) / 100} AUD) will be retained if a refund is approved.
+            {refundQuote.shopOrder
+              ? 'CardPop Shop order — refunded in full if a refund is approved (no restocking fee). '
+              : `$${refundQuote.retainedFee.toFixed(2)} AUD in fees (50% of the platform fee, plus any payment processing fee) will be retained if a refund is approved. `}
             Refunds available for {REFUND_WINDOW_DAYS - daysSince} more day{REFUND_WINDOW_DAYS - daysSince !== 1 ? 's' : ''}.
           </span>
         </div>
@@ -366,9 +382,10 @@ const AccountOrders = () => {
           <p className="font-semibold text-foreground">CardPop Refund Policy</p>
           <p className="text-muted-foreground">
             Refunds can be requested within {REFUND_WINDOW_DAYS} days of purchase for items not received,
-            not as described, or damaged. If approved, <strong>50% of the platform fee is non-refundable</strong> to
-            cover payment processing costs — this is deducted from your refund automatically.
-            All other amounts (item price + 50% of fee) are returned to your original payment method within 5–10 business days.
+            not as described, or damaged. On marketplace purchases, <strong>50% of the platform fee and any payment
+            processing fee are non-refundable</strong> — they're deducted from your refund automatically, and everything
+            else is returned to your original payment method within 5–10 business days.
+            CardPop Shop orders are refunded in full, with no restocking fee.
           </p>
           <Link to="/returns" className="text-primary font-semibold text-xs hover:underline">View full returns policy →</Link>
         </div>

@@ -187,6 +187,41 @@ describe('processRefund — fee retention math (happy path)', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ refundAmount: 105, retainedFee: 5 }));
   });
 
+  it('refunds a CardPop Shop order in full — no restocking fee, no fee retention', async () => {
+    // Shop orders have no seller and every order line is type 'shop'.
+    const shopRefund = {
+      ...refundRow,
+      seller_id: null,
+      order: {
+        ...refundRow.order,
+        seller_id: null,
+        total_aud: 51.37,
+        platform_fee_aud: 0,
+        processing_fee_aud: 1.32,
+        order_items: [{ type: 'shop', id: 'p1', seller_id: null, quantity: 1, line_total_aud: 40.05 }],
+      },
+    };
+    queueFrom(
+      builder({ single: { data: shopRefund, error: null } }),         // refunds select
+      builder({ value: { data: [{ id: 'r1' }], error: null } }),      // claim
+      builder({ value: { data: null, error: null } }),                // refunds -> processed
+      builder({ value: { data: null, error: null } }),                // orders -> refunded
+      builder({ value: { data: null, error: null } }),                // notifications (buyer)
+      builder({ single: { data: { email: 'buyer@x.com', display_name: 'Buyer' }, error: null } }),
+    );
+    mockStripe.refunds.create.mockResolvedValue({ id: 're_shop' });
+
+    const res = makeRes();
+    await processRefund({ body: { refundId: 'r1' } }, res);
+
+    expect(mockStripe.refunds.create).toHaveBeenCalledWith(
+      expect.objectContaining({ payment_intent: 'pi_123', amount: 5137 }),
+      { idempotencyKey: 'refund_order_o1' },
+    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: true, refundAmount: 51.37, retainedFee: 0 }));
+    expect(mockEmail.sendRefundProcessed).toHaveBeenCalledWith(expect.objectContaining({ refundAmount: 51.37 }));
+  });
+
   it('returns 409 without calling Stripe when the approved->processing claim wins zero rows (concurrent processing)', async () => {
     queueFrom(
       builder({ single: { data: refundRow, error: null } }),      // refunds select

@@ -3,14 +3,16 @@ import { Info } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 /**
- * RefundPolicyNote — inline disclosure shown on checkout and listing detail pages.
+ * RefundPolicyNote — inline disclosure shown on marketplace checkout (CheckoutModal).
+ * Marketplace purchases only: CardPop Shop orders are refunded in full with no
+ * fee retained (utils/refundAmounts.js), so don't render this for shop items.
  *
  * Props:
  *   variant  'compact' (one line) | 'full' (two lines with example)   default 'compact'
  *   breakdown  object  optional — the /calculate breakdown; 'full' uses it to
  *                      show what THIS order would actually refund
  *
- * The worked example mirrors src/services/refundService.js exactly: the buyer
+ * The worked example mirrors utils/refundAmounts.js for marketplace orders: the buyer
  * gets the whole order total back minus (a) half of the platform fee (the
  * commission + GST that platform_fee_aud holds) and (b) all of the payment
  * processing fee, which Stripe keeps on a refunded charge and so cannot be
@@ -35,7 +37,7 @@ const RefundPolicyNote = ({ variant = 'compact', breakdown }) => {
         <div className="space-y-0.5">
           <p>
             <span className="font-semibold text-foreground">Refund policy:</span>{' '}
-            If a refund is issued, 50% of the platform fee is non-refundable
+            If a refund is issued on a marketplace purchase, 50% of the platform fee is non-refundable
             {processingAud > 0 ? ', and the payment processing fee is not returned to us by our payment provider' : ''}.
           </p>
           <p>
@@ -53,7 +55,7 @@ const RefundPolicyNote = ({ variant = 'compact', breakdown }) => {
     <div className="flex items-center gap-2 text-xs text-muted-foreground">
       <Info className="w-3.5 h-3.5 shrink-0 text-primary/70" />
       <span>
-        50% of the platform fee is retained on refunds.{' '}
+        50% of the platform fee is retained on marketplace refunds. CardPop Shop orders are refunded in full.{' '}
         <Link to="/returns" className="text-primary font-semibold hover:underline">Refund policy →</Link>
       </span>
     </div>
