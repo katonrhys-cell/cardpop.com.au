@@ -14,6 +14,7 @@ import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
 import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js';
 import { colourListText } from '../utils/colourSwatch.js';
+import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopReturnPolicy.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -901,6 +902,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
   };
@@ -1019,6 +1021,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia\u2122' },
+        hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
   };
@@ -1840,27 +1843,37 @@ const STATIC_CONTENT = {
 
   '/returns': {
     title: 'Returns & Refund Policy | CardPop',
-    description: "CardPop's full refund policy — fee retention, eligible reasons, timelines, and how to request a refund on a marketplace purchase.",
+    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, plus buyer protection and refunds on marketplace purchases.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Returns & Refunds', path: '/returns' }],
     h1: 'Returns & Refunds',
-    intro: 'How CardPop handles refunds, what fees are retained, and how to request a return.',
+    intro: 'How returns, exchanges and refunds work for CardPop Shop products and marketplace purchases.',
     sections: [
-      { h2: 'Overview', paras: ['Buyer protection applies to all marketplace purchases. Request a refund within 30 days of purchase through your account. Requests are reviewed within 2 business days; if approved, the refund is issued to your original payment method.'] },
-      { h2: 'Platform fee retention on refunds', paras: ['When a refund is issued, 50% of the platform fee is non-refundable (it covers Stripe processing costs CardPop can’t recover). The other 50% of the fee plus the full item price is returned. Example — on a $100 sale with a $3 platform fee: $100.00 item price refunded, $1.50 (50% of the fee) refunded, $1.50 retained, for $101.50 AUD returned. This policy is shown before every purchase.'] },
-      { h2: 'Eligible refund reasons', items: [
+      { h2: 'Overview', paras: [`CardPop sells two kinds of items, each with its own returns policy: new CardPop Shop products sold by CardPop itself, which can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days for any reason, and marketplace purchases from other CardPop sellers, which are covered by buyer protection. Returns are available within Australia. Nothing in this policy limits your rights under the Australian Consumer Law.`] },
+      { h2: 'CardPop Shop returns & exchanges (new products)', items: [
+        { text: `Return window: ${SHOP_RETURN_POLICY.windowDays} days from the day your order is delivered.` },
+        { text: 'Defective and non-defective items: we accept returns of faulty items and change-of-mind returns. For a change-of-mind return the item must be new and unused, in its original condition and packaging.' },
+        { text: 'Exchanges: accepted — swap for a different colour, size or product, subject to stock.' },
+        { text: 'Return method: by mail. You arrange the return postage and the cost of the return postage is your responsibility. A tracked service is recommended.' },
+        { text: 'Restocking fee: none. There is no charge for returning an item.' },
+        { text: `Refund processing time: once your return arrives and has been checked, your refund is processed within ${SHOP_RETURN_POLICY.refundProcessingDays} days to your original payment method.` },
+      ] },
+      { h2: 'How to return or exchange a Shop product', paras: [`Within ${SHOP_RETURN_POLICY.windowDays} days of delivery, email support@cardpop.com.au with your order number, the item(s) you are returning and whether you would like a refund or an exchange. We reply with the return address and instructions; post the item back well packed with your order number included. Once it arrives we process your refund within ${SHOP_RETURN_POLICY.refundProcessingDays} days, or send out your exchange.`] },
+      { h2: 'Marketplace purchases', paras: ['Buyer protection applies to all marketplace purchases. Request a refund within 30 days of purchase through your account. Requests are reviewed within 2 business days; if approved, the refund is issued to your original payment method. Because marketplace cards are sold by individual sellers, the change-of-mind returns offered on CardPop Shop products don’t apply to marketplace purchases.'] },
+      { h2: 'Platform fee retention on marketplace refunds', paras: ['When a marketplace refund is issued, 50% of the platform fee is non-refundable (it covers Stripe processing costs CardPop can’t recover). The other 50% of the fee plus the full item price is returned. Example — on a $100 sale with a $3 platform fee: $100.00 item price refunded, $1.50 (50% of the fee) refunded, $1.50 retained, for $101.50 AUD returned. This policy is shown before every purchase.'] },
+      { h2: 'Eligible marketplace refund reasons', items: [
         { text: 'Item not received within a reasonable timeframe.' },
         { text: 'Item significantly not as described (wrong card or wrong condition grade).' },
         { text: 'Item arrived damaged in transit (photo evidence of packaging required).' },
         { text: 'Item proven counterfeit.' },
         { text: 'Seller cancelled the order after payment.' },
       ] },
-      { h2: 'Non-eligible reasons', items: [
+      { h2: 'Non-eligible marketplace refund reasons', items: [
         { text: 'Change of mind or buyer’s remorse.' },
         { text: 'Market price fluctuations after purchase.' },
         { text: 'Minor subjective condition discrepancies on raw (ungraded) cards.' },
         { text: 'Requests made more than 30 days after purchase.' },
       ] },
-      { h2: 'How to request a refund', paras: ['Go to My Account → Orders, find the order and click Request Refund, select the reason and provide details or photos. CardPop reviews within 2 business days and notifies you by email and in-app. If approved, the refund is issued via Stripe and takes 5–10 business days to appear.'] },
+      { h2: 'How to request a marketplace refund', paras: ['Go to My Account → Orders, find the order and click Request Refund, select the reason and provide details or photos. CardPop reviews within 2 business days and notifies you by email and in-app. If approved, the refund is issued via Stripe and takes 5–10 business days to appear.'] },
       { h2: 'Seller obligations', paras: ['Sellers must accurately describe item condition and grade. If a refund is approved due to misrepresentation, the seller’s proceeds may be clawed back at CardPop’s discretion; repeat violations may result in account suspension.'] },
       { h2: 'Disputes', paras: ['If buyer and seller can’t resolve an issue directly, contact CardPop support with the order number and evidence. The team mediates and makes a binding decision within 5 business days.'] },
     ],

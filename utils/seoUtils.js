@@ -212,13 +212,6 @@ export const generateProductSchema = ({
           maxValue: 7,
           unitCode: 'DAY'
         }
-      },
-      hasMerchantReturnPolicy: {
-        '@type': 'MerchantReturnPolicy',
-        returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-        applicableCountry: 'AU',
-        merchantReturnDays: 30,
-        returnShippingFeeBusiness: 'https://schema.org/FreeReturn'
       }
     };
   }
