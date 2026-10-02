@@ -696,6 +696,37 @@ describe('prerender Palms Off Gaming binders', () => {
     expect(body).not.toContain('"@type":"Offer"');
   });
 
+  it('prices a colour family from its public siblings when the line row is archived', async () => {
+    // After the colour split the slug row is archived (not returned); the
+    // family siblings carry the live price/stock.
+    state.result = { data: null };
+    state.listResult = { data: [
+      { price_aud: 54.95, retail_price_aud: 64.95, stock_quantity: 0, status: 'active' },
+      { price_aud: 49.95, retail_price_aud: 64.95, stock_quantity: 3, status: 'active' },
+    ] };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('"@type":"Offer"');
+    expect(body).toContain('"price":"49.95"');
+    expect(body).toContain('https://schema.org/InStock');
+  });
+
+  it('marks a family of only pre-order siblings as PreOrder', async () => {
+    state.listResult = { data: [
+      { price_aud: 49.95, retail_price_aud: null, stock_quantity: 0, status: 'preorder' },
+      { price_aud: 49.95, retail_price_aud: null, stock_quantity: 0, status: 'active' },
+    ] };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('https://schema.org/PreOrder');
+  });
+
+  it('marks a family with no purchasable stock out of stock', async () => {
+    state.listResult = { data: [
+      { price_aud: 49.95, retail_price_aud: null, stock_quantity: 0, status: 'active' },
+    ] };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('https://schema.org/OutOfStock');
+  });
+
   it('404s an unknown binder slug', async () => {
     const { status, body } = await run('/shop/binders/not-a-real-binder');
     expect(status).toBe(404);

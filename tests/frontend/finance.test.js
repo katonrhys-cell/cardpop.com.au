@@ -3,6 +3,7 @@ import {
   financialYearOf, basQuarterOf, periodOptions, filterByPeriod,
   shopLineEconomics, summariseShopSales, summariseMarketplace, basSummary,
   inventoryValuation, toCsv, SALES_CSV_COLUMNS, gstInsideCents,
+  shopShippingCents, sellerCommissionCents, fetchAllPages,
 } from '@/utils/finance.js';
 
 describe('Australian periods', () => {
@@ -74,7 +75,7 @@ const ORDERS = [
       { id: 'p1', type: 'shop', title: 'Top Loaders', quantity: 1, unit_price_aud: 9.99, line_total_aud: 9.99, gst_aud: 0.91 },
       { id: 'p2', type: 'shop', title: 'Team Bags', quantity: 2, unit_price_aud: 5.99, line_total_aud: 11.98, gst_aud: 1.09 },
     ] },
-  { id: 'o-market', status: 'completed', created_at: '2026-09-14T00:00:00Z', seller_id: 's1', shipping_aud: '8.00', platform_fee_aud: '11.00', processing_fee_aud: '2.40', platform_gst_aud: '1.22', seller_gst_aud: '9.82', seller_proceeds_aud: '97.00', gst_aud: '0',
+  { id: 'o-market', status: 'completed', created_at: '2026-09-14T00:00:00Z', seller_id: 's1', shipping_aud: '8.00', platform_fee_aud: '11.00', processing_fee_aud: '2.40', platform_gst_aud: '2.22', seller_gst_aud: '9.82', seller_proceeds_aud: '97.00', gst_aud: '0',
     order_items: [{ id: 'l1', type: 'listing', title: 'Card', quantity: 1, unit_price_aud: 100, line_total_aud: 100, gst_aud: 9.09, seller_id: 's1' }] },
   { id: 'o-unpaid', status: 'pending', created_at: '2026-09-15T00:00:00Z', seller_id: null, shipping_aud: '10', order_items: [{ id: 'p1', type: 'shop', quantity: 5, unit_price_aud: 9.99, line_total_aud: 49.95, gst_aud: 4.54 }] },
 ];
@@ -100,11 +101,15 @@ describe('summaries', () => {
   it('marketplace split: fee revenue ex GST, seller GST kept separate', () => {
     const m = summariseMarketplace(ORDERS);
     expect(m.orderCount).toBe(1);
-    expect(m.commissionInc).toBe(11);
+    // Commission is earned twice: charged to the buyer and deducted from the
+    // seller — platform_gst_aud is the GST inside 2 × commission + processing.
+    expect(m.buyerCommissionInc).toBe(11);
+    expect(m.sellerCommissionInc).toBe(11);
+    expect(m.commissionInc).toBe(22);
     expect(m.processingFeeInc).toBe(2.4);
-    expect(m.feesInc).toBe(13.4);
-    expect(m.platformGst).toBe(1.22);
-    expect(m.feesEx).toBe(12.18);
+    expect(m.feesInc).toBe(24.4);
+    expect(m.platformGst).toBe(2.22);
+    expect(m.feesEx).toBe(22.18);
     expect(m.sellerGstRemitted).toBe(9.82);
     expect(m.sellerProceeds).toBe(97);
   });
@@ -113,12 +118,67 @@ describe('summaries', () => {
     const s = summariseShopSales(ORDERS, COSTS, REFUNDS);
     const m = summariseMarketplace(ORDERS);
     const b = basSummary(s, m);
-    expect(b.g1TotalSalesInc).toBe(21.97 + 10 + 13.4);
-    expect(b.oneAGstOnSales).toBe(2 + 0.91 + 1.22);
+    expect(b.g1TotalSalesInc).toBe(Math.round((21.97 + 10 + 24.4) * 100) / 100);
+    expect(b.oneAGstOnSales).toBe(Math.round((2 + 0.91 + 2.22) * 100) / 100);
     expect(b.oneBGstCreditsEstimate).toBe(s.gstCreditsOnCogs);
     expect(b.sellerGstRemittedOnBehalf).toBe(9.82);
-    expect(b.netGstOwnSupplies).toBe(Math.round((4.13 - s.gstCreditsOnCogs) * 100) / 100);
+    expect(b.netGstOwnSupplies).toBe(Math.round((5.13 - s.gstCreditsOnCogs) * 100) / 100);
     expect(b.netGstPayableIncludingSellers).toBe(Math.round((b.netGstOwnSupplies + 9.82) * 100) / 100);
+  });
+});
+
+describe('mixed cart orders', () => {
+  // One cart: a $9.99 shop item ($15 flat shop shipping) + a $50 card whose
+  // seller charges $8 postage and $2.50 commission (each side).
+  const MIXED = {
+    id: 'o-mixed', status: 'payment_confirmed', created_at: '2026-09-16T00:00:00Z', seller_id: null,
+    shipping_aud: '23.00', platform_fee_aud: '2.50', processing_fee_aud: '1.70', gst_aud: '0',
+    order_items: [
+      { id: 'p1', type: 'shop', quantity: 1, unit_price_aud: 9.99, line_total_aud: 9.99, gst_aud: 0.91, commission_aud: 0 },
+      { id: 'l1', type: 'listing', seller_id: 's1', quantity: 1, unit_price_aud: 50, line_total_aud: 50, commission_aud: 2.5, gst_aud: 4.55, shipping_aud: 8 },
+    ],
+  };
+
+  it('counts only the shop share of shipping as shop revenue', () => {
+    expect(shopShippingCents(MIXED)).toBe(1500);
+    const s = summariseShopSales([MIXED]);
+    expect(s.shippingInc).toBe(15);
+    // A shop-only order keeps all of its shipping.
+    expect(shopShippingCents({ shipping_aud: '10', order_items: [{ type: 'shop' }] })).toBe(1000);
+  });
+
+  it('reads seller-side commission from listing lines, else from the order', () => {
+    expect(sellerCommissionCents(MIXED)).toBe(250);
+    expect(sellerCommissionCents({ seller_id: 's1', platform_fee_aud: '5.50', gst_aud: '0.50', order_items: [] })).toBe(500);
+    expect(sellerCommissionCents({ seller_id: null, platform_fee_aud: '0', order_items: [{ type: 'shop' }] })).toBe(0);
+    const m = summariseMarketplace([MIXED]);
+    expect(m.commissionInc).toBe(5);
+    expect(m.feesInc).toBe(6.7);
+  });
+});
+
+describe('fetchAllPages', () => {
+  it('pages through until a short page, past the 1000-row cap', async () => {
+    const total = 2345;
+    const ranges = [];
+    const makeQuery = () => ({
+      range: (from, to) => {
+        ranges.push([from, to]);
+        const n = Math.max(0, Math.min(to, total - 1) - from + 1);
+        return Promise.resolve({ data: Array.from({ length: n }, (_, i) => ({ id: from + i })), error: null });
+      },
+    });
+    const { data, error } = await fetchAllPages(makeQuery);
+    expect(error).toBeNull();
+    expect(data).toHaveLength(total);
+    expect(ranges).toEqual([[0, 999], [1000, 1999], [2000, 2999]]);
+  });
+
+  it('returns the error from any page', async () => {
+    const err = new Error('boom');
+    const { data, error } = await fetchAllPages(() => ({ range: () => Promise.resolve({ data: null, error: err }) }));
+    expect(data).toBeNull();
+    expect(error).toBe(err);
   });
 });
 
@@ -140,6 +200,12 @@ describe('inventoryValuation', () => {
 });
 
 describe('toCsv', () => {
+  it('neutralises spreadsheet formulas in text but leaves numbers alone', () => {
+    const csv = toCsv([{ a: '=HYPERLINK("x")', b: '-5.3', c: -2.5 }], [{ label: 'A', key: 'a' }, { label: 'B', key: 'b' }, { label: 'C', key: 'c' }]);
+    expect(csv.split('\n')[1]).toBe(`"'=HYPERLINK(""x"")",-5.3,-2.50`);
+  });
+
+
   it('quotes commas and quotes, formats money to 2dp', () => {
     const s = summariseShopSales(ORDERS, COSTS, REFUNDS);
     const csv = toCsv(s.lines.map((l) => ({ ...l, title: 'Bags, "resealable"' })), SALES_CSV_COLUMNS);

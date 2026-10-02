@@ -14,6 +14,22 @@ import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/sh
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { variantStock } from '@/utils/shopVariants.js';
 import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
+import { escapeLike } from '@/src/utils/escapeLike.js';
+
+/**
+ * Stock is decremented by the Stripe webhook while this form is open, so the
+ * value loaded when it opened goes stale. Saving it back unchanged would
+ * restore units that have since sold (→ oversell). Only write stock when the
+ * admin actually edited the field: `original` is the string loaded into the
+ * form (null/undefined for a new row, which always sends stock).
+ */
+export function stockEdited(current, original) {
+  if (original == null) return true;
+  const a = parseInt(current, 10);
+  const b = parseInt(original, 10);
+  if (Number.isNaN(a) && Number.isNaN(b)) return false;
+  return a !== b;
+}
 
 // One-tap estimates for the pre-order field; any free text works too.
 const PREORDER_ETA_PRESETS = ['Ships in 7–10 days', 'Ships in 1–2 weeks', 'Ships in 2–4 weeks', 'Ships in 4–6 weeks', 'Ships in 6–8 weeks'];
@@ -26,7 +42,7 @@ const suggestVariantSku = (productSku, colour) => {
   const code = COLOUR_CODES[c.toLowerCase()] || c.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
   return `${base}-${code}`;
 };
-const newVariant = () => ({ _key: Math.random().toString(36).slice(2), id: null, sku: '', barcode: '', colour: '', colour_hex: '', stock_quantity: '0', price_aud: '', status: 'active' });
+const newVariant = () => ({ _key: Math.random().toString(36).slice(2), id: null, sku: '', barcode: '', colour: '', colour_hex: '', stock_quantity: '0', _origStock: null, price_aud: '', status: 'active' });
 
 const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
@@ -71,9 +87,12 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const [variants, setVariants] = useState([]);
   const [removedVariantIds, setRemovedVariantIds] = useState([]);
   const fileInputRef = useRef(null);
+  // Stock as loaded when the form opened — see stockEdited().
+  const originalStockRef = useRef(null);
 
   useEffect(() => {
     if (product) {
+      originalStockRef.current = product.stock_quantity != null ? String(product.stock_quantity) : '0';
       setFormData({
         title: product.title || '',
         sku: product.sku || '',
@@ -104,7 +123,9 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         .then(({ data }) => {
           setVariants((data || []).map((v) => ({
             _key: v.id, id: v.id, sku: v.sku || '', barcode: v.barcode || '', colour: v.colour || '', colour_hex: v.colour_hex || '',
-            stock_quantity: v.stock_quantity != null ? String(v.stock_quantity) : '0', price_aud: v.price_aud != null ? String(v.price_aud) : '', status: v.status || 'active',
+            stock_quantity: v.stock_quantity != null ? String(v.stock_quantity) : '0',
+            _origStock: v.stock_quantity != null ? String(v.stock_quantity) : '0',
+            price_aud: v.price_aud != null ? String(v.price_aud) : '', status: v.status || 'active',
           })));
           setRemovedVariantIds([]);
         });
@@ -123,6 +144,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
           }));
         });
     } else {
+      originalStockRef.current = null;
       setFormData(INITIAL_STATE);
       setVariants([]);
       setRemovedVariantIds([]);
@@ -241,7 +263,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     try {
       // Friendly pre-check so a duplicate SKU reads as a clear message rather
       // than a raw constraint error. The unique index is the real guard.
-      let dupQuery = supabase.from('shop_products').select('id, title').ilike('sku', sku).limit(1);
+      let dupQuery = supabase.from('shop_products').select('id, title').ilike('sku', escapeLike(sku)).limit(1);
       if (product?.id) dupQuery = dupQuery.neq('id', product.id);
       const { data: dup } = await dupQuery;
       if (dup && dup.length) {
@@ -258,7 +280,6 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         description: formData.description.trim() || null,
         price_aud: price,
         retail_price_aud: rrp,
-        stock_quantity: Number.isNaN(stock) ? 0 : Math.max(0, stock),
         category: formData.category.trim() || null,
         product_type: formData.product_type || null,
         status: formData.status,
@@ -282,6 +303,11 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       // when the product goes back to active, so flipping it again is quick.
       if ((product && 'preorder_eta' in product) || preorderEta) {
         payload.preorder_eta = preorderEta || null;
+      }
+      // Only (re)write stock when the admin changed it, or for a new product —
+      // otherwise sales made while the form was open would be undone.
+      if (!product || stockEdited(formData.stock_quantity, originalStockRef.current)) {
+        payload.stock_quantity = Number.isNaN(stock) ? 0 : Math.max(0, stock);
       }
 
       let productId = product?.id ?? null;
@@ -318,12 +344,25 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
             barcode: v.barcode || null,
             colour: v.colour || null,
             colour_hex: v.colour_hex || null,
-            stock_quantity: Math.max(0, parseInt(v.stock_quantity, 10) || 0),
+            // Existing variants keep their live stock unless edited here.
+            ...(!v.id || stockEdited(v.stock_quantity, v._origStock)
+              ? { stock_quantity: Math.max(0, parseInt(v.stock_quantity, 10) || 0) }
+              : {}),
             price_aud: v.price_aud === '' ? null : Number(v.price_aud),
             status: v.status === 'archived' ? 'archived' : 'active',
             sort_order: i,
           }));
-          const { error: varErr } = await supabase.from('shop_product_variants').upsert(rows, { onConflict: 'id' });
+          // A bulk upsert sends the union of columns, so a row without
+          // stock_quantity would be reset to the default. Upsert the two
+          // shapes separately so untouched stock is never written.
+          const withStock = rows.filter((r) => 'stock_quantity' in r);
+          const withoutStock = rows.filter((r) => !('stock_quantity' in r));
+          let varErr = null;
+          for (const group of [withStock, withoutStock]) {
+            if (!group.length || varErr) continue;
+            const { error } = await supabase.from('shop_product_variants').upsert(group, { onConflict: 'id' });
+            if (error) varErr = error;
+          }
           if (varErr) {
             toast.error(varErr.code === '23505'
               ? 'Product saved, but a variant SKU or barcode is already used by another product'

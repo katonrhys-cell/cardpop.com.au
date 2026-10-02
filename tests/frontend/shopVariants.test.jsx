@@ -47,6 +47,17 @@ describe('VariantPicker', () => {
     expect(screen.getByText(/only 3 left/)).toBeInTheDocument();
   });
 
+  it('never marks a pre-order colour sibling sold out, but still marks a sold-out active one', () => {
+    const variants = [
+      { id: 'p-blk', sku: 'ZB-BLK', colour: 'Black', stock_quantity: 0, status: 'active', sort_order: 0 },
+      { id: 'p-red', sku: 'ZB-RED', colour: 'Red', stock_quantity: 0, status: 'active', preorder: true, sort_order: 1 },
+    ];
+    render(<VariantPicker product={{ variants }} value="p-red" onChange={() => {}} />);
+    expect(screen.getByRole('radio', { name: 'Red' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Black (sold out)' })).toBeInTheDocument();
+    expect(screen.getByText(/pre-order/)).toBeInTheDocument();
+  });
+
   it('renders nothing for a product without variants', () => {
     const { container } = render(<VariantPicker product={{ id: 'x', variants: [] }} value={null} onChange={() => {}} />);
     expect(container).toBeEmptyDOMElement();

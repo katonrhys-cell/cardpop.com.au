@@ -22,6 +22,43 @@ import { format } from 'date-fns';
 import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
 import ShipOrderDialog from '@/components/admin/ShipOrderDialog.jsx';
 import { orderPreorderLines, isAwaitingPreorderStock } from '@/utils/shopStock.js';
+import { toCsv } from '@/utils/finance.js';
+
+/**
+ * The refund to show for an order. A rejected request can sit alongside a
+ * newer active one (the unique index only covers non-rejected rows), so
+ * prefer the latest non-rejected refund, else the latest of any status.
+ * `rows` are expected newest first.
+ */
+export function pickOrderRefund(rows) {
+  const list = Array.isArray(rows) ? rows.filter(Boolean) : [];
+  return list.find((r) => r.status !== 'rejected') || list[0] || null;
+}
+
+export const ORDER_CSV_COLUMNS = [
+  { label: 'Order id', key: 'id' },
+  { label: 'Order date', value: (o) => (o.created_at ? format(new Date(o.created_at), 'yyyy-MM-dd HH:mm') : '') },
+  { label: 'Buyer', value: (o) => o.buyer?.display_name || o.buyer?.username || o.shipping_name || '' },
+  { label: 'Buyer email', key: 'buyer_email' },
+  { label: 'Guest', value: (o) => (o.buyer_id ? 'no' : 'yes') },
+  { label: 'Seller', value: (o) => o.seller?.display_name || o.seller?.username || '' },
+  { label: 'Total AUD', value: (o) => (o.total_aud == null ? '' : Number(o.total_aud)) },
+  { label: 'Platform fee AUD', value: (o) => (o.platform_fee_aud == null ? '' : Number(o.platform_fee_aud)) },
+  { label: 'Status', key: 'status' },
+  { label: 'Refund status', key: 'refund_status' },
+  { label: 'Tracking number', key: 'tracking_number' },
+];
+
+/** CSV text for the given (already filtered) orders. */
+export const ordersToCsv = (orders) => toCsv(orders || [], ORDER_CSV_COLUMNS);
+
+function downloadCsv(filename, text) {
+  const blob = new Blob([text], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 const STATUS_BADGE = {
   pending:           'bg-muted text-muted-foreground border-border',
@@ -251,7 +288,14 @@ const OrderManagementPage = () => {
   }, [fetchOrders]);
 
   const openRefundDialog = async (order) => {
-    const { data, error } = await supabase.from('refunds').select('*').eq('order_id', order.id).maybeSingle();
+    // Not .maybeSingle(): a rejected request plus a newer active one is two
+    // rows, which maybeSingle reports as an error.
+    const { data: rows, error } = await supabase
+      .from('refunds')
+      .select('*')
+      .eq('order_id', order.id)
+      .order('created_at', { ascending: false });
+    const data = error ? null : pickOrderRefund(rows);
     if (error) {
       // A real read failure (RLS/transient) — don't mislabel it as "no details".
       toast.error('Could not load the refund details. Please try again.');
@@ -292,6 +336,11 @@ const OrderManagementPage = () => {
     return o.status === statusFilter;
   });
 
+  const exportCsv = () => {
+    if (!filtered.length) { toast.error('No orders to export.'); return; }
+    downloadCsv(`cardpop-orders-${format(new Date(), 'yyyy-MM-dd')}.csv`, ordersToCsv(filtered));
+  };
+
   const fmt = (val) => new Intl.NumberFormat('en-AU', { style: 'currency', currency: 'AUD' }).format(val || 0);
 
   return (
@@ -303,7 +352,13 @@ const OrderManagementPage = () => {
         title="Order Management"
         subtitle="View and manage platform transactions and refund requests."
       >
-        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+        <Button
+          variant="outline"
+          onClick={exportCsv}
+          disabled={loading || filtered.length === 0}
+          title="Export the orders currently shown (search and status filter applied)"
+          className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+        >
           <Download className="w-4 h-4" /> Export CSV
         </Button>
       </AdminPageHeader>

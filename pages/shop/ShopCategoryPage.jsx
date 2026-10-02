@@ -35,6 +35,8 @@ const ShopCategoryPage = () => {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
   const [searchTerm, setSearchTerm] = useState('');
+  // The query uses a debounced copy so each keystroke doesn't fire a fetch.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
   const fetchRef = useRef(null);
@@ -59,13 +61,21 @@ const ShopCategoryPage = () => {
   // grid just because they finished loading.
   const filterRows = filtering ? facets.rows : null;
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Reset to the first page whenever the category path, sort, search or a
   // filter changes, so we never land on an out-of-range page showing zero products.
   useEffect(() => {
     setPage(1);
-  }, [categorySlug, subcategorySlug, productTypeSlug, sort, searchTerm, selectionKey]);
+  }, [categorySlug, subcategorySlug, productTypeSlug, sort, debouncedSearch, selectionKey]);
 
   useEffect(() => {
+    // Guards against a slower, older response overwriting a newer one (e.g.
+    // switching category or typing a search while a fetch is in flight).
+    let cancelled = false;
     const fetchProducts = async () => {
       setLoading(true);
       try {
@@ -75,10 +85,11 @@ const ShopCategoryPage = () => {
         // so filter + sort them here and fetch full rows for this page only.
         if (filtering) {
           const matched = sortFacetRows(
-            filterFacetRows(facets.rows, facets.selection).filter((r) => matchesSearch(r, searchTerm)),
+            filterFacetRows(facets.rows, facets.selection).filter((r) => matchesSearch(r, debouncedSearch)),
             sort,
           );
           const pageRows = await fetchShopProductsByIds(supabase, matched.slice(from, from + PER_PAGE).map((r) => r.id));
+          if (cancelled) return;
           setProducts(pageRows.map(p => ({ ...p, source: 'shop', type: 'shop' })));
           setTotalItems(matched.length);
           setTotalPages(Math.ceil(matched.length / PER_PAGE));
@@ -97,7 +108,7 @@ const ShopCategoryPage = () => {
         // shop_products stores a free-text category; match the resolved
         // subcategory/category name against it.
         if (categoryName) query = query.ilike('category', `%${escapeLike(categoryName)}%`);
-        if (searchTerm) query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
+        if (debouncedSearch) query = query.ilike('title', `%${escapeLike(debouncedSearch)}%`);
 
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
@@ -107,16 +118,18 @@ const ShopCategoryPage = () => {
         query = query.range(from, from + PER_PAGE - 1);
 
         const { data, count, error } = await query;
+        if (cancelled) return;
         if (error) throw error;
 
         setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
         setTotalItems(count || 0);
         setTotalPages(Math.ceil((count || 0) / PER_PAGE));
       } catch (error) {
+        if (cancelled) return;
         console.error('Failed to load shop category products:', error);
         toast.error('Failed to load products. Please try again.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
@@ -126,10 +139,11 @@ const ShopCategoryPage = () => {
       fetchRef.current = fetchProducts;
       fetchProducts();
     }
+    return () => { cancelled = true; };
     // Depend on stable slug strings (not the derived path objects, which get new
     // identities every render and would re-run this effect needlessly). The
     // selection is tracked by value via selectionKey for the same reason.
-  }, [categoryName, page, sort, searchTerm, contextLoading, selectionKey, filterRows, facets.waiting]);
+  }, [categoryName, page, sort, debouncedSearch, contextLoading, selectionKey, filterRows, facets.waiting]);
 
   useEffect(() => {
     const channel = supabase

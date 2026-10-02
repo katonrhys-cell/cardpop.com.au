@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
-import { colourListText, familyAsVariants, productImages, sortColourNames } from '@/utils/shopFamily.js';
+import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
 import { Badge } from '@/components/ui/badge';
@@ -265,7 +265,7 @@ const ShopProductPage = () => {
 
                 onChange={(v) => setSelectedId(v.id)}
 
-                showAvailability={!isComingSoon && !unlimited}
+                showAvailability={familyHasPurchasable(family)}
 
                 className="mt-6"
 

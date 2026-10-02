@@ -18,7 +18,7 @@ import { format } from 'date-fns';
 import { formatAud } from '@/utils/revenue.js';
 import {
   periodOptions, filterByPeriod, summariseShopSales, summariseMarketplace, basSummary,
-  inventoryValuation, toCsv, SALES_CSV_COLUMNS, INVENTORY_CSV_COLUMNS,
+  inventoryValuation, toCsv, SALES_CSV_COLUMNS, INVENTORY_CSV_COLUMNS, fetchAllPages,
 } from '@/utils/finance.js';
 
 const pct = (v) => (v == null ? '—' : `${v.toFixed(1)}%`);
@@ -73,11 +73,14 @@ const FinanceTaxPage = () => {
     setLoading(true);
     setError(null);
     try {
+      // Paged: an unranged select is capped at 1000 rows, which silently
+      // dropped orders from the report. Each query has a unique tiebreak so
+      // pages never overlap or skip rows.
       const [ordersRes, refundsRes, productsRes, costsRes] = await Promise.all([
-        supabase.from('orders').select('id, status, created_at, order_items, seller_id, shipping_aud, platform_fee_aud, processing_fee_aud, platform_gst_aud, seller_gst_aud, seller_proceeds_aud, gst_aud, gst_included_aud, total_aud').order('created_at', { ascending: false }),
-        supabase.from('refunds').select('id, order_id, status, refund_amount_aud, processed_at'),
-        supabase.from('shop_products').select('id, sku, title, status, price_aud, stock_quantity'),
-        supabase.from('shop_product_costs').select('product_id, wholesale_ex_gst_aud, wholesale_inc_gst_aud'),
+        fetchAllPages(() => supabase.from('orders').select('id, status, created_at, order_items, seller_id, shipping_aud, platform_fee_aud, processing_fee_aud, platform_gst_aud, seller_gst_aud, seller_proceeds_aud, gst_aud, gst_included_aud, total_aud').order('created_at', { ascending: false }).order('id', { ascending: true })),
+        fetchAllPages(() => supabase.from('refunds').select('id, order_id, status, refund_amount_aud, processed_at').order('id', { ascending: true })),
+        fetchAllPages(() => supabase.from('shop_products').select('id, sku, title, status, price_aud, stock_quantity').order('id', { ascending: true })),
+        fetchAllPages(() => supabase.from('shop_product_costs').select('product_id, wholesale_ex_gst_aud, wholesale_inc_gst_aud').order('product_id', { ascending: true })),
       ]);
       const loadError = [ordersRes.error, refundsRes.error, productsRes.error, costsRes.error].find(Boolean);
       if (loadError) throw loadError;
@@ -187,7 +190,11 @@ const FinanceTaxPage = () => {
             <CardDescription>CardPop as the platform · {marketplace.orderCount} listing order{marketplace.orderCount === 1 ? '' : 's'}</CardDescription>
           </CardHeader>
           <CardContent>
-            <Row label="Commission inc GST" value={formatAud(marketplace.commissionInc)} />
+            <Row
+              label="Commission inc GST"
+              value={formatAud(marketplace.commissionInc)}
+              hint={`Buyer-side ${formatAud(marketplace.buyerCommissionInc)} + deducted from sellers ${formatAud(marketplace.sellerCommissionInc)}`}
+            />
             <Row label="Processing fees inc GST" value={formatAud(marketplace.processingFeeInc)} />
             <Row label="GST inside CardPop's fees" value={`− ${formatAud(marketplace.platformGst)}`} muted />
             <Row label="Fee revenue ex GST" value={formatAud(marketplace.feesEx)} strong />

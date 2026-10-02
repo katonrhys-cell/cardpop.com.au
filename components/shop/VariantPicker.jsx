@@ -12,6 +12,10 @@ import { activeVariants, variantInStock, variantLabel, variantStock } from '@/ut
  * showAvailability (default true) — pass false where nothing is buyable yet
  * (e.g. Coming soon), so zero stock doesn't strike every colour through.
  */
+// Pre-order options (colour-family siblings flagged by familyAsVariants) are
+// unlimited, so they are never shown as sold out.
+const optionAvailable = (v) => v?.preorder === true || variantInStock(v);
+
 const VariantPicker = ({ product, value, onChange, className = '', showAvailability = true }) => {
   const list = activeVariants(product);
   if (list.length === 0) return null;
@@ -26,15 +30,17 @@ const VariantPicker = ({ product, value, onChange, className = '', showAvailabil
         {selected && (
           <span className="text-sm text-muted-foreground">
             <span className="font-semibold text-foreground">{variantLabel(selected)}</span>
-            {!showAvailability ? null : variantInStock(selected)
-              ? (variantStock(selected) <= 5 ? ` · only ${variantStock(selected)} left` : ' · in stock')
-              : ' · sold out'}
+            {!showAvailability ? null : selected.preorder === true
+              ? ' · pre-order'
+              : variantInStock(selected)
+                ? (variantStock(selected) <= 5 ? ` · only ${variantStock(selected)} left` : ' · in stock')
+                : ' · sold out'}
           </span>
         )}
       </div>
       <div role="radiogroup" aria-label="Colour" className="mt-3 flex flex-wrap gap-2">
         {list.map((v) => {
-          const inStock = !showAvailability || variantInStock(v);
+          const inStock = !showAvailability || optionAvailable(v);
           const isSelected = v.id === value;
           return (
             <button
