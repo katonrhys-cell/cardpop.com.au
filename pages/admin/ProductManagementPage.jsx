@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3 } from 'lucide-react';
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
+import ShopCategoryManager from '@/components/admin/ShopCategoryManager.jsx';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import {
   SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
@@ -47,6 +49,25 @@ const COLUMNS = [
 // shared link keeps the admin where they were.
 const PARAM_DEFAULTS = { q: '', section: 'all', category: 'all', status: 'all', brand: 'all', sort: 'title', dir: 'asc', view: 'sections' };
 
+// Which section / category headers the admin has collapsed in the Sections
+// view. A per-browser convenience, so it lives in localStorage (which can
+// throw or be empty in private windows — fall back to everything open).
+const COLLAPSED_STORAGE_KEY = 'cardpop.admin.products.collapsed';
+const loadCollapsed = () => {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    const keys = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(keys) ? keys : []);
+  } catch {
+    return new Set();
+  }
+};
+const saveCollapsed = (set) => {
+  try {
+    window.localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...set]));
+  } catch { /* storage unavailable — collapse state just won't persist */ }
+};
+
 const ProductManagementPage = () => {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
@@ -76,7 +97,19 @@ const ProductManagementPage = () => {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  // Built-in + admin-added categories, minus removed ones.
+  const { groups: categoryGroups } = useShopCategoryGroups();
   const isMounted = useRef(true);
+  // Keys are `section` or `section/category`.
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const updateCollapsed = (fn) => setCollapsed((prev) => {
+    const next = new Set(prev);
+    fn(next);
+    saveCollapsed(next);
+    return next;
+  });
+  const toggleCollapsed = (key) => updateCollapsed((set) => (set.has(key) ? set.delete(key) : set.add(key)));
 
   const fetchProducts = async () => {
     if (!isMounted.current) return;
@@ -136,14 +169,19 @@ const ProductManagementPage = () => {
   };
 
   const filteredProducts = useMemo(
-    () => sortProducts(filterProducts(products, filters, { variantsByProduct }), sortKey, sortDir, { costs }),
+    () => sortProducts(filterProducts(products, filters, { variantsByProduct, groups: categoryGroups }), sortKey, sortDir, { costs }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [products, variantsByProduct, costs, searchParams],
+    [products, variantsByProduct, costs, searchParams, categoryGroups],
   );
-  const sections = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
-  const categoryChoices = useMemo(() => categoryOptions(products, filters.section), [products, filters.section]);
+  const sections = useMemo(() => groupProducts(filteredProducts, categoryGroups), [filteredProducts, categoryGroups]);
+  const categoryChoices = useMemo(() => categoryOptions(products, filters.section, categoryGroups), [products, filters.section, categoryGroups]);
   const brandChoices = useMemo(() => brandOptions(products), [products]);
   const activeFilterCount = ['section', 'category', 'status', 'brand'].filter((k) => filters[k] !== 'all').length + (searchTerm ? 1 : 0);
+
+  const allGroupKeys = sections.flatMap(({ section, categories }) => [section, ...categories.map(({ category }) => `${section}/${category}`)]);
+  const anyCollapsed = allGroupKeys.some((k) => collapsed.has(k));
+  const collapseAll = () => updateCollapsed((set) => sections.forEach(({ section }) => set.add(section)));
+  const expandAll = () => updateCollapsed((set) => allGroupKeys.forEach((k) => set.delete(k)));
 
   const toggleSort = (col) => {
     if (sortKey === col.key) setParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' });
@@ -224,6 +262,9 @@ const ProductManagementPage = () => {
         title="Shop Products"
         subtitle="Manage official catalog and inventory."
       >
+        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setIsCategoriesOpen(true)}>
+          <FolderTree className="w-4 h-4" /> Categories
+        </Button>
         <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => { setEditingProduct(null); setIsAddModalOpen(true); }}>
           <Plus className="w-4 h-4" /> New Product
         </Button>
@@ -286,6 +327,13 @@ const ProductManagementPage = () => {
             <span className="text-sm text-muted-foreground tabular-nums">
               {filteredProducts.length} of {products.length}
             </span>
+            {view === 'sections' && sections.length > 0 && (
+              <Button variant="ghost" size="sm" className="h-8 gap-1.5 rounded-lg text-muted-foreground" onClick={anyCollapsed ? expandAll : collapseAll}>
+                {!anyCollapsed
+                  ? <><ChevronsDownUp className="w-4 h-4" /> Collapse all</>
+                  : <><ChevronsUpDown className="w-4 h-4" /> Expand all</>}
+              </Button>
+            )}
             <div className="inline-flex rounded-xl border border-border bg-background p-0.5" role="group" aria-label="Table layout">
               <Button variant={view === 'sections' ? 'secondary' : 'ghost'} size="sm" className="h-8 gap-1.5 rounded-lg" aria-pressed={view === 'sections'} onClick={() => setParams({ view: 'sections' })}>
                 <Rows3 className="w-4 h-4" /> Sections
@@ -351,25 +399,40 @@ const ProductManagementPage = () => {
                 </TableRow>
               ) : (
                 view === 'sections' ? (
-                  sections.map(({ section, count, categories }) => (
-                    <React.Fragment key={section}>
-                      <TableRow className="bg-muted/60 hover:bg-muted/60">
-                        <TableCell colSpan={10} className="py-2.5 font-bold uppercase tracking-wide text-foreground">
-                          {section} <span className="ml-1 font-semibold text-muted-foreground normal-case tracking-normal">· {count}</span>
-                        </TableCell>
-                      </TableRow>
-                      {categories.map(({ category, products: rows }) => (
-                        <React.Fragment key={`${section}/${category}`}>
-                          <TableRow className="bg-muted/20 hover:bg-muted/20">
-                            <TableCell colSpan={10} className="py-1.5 pl-6 text-xs font-semibold text-muted-foreground">
-                              {category} · {rows.length}
-                            </TableCell>
-                          </TableRow>
-                          {rows.map(renderRow)}
-                        </React.Fragment>
-                      ))}
-                    </React.Fragment>
-                  ))
+                  sections.map(({ section, count, categories }) => {
+                    const sectionOpen = !collapsed.has(section);
+                    return (
+                      <React.Fragment key={section}>
+                        <TableRow className="bg-muted/60 hover:bg-muted/80">
+                          <TableCell colSpan={10} className="p-0">
+                            <button type="button" onClick={() => toggleCollapsed(section)} aria-expanded={sectionOpen}
+                              className="flex w-full items-center gap-2 px-2 py-2.5 text-left font-bold uppercase tracking-wide text-foreground">
+                              <ChevronRight aria-hidden="true" className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${sectionOpen ? 'rotate-90' : ''}`} />
+                              {section} <span className="font-semibold text-muted-foreground normal-case tracking-normal">· {count}</span>
+                            </button>
+                          </TableCell>
+                        </TableRow>
+                        {sectionOpen && categories.map(({ category, products: rows }) => {
+                          const key = `${section}/${category}`;
+                          const categoryOpen = !collapsed.has(key);
+                          return (
+                            <React.Fragment key={key}>
+                              <TableRow className="bg-muted/20 hover:bg-muted/40">
+                                <TableCell colSpan={10} className="p-0">
+                                  <button type="button" onClick={() => toggleCollapsed(key)} aria-expanded={categoryOpen}
+                                    className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 text-left text-xs font-semibold text-muted-foreground">
+                                    <ChevronRight aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 transition-transform ${categoryOpen ? 'rotate-90' : ''}`} />
+                                    {category} · {rows.length}
+                                  </button>
+                                </TableCell>
+                              </TableRow>
+                              {categoryOpen && rows.map(renderRow)}
+                            </React.Fragment>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })
                 ) : (
                   filteredProducts.map(renderRow)
                 )
@@ -378,6 +441,8 @@ const ProductManagementPage = () => {
           </Table>
         </div>
       </Card>
+
+      <ShopCategoryManager open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} products={products} />
 
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background rounded-2xl border-border p-0">

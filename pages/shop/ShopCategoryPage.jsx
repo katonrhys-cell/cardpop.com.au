@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
-import { findShopCategory } from '@/utils/shopCategories.js';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { generateMetaTitle, generateMetaDescription, generateBreadcrumbStructuredData } from '@/utils/seoUtils.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import SEOHead from '@/components/SEOHead.jsx';
@@ -44,6 +44,7 @@ const ShopCategoryPage = () => {
   // config, not the marketplace `categories` hierarchy — resolve those first so
   // each dropdown item renders a real page. Fall back to the TCG hierarchy for
   // legacy slugs (pokemon, etc.).
+  const { findCategory: findShopCategory } = useShopCategoryGroups();
   const shopCategory = findShopCategory(categorySlug);
   const pathInfo = getCategoryBySlug(hierarchy, categorySlug, subcategorySlug, productTypeSlug);
   const { category, subcategory, productType } = pathInfo || {};

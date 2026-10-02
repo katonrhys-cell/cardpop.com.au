@@ -6,12 +6,12 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 
 const ShopCategoryBrowse = () => {
-  const [activeSlug, setActiveSlug] = useState(SHOP_CATEGORY_GROUPS[0].slug);
-  const activeGroup =
-    SHOP_CATEGORY_GROUPS.find((g) => g.slug === activeSlug) || SHOP_CATEGORY_GROUPS[0];
+  const { groups } = useShopCategoryGroups();
+  const [activeSlug, setActiveSlug] = useState(groups[0].slug);
+  const activeGroup = groups.find((g) => g.slug === activeSlug) || groups[0];
 
   // Only mouse pointers open-on-hover — touch taps go through onClick so a tap
   // doesn't both hover and click the same tab.
@@ -24,7 +24,7 @@ const ShopCategoryBrowse = () => {
     <div className="rounded-2xl border border-border bg-card">
       <div className="flex items-center gap-2 border-b border-border px-3 sm:px-4 py-2.5">
         <div className="flex flex-1 min-w-0 flex-nowrap gap-1.5 overflow-x-auto scrollbar-hide">
-          {SHOP_CATEGORY_GROUPS.map((group) => {
+          {groups.map((group) => {
             const isActive = group.slug === activeSlug;
             return (
               <button

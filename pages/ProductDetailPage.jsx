@@ -39,7 +39,7 @@ import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, var
 import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFamily.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
-import { findShopCategory } from '@/utils/shopCategories.js';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { listingTakesOffers } from '@/utils/offerEligibility.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
@@ -59,6 +59,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   const { addToCart, setIsCartOpen } = useCart();
   const { currentUser, isAdmin, loading: authLoading } = useAuth();
   const { settings } = usePlatformSettings();
+  const { findCategory: findShopCategory } = useShopCategoryGroups();
   
   const [product, setProduct] = useState(null);
   const [enquiryOpen, setEnquiryOpen] = useState(false);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabaseClient.js';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import { resolveShopCollection } from '@/data/shopCollectionConfigs.js';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { isSoldOut, isComingSoon, isPreorder, PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
@@ -113,7 +114,15 @@ const ShopCollectionPage = () => {
   const browseGridRef = useRef(null);
   const { addToCart } = useCart();
 
-  const config = resolveShopCollection(groupSlug);
+  // The static config, with its leaf items swapped for the admin-edited list
+  // (custom categories added, removed ones dropped — utils/shopCategories.js).
+  const { groups } = useShopCategoryGroups();
+  const baseConfig = resolveShopCollection(groupSlug);
+  const config = useMemo(() => {
+    if (!baseConfig) return null;
+    const items = groups.find((g) => g.slug === baseConfig.slug)?.items;
+    return items ? { ...baseConfig, items } : baseConfig;
+  }, [baseConfig, groups]);
 
   // ─── State ─────────────────────────────────────────────────────────────
   const [activeSub, setActiveSub] = useState(null);       // pill filter (item name)

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSepa
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Loader2, X, ImagePlus, Plus, Trash2 } from 'lucide-react';
-import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { variantStock } from '@/utils/shopVariants.js';
@@ -44,7 +44,6 @@ const suggestVariantSku = (productSku, colour) => {
 };
 const newVariant = () => ({ _key: Math.random().toString(36).slice(2), id: null, sku: '', barcode: '', colour: '', colour_hex: '', stock_quantity: '0', _origStock: null, price_aud: '', status: 'active' });
 
-const KNOWN_CATEGORY_NAMES = SHOP_CATEGORIES.map((c) => c.name);
 const CUSTOM_CATEGORY = '__custom__';
 
 const INITIAL_STATE = {
@@ -89,6 +88,9 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const fileInputRef = useRef(null);
   // Stock as loaded when the form opened — see stockEdited().
   const originalStockRef = useRef(null);
+  // Built-in + admin-added categories (Admin → Products → Categories).
+  const { groups: categoryGroups, categories: shopCategories } = useShopCategoryGroups();
+  const knownCategoryNames = shopCategories.map((c) => c.name);
 
   useEffect(() => {
     if (product) {
@@ -114,7 +116,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         : (product.image_url ? [product.image_url] : []);
       setImages(existing.map(url => ({ isExisting: true, url })));
       setPreviewUrls(existing);
-      setUseCustomCategory(!!product.category && !KNOWN_CATEGORY_NAMES.includes(product.category));
+      setUseCustomCategory(!!product.category && !knownCategoryNames.includes(product.category));
       supabase
         .from('shop_product_variants')
         .select('id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, status, sort_order')
@@ -152,7 +154,15 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       setPreviewUrls([]);
       setUseCustomCategory(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product]);
+
+  // Admin-added categories arrive after the first render — once they do, a
+  // product already in one shows it in the picker rather than as free text.
+  useEffect(() => {
+    if (useCustomCategory && knownCategoryNames.includes(formData.category)) setUseCustomCategory(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shopCategories]);
 
   const handleInputChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
@@ -727,7 +737,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 <SelectValue placeholder="Select a category" />
               </SelectTrigger>
               <SelectContent>
-                {SHOP_CATEGORY_GROUPS.map((group) => (
+                {categoryGroups.map((group) => (
                   <SelectGroup key={group.slug}>
                     <SelectLabel>{group.label}</SelectLabel>
                     {group.items.map((item) => (
