@@ -273,6 +273,9 @@ export const OFFER_ACTIONS = {
   withdraw: { role: 'buyer', from: 'pending', to: 'withdrawn', email: [['seller', 'withdrawn']] },
 };
 
+// Moves that commit the card to the buyer — refused unless the listing is live.
+export const LIVE_LISTING_ACTIONS = new Set(['accept', 'counter', 'accept_counter']);
+
 const OFFER_FIELDS = 'id, listing_id, buyer_id, seller_id, amount_aud, counter_amount_aud, counter_message, message, status, expires_at, payment_due_at, paid_at, created_at';
 
 // PATCH /offers/:id — { action, counterAmountAud?, counterMessage? }
@@ -320,6 +323,26 @@ router.patch('/:id', authMiddleware, async (req, res) => {
   }
   if (current.status !== move.from) {
     return res.status(409).json({ error: `This offer is ${current.status} and can no longer be changed that way` });
+  }
+
+  // Accepting or countering commits the card to this buyer, so the listing
+  // must still be live. Declines and withdrawals always go through so a
+  // dead offer can still be closed out.
+  if (LIVE_LISTING_ACTIONS.has(action)) {
+    const { data: listing, error: listingError } = await supabase
+      .from('listings')
+      .select('status')
+      .eq('id', current.listing_id)
+      .maybeSingle();
+    if (listingError) {
+      logger.error(`[OFFERS] listing lookup failed for offer ${offerId}: ${listingError.message}`);
+      return res.status(500).json({ error: 'Failed to update offer' });
+    }
+    if (listing?.status !== 'active') {
+      return res.status(409).json({
+        error: 'This listing is no longer available (it has sold or been taken down), so the offer can only be declined or withdrawn',
+      });
+    }
   }
 
   const userClient = createUserScopedClient(token);

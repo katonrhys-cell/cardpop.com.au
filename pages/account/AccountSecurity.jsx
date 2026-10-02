@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Shield, Smartphone, CheckCircle2, Loader2, KeyRound, Copy, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,12 @@ const TOTPSetup = ({ onComplete, onCancel }) => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // The parent passes an inline onCancel, so it changes on every parent
+  // render. Read it through a ref: depending on it would re-run enrolment on
+  // any re-render and swap the QR code out from under the user mid-setup.
+  const onCancelRef = useRef(onCancel);
+  useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -29,12 +35,12 @@ const TOTPSetup = ({ onComplete, onCancel }) => {
       } catch (e) {
         if (!cancelled) {
           toast.error(e.message || 'Failed to start 2FA setup');
-          onCancel();
+          onCancelRef.current?.();
         }
       }
     })();
     return () => { cancelled = true; };
-  }, [enrollTOTP, onCancel]);
+  }, [enrollTOTP]);
 
   const copySecret = async () => {
     await navigator.clipboard.writeText(enrollment.totp.secret);

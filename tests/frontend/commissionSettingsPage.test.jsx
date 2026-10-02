@@ -48,7 +48,7 @@ vi.mock('@/components/admin/AdminPageHeader.jsx', () => ({
 }));
 
 import { toast } from 'sonner';
-import CommissionSettingsPage from '@/pages/admin/CommissionSettingsPage.jsx';
+import CommissionSettingsPage, { platformGstOf } from '@/pages/admin/CommissionSettingsPage.jsx';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -138,5 +138,26 @@ describe('CommissionSettingsPage toggles', () => {
     await waitFor(() => expect(toast.error).toHaveBeenCalled());
     expect(toast.error.mock.calls[0][0]).toMatch(/does not exist/i);
     expect(toast.success).not.toHaveBeenCalled();
+  });
+});
+
+describe('platformGstOf', () => {
+  it('reports the GST inside CardPop\'s fees, not the always-zero gst_aud', () => {
+    expect(platformGstOf({ gst_aud: 0, platform_gst_aud: 2.22 })).toBeCloseTo(2.22, 2);
+    // Legacy orders added GST on top and have no platform_gst_aud.
+    expect(platformGstOf({ gst_aud: 1.1, platform_gst_aud: null })).toBeCloseTo(1.1, 2);
+    expect(platformGstOf({})).toBe(0);
+  });
+
+  it('labels the stat as GST on platform fees and sums platform_gst_aud', async () => {
+    state.tables.orders = { data: [
+      { id: 'o1', created_at: '2026-09-20T00:00:00Z', status: 'completed', total_aud: 100, item_price_aud: 95, platform_fee_aud: 5, gst_aud: 0, platform_gst_aud: 1.1, seller_proceeds_aud: 90 },
+      { id: 'o2', created_at: '2026-09-21T00:00:00Z', status: 'completed', total_aud: 50, item_price_aud: 47.5, platform_fee_aud: 2.5, gst_aud: 0, platform_gst_aud: 0.55, seller_proceeds_aud: 45 },
+    ], error: null };
+    render(<CommissionSettingsPage />);
+    // StatCard is declared inside the page, so it remounts on every render —
+    // query inside waitFor rather than holding a possibly-detached node.
+    await waitFor(() => expect(screen.getByText('$1.65')).toBeInTheDocument());
+    expect(screen.getByText('GST on Platform Fees')).toBeInTheDocument();
   });
 });

@@ -14,6 +14,11 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const suggestionsRef = useRef(null);
+  const inputRef = useRef(null);
+  // Suggestions only open while the user is in the box — otherwise the debounced
+  // fetch that a submit/suggestion click triggers (by changing `query`) would
+  // re-open the dropdown over the results page after navigating away.
+  const isFocused = () => typeof document !== 'undefined' && document.activeElement === inputRef.current;
 
   // Load search history on mount
   useEffect(() => {
@@ -31,7 +36,7 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
         if (!cancelled) {
           setSuggestions([]);
           // Show search history when query is empty
-          if (query.length === 0) setShowSuggestions(searchHistory.length > 0);
+          if (query.length === 0) setShowSuggestions(searchHistory.length > 0 && isFocused());
         }
         return;
       }
@@ -43,7 +48,7 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
         if (cancelled) return;
         setSuggestions(data.suggestions || []);
         setDidYouMean(data.didYouMean || null);
-        setShowSuggestions(true);
+        setShowSuggestions(isFocused());
       } catch (error) {
         if (cancelled) return;
         console.error('Error fetching suggestions:', error);
@@ -80,7 +85,8 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
       const updatedHistory = addToSearchHistory(query.trim());
       setSearchHistory(updatedHistory);
       setShowSuggestions(false);
-      
+      inputRef.current?.blur();
+
       if (onSearchChange) {
         onSearchChange(query.trim());
       } else {
@@ -95,7 +101,8 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
     const updatedHistory = addToSearchHistory(suggestion);
     setSearchHistory(updatedHistory);
     setShowSuggestions(false);
-    
+    inputRef.current?.blur();
+
     if (onSearchChange) {
       onSearchChange(suggestion);
     } else {
@@ -106,6 +113,7 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
   const handleHistoryClick = (term) => {
     setQuery(term);
     setShowSuggestions(false);
+    inputRef.current?.blur();
     if (onSearchChange) {
       onSearchChange(term);
     } else {
@@ -130,13 +138,14 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
       <form onSubmit={handleSearch} className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
         <Input
+          ref={inputRef}
           type="search"
           name="q"
           placeholder={placeholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => query.length >= 2 && setShowSuggestions(true)}
-          className="w-full pl-9 pr-10 rounded-full bg-background border-input focus-visible:ring-primary"
+          onFocus={() => (query.length >= 2 || (query.length === 0 && searchHistory.length > 0)) && setShowSuggestions(true)}
+          className="w-full pl-9 pr-10 rounded-full bg-background focus-visible:border-primary focus-visible:ring-primary [&::-webkit-search-cancel-button]:appearance-none"
           aria-label="Search items"
         />
         {query && (
@@ -145,6 +154,7 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
             variant="ghost"
             size="icon"
             onClick={clearQuery}
+            aria-label="Clear search"
             className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 rounded-full hover:bg-muted"
           >
             <X className="w-4 h-4 text-muted-foreground" />

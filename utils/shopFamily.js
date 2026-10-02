@@ -12,6 +12,7 @@
  */
 import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { colourRank } from '@/utils/colourSwatch.js';
+import { isPreorder, isPurchasableStatus } from '@/utils/shopStock.js';
 
 export { colourListText, sortColourNames } from '@/utils/colourSwatch.js';
 
@@ -31,8 +32,22 @@ export function sortFamily(siblings) {
 }
 
 /**
+ * True when a sibling can be bought right now: a pre-order (unlimited — stock
+ * is ignored), or a purchasable sibling with stock. A row without a status is
+ * judged on stock alone.
+ */
+export function siblingAvailable(sibling) {
+  if (!sibling) return false;
+  if (isPreorder(sibling)) return true;
+  if (sibling.status && !isPurchasableStatus(sibling.status)) return false;
+  return (Number(sibling.stock_quantity) || 0) > 0;
+}
+
+/**
  * Siblings shaped like shop_product_variants rows, so the existing
  * VariantPicker can draw them. Each option's `id` is the sibling PRODUCT id.
+ * Pre-order siblings carry `preorder: true` so the picker treats them as
+ * available whatever their stock says.
  */
 export function familyAsVariants(siblings) {
   return sortFamily(siblings).map((s, i) => ({
@@ -41,15 +56,25 @@ export function familyAsVariants(siblings) {
     colour: s.colour || null,
     colour_hex: s.colour_hex || null,
     stock_quantity: s.stock_quantity ?? 0,
+    // Public siblings only reach the picker; 'archived' would hide the chip.
     status: 'active',
+    ...(isPreorder(s) ? { preorder: true } : {}),
     sort_order: i,
   }));
 }
 
-/** Default sibling to show: the first in stock, else the first in swatch order. */
+/**
+ * Default sibling to show: the first available (in stock, or a pre-order),
+ * else the first in swatch order.
+ */
 export function pickDefaultSibling(siblings) {
   const sorted = sortFamily(siblings);
-  return sorted.find((s) => (s.stock_quantity ?? 0) > 0) || sorted[0] || null;
+  return sorted.find(siblingAvailable) || sorted[0] || null;
+}
+
+/** True when any sibling can be bought — gates the picker's availability marks. */
+export function familyHasPurchasable(siblings) {
+  return (siblings || []).some((s) => !s?.status || isPurchasableStatus(s.status));
 }
 
 /** Page for a sibling — its line's canonical page with the colour preselected. */

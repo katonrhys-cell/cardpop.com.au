@@ -124,6 +124,9 @@ const GuestAccountCard = ({ email, name }) => {
 const CheckoutSuccessPage = () => {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  // A buy-now / accepted-offer purchase (CheckoutModal) is paid outside the
+  // cart, so confirming it must not empty whatever else is in the cart.
+  const singleItem = searchParams.get('single') === '1';
   const { clearCart } = useCart();
   const { isAuthenticated } = useAuth();
 
@@ -145,14 +148,14 @@ const CheckoutSuccessPage = () => {
         const paid = data.status === 'paid' || data.status === 'no_payment_required';
         setStatus(paid ? 'paid' : 'unpaid');
         // Only empty the cart once payment is actually confirmed.
-        if (paid) clearCart();
+        if (paid && !singleItem) clearCart();
       })
       .catch(err => {
         if (!cancelled) setStatus('error');
       });
 
     return () => { cancelled = true; };
-  }, [sessionId, clearCart]);
+  }, [sessionId, singleItem, clearCart]);
 
   if (status === 'verifying') {
     return (

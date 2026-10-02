@@ -137,17 +137,21 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
           decline the seller's counter from their Sent tab. */}
       {status === 'countered' && !isReceived && (
         <div className="flex sm:flex-col gap-2 shrink-0 self-start sm:self-center">
-          <Button
-            size="sm"
-            className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
-            disabled={!!actionLoading}
-            onClick={() => onAction(offer.id, 'accepted', perspective)}
-          >
-            {actionLoading === `${offer.id}_accept`
-              ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              : <CheckCircle2 className="w-3.5 h-3.5" />}
-            Accept Counter
-          </Button>
+          {/* Accepting commits the card — only while the listing is live.
+              Declining stays available so a dead offer can be closed. */}
+          {listingActive && (
+            <Button
+              size="sm"
+              className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
+              disabled={!!actionLoading}
+              onClick={() => onAction(offer.id, 'accepted', perspective)}
+            >
+              {actionLoading === `${offer.id}_accept`
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Accept Counter
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -195,27 +199,33 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
         <div className="flex sm:flex-col gap-2 shrink-0 self-start sm:self-center">
           {isReceived ? (
             <>
-              <Button
-                size="sm"
-                className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
-                disabled={!!actionLoading}
-                onClick={() => onAction(offer.id, 'accepted', perspective)}
-              >
-                {actionLoading === `${offer.id}_accept`
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <CheckCircle2 className="w-3.5 h-3.5" />}
-                Accept
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="rounded-xl font-bold gap-1.5 text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950"
-                disabled={!!actionLoading}
-                onClick={() => onCounter(offer)}
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                Counter
-              </Button>
+              {/* Accept / Counter commit the card — only while the listing is
+                  live. Decline stays so the offer can still be closed. */}
+              {listingActive && (
+                <>
+                  <Button
+                    size="sm"
+                    className="rounded-xl font-bold bg-emerald-500 hover:bg-emerald-600 text-white gap-1.5"
+                    disabled={!!actionLoading}
+                    onClick={() => onAction(offer.id, 'accepted', perspective)}
+                  >
+                    {actionLoading === `${offer.id}_accept`
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    Accept
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl font-bold gap-1.5"
+                    disabled={!!actionLoading}
+                    onClick={() => onCounter(offer)}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Counter
+                  </Button>
+                </>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -434,7 +444,7 @@ const AccountOffers = () => {
           <div className="px-6 pt-6 pb-4 border-b border-border">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <RefreshCw className="w-5 h-5 text-blue-500" /> Send Counter Offer
+                <RefreshCw className="w-5 h-5 text-primary" /> Send Counter Offer
               </DialogTitle>
             </DialogHeader>
           </div>

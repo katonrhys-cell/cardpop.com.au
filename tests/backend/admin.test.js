@@ -49,7 +49,7 @@ const app = makeApp();
 function makeBuilder(result = { data: null, error: null }) {
   const b = {
     select: vi.fn(() => b), update: vi.fn(() => b), insert: vi.fn(() => b), eq: vi.fn(() => b),
-    order: vi.fn(() => b), limit: vi.fn(() => b), not: vi.fn(() => b),
+    order: vi.fn(() => b), limit: vi.fn(() => b), not: vi.fn(() => b), is: vi.fn(() => b),
     single: vi.fn(() => Promise.resolve(result)),
     maybeSingle: vi.fn(() => Promise.resolve(result)),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
@@ -302,8 +302,8 @@ describe('PATCH /disputes/:id', () => {
     queueFrom(
       makeBuilder({ data: { id: 'd1', order_id: 'o1' }, error: null }),
       makeBuilder({ data: { id: 'o1', seller_id: null, listing_id: null, seller_proceeds_aud: null, order_items: lines }, error: null }),
+      makeBuilder({ data: { id: 'd1', status: 'resolved_released' }, error: null }), // dispute claim (before any payout)
       ordersUpdate,
-      makeBuilder({ data: { id: 'd1', status: 'resolved_released' }, error: null }),
     );
     mockPayoutSeller
       .mockResolvedValueOnce({ status: 'transferred', transferId: 'tr_new1' })

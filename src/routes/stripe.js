@@ -162,12 +162,12 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
     const userId = req.user?.id ?? null;
     const code = typeof promoCode === 'string' ? promoCode.trim() : '';
 
-    // A partner code can carry a free-shipping perk, so it has to be resolved
-    // BEFORE the cart is priced — the waiver changes the shipping line itself,
-    // not just a discount applied on top of the total. Welcome offers never
-    // touch shipping, so they stay in the post-pricing block below. An invalid
-    // code doesn't fail the whole calculation: the UI shows `promoError` inline
-    // and the undiscounted totals stay correct.
+    // Resolve a partner referral code. No code waives shipping — priceCart
+    // charges the platform's shop fee below the free-shipping threshold
+    // whatever code is applied — so a partner code only ever discounts shop
+    // items (see partnerDiscountCents below). An invalid code doesn't fail the
+    // whole calculation: the UI shows `promoError` inline and the undiscounted
+    // totals stay correct.
     let partner = null;
     let promoError = null;
     if (userId && code && !isWelcomeCodeFormat(code)) {
@@ -209,7 +209,9 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
     } else if (useWalletBalance) {
       // Live read from Stripe — CardPop keeps no local wallet ledger for buyers.
       walletBalanceCents = await getWalletBalanceCents(stripe, userId);
-      walletAppliedCents = Math.min(walletBalanceCents, priced.grandCents);
+      // Same cap as /create-cart-checkout: leave Stripe's 50¢ AUD minimum on
+      // the card, or the preview promises more credit than checkout applies.
+      walletAppliedCents = Math.min(walletBalanceCents, Math.max(0, priced.grandCents - 50));
     }
 
     res.json({
@@ -323,7 +325,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       ? await validatePartnerCode(userId, promoCodeText)
       : null;
 
-    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, sellerGstCents, shippingCents, processingCents, grandCents } =
+    const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, sellerGstCents, platformGstCents, shippingCents, processingCents, grandCents } =
       await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
@@ -363,8 +365,8 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
           welcomeOfferId = offer.id;
         }
       } else {
-        // `partner` was resolved before pricing (its free-shipping perk had to
-        // be applied to the shipping line), so it is non-null on this branch.
+        // `partner` was resolved (and validated) above — an invalid code threw
+        // there — so it is non-null on this branch.
         const built = await buildPartnerDiscount(stripe, partner, partnerDiscountCents(partner, orderLines));
         if (built) {
           discounts = [{ coupon: built.couponId }];
@@ -503,6 +505,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // The GST deducted from sellers' payouts on this order and remitted by
       // CardPop on their behalf. Part of gst_included_aud, not on top of it.
       seller_gst_aud:    sellerGstCents / 100,
+      // The GST inside CardPop's own supplies on this order (commission, both
+      // sides, and the processing fee) — the platform's share of
+      // gst_included_aud, which the single-item path records too.
+      platform_gst_aud:  platformGstCents / 100,
       // GST already inside every price on the order (cards, shop stock,
       // postage, commission, processing). Kept separate from gst_aud — which
       // is GST *added* on top, and is now always 0 — so the receipt can show it
@@ -532,7 +538,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // amounts stay recoverable from the per-line order_items.
     const { error: orderErr } = await insertWithOptionalColumns(
       orderRow,
-      ['gst_included_aud', 'processing_fee_aud', 'seller_gst_aud'],
+      ['gst_included_aud', 'processing_fee_aud', 'seller_gst_aud', 'platform_gst_aud'],
       row => supabase.from('orders').insert(row),
       col => logger.warn(`[STRIPE] ${col} column not present yet — inserting order without it`),
     );

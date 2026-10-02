@@ -30,7 +30,10 @@ router.get('/products', authMiddleware, async (req, res) => {
 
   if (!isAdmin) query = query.eq('owner_id', req.user.id);
 
-  const sortMap = { name: 'title', '-name': 'title', price: 'asking_price', '-price': 'asking_price' };
+  // vault_items has no title / asking_price / description columns — the card's
+  // name is card_name and its value is estimated_value_aud (see
+  // src/utils/vaultItemInput.js). Sorting by a missing column 500'd.
+  const sortMap = { name: 'card_name', '-name': 'card_name', price: 'estimated_value_aud', '-price': 'estimated_value_aud' };
   const sortCol = sortMap[sort] || 'created_at';
   const ascending = !sort.startsWith('-');
   query = query.order(sortCol, { ascending }).range(from, from + limitNum - 1);
@@ -41,9 +44,9 @@ router.get('/products', authMiddleware, async (req, res) => {
   res.json({
     products: (items || []).map(p => ({
       id: p.id,
-      name: p.title,
-      description: p.description || '',
-      price: p.asking_price || 0,
+      name: p.card_name || '',
+      description: p.notes || '',
+      price: Number(p.estimated_value_aud) || 0,
       userId: p.owner_id,
       is_public: p.is_public || false,
       created: p.created_at,
@@ -76,7 +79,7 @@ router.get('/public', async (req, res) => {
 
   if (userId) query = query.eq('owner_id', userId);
 
-  const sortCol = sort.replace('-', '') === 'price' ? 'asking_price' : 'created_at';
+  const sortCol = sort.replace('-', '') === 'price' ? 'estimated_value_aud' : 'created_at';
   query = query.order(sortCol, { ascending: !sort.startsWith('-') }).range(from, from + limitNum - 1);
 
   const { data: items, count, error } = await query;
@@ -85,9 +88,10 @@ router.get('/public', async (req, res) => {
   res.json({
     products: (items || []).map(p => ({
       id: p.id,
-      name: p.title,
-      description: p.description || '',
-      price: p.asking_price || 0,
+      name: p.card_name || '',
+      // The owner's free-text notes are not published on the public feed.
+      description: '',
+      price: Number(p.estimated_value_aud) || 0,
       userId: p.owner_id,
       userName: p.profiles?.business_name || p.profiles?.username || 'Unknown',
       created: p.created_at,
@@ -118,9 +122,9 @@ router.get('/:id', optionalAuthMiddleware, async (req, res) => {
   if (product.is_public) {
     return res.json({
       id: product.id,
-      name: product.title,
-      description: product.description || '',
-      price: product.asking_price || 0,
+      name: product.card_name || '',
+      description: '',
+      price: Number(product.estimated_value_aud) || 0,
       userId: product.owner_id,
       userName: product.profiles?.business_name || product.profiles?.username || 'Unknown',
       is_public: true,
@@ -138,9 +142,9 @@ router.get('/:id', optionalAuthMiddleware, async (req, res) => {
 
   res.json({
     id: product.id,
-    name: product.title,
-    description: product.description || '',
-    price: product.asking_price || 0,
+    name: product.card_name || '',
+    description: product.notes || '',
+    price: Number(product.estimated_value_aud) || 0,
     userId: product.owner_id,
     userName: product.profiles?.business_name || product.profiles?.username || 'Unknown',
     is_public: product.is_public || false,

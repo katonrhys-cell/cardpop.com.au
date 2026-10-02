@@ -78,11 +78,15 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
     // Reuse an existing non-archived listing if one already exists.
     const { data: existing, error: findError } = await userClient
       .from('listings')
-      .select('id')
+      .select('id, status')
       .eq('vault_item_id', cardId)
       .neq('status', 'archived')
       .maybeSingle();
     if (findError) throw findError;
+
+    // A listing held for admin approval must stay held: editing the card is
+    // not an approval. (The DB trigger enforces this too, on UPDATE OF status.)
+    if (existing?.status === 'pending') listingPayload.status = 'pending';
 
     // Read the status back: the enforce_listing_approval trigger may have
     // downgraded a new 'active' listing to 'pending', and the seller needs to

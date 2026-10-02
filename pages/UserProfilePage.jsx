@@ -137,7 +137,7 @@ const UserProfilePage = () => {
           .from('profiles')
           .update(updatePayload)
           .eq('id', currentUser.id)
-          .select()
+          .select(PUBLIC_PROFILE_COLUMNS)
           .single();
         if (error) throw error;
         updatedProfile = data;
@@ -146,7 +146,7 @@ const UserProfilePage = () => {
         const { data, error } = await supabase
           .from('profiles')
           .insert(updatePayload)
-          .select()
+          .select(PUBLIC_PROFILE_COLUMNS)
           .single();
         if (error) throw error;
         updatedProfile = data;

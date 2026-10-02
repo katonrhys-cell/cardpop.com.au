@@ -232,8 +232,16 @@ const HomePage = () => {
     return () => cancelAnimationFrame(id);
   }, [deskInstant]);
 
-  const goDeskNext = () => setDeskPos(p => p + 1);
-  const goDeskPrev = () => setDeskPos(p => p - 1);
+  // The snap back into range waits for `transitionend`, which never fires when
+  // reduced motion turns the transition off — so wrap directly in that case.
+  // Otherwise clamp to the rendered buffer so clicking faster than the slide
+  // can't run the track past the duplicated tiles into empty space.
+  const prefersReducedMotion = () =>
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const goDeskNext = () =>
+    setDeskPos(p => (prefersReducedMotion() ? (p + 1) % total : Math.min(p + 1, total)));
+  const goDeskPrev = () =>
+    setDeskPos(p => (prefersReducedMotion() ? (p - 1 + total) % total : Math.max(p - 1, -DESK_VISIBLE)));
   const onDeskSlideEnd = (e) => {
     // Only react to the track's own transform slide, not bubbled hover
     // transitions from the tiles inside it.

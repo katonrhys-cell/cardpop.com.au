@@ -805,6 +805,66 @@ function renderBindersHub() {
   });
 }
 
+// ── Commercial data for a catalogue line page ───────────────────────────────
+//
+// Mirrors hooks/useShopLine.js: a line is either a colour family (one public
+// shop_products row per colour, linked by family_sku = the line SKU) or a
+// single row matched by slug. Since the colour split migration
+// (20260926024651) the slug row of a multi-colour line is archived, so the
+// family has to be read or crawlers get no Offer at all.
+//
+// Returns { price, rrp, inStock, preorder, isPurchasable }.
+async function loadShopLineCommerce(supabaseClient, { slug, sku }) {
+  const COLS = 'price_aud, retail_price_aud, stock_quantity, status';
+  const positive = (v) => (v != null && Number(v) > 0 ? Number(v) : null);
+  let siblings = [];
+  if (sku) {
+    try {
+      const { data, error } = await supabaseClient
+        .from('shop_products')
+        .select(COLS)
+        .eq('family_sku', sku)
+        .in('status', PUBLIC_SHOP_STATUSES);
+      if (!error && Array.isArray(data)) siblings = data;
+    } catch { /* fall back to the slug row */ }
+  }
+
+  if (siblings.length > 0) {
+    const purchasable = siblings.filter((s) => isPurchasableStatus(s.status) && positive(s.price_aud) != null);
+    const available = purchasable.filter((s) => s.status === 'preorder' || (Number(s.stock_quantity) || 0) > 0);
+    const inStockNow = available.some((s) => s.status !== 'preorder');
+    // Price the Offer from what can actually be bought now, cheapest first.
+    const priced = available.length ? available : purchasable;
+    const prices = priced.map((s) => positive(s.price_aud)).filter((v) => v != null);
+    const rrps = siblings.map((s) => positive(s.retail_price_aud)).filter((v) => v != null);
+    return {
+      price: prices.length ? Math.min(...prices) : null,
+      rrp: rrps.length ? Math.max(...rrps) : null,
+      inStock: available.length > 0,
+      // PreOrder only when nothing is in stock right now.
+      preorder: available.length > 0 && !inStockNow,
+      isPurchasable: purchasable.length > 0,
+    };
+  }
+
+  const { data: row } = await supabaseClient
+    .from('shop_products')
+    .select(COLS)
+    .eq('slug', slug)
+    .in('status', PUBLIC_SHOP_STATUSES)
+    .maybeSingle();
+  const price = positive(row?.price_aud);
+  return {
+    price,
+    rrp: positive(row?.retail_price_aud),
+    inStock: row?.status === 'preorder' || (Number(row?.stock_quantity) || 0) > 0,
+    preorder: row?.status === 'preorder',
+    // Enquiry-only until a price is set: the page is complete and indexable
+    // without one, but no Offer is emitted for a product that can't be bought.
+    isPurchasable: Boolean(row) && isPurchasableStatus(row.status) && price != null,
+  };
+}
+
 async function renderBinderProduct(supabaseClient, slugParam) {
   const product = resolveBinderProduct(slugParam);
   if (!product) {
@@ -818,21 +878,9 @@ async function renderBinderProduct(supabaseClient, slugParam) {
 
   const canonical = `${BASE_URL}/shop/binders/${product.slug}`;
   const images = binderImages(product);
-  const { data: row } = await supabaseClient
-    .from('shop_products')
-    .select('price_aud, retail_price_aud, stock_quantity, status')
-    .eq('slug', product.slug)
-    .maybeSingle();
-
-  const price = row?.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
-  const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
-    ? Number(row.retail_price_aud)
-    : null;
-  const inStock = row?.status === 'preorder' || (row?.stock_quantity ?? 0) > 0;
-  // Enquiry-only until a price is set: the page is complete and indexable
-  // without one, but no Offer is emitted for a product that can't be bought.
-  const isPurchasable = isPurchasableStatus(row?.status) && price != null;
-  const preorder = row?.status === 'preorder';
+  const { price, rrp, inStock, preorder, isPurchasable } = await loadShopLineCommerce(
+    supabaseClient, { slug: product.slug, sku: product.sku },
+  );
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -942,19 +990,9 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
 
   const canonical = `${BASE_URL}/shop/${category.slug}/${product.slug}`;
   const images = palmsOffImages(product);
-  const { data: row } = await supabaseClient
-    .from('shop_products')
-    .select('price_aud, retail_price_aud, stock_quantity, status')
-    .eq('slug', product.slug)
-    .maybeSingle();
-
-  const price = row && row.price_aud != null && Number(row.price_aud) > 0 ? Number(row.price_aud) : null;
-  const rrp = row && row.retail_price_aud != null && Number(row.retail_price_aud) > 0
-    ? Number(row.retail_price_aud)
-    : null;
-  const inStock = row?.status === 'preorder' || ((row && row.stock_quantity) || 0) > 0;
-  const isPurchasable = row && isPurchasableStatus(row.status) && price != null;
-  const preorder = row?.status === 'preorder';
+  const { price, rrp, inStock, preorder, isPurchasable } = await loadShopLineCommerce(
+    supabaseClient, { slug: product.slug, sku: product.sku },
+  );
   // Product copy wins where it exists; the product type's shared copy is the
   // fallback. FAQs stay type-level — they are genuinely shared within a type.
   const description = product.metaDescription
@@ -2967,7 +3005,7 @@ async function renderShopCollection(supabase, rawSlug) {
   const { data } = await supabase
     .from('shop_products')
     .select('id, title, slug, category, colour, family_sku, price_aud, images, image_url')
-    .eq('status', 'active')
+    .in('status', PUBLIC_SHOP_STATUSES)
     .or(orClause)
     .order('created_at', { ascending: false })
     .limit(50);

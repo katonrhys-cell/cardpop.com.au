@@ -102,7 +102,7 @@ export async function createSingleItemCheckout(req, res) {
 
     let { data: listing, error: listingErr } = await supabase
       .from('listings')
-      .select('id, price_aud, shipping_cost_aud, vault_item_id, seller_id, title, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
+      .select('id, price_aud, shipping_cost_aud, vault_item_id, seller_id, title, listing_type, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
       .eq('id', listingId)
       .eq('status', 'active')
       .maybeSingle();
@@ -113,7 +113,7 @@ export async function createSingleItemCheckout(req, res) {
     if (listingErr && /shipping_cost_aud/.test(listingErr.message || '')) {
       ({ data: listing, error: listingErr } = await supabase
         .from('listings')
-        .select('id, price_aud, vault_item_id, seller_id, title, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
+        .select('id, price_aud, vault_item_id, seller_id, title, listing_type, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
         .eq('id', listingId)
         .eq('status', 'active')
         .maybeSingle());
@@ -134,6 +134,26 @@ export async function createSingleItemCheckout(req, res) {
         return res.status(400).json({ error: resolved.error });
       }
       itemPrice = resolved.itemPrice;
+    }
+
+    // What can be bought, and at what price. Trade-only and Expression of
+    // Interest listings stay 'active' with price_aud = null, and there is no
+    // auction/bidding flow (bidId is never trusted, see below) — so a plain
+    // Buy Now is only for a buy-now ('fixed') listing with a real price; a null
+    // price would otherwise check out as $0 + postage. The one exception is a
+    // seller-consented offer resolved above: EOI listings sell ONLY that way,
+    // and a fixed listing may sell at an accepted offer's price. A null
+    // listing_type is a legacy buy-now row (same rule as utils/offerEligibility.js).
+    const listingType = listing.listing_type ?? 'fixed';
+    const purchasable = offerId
+      ? (listingType === 'fixed' || listingType === 'expression_of_interest')
+      : listingType === 'fixed';
+    if (!purchasable || !(Number(itemPrice) > 0)) {
+      return res.status(409).json({
+        error: listingType === 'expression_of_interest'
+          ? 'This listing sells by offer only — make an offer instead'
+          : 'This listing is not for sale at a fixed price',
+      });
     }
 
     // Derive the commission tier from server-side context, NEVER the request
@@ -337,7 +357,7 @@ export async function createSingleItemCheckout(req, res) {
       // reached from the Buy Now modal, which collects no address, so without
       // this an overseas buyer has nothing to fail. The country list is the
       // gate; the address it captures also lands on the order, since the
-      // webhook already falls back to session.shipping_details.
+      // webhook falls back to the session's collected shipping details.
       shipping_address_collection: { allowed_countries: ['AU'] },
       billing_address_collection: 'auto',
       line_items: lineItems,

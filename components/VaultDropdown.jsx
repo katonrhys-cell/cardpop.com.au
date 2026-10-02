@@ -1,10 +1,9 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, CheckCircle2, CalendarDays, Tv2 } from 'lucide-react';
+import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, Check, CalendarDays, Tv2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,11 +70,16 @@ const VaultDropdown = ({ isMobile = false }) => {
               <User className="h-5 w-5 text-foreground" />
             )}
             {isVerified && (
-              <div className="absolute -top-1 -right-1">
-                <Badge className="h-5 w-5 p-0 flex items-center justify-center rounded-full bg-emerald-500 text-white border-2 border-background shadow-sm hover:bg-emerald-600">
-                  <CheckCircle2 className="h-3 w-3" />
-                </Badge>
-              </div>
+              // Sits on the avatar's rim at the bottom-right (the 45° point of a
+              // 40px circle is ~6px in from the box corner), not at the corner
+              // of the square button box, where it floated outside the circle.
+              <span
+                className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-background"
+                aria-label="Verified"
+                role="img"
+              >
+                <Check className="h-2.5 w-2.5" strokeWidth={3.5} />
+              </span>
             )}
           </Button>
         )}

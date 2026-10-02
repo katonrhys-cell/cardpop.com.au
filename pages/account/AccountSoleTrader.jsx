@@ -40,7 +40,7 @@ const slugify = (s) => String(s || '')
   .replace(/-+$/g, '');
 
 const AccountSoleTrader = () => {
-  const { currentUser, isPro } = useAuth();
+  const { currentUser, isPro, refetchProfile } = useAuth();
   const [loading, setLoading]           = useState(false);
   const [pageLoading, setPageLoading]   = useState(true);
 
@@ -172,6 +172,8 @@ const AccountSoleTrader = () => {
       setExistingLogoUrl(business_logo_url);
       setStoreSlug(finalSlug);
       toast.success('Business profile saved!');
+      // No realtime push for profiles any more — refresh AuthContext's copy.
+      Promise.resolve(refetchProfile?.()).catch(() => {});
     } catch (err) {
       toast.error(err.message || 'Failed to save business profile.');
     } finally {

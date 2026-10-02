@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
   sortFamily, familyAsVariants, pickDefaultSibling, familyProductPath, productImages, fetchFamily, packagingFirst,
+  siblingAvailable, familyHasPurchasable,
 } from '@/utils/shopFamily.js';
 
 const S = (o) => ({ id: o.sku, title: `Zip Binder — ${o.colour}`, stock_quantity: 0, ...o });
@@ -25,6 +26,28 @@ describe('shop colour families', () => {
     expect(pickDefaultSibling(family).sku).toBe('ZB-04-BLK');
     expect(pickDefaultSibling([...family, S({ sku: 'ZB-04-PNK', colour: 'Pink', stock_quantity: 3 })]).sku).toBe('ZB-04-PNK');
     expect(pickDefaultSibling([])).toBeNull();
+  });
+
+  it('treats pre-order siblings as available (unlimited) and flags them for the picker', () => {
+    const withPreorder = [
+      S({ sku: 'ZB-04-BLK', colour: 'Black', status: 'active', stock_quantity: 0 }),
+      S({ sku: 'ZB-04-RED', colour: 'Red', status: 'preorder', stock_quantity: 0 }),
+    ];
+    // Sold-out active Black is skipped; the pre-order Red is the default.
+    expect(pickDefaultSibling(withPreorder).sku).toBe('ZB-04-RED');
+    const opts = familyAsVariants(withPreorder);
+    expect(opts.find((o) => o.sku === 'ZB-04-RED').preorder).toBe(true);
+    expect(opts.find((o) => o.sku === 'ZB-04-BLK').preorder).toBeUndefined();
+    expect(siblingAvailable(withPreorder[0])).toBe(false);
+    expect(siblingAvailable(withPreorder[1])).toBe(true);
+    // A coming-soon sibling with stock is not buyable.
+    expect(siblingAvailable({ status: 'coming_soon', stock_quantity: 4 })).toBe(false);
+  });
+
+  it('shows availability whenever any sibling is purchasable', () => {
+    expect(familyHasPurchasable([{ status: 'coming_soon' }, { status: 'preorder' }])).toBe(true);
+    expect(familyHasPurchasable([{ status: 'coming_soon' }])).toBe(false);
+    expect(familyHasPurchasable(family)).toBe(true); // no status → legacy rows
   });
 
   it('links to the sibling product page', () => {

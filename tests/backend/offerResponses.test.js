@@ -72,7 +72,7 @@ const patch = (body) => request(app).patch(`/${OFFER}`).set('Authorization', 'Be
 beforeEach(() => {
   vi.clearAllMocks();
   mockEqs.length = 0;
-  mockListing.mockResolvedValue({ data: { listing_type: 'fixed', price_aud: 4999, vault_item: { card_name: 'Kevin Durant RC' } } });
+  mockListing.mockResolvedValue({ data: { status: 'active', listing_type: 'fixed', price_aud: 4999, vault_item: { card_name: 'Kevin Durant RC' } } });
   mockProfiles.mockResolvedValue({
     data: [
       { id: SELLER, email: 'seller@example.com', display_name: 'Kat' },

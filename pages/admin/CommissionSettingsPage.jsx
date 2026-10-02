@@ -15,6 +15,14 @@ import { format, startOfMonth, subMonths } from 'date-fns';
 
 // ─── Fee Config Table ─────────────────────────────────────────────────────────
 
+/**
+ * GST CardPop collected on an order's own fees: platform_gst_aud (the GST
+ * inside commission + processing fee), plus gst_aud for legacy orders that
+ * added GST on top (always 0 for current orders).
+ */
+export const platformGstOf = (order) =>
+  (Number(order?.platform_gst_aud) || 0) + (Number(order?.gst_aud) || 0);
+
 const FeeRow = ({ row, onSave }) => {
   const [editing, setEditing] = useState(false);
   const [pct, setPct] = useState(String(row.fee_pct));
@@ -187,14 +195,17 @@ const CommissionSettingsPage = () => {
 
     const { data } = await supabase
       .from('orders')
-      .select('total_aud, platform_fee_aud, commission_pct, gst_aud, seller_proceeds_aud, created_at, status, transaction_type')
+      .select('total_aud, platform_fee_aud, commission_pct, gst_aud, platform_gst_aud, seller_proceeds_aud, created_at, status, transaction_type')
       .gte('created_at', since)
       .in('status', ['payment_confirmed', 'shipped', 'completed']);
 
     if (data) {
       const totalGross    = data.reduce((s, r) => s + (r.total_aud || 0), 0);
       const totalFees     = data.reduce((s, r) => s + (r.platform_fee_aud || 0), 0);
-      const totalGst      = data.reduce((s, r) => s + (r.gst_aud || 0), 0);
+      // Every price is GST-inclusive now, so gst_aud (GST added on top) is
+      // always 0; platform_gst_aud is the GST inside CardPop's own commission
+      // and processing fee. gst_aud is kept for legacy add-on-top orders.
+      const totalGst      = data.reduce((s, r) => s + platformGstOf(r), 0);
       const totalProceeds = data.reduce((s, r) => s + (r.seller_proceeds_aud || 0), 0);
       setStats({ totalGross, totalFees, totalGst, totalProceeds, orderCount: data.length });
     }
@@ -205,7 +216,7 @@ const CommissionSettingsPage = () => {
     setLoadingTx(true);
     const { data } = await supabase
       .from('orders')
-      .select('id, created_at, total_aud, item_price_aud, platform_fee_aud, commission_pct, gst_aud, seller_proceeds_aud, transaction_type, status, buyer:profiles!buyer_id(username), seller:profiles!seller_id(username)')
+      .select('id, created_at, total_aud, item_price_aud, platform_fee_aud, commission_pct, gst_aud, platform_gst_aud, seller_proceeds_aud, transaction_type, status, buyer:profiles!buyer_id(username), seller:profiles!seller_id(username)')
       .order('created_at', { ascending: false })
       .range(txPage * TX_PAGE_SIZE, (txPage + 1) * TX_PAGE_SIZE - 1);
     setTransactions(data || []);
@@ -236,13 +247,13 @@ const CommissionSettingsPage = () => {
   const exportCsv = async () => {
     const { data } = await supabase
       .from('orders')
-      .select('id, created_at, total_aud, item_price_aud, platform_fee_aud, commission_pct, gst_aud, seller_proceeds_aud, transaction_type, status')
+      .select('id, created_at, total_aud, item_price_aud, platform_fee_aud, commission_pct, gst_aud, platform_gst_aud, seller_proceeds_aud, transaction_type, status')
       .order('created_at', { ascending: false })
       .limit(5000);
 
     if (!data?.length) { toast.info('No data to export'); return; }
 
-    const headers = ['ID', 'Date', 'Total AUD', 'Item Price', 'Platform Fee', 'Commission %', 'GST', 'Seller Proceeds', 'Type', 'Status'];
+    const headers = ['ID', 'Date', 'Total AUD', 'Item Price', 'Platform Fee', 'Commission %', 'Platform GST', 'Seller Proceeds', 'Type', 'Status'];
     const rows = data.map(r => [
       r.id,
       format(new Date(r.created_at), 'yyyy-MM-dd HH:mm'),
@@ -250,7 +261,7 @@ const CommissionSettingsPage = () => {
       r.item_price_aud,
       r.platform_fee_aud,
       r.commission_pct,
-      r.gst_aud,
+      platformGstOf(r).toFixed(2),
       r.seller_proceeds_aud,
       r.transaction_type,
       r.status,
@@ -323,7 +334,7 @@ const CommissionSettingsPage = () => {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard label="Gross Sales"      value={`$${(stats?.totalGross    ?? 0).toFixed(2)}`} sub={`${stats?.orderCount ?? 0} orders`} icon={DollarSign} />
           <StatCard label="Platform Revenue" value={`$${(stats?.totalFees     ?? 0).toFixed(2)}`} sub="Fees collected"                      icon={TrendingUp}  color="text-emerald-500" />
-          <StatCard label="GST Collected"    value={`$${(stats?.totalGst      ?? 0).toFixed(2)}`} sub="10% of commission"                   icon={DollarSign}  color="text-amber-500" />
+          <StatCard label="GST on Platform Fees" value={`$${(stats?.totalGst ?? 0).toFixed(2)}`} sub="Included in commission + processing fee" icon={DollarSign}  color="text-amber-500" />
           <StatCard label="Seller Proceeds"  value={`$${(stats?.totalProceeds ?? 0).toFixed(2)}`} sub="After fees"                          icon={DollarSign}  color="text-blue-500" />
         </div>
       </section>
@@ -449,7 +460,7 @@ const CommissionSettingsPage = () => {
             <table className="w-full min-w-[700px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
-                  {['Date', 'Buyer', 'Seller', 'Type', 'Item Price', 'Fee', 'GST', 'Total', 'Status'].map(h => (
+                  {['Date', 'Buyer', 'Seller', 'Type', 'Item Price', 'Fee', 'Fee GST', 'Total', 'Status'].map(h => (
                     <th key={h} className="py-3 px-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -473,7 +484,7 @@ const CommissionSettingsPage = () => {
                     </td>
                     <td className="py-3 px-4 text-xs font-mono">${(tx.item_price_aud || 0).toFixed(2)}</td>
                     <td className="py-3 px-4 text-xs font-mono text-emerald-600">${(tx.platform_fee_aud || 0).toFixed(2)}</td>
-                    <td className="py-3 px-4 text-xs font-mono text-amber-600">${(tx.gst_aud || 0).toFixed(2)}</td>
+                    <td className="py-3 px-4 text-xs font-mono text-amber-600">${platformGstOf(tx).toFixed(2)}</td>
                     <td className="py-3 px-4 text-xs font-mono font-bold">${(tx.total_aud || 0).toFixed(2)}</td>
                     <td className="py-3 px-4">
                       <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'} className="text-xs capitalize">

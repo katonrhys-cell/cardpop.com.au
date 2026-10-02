@@ -129,7 +129,7 @@ const VaultProfilePage = () => {
         .from('profiles')
         .update(updatePayload)
         .eq('id', currentUser.id)
-        .select()
+        .select(PUBLIC_PROFILE_COLUMNS)
         .single();
 
       if (updateError) throw updateError;

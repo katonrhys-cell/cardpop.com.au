@@ -529,7 +529,7 @@ const DISPUTE_TERMINAL = ['resolved_released', 'resolved_kept'];
 // payoutService.reverseSellerPayout's cart branch). Each line's payout record
 // is refreshed with the new transfer, and the order's payout_status leaves
 // 'frozen' the same way payoutSeller would set it for a single-item order.
-async function releaseCartLinePayouts(order, lines, reversedLines) {
+async function releaseCartLinePayouts(order, lines, reversedLines, disputeId) {
   let transferred = 0;
   let walletCredited = 0;
   let failed = 0;
@@ -538,6 +538,8 @@ async function releaseCartLinePayouts(order, lines, reversedLines) {
       sellerId: line.seller_id,
       sellerProceeds: Number(line.payout.proceeds),
       listingId: line.id ?? null,
+      // One transfer per (dispute, line), however many times release runs.
+      idempotencyKey: `dispute-release-${disputeId}-${line.id ?? line.seller_id}`,
     }).catch(e => {
       logger.error(`[ADMIN] cart release payout failed for seller ${line.seller_id} (order ${order.id}): ${e.message}`);
       return { status: 'failed' };
@@ -545,11 +547,16 @@ async function releaseCartLinePayouts(order, lines, reversedLines) {
     if (result.status === 'transferred') transferred += 1;
     else if (result.status === 'wallet_credited') walletCredited += 1;
     else failed += 1;
+    const released = result.status === 'transferred' || result.status === 'wallet_credited';
     line.payout = {
       ...line.payout,
       status: result.status,
       transferId: result.transferId || null,
       releasedAt: new Date().toISOString(),
+      // Marks this line as paid for THIS dispute, so a retry after a partial
+      // failure (the dispute is re-opened, below) only pays the lines that
+      // didn't go out — never a line twice.
+      ...(released && disputeId ? { releasedForDispute: disputeId } : {}),
     };
   }
   const status = transferred > 0 ? 'transferred' : walletCredited > 0 ? 'wallet_credited' : 'failed';
@@ -651,55 +658,103 @@ router.patch('/disputes/:id', validateRequestParams(resolveDisputeSchema), valid
       .from('payment_disputes').select('*').eq('id', id).maybeSingle();
     if (fetchErr) throw fetchErr;
     if (!dispute) return res.status(404).json({ error: 'Dispute not found' });
+    // Resolution is one-shot. A repeated 'release' (double click, retry, two
+    // admins) used to pay the seller again on every request. resolved_at is
+    // checked too: charge.dispute.closed overwrites status with Stripe's own
+    // ('won' / 'lost'), which would otherwise make a released dispute look open.
+    if (DISPUTE_TERMINAL.includes(dispute.status) || dispute.resolved_at) {
+      return res.status(409).json({ error: 'This dispute has already been resolved' });
+    }
 
-    let payout = null;
+    // Look up the order (release only) BEFORE claiming, so a missing order
+    // leaves the dispute untouched.
+    let order = null;
     if (action === 'release') {
-      // Look up the order to recover the exact proceeds owed to the seller.
-      const { data: order } = await supabase
+      ({ data: order } = await supabase
         .from('orders')
         .select('id, seller_id, listing_id, seller_proceeds_aud, order_items')
         .eq('id', dispute.order_id)
-        .maybeSingle();
+        .maybeSingle());
       if (!order) return res.status(404).json({ error: 'Order for this dispute no longer exists' });
-
-      // Cart orders carry seller_id = null and record each seller's payout on
-      // the order_items line (line.payout) — handleDisputeCreated reversed
-      // those line by line, so release must re-issue them line by line too.
-      // Calling payoutSeller with the order-level columns here returned
-      // { status: 'none' } and paid nobody while reporting success.
-      const lines = Array.isArray(order.order_items) ? order.order_items : [];
-      const reversedLines = lines.filter(l => l?.seller_id && l?.payout
-        && ['transferred', 'wallet_credited'].includes(l.payout.status)
-        && Number(l.payout.proceeds) > 0);
-      if (reversedLines.length > 0) {
-        payout = await releaseCartLinePayouts(order, lines, reversedLines);
-      } else {
-        payout = await payoutSeller(stripe, {
-          sellerId: order.seller_id,
-          sellerProceeds: order.seller_proceeds_aud,
-          orderId: order.id,
-          listingId: order.listing_id,
-        });
-      }
     }
 
+    // Claim the resolution atomically BEFORE any money moves: only the request
+    // whose conditional update gets the row back may pay. A concurrent or
+    // repeated request matches nothing and gets a 409.
     const newStatus = action === 'release' ? 'resolved_released' : 'resolved_kept';
-    const { data: updated, error: updErr } = await supabase
+    const now = new Date().toISOString();
+    const { data: claimed, error: claimErr } = await supabase
       .from('payment_disputes')
       .update({
         status: newStatus,
         resolution_notes: resolution_notes?.trim() || null,
         resolved_by: req.user.id,
-        resolved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        resolved_at: now,
+        updated_at: now,
       })
       .eq('id', id)
+      .eq('status', dispute.status)
+      .is('resolved_at', null)
       .select()
-      .single();
-    if (updErr) throw updErr;
+      .maybeSingle();
+    if (claimErr) throw claimErr;
+    if (!claimed) return res.status(409).json({ error: 'This dispute has already been resolved' });
+
+    // Put the dispute back the way it was, so a release whose payout failed can
+    // be retried (lines already paid are skipped, and the transfers carry
+    // idempotency keys, so a retry can't pay anyone twice).
+    const unclaim = async () => {
+      const { error: undoErr } = await supabase
+        .from('payment_disputes')
+        .update({
+          status: dispute.status,
+          resolution_notes: dispute.resolution_notes ?? null,
+          resolved_by: null,
+          resolved_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('status', newStatus);
+      if (undoErr) logger.error(`[ADMIN] Could not re-open dispute ${id} after a failed release: ${undoErr.message}`);
+    };
+
+    let payout = null;
+    if (action === 'release') {
+      try {
+        // Cart orders carry seller_id = null and record each seller's payout on
+        // the order_items line (line.payout) — handleDisputeCreated reversed
+        // those line by line, so release must re-issue them line by line too.
+        // Calling payoutSeller with the order-level columns here returned
+        // { status: 'none' } and paid nobody while reporting success.
+        const lines = Array.isArray(order.order_items) ? order.order_items : [];
+        const reversedLines = lines.filter(l => l?.seller_id && l?.payout
+          && ['transferred', 'wallet_credited'].includes(l.payout.status)
+          && Number(l.payout.proceeds) > 0
+          && l.payout.releasedForDispute !== id);
+        if (reversedLines.length > 0) {
+          payout = await releaseCartLinePayouts(order, lines, reversedLines, id);
+        } else {
+          payout = await payoutSeller(stripe, {
+            sellerId: order.seller_id,
+            sellerProceeds: order.seller_proceeds_aud,
+            orderId: order.id,
+            listingId: order.listing_id,
+            idempotencyKey: `dispute-release-${id}`,
+          });
+        }
+      } catch (payErr) {
+        await unclaim();
+        throw payErr;
+      }
+      if (payout?.status === 'failed' || Number(payout?.failed) > 0) {
+        await unclaim();
+        logger.error(`[ADMIN] ${req.user.id} release of dispute ${id} failed to pay out — dispute re-opened for retry`);
+        return res.status(502).json({ error: 'The seller payout failed — the dispute is still open, try releasing it again', payout });
+      }
+    }
 
     logger.info(`[ADMIN] ${req.user.id} resolved dispute ${id} → ${newStatus}${payout ? ` (payout: ${payout.status})` : ''}`);
-    res.json({ success: true, dispute: updated, payout });
+    res.json({ success: true, dispute: claimed, payout });
   } catch (err) {
     logger.error(`[ADMIN] Failed to resolve dispute: ${err.message}`);
     res.status(500).json({ error: 'Failed to resolve dispute' });

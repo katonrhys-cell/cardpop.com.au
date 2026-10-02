@@ -33,7 +33,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/admin/AdminPageHeader.jsx', () => ({ default: ({ title, children }) => <div><h1>{title}</h1>{children}</div> }));
 vi.mock('@/components/admin/OrderDetailDialog.jsx', () => ({ default: () => null }));
 
-import OrderManagementPage from '@/pages/admin/OrderManagementPage.jsx';
+import OrderManagementPage, { pickOrderRefund, ordersToCsv } from '@/pages/admin/OrderManagementPage.jsx';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
@@ -81,5 +81,37 @@ describe('OrderManagementPage', () => {
     await user.type(screen.getByPlaceholderText(/search by order/i), '60CBB06E');
     await waitFor(() => expect(screen.queryByText('Jordan Carnelley')).not.toBeInTheDocument());
     expect(screen.getByText('Ryan Conway')).toBeInTheDocument();
+  });
+});
+
+describe('pickOrderRefund', () => {
+  it('prefers the active refund over an older rejected one', () => {
+    // newest first, as the page queries them
+    const rows = [
+      { id: 'r2', status: 'pending', created_at: '2026-09-20' },
+      { id: 'r1', status: 'rejected', created_at: '2026-09-10' },
+    ];
+    expect(pickOrderRefund(rows).id).toBe('r2');
+    expect(pickOrderRefund([{ id: 'r9', status: 'rejected' }, rows[0]]).id).toBe('r2');
+  });
+
+  it('falls back to the latest rejected refund, or null', () => {
+    expect(pickOrderRefund([{ id: 'a', status: 'rejected' }, { id: 'b', status: 'rejected' }]).id).toBe('a');
+    expect(pickOrderRefund([])).toBeNull();
+    expect(pickOrderRefund(null)).toBeNull();
+  });
+});
+
+describe('ordersToCsv', () => {
+  it('exports one row per order with buyer, totals and status', () => {
+    const csv = ordersToCsv(ORDERS).trim().split('\n');
+    expect(csv).toHaveLength(3);
+    expect(csv[0]).toMatch(/^Order id,Order date,Buyer,/);
+    expect(csv[1]).toContain('42d5b6ed-8a99-428f-bfbf-18f63ee3fa97');
+    expect(csv[1]).toContain('Jordan Carnelley');
+    expect(csv[1]).toContain('jordan@example.com');
+    expect(csv[1]).toContain('50.96');
+    expect(csv[2]).toContain('Ryan Conway');
+    expect(csv[2]).toContain('cancelled');
   });
 });

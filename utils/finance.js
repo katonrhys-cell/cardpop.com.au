@@ -165,6 +165,40 @@ export const shopSalesLines = (orders = [], costsById = new Map()) => {
   return out;
 };
 
+/**
+ * The CardPop Shop's share of an order's shipping, in cents: shipping_aud
+ * minus the marketplace sellers' postage carried on listing lines.
+ */
+export const shopShippingCents = (order) => {
+  const lines = Array.isArray(order?.order_items) ? order.order_items : [];
+  const sellerPostage = lines
+    .filter((l) => l && !isShopLine(l))
+    .reduce((s, l) => s + toCents(l.shipping_aud), 0);
+  return Math.max(0, toCents(order?.shipping_aud) - sellerPostage);
+};
+
+/**
+ * Commission CardPop deducts from the seller's payout on an order, in cents.
+ * Commission is earned twice — charged to the buyer (platform_fee_aud) AND
+ * deducted from the seller (see cartService / checkoutService, and
+ * platform_gst_aud, which is the GST inside 2 × commission + processing fee).
+ * Cart orders carry it per listing line (commission_aud); single-item orders
+ * deduct the same commission the buyer was charged.
+ */
+export const sellerCommissionCents = (order) => {
+  const lines = Array.isArray(order?.order_items) ? order.order_items : [];
+  const listingLines = lines.filter((l) => l && !isShopLine(l));
+  if (listingLines.some((l) => l.commission_aud != null)) {
+    return listingLines.reduce((s, l) => s + toCents(l.commission_aud), 0);
+  }
+  if (listingLines.length > 0 || (lines.length === 0 && order?.seller_id)) {
+    // platform_fee_aud bundles any legacy GST added on top; the seller's
+    // deduction is the commission alone.
+    return Math.max(0, toCents(order?.platform_fee_aud) - toCents(order?.gst_aud));
+  }
+  return 0;
+};
+
 /** Shop P&L for a set of (already period-filtered) orders. */
 export const summariseShopSales = (orders = [], costsById = new Map(), refunds = []) => {
   const lines = shopSalesLines(orders, costsById);
@@ -180,10 +214,13 @@ export const summariseShopSales = (orders = [], costsById = new Map(), refunds =
     return acc;
   }, { revenueInc: 0, gst: 0, revenueEx: 0, cogsEx: 0, gstCredits: 0, units: 0, missing: 0, currentCost: 0 });
 
-  // Shipping charged on shop orders (order.shipping_aud where the order has
-  // any shop line) is CardPop revenue too, GST-inclusive.
+  // Shipping charged on shop orders is CardPop revenue too, GST-inclusive.
+  // On a mixed cart order.shipping_aud = the shop's flat rate + each
+  // marketplace seller's postage, and the seller's postage (recorded as
+  // shipping_aud on that seller's parcel-defining listing line) is passed
+  // through to the seller — so it is taken back out here.
   const shopOrders = (orders || []).filter((o) => isPaidOrder(o) && (Array.isArray(o.order_items) ? o.order_items : []).some(isShopLine));
-  const shippingInc = shopOrders.reduce((s, o) => s + toCents(o.shipping_aud), 0);
+  const shippingInc = shopOrders.reduce((s, o) => s + shopShippingCents(o), 0);
   const shippingGst = gstInsideCents(shippingInc);
   const orderIds = new Set(shopOrders.map((o) => o.id));
   const refunded = (refunds || []).filter((r) => isSettledRefund(r) && orderIds.has(r.order_id)).reduce((s, r) => s + toCents(r.refund_amount_aud), 0);
@@ -217,20 +254,26 @@ export const summariseMarketplace = (orders = []) => {
     const lines = Array.isArray(o.order_items) ? o.order_items : [];
     const hasListing = lines.some((l) => l && !isShopLine(l)) || (lines.length === 0 && o.seller_id);
     if (hasListing) acc.orders += 1;
-    acc.commissionInc += toCents(o.platform_fee_aud);
+    acc.buyerCommissionInc += toCents(o.platform_fee_aud);
+    acc.sellerCommissionInc += sellerCommissionCents(o);
     acc.processingFeeInc += toCents(o.processing_fee_aud);
     acc.platformGst += toCents(o.platform_gst_aud);
     acc.sellerGst += toCents(o.seller_gst_aud);
     acc.sellerProceeds += toCents(o.seller_proceeds_aud);
     acc.gstAddedOnTop += toCents(o.gst_aud);
     return acc;
-  }, { orders: 0, commissionInc: 0, processingFeeInc: 0, platformGst: 0, sellerGst: 0, sellerProceeds: 0, gstAddedOnTop: 0 });
-  // platform_fee_aud is commission + the GST inside it; processing fee is
-  // GST-inclusive too. platform_gst_aud is the GST inside both.
-  const feesInc = t.commissionInc + t.processingFeeInc;
+  }, { orders: 0, buyerCommissionInc: 0, sellerCommissionInc: 0, processingFeeInc: 0, platformGst: 0, sellerGst: 0, sellerProceeds: 0, gstAddedOnTop: 0 });
+  // Commission is earned on both sides: charged to the buyer (platform_fee_aud)
+  // and deducted from the seller's payout. Both, and the processing fee, are
+  // GST-inclusive; platform_gst_aud is the GST inside all three, so revenue
+  // has to include the seller-side commission for feesEx to be consistent.
+  const commissionInc = t.buyerCommissionInc + t.sellerCommissionInc;
+  const feesInc = commissionInc + t.processingFeeInc;
   return {
     orderCount: t.orders,
-    commissionInc: fromCents(t.commissionInc),
+    buyerCommissionInc: fromCents(t.buyerCommissionInc),
+    sellerCommissionInc: fromCents(t.sellerCommissionInc),
+    commissionInc: fromCents(commissionInc),
     processingFeeInc: fromCents(t.processingFeeInc),
     feesInc: fromCents(feesInc),
     platformGst: fromCents(t.platformGst),
@@ -298,11 +341,36 @@ export const inventoryValuation = (products = [], costsById = new Map()) => {
   };
 };
 
+// ─── Loading ─────────────────────────────────────────────────────────────────
+
+/**
+ * Read every row of a query, page by page. PostgREST caps an unranged select
+ * (1000 rows by default), which silently truncated the report. `makeQuery`
+ * builds a fresh, stably ordered query; it is called once per page with
+ * .range(from, to) applied here. Resolves to { data, error }.
+ */
+export const fetchAllPages = async (makeQuery, pageSize = 1000, maxPages = 1000) => {
+  const all = [];
+  for (let page = 0; page < maxPages; page += 1) {
+    const from = page * pageSize;
+    const { data, error } = await makeQuery().range(from, from + pageSize - 1);
+    if (error) return { data: null, error };
+    const rows = data || [];
+    all.push(...rows);
+    if (rows.length < pageSize) break;
+  }
+  return { data: all, error: null };
+};
+
 // ─── CSV export ──────────────────────────────────────────────────────────────
 
 const csvCell = (v) => {
   if (v == null) return '';
-  const s = typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : String(v);
+  let s = typeof v === 'number' ? (Number.isInteger(v) ? String(v) : v.toFixed(2)) : String(v);
+  // Spreadsheet formula injection: user-supplied text (names, titles) that
+  // starts with = + - @ would run as a formula when the CSV is opened.
+  // Plain numeric strings (e.g. a negative margin '-5.3') are left alone.
+  if (typeof v !== 'number' && /^[=+\-@\t\r]/.test(s) && !/^-?\d+(\.\d+)?$/.test(s)) s = `'${s}`;
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
