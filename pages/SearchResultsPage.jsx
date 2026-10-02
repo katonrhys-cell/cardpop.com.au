@@ -221,6 +221,7 @@ const SearchResultsPage = () => {
       const tokens = tokenizeSearch(query);
       if (safe.length < 2 || tokens.length === 0) {
         setGroups({ listings: [], shop: [], sellers: [], blog: [], events: [] });
+        setDidYouMean(null);
         setLoading(false);
         return;
       }
@@ -273,7 +274,10 @@ const SearchResultsPage = () => {
 
       <div className="max-w-2xl mx-auto text-center mb-12">
         <h1 className="text-3xl md:text-4xl font-bold font-heading mb-6">Search CardPop</h1>
-        <SearchBar initialQuery={query} className="mx-auto" placeholder="Search cards, supplies, sellers, guides, events..." />
+        {/* Keyed on the query so the box shows the current search after a header
+            search, a "Did you mean" click or Clear Search (SearchBar only reads
+            initialQuery on mount). */}
+        <SearchBar key={query} initialQuery={query} className="mx-auto" placeholder="Search cards, supplies, sellers, guides, events..." />
       </div>
 
       <div className="mb-8 flex items-center justify-between">
@@ -281,9 +285,11 @@ const SearchResultsPage = () => {
           {loading ? 'Searching…' : <>{total} result{total === 1 ? '' : 's'} {query && <span>for "{query}"</span>}</>}
         </h2>
         {query && (
-          <Badge variant="outline" className="cursor-pointer" onClick={() => setSearchParams({})}>
-            Clear Search ✕
-          </Badge>
+          <button type="button" onClick={() => setSearchParams({})} className="rounded-pill focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <Badge variant="outline" className="cursor-pointer">
+              Clear Search ✕
+            </Badge>
+          </button>
         )}
       </div>
 
