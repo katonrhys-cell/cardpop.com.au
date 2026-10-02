@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Admin Shop Products: the table is split into Shop-menu sections, columns
 // sort on click, and the status cards filter the list.
@@ -42,6 +42,8 @@ const productNames = () => screen.getAllByRole('row')
   .filter((t) => t && !t.includes('·'));
 
 describe('ProductManagementPage filters, sorting and sections', () => {
+  beforeEach(() => window.localStorage.clear());
+
   it('groups products under their Shop section and category', async () => {
     renderPage();
     expect(await screen.findByText('Protection')).toBeInTheDocument();
@@ -70,5 +72,30 @@ describe('ProductManagementPage filters, sorting and sections', () => {
     expect(screen.getByText('1 of 3')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /Clear \(1\)/ }));
     expect(productNames()).toHaveLength(3);
+  });
+
+  it('collapses and expands sections and categories, remembering the choice', async () => {
+    const user = userEvent.setup();
+    const { unmount } = renderPage();
+    await screen.findByText('Protection');
+    expect(productNames()).toHaveLength(3);
+
+    await user.click(screen.getByRole('button', { name: /Top Loaders · 2/ }));
+    expect(productNames()).toEqual(['Bubble Mailers 10 Pack']);
+    expect(screen.getByRole('button', { name: /Top Loaders · 2/ })).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(screen.getByRole('button', { name: /Shipping/ }));
+    expect(productNames()).toEqual([]);
+    expect(screen.queryByText('Bubble Mailers · 1')).not.toBeInTheDocument();
+
+    unmount();
+    renderPage();
+    await screen.findByText('Protection');
+    expect(productNames()).toEqual([]);
+
+    await user.click(screen.getByRole('button', { name: /Expand all/ }));
+    expect(productNames()).toHaveLength(3);
+    await user.click(screen.getByRole('button', { name: /Collapse all/ }));
+    expect(productNames()).toEqual([]);
   });
 });
