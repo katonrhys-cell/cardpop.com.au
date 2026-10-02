@@ -81,10 +81,10 @@ async function getPlatformSetting(key, defaultValue) {
 // having to check email or refresh Admin -> Orders. Best-effort — a failure
 // here must never re-throw and turn a fulfilled order into a webhook 500
 // (which Stripe would retry).
-export async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+export async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }) {
   try {
     const to = await getAdminNotificationEmails();
-    await sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName });
+    await sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary });
   } catch (e) {
     logger.warn(`[STRIPE] admin order notice email failed for order ${orderId || 'n/a'}: ${e.message}`);
   }
@@ -101,8 +101,8 @@ export async function notifyAdminOfOrder({ orderId, buyerName, buyerEmail, total
       const { error: insertErr } = await supabase.from('notifications').insert(admins.map(a => ({
         user_id: a.id,
         type: 'order_placed',
-        title: 'New order placed',
-        body: `${buyerName || 'A buyer'} placed ${amount} order for ${itemsSummary || 'an item'}${sellerName ? ` from ${sellerName}` : ''}.`,
+        title: preorderSummary ? 'New pre-order placed' : 'New order placed',
+        body: `${buyerName || 'A buyer'} placed ${amount} order for ${itemsSummary || 'an item'}${sellerName ? ` from ${sellerName}` : ''}.${preorderSummary ? ` Pre-order: ${preorderSummary}.` : ''}`,
         link: '/admin/orders',
         related_id: orderId,
       })));
@@ -613,6 +613,8 @@ async function handleCartOrder(existing, session, stripe) {
       name: l.title || l.name || l.card_name || 'Item',
       quantity: l.quantity || 1,
       total: Number(l.line_total_aud ?? l.price_aud ?? l.price ?? 0),
+      // The dispatch estimate the buyer bought with (snapshotted by cartService).
+      ...(l.preorder ? { preorderEta: l.preorder_eta || 'Ships when stock arrives' } : {}),
     }));
     await sendOrderConfirmed({
       buyerEmail: receiptEmail,
@@ -679,6 +681,13 @@ async function handleCartOrder(existing, session, stripe) {
         : `${sellerIds.size} marketplace seller${sellerIds.size === 1 ? '' : 's'}`;
     }
 
+    // Pre-order lines are paid for but can't ship yet — say so up front so
+    // they aren't packed with the in-stock part of the order by mistake.
+    const preorderLines = lines.filter(l => l.preorder);
+    const preorderSummary = preorderLines.length
+      ? preorderLines.map(l => `${l.title || 'Item'}${(l.quantity || 1) > 1 ? ` ×${l.quantity}` : ''} (${l.preorder_eta || 'ships when stock arrives'})`).join('; ')
+      : null;
+
     await notifyAdminOfOrder({
       orderId: existing.id,
       buyerName: receiptName,
@@ -686,6 +695,7 @@ async function handleCartOrder(existing, session, stripe) {
       total: amountCents2 / 100,
       itemsSummary,
       sellerName,
+      preorderSummary,
     });
   }
 

@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields } from '@/utils/shopStock.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -155,6 +155,7 @@ const ShopCategoryPage = () => {
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
       grade: product.grade || null,
+      ...preorderCartFields(product),
     };
     const cartVariant = {
       id: product.id,

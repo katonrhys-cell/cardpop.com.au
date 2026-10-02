@@ -7,6 +7,7 @@ import { PAID_TIERS } from '../config/plans.js';
 import { BINDER_SLUGS } from '../data/shopBinderProducts.js';
 import { PALMS_OFF_PRODUCTS } from '../data/palmsOffCatalogue.js';
 import { shopProductBasePath, legacyShopProductPath } from '../utils/shopProductUrl.js';
+import { PUBLIC_SHOP_STATUSES } from '../utils/shopStock.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -190,7 +191,7 @@ export default async function handler(req, res) {
         supabase
           .from('shop_products')
           .select('id, title, slug, category, colour, family_sku, updated_at, created_at')
-          .in('status', ['active', 'coming_soon'])
+          .in('status', PUBLIC_SHOP_STATUSES)
           .order('created_at', { ascending: false })
           .limit(500),
         supabase

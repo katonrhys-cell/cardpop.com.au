@@ -16,8 +16,11 @@ import { colourRank } from '@/utils/colourSwatch.js';
 export { colourListText, sortColourNames } from '@/utils/colourSwatch.js';
 
 /** Columns a colour picker needs from each sibling. */
-export const FAMILY_SELECT =
+export const FAMILY_SELECT_BASE =
   'id, sku, title, slug, category, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
+
+/** With the pre-order estimate (shop_products.preorder_eta). */
+export const FAMILY_SELECT = `${FAMILY_SELECT_BASE}, preorder_eta`;
 
 /** Siblings in swatch order (stable, colour-less rows last). */
 export function sortFamily(siblings) {
@@ -80,9 +83,15 @@ export function productImages(row) {
 export async function fetchFamily(supabase, familySku, statuses) {
   if (!familySku) return [];
   try {
-    let query = supabase.from('shop_products').select(FAMILY_SELECT).eq('family_sku', familySku);
-    if (statuses?.length) query = query.in('status', statuses);
-    const { data, error } = await query;
+    const run = (columns) => {
+      let query = supabase.from('shop_products').select(columns).eq('family_sku', familySku);
+      if (statuses?.length) query = query.in('status', statuses);
+      return query;
+    };
+    let { data, error } = await run(FAMILY_SELECT);
+    // The site can deploy before the preorder_eta migration lands — retry
+    // without it rather than losing the colour picker for the window.
+    if (error && /preorder_eta/.test(error.message || '')) ({ data, error } = await run(FAMILY_SELECT_BASE));
     if (error) return [];
     return sortFamily(data || []);
   } catch {

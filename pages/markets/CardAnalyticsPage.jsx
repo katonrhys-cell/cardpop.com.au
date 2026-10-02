@@ -23,6 +23,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
 } from 'recharts';
+import { PURCHASABLE_SHOP_STATUSES } from '@/utils/shopStock.js';
 
 // ─── Seeded PRNG for consistent demo data per card ──────────────────────────
 const makePrng = (str) => {
@@ -259,7 +260,7 @@ const CardAnalyticsPage = () => {
     const term = cardName.split(' ')[0].replace(/"/g, '');
 
     Promise.all([
-      supabase.from('shop_products').select('*').ilike('title', `%${term}%`).eq('status', 'active').order('price_aud').limit(6).then(r => r.data ?? []),
+      supabase.from('shop_products').select('*').ilike('title', `%${term}%`).in('status', PURCHASABLE_SHOP_STATUSES).order('price_aud').limit(6).then(r => r.data ?? []),
       supabase.from('vault_items').select(`*, ${VAULT_ITEM_LISTING_EMBED}`).ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
       if (!cancelled) {

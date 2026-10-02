@@ -186,3 +186,40 @@ describe('offerAdminNoticeEmail (admin)', () => {
     expect(html).not.toContain('<a href="https://evil.example">click</a>');
   });
 });
+
+describe('pre-order emails', () => {
+  const invoice = (items) => ({ items, subtotal: 100, total: 100, gst: 0, gstIncluded: 9.09, shipping: 0, discount: 0 });
+
+  it('marks pre-order lines on the receipt and explains dispatch', () => {
+    const html = orderConfirmedEmail({
+      buyerName: 'Ash', cardName: '2 items', itemPrice: 100, total: 100, orderId: 'abc12345',
+      invoice: invoice([{ name: 'Sleeves', quantity: 1, total: 10 }, { name: 'Booster Box', quantity: 1, total: 90, preorderEta: 'Ships in 4–6 weeks' }]),
+    });
+    expect(html).toContain('Pre-order &middot; Ships in 4–6 weeks');
+    expect(html).toContain('Your order includes pre-order items.');
+  });
+
+  it('escapes the estimate', () => {
+    const html = orderConfirmedEmail({
+      buyerName: 'Ash', cardName: 'x', itemPrice: 1, total: 1, orderId: 'o',
+      invoice: invoice([{ name: 'Box', quantity: 1, total: 1, preorderEta: XSS }]),
+    });
+    expect(html).not.toContain(XSS);
+  });
+
+  it('leaves a normal receipt alone', () => {
+    const html = orderConfirmedEmail({
+      buyerName: 'Ash', cardName: 'x', itemPrice: 1, total: 1, orderId: 'o',
+      invoice: invoice([{ name: 'Box', quantity: 1, total: 1 }]),
+    });
+    expect(html).not.toContain('pre-order');
+    expect(html).not.toContain('Pre-order');
+  });
+
+  it('flags a pre-order to the admin so it is not packed early', () => {
+    const html = orderAdminNoticeEmail({ orderId: 'o1', buyerName: 'Ash', buyerEmail: 'a@b.co', total: 90, itemsSummary: '1 item — Box', preorderSummary: 'Box (Ships in 4–6 weeks)' });
+    expect(html).toContain('New Pre-order');
+    expect(html).toContain('Box (Ships in 4–6 weeks)');
+    expect(orderAdminNoticeEmail({ orderId: 'o1', total: 1, itemsSummary: 'x' })).not.toContain('Pre-order');
+  });
+});

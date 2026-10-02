@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields } from '@/utils/shopStock.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -137,6 +137,7 @@ const ShopSinglesPage = () => {
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
       grade: product.grade || null,
+      ...preorderCartFields(product),
     };
     const cartVariant = {
       id: product.id,

@@ -16,6 +16,8 @@ import { format, differenceInDays } from 'date-fns';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
 import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
+import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
+import { orderPreorderLines } from '@/utils/shopStock.js';
 
 // Order states in which the buyer has something real to review — the seller
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
@@ -181,10 +183,21 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
         </Badge>
       </div>
 
-      {/* Item name */}
+      {/* Item name — cart orders carry their lines in order_items. */}
       <p className="font-semibold text-foreground">
-        {order.listing?.vault_item?.card_name || 'Trading Card Purchase'}
+        {order.listing?.vault_item?.card_name
+          || (Array.isArray(order.order_items) && order.order_items.map((l) => l?.title).filter(Boolean).join(', '))
+          || 'Trading Card Purchase'}
       </p>
+
+      {/* Pre-ordered items: the estimate given at checkout, until it ships. */}
+      {order.status === 'payment_confirmed' && orderPreorderLines(order).map((l, i) => (
+        <PreorderNotice
+          key={`${l.id || i}-${l.variant_id || ''}`}
+          variant="inline"
+          eta={`${l.title || 'Item'} — ${l.preorder_eta || 'ships when stock arrives'}`}
+        />
+      ))}
 
       {/* Financials */}
       <div className="grid grid-cols-3 gap-3 text-xs">

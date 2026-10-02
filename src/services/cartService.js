@@ -1,6 +1,9 @@
 import { supabase } from '../utils/supabaseClient.js';
 import { calculateBreakdown, calculateProcessingFee, calculateGst, gstInsideCents } from './commissionService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
+import { isPurchasableStatus, isPreorder, preorderEta } from '../../utils/shopStock.js';
+
+const SHOP_COLUMNS = 'id, title, price_aud, stock_quantity, status, variants:shop_product_variants(id, sku, colour, barcode, stock_quantity, price_aud, status)';
 
 /**
  * Price a cart server-side.
@@ -58,13 +61,29 @@ export async function priceCart(items, userId) {
     if (type === 'shop') {
       // Variants ride along in the same query so a product with colours costs
       // no extra round trip (and the per-item query count stays at one).
-      const { data: product, error } = await supabase
+      let { data: product, error } = await supabase
         .from('shop_products')
-        .select('id, title, price_aud, stock_quantity, status, variants:shop_product_variants(id, sku, colour, barcode, stock_quantity, price_aud, status)')
+        .select(`${SHOP_COLUMNS}, preorder_eta`)
         .eq('id', id)
         .maybeSingle();
+      // Vercel can redeploy before `supabase db push` lands the preorder_eta
+      // migration — retry without the column (no product can be a pre-order
+      // yet, so nothing is lost) rather than 500ing every shop checkout.
+      if (error && /preorder_eta/.test(error.message || '')) {
+        ({ data: product, error } = await supabase
+          .from('shop_products')
+          .select(SHOP_COLUMNS)
+          .eq('id', id)
+          .maybeSingle());
+      }
       if (error) throw error;
-      if (!product || product.status !== 'active') throw httpError(404, 'A shop product in your cart is unavailable');
+      // `active` and `preorder` are both on sale; anything else (coming soon,
+      // draft, archived) is refused however the cart line got here.
+      if (!product || !isPurchasableStatus(product.status)) throw httpError(404, 'A shop product in your cart is unavailable');
+      // Pre-orders are charged now and dispatched when stock arrives. Stock is
+      // the pre-order allocation, so the checks below still cap them.
+      const preorder = isPreorder(product);
+      const eta = preorder ? preorderEta(product) : '';
 
       // A product with colour variants is sold per variant: the line must name
       // one (a single-variant product is resolved automatically), stock is the
@@ -80,6 +99,9 @@ export async function priceCart(items, userId) {
         throw httpError(409, `Not enough stock for ${product.title}`);
       }
       const lineTitle = variant?.colour ? `${product.title} — ${variant.colour}` : product.title;
+      // The Stripe Checkout page and Stripe receipt show this name,
+      // so a pre-order says so (with its estimate) at the moment of payment.
+      const stripeName = preorder ? `${lineTitle} (Pre-order — ${eta})` : lineTitle;
 
       // The advertised shop price is GST-inclusive, so the buyer pays exactly
       // the ticket price — the GST is the tax component already inside it
@@ -93,7 +115,7 @@ export async function priceCart(items, userId) {
       includedGstCents += lineGstCents;
 
       lineItems.push({
-        price_data: { currency: 'aud', product_data: { name: lineTitle }, unit_amount: unitCents },
+        price_data: { currency: 'aud', product_data: { name: stripeName.slice(0, 250) }, unit_amount: unitCents },
         quantity,
       });
       orderLines.push({
@@ -101,6 +123,11 @@ export async function priceCart(items, userId) {
         quantity, unit_price_aud: unitCents / 100, line_total_aud: lineCents / 100,
         commission_aud: 0, gst_aud: lineGstCents / 100,
         ...(variant ? { variant_id: variant.id, variant_sku: variant.sku, variant_colour: variant.colour || null, variant_barcode: variant.barcode || null } : {}),
+        // Snapshot of the promise made at purchase time: the receipt, order
+        // history and Admin → Order Management read these, so a later edit to
+        // the product's estimate (or flipping it to active) doesn't rewrite
+        // what this buyer was told.
+        ...(preorder ? { preorder: true, preorder_eta: eta } : {}),
       });
     } else if (type === 'listing') {
       let { data: listing, error } = await supabase
@@ -272,6 +299,9 @@ export async function priceCart(items, userId) {
 
   return {
     lineItems, orderLines, itemsCents, commissionCents,
+    // True when any line is a pre-order — checkout echoes it so the buyer's
+    // order summary can warn that part of the order ships later.
+    hasPreorder: orderLines.some((l) => l.preorder === true),
     // Nothing is added on top of the buyer's bill any more: gstCents stays 0 so
     // every caller that reported an "added GST" line reports none.
     gstCents,

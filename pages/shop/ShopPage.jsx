@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER, preorderCartFields } from '@/utils/shopStock.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -124,6 +124,7 @@ const ShopPage = () => {
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
       grade: product.grade || null,
+      ...preorderCartFields(product),
     };
     const cartVariant = {
       id: product.id,

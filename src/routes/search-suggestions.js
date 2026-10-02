@@ -2,6 +2,7 @@ import logger from "../utils/logger.js";
 import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { findBestMatches, getDidYouMean } from '../../utils/fuzzyMatch.js';
+import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
 
 const router = Router();
 
@@ -49,7 +50,7 @@ router.get('/', async (req, res) => {
     const { data: shopProducts, error: productsError } = await supabase
       .from('shop_products')
       .select('title')
-      .in('status', ['active', 'coming_soon'])
+      .in('status', PUBLIC_SHOP_STATUSES)
       .ilike('title', `%${safeQ}%`)
       .limit(limit)
       .order('title');

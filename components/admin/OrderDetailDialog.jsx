@@ -5,6 +5,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertCircle, Package, MapPin, Truck } from 'lucide-react';
 import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
+import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient } from '@/lib/apiServerClient.js';
 import { format } from 'date-fns';
@@ -171,6 +172,8 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
                       <div className="min-w-0">
                         <p className="font-medium text-foreground truncate">{item.title || 'Item'}</p>
                         <p className="text-xs text-muted-foreground">Qty {item.quantity || 1}</p>
+                        {/* The estimate the buyer was given at checkout. */}
+                        {item.preorder && <PreorderNotice variant="inline" eta={item.preorder_eta || 'Ships when stock arrives'} className="mt-0.5" />}
                       </div>
                       <p className="font-medium tabular-nums shrink-0">{fmt(item.line_total_aud)}</p>
                     </div>

@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import { resolveShopCollection } from '@/data/shopCollectionConfigs.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
-import { isSoldOut, isComingSoon, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { isSoldOut, isComingSoon, isPreorder, PUBLIC_SHOP_STATUSES, preorderCartFields } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { DEFAULT_FACET_KEYS, filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
@@ -53,6 +53,7 @@ const MiniProductCard = ({ product, accentHex }) => {
   const detailPath = shopProductPath(product);
   const comingSoon = isComingSoon(product);
   const soldOut = !comingSoon && isSoldOut(product);
+  const preorder = !comingSoon && !soldOut && isPreorder(product);
 
   return (
     <Link
@@ -63,6 +64,11 @@ const MiniProductCard = ({ product, accentHex }) => {
         {comingSoon && (
           <span className="absolute top-2 right-2 z-10 rounded-md bg-brand-charcoal px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white shadow-md">
             Coming soon
+          </span>
+        )}
+        {preorder && (
+          <span className="absolute top-2 right-2 z-10 rounded-md border border-brand-red bg-brand-white px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-brand-red shadow-md">
+            Pre-order
           </span>
         )}
         {soldOut && (
@@ -282,6 +288,7 @@ const ShopCollectionPage = () => {
       title: product.title,
       price: priceInCents / 100,
       image: product.images?.[0] || product.image_url || product.card_image || null,
+      ...preorderCartFields(product),
     };
     const cartVariant = {
       id: product.id,
