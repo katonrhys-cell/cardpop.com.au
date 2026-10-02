@@ -36,6 +36,13 @@ const STATUS_OPTIONS = [
   { value: 'archived', label: 'Archived — hidden from the marketplace' },
 ];
 const VALID_STATUSES = STATUS_OPTIONS.map((o) => o.value);
+// A listing held for admin approval keeps its 'pending' status through an
+// edit — mapping it to 'active' would publish it without review. The option
+// is only offered for a listing that is already pending.
+const PENDING_OPTION = { value: 'pending', label: 'Pending approval — awaiting review' };
+const statusOptionsFor = (listing) => (
+  listing?.status === 'pending' ? [PENDING_OPTION, ...STATUS_OPTIONS] : STATUS_OPTIONS
+);
 
 // Sale mode maps to (listing_type, accepts_trade). "For Sale & Trade" stays a
 // fixed-price listing that also accepts trade offers — see migration
@@ -172,9 +179,12 @@ const AccountListings = () => {
 
   const openEdit = (listing) => {
     setEditListing(listing);
-    setNewStatus(VALID_STATUSES.includes(listing.status) ? listing.status : 'active');
+    setNewStatus(
+      listing.status === 'pending' || VALID_STATUSES.includes(listing.status) ? listing.status : 'active',
+    );
     setSaleMode(saleModeOf(listing));
-    setAcceptsOffers(listing.accepts_offers ?? false);
+    // The DB treats a null accepts_offers as on (column default true).
+    setAcceptsOffers(listing.accepts_offers ?? true);
   };
 
   // A saved style is reflected in place — no refetch for a cosmetic change.
@@ -283,7 +293,7 @@ const AccountListings = () => {
                             <StatusIcon className="w-3 h-3 mr-1.5 inline-block" />
                             {cfg.label}
                           </Badge>
-                          {listing.accepts_offers && (
+                          {listing.accepts_offers !== false && (
                             <Badge variant="outline" className="font-bold text-xs w-fit bg-primary/5 text-primary border-primary/30">
                               <Tag className="w-3 h-3 mr-1 inline-block" /> Offers On
                             </Badge>
@@ -345,7 +355,7 @@ const AccountListings = () => {
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {STATUS_OPTIONS.map((o) => (
+                  {statusOptionsFor(editListing).map((o) => (
                     <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                   ))}
                 </SelectContent>

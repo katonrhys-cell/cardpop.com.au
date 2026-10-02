@@ -16,7 +16,7 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const AccountProfile = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, refetchProfile } = useAuth();
   const [loading, setLoading] = useState(false);
 
   const [formData, setFormData] = useState({
@@ -122,6 +122,9 @@ const AccountProfile = () => {
       setAvatarFile(null);
       setRemoveAvatar(false);
       toast.success('Profile updated successfully!');
+      // profiles left the realtime publication, so nothing pushes the change
+      // back into AuthContext — refresh it so the header/avatar update now.
+      Promise.resolve(refetchProfile?.()).catch(() => {});
     } catch (err) {
       toast.error(err.message || 'Failed to update profile.');
     } finally {

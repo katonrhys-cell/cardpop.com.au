@@ -347,6 +347,32 @@ export const AuthProvider = ({ children }) => {
 
   // ── Supabase native TOTP MFA ──────────────────────────────────────────────
 
+  // mfa.verify() resolves with the session's tokens at the top level
+  // ({ access_token, refresh_token, expires_in, token_type, user }) — there is
+  // no `data.session`. A successful verify means the session is now AAL2, so
+  // clear mfaRequired unconditionally rather than waiting for the assurance
+  // re-check (which made the login page flash), and adopt the upgraded
+  // tokens. supabase-js has already persisted them and will also emit
+  // MFA_CHALLENGE_VERIFIED with the canonical session.
+  const applyVerifiedSession = (data) => {
+    const upgraded = data?.session
+      ?? (data?.access_token
+        ? {
+            access_token: data.access_token,
+            refresh_token: data.refresh_token,
+            token_type: data.token_type,
+            expires_in: data.expires_in,
+            expires_at: data.expires_at ?? Math.round(Date.now() / 1000) + (Number(data.expires_in) || 0),
+            user: data.user,
+          }
+        : null);
+    if (upgraded?.access_token) {
+      setSession(upgraded);
+      if (upgraded.user) setCurrentUser(upgraded.user);
+    }
+    setMfaRequired(false);
+  };
+
   // Start enrollment: returns { id, totp: { qr_code, secret, uri } }
   const enrollTOTP = async () => {
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp' });
@@ -365,11 +391,7 @@ export const AuthProvider = ({ children }) => {
       code,
     });
     if (error) throw new Error(error.message);
-    if (data.session) {
-      setSession(data.session);
-      setCurrentUser(data.session.user);
-      setMfaRequired(false);
-    }
+    applyVerifiedSession(data);
     return data;
   };
 
@@ -396,11 +418,7 @@ export const AuthProvider = ({ children }) => {
       code,
     });
     if (error) throw new Error(error.message);
-    if (data.session) {
-      setSession(data.session);
-      setCurrentUser(data.session.user);
-      setMfaRequired(false);
-    }
+    applyVerifiedSession(data);
     return data;
   };
 
