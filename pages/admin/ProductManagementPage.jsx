@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3 } from 'lucide-react';
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, FolderTree } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
+import ShopCategoryManager from '@/components/admin/ShopCategoryManager.jsx';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import {
   SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
@@ -75,6 +77,9 @@ const ProductManagementPage = () => {
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+  const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
+  // Built-in + admin-added categories, minus removed ones.
+  const { groups: categoryGroups } = useShopCategoryGroups();
   const isMounted = useRef(true);
 
   const fetchProducts = async () => {
@@ -135,12 +140,12 @@ const ProductManagementPage = () => {
   };
 
   const filteredProducts = useMemo(
-    () => sortProducts(filterProducts(products, filters, { variantsByProduct }), sortKey, sortDir, { costs }),
+    () => sortProducts(filterProducts(products, filters, { variantsByProduct, groups: categoryGroups }), sortKey, sortDir, { costs }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [products, variantsByProduct, costs, searchParams],
+    [products, variantsByProduct, costs, searchParams, categoryGroups],
   );
-  const sections = useMemo(() => groupProducts(filteredProducts), [filteredProducts]);
-  const categoryChoices = useMemo(() => categoryOptions(products, filters.section), [products, filters.section]);
+  const sections = useMemo(() => groupProducts(filteredProducts, categoryGroups), [filteredProducts, categoryGroups]);
+  const categoryChoices = useMemo(() => categoryOptions(products, filters.section, categoryGroups), [products, filters.section, categoryGroups]);
   const brandChoices = useMemo(() => brandOptions(products), [products]);
   const activeFilterCount = ['section', 'category', 'status', 'brand'].filter((k) => filters[k] !== 'all').length + (searchTerm ? 1 : 0);
 
@@ -219,6 +224,9 @@ const ProductManagementPage = () => {
         title="Shop Products"
         subtitle="Manage official catalog and inventory."
       >
+        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setIsCategoriesOpen(true)}>
+          <FolderTree className="w-4 h-4" /> Categories
+        </Button>
         <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => { setEditingProduct(null); setIsAddModalOpen(true); }}>
           <Plus className="w-4 h-4" /> New Product
         </Button>
@@ -369,6 +377,8 @@ const ProductManagementPage = () => {
           </Table>
         </div>
       </Card>
+
+      <ShopCategoryManager open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} products={products} />
 
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-background rounded-2xl border-border p-0">

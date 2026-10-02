@@ -13,18 +13,27 @@ export const OTHER_SECTION = 'Other';
 export const UNCATEGORISED = 'Uncategorised';
 
 // Category name (lower-cased) → { section, sectionIndex, categoryIndex }, so
-// sections and categories list in the same order as the Shop menu.
-const CATEGORY_INDEX = new Map();
-SHOP_CATEGORY_GROUPS.forEach((group, sectionIndex) => {
-  group.items.forEach((item, categoryIndex) => {
-    CATEGORY_INDEX.set(item.name.toLowerCase(), { section: group.label, sectionIndex, categoryIndex });
+// sections and categories list in the same order as the Shop menu. Built per
+// groups list: the page passes the admin-edited groups (custom categories
+// added, removed ones dropped — hooks/useShopCategoryGroups.js), so a removed
+// category's products fall into "Other" where they can't hide.
+const INDEX_CACHE = new WeakMap();
+function categoryIndex(groups = SHOP_CATEGORY_GROUPS) {
+  if (INDEX_CACHE.has(groups)) return INDEX_CACHE.get(groups);
+  const index = new Map();
+  groups.forEach((group, sectionIndex) => {
+    group.items.forEach((item, idx) => {
+      index.set(item.name.toLowerCase(), { section: group.label, sectionIndex, categoryIndex: idx });
+    });
   });
-});
+  INDEX_CACHE.set(groups, index);
+  return index;
+}
 
 export const SECTION_NAMES = [...SHOP_CATEGORY_GROUPS.map((g) => g.label), OTHER_SECTION];
 
-export function sectionOf(product) {
-  return CATEGORY_INDEX.get(String(product?.category || '').trim().toLowerCase())?.section ?? OTHER_SECTION;
+export function sectionOf(product, groups) {
+  return categoryIndex(groups).get(String(product?.category || '').trim().toLowerCase())?.section ?? OTHER_SECTION;
 }
 
 function categoryLabel(product) {
@@ -61,14 +70,15 @@ function numberOrNull(v) {
  *
  * @param {object[]} products
  * @param {object} filters  { search, section, category, status, brand } — '' / 'all' means no filter
- * @param {object} [ctx]    { variantsByProduct } — colour SKUs/barcodes/colours are searchable too
+ * @param {object} [ctx]    { variantsByProduct, groups } — colour SKUs/barcodes/colours are searchable too;
+ *                          `groups` is the (admin-edited) taxonomy used for sections
  */
 export function filterProducts(products, filters = {}, ctx = {}) {
   const term = String(filters.search || '').trim().toLowerCase();
   const on = (v) => v && v !== 'all';
   return (products || []).filter((p) => {
     if (on(filters.status) && p.status !== filters.status) return false;
-    if (on(filters.section) && sectionOf(p) !== filters.section) return false;
+    if (on(filters.section) && sectionOf(p, ctx.groups) !== filters.section) return false;
     if (on(filters.category) && categoryLabel(p) !== filters.category) return false;
     if (on(filters.brand) && (String(p.brand || '').trim() || 'CardPop') !== filters.brand) return false;
     if (!term) return true;
@@ -105,10 +115,11 @@ export function sortProducts(products, sortKey = 'title', direction = 'asc', ctx
  *
  * @returns {{ section: string, count: number, categories: { category: string, products: object[] }[] }[]}
  */
-export function groupProducts(products) {
+export function groupProducts(products, groups) {
+  const index = categoryIndex(groups);
   const sections = new Map();
   for (const p of products || []) {
-    const section = sectionOf(p);
+    const section = sectionOf(p, groups);
     const category = categoryLabel(p);
     if (!sections.has(section)) sections.set(section, new Map());
     const cats = sections.get(section);
@@ -119,7 +130,7 @@ export function groupProducts(products) {
     const i = SECTION_NAMES.indexOf(name);
     return i === -1 ? SECTION_NAMES.length : i;
   };
-  const categoryRank = (name) => CATEGORY_INDEX.get(name.toLowerCase())?.categoryIndex ?? Number.MAX_SAFE_INTEGER;
+  const categoryRank = (name) => index.get(name.toLowerCase())?.categoryIndex ?? Number.MAX_SAFE_INTEGER;
   return [...sections.entries()]
     .sort(([a], [b]) => sectionRank(a) - sectionRank(b))
     .map(([section, cats]) => {
@@ -131,13 +142,13 @@ export function groupProducts(products) {
 }
 
 /** Distinct categories present in the list (optionally within one section), Shop-menu order. */
-export function categoryOptions(products, section) {
+export function categoryOptions(products, section, groups) {
   const names = new Set();
   for (const p of products || []) {
-    if (section && section !== 'all' && sectionOf(p) !== section) continue;
+    if (section && section !== 'all' && sectionOf(p, groups) !== section) continue;
     names.add(categoryLabel(p));
   }
-  return groupProducts([...names].map((category) => ({ category: category === UNCATEGORISED ? '' : category })))
+  return groupProducts([...names].map((category) => ({ category: category === UNCATEGORISED ? '' : category })), groups)
     .flatMap((s) => s.categories.map((c) => c.category));
 }
 

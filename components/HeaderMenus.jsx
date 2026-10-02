@@ -18,7 +18,7 @@ import {
   ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2, ScanLine,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
-import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
+import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -384,7 +384,8 @@ const ShopDropdown = ({ onNavigate }) => {
   // flyout is predictable rather than stuck on whatever the user last hovered.
   useEffect(() => { if (!open) setActiveSlug(null); }, [open]);
 
-  const activeGroup = SHOP_CATEGORY_GROUPS.find(g => g.slug === activeSlug) || null;
+  const { groups: shopGroups } = useShopCategoryGroups();
+  const activeGroup = shopGroups.find(g => g.slug === activeSlug) || null;
 
   return (
     <div className="relative" ref={ref} onPointerEnter={handlePointerEnter} onPointerLeave={handlePointerLeave}>
@@ -418,7 +419,7 @@ const ShopDropdown = ({ onNavigate }) => {
           <div className="flex">
             {/* Parent categories — hover/focus opens the panel on the right */}
             <div className={`w-[292px] shrink-0 p-3 ${activeGroup ? 'border-r border-border' : ''}`}>
-              {SHOP_CATEGORY_GROUPS.map(group => {
+              {shopGroups.map(group => {
                 const isActive = group.slug === activeSlug;
                 return (
                   // The parent navigates to the group's supply collection page;
@@ -774,6 +775,7 @@ const MoreDropdown = ({ onNavigate }) => {
 const MobileShopSection = ({ onNavigate }) => {
   const [open, setOpen] = useState(false);
   const [openGroups, setOpenGroups] = useState(() => new Set());
+  const { groups: shopGroups } = useShopCategoryGroups();
 
   const toggleGroup = (slug) => {
     startTransition(() => {
@@ -808,7 +810,7 @@ const MobileShopSection = ({ onNavigate }) => {
               Shop All Supplies
             </Link>
           </SheetClose>
-          {SHOP_CATEGORY_GROUPS.map(group => {
+          {shopGroups.map(group => {
             const groupOpen = openGroups.has(group.slug);
             return (
               <div key={group.slug}>

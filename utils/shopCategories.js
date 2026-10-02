@@ -4,9 +4,11 @@
 // pages and the editable data never drift apart).
 //
 // Each leaf `name` is exactly what gets stored in shop_products.category, so the
-// category pages match products with a simple ILIKE on that name. Adding a new
-// category is a one-line edit here — the menu, page and admin picker pick it up
-// automatically.
+// category pages match products with a simple ILIKE on that name. Admins can
+// also add/remove leaf categories without a deploy (Admin → Products →
+// Categories): those live in the shop_categories table and are merged over this
+// list by mergeShopCategoryGroups() below — components read the merged list via
+// hooks/useShopCategoryGroups.js.
 import {
   Frame,
   Layers, Sparkles, Layers2, CreditCard, Magnet, ShieldCheck,
@@ -114,22 +116,67 @@ export const SHOP_CATEGORY_GROUPS = [
 ];
 
 // Flat list of every leaf category, each tagged with its parent group.
-export const SHOP_CATEGORIES = SHOP_CATEGORY_GROUPS.flatMap((group) =>
-  group.items.map((item) => ({
-    ...item,
-    group: group.label,
-    groupSlug: group.slug,
-    gradient: group.gradient,
-    blurb: group.blurb,
-    // Keep the leaf's own icon (the ...item spread sets it as `Icon`) available
-    // under `LeafIcon` before we overwrite `Icon` with the parent group's icon,
-    // so consumers that want the specific category icon (e.g. the category page
-    // hero) can still reach it while the shared `Icon` stays the group icon.
-    LeafIcon: item.Icon,
-    Icon: group.Icon,
-  }))
-);
+// Keeps the leaf's own icon under `LeafIcon` before `Icon` is overwritten with
+// the parent group's, so consumers that want the specific category icon (e.g.
+// the category page hero) can still reach it.
+export const SHOP_CATEGORIES = flattenShopCategoryGroups(SHOP_CATEGORY_GROUPS);
 
 // Resolve a /shop/category/<slug> param to its leaf category (or null).
 export const findShopCategory = (slug) =>
   SHOP_CATEGORIES.find((c) => c.slug === slug) || null;
+
+// ---------------------------------------------------------------------------
+// Admin-editable overlay (shop_categories table, Admin → Products →
+// Categories). Rows either add a leaf under an existing group or hide one by
+// name. Pure so it's testable; hooks/useShopCategoryGroups.js feeds it the rows.
+
+// Same rules as utils/shopProductUrl.js slugify, so a custom category's page
+// slug matches the /shop/<category-slug>/… product URLs built from its name.
+const slugifyName = (str = '') => String(str)
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[̀-ͯ]/g, '')
+  .replace(/[^a-z0-9\s-]/g, ' ')
+  .trim()
+  .replace(/\s+/g, '-')
+  .replace(/-+/g, '-');
+
+const nameKey = (name) => String(name || '').trim().toLowerCase();
+
+/**
+ * Apply shop_categories rows to the built-in groups.
+ *
+ * @param {object[]} groups  SHOP_CATEGORY_GROUPS (or a test fixture)
+ * @param {object[]} rows    { id, section_slug, name, description, hidden }
+ * @returns groups with hidden leaves dropped and custom leaves appended; each
+ *          custom leaf is flagged `custom: true` and carries its row `id`.
+ */
+export function mergeShopCategoryGroups(groups, rows = []) {
+  const hidden = new Set((rows || []).filter((r) => r.hidden).map((r) => nameKey(r.name)));
+  const additions = (rows || []).filter((r) => !r.hidden && nameKey(r.name));
+  return groups.map((group) => {
+    const items = group.items.filter((item) => !hidden.has(nameKey(item.name)));
+    const taken = new Set(items.map((item) => nameKey(item.name)));
+    for (const row of additions) {
+      if (row.section_slug !== group.slug || taken.has(nameKey(row.name))) continue;
+      taken.add(nameKey(row.name));
+      const name = String(row.name).trim();
+      items.push({ id: row.id, name, slug: slugifyName(name), Icon: Tag, desc: row.description || '', custom: true });
+    }
+    return { ...group, items };
+  });
+}
+
+/** Flatten (merged) groups into leaves the same way SHOP_CATEGORIES is built. */
+export function flattenShopCategoryGroups(groups) {
+  return groups.flatMap((group) =>
+    group.items.map((item) => ({
+      ...item,
+      group: group.label,
+      groupSlug: group.slug,
+      gradient: group.gradient,
+      blurb: group.blurb,
+      LeafIcon: item.Icon,
+      Icon: group.Icon,
+    })));
+}
