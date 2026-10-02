@@ -31,6 +31,9 @@ vi.mock('../../src/middleware/auth.js', () => ({
   },
 }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
+// Admin promo-code lookups (promo_codes) get their own mock so they don't
+// consume the queued partner/listing reads. Default: no such promo code.
+const mockPromoMaybeSingle = vi.hoisted(() => vi.fn());
 // The buy-side identity gate (requireIdentityForMarketplacePurchase) reads
 // profiles.is_verified for the authenticated buyer. Default it to a verified
 // buyer so the existing checkout tests exercise the happy path; tests that want
@@ -65,7 +68,11 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     q.single = () => Promise.resolve({ data: null, error: null });
     // The identity gate's profiles lookup uses its own mock so it doesn't
     // consume the generic listing/offer mock the handlers rely on.
-    q.maybeSingle = () => (table === 'profiles' ? mockProfileMaybeSingle() : mockMaybeSingle());
+    q.maybeSingle = () => {
+      if (table === 'profiles') return mockProfileMaybeSingle();
+      if (table === 'promo_codes') return mockPromoMaybeSingle();
+      return mockMaybeSingle();
+    };
     q.insert = (payload) => (table === 'orders'
       ? mockOrdersInsert(payload)
       : Promise.resolve({ data: null, error: null }));
@@ -106,6 +113,7 @@ const MOCK_LISTING = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockMaybeSingle.mockResolvedValue({ data: MOCK_LISTING, error: null });
+  mockPromoMaybeSingle.mockResolvedValue({ data: null, error: null });
   // Buyer is identity-verified by default (passes the marketplace buy gate).
   mockProfileMaybeSingle.mockResolvedValue({ data: { is_verified: true }, error: null });
   // Pending-order insert succeeds by default.
@@ -716,6 +724,79 @@ describe('POST /calculate-cart', () => {
     // nothing says so.
     expect(res.body.promoError).toBe('This code applies to CardPop Shop items only.');
     expect(res.body.totalAud).toBe(204.24);
+  });
+
+  // Admin promo codes (Admin → Promo Codes) are matched before partner codes.
+  const promoRow = (overrides = {}) => mockPromoMaybeSingle.mockResolvedValueOnce({
+    data: {
+      id: 'promo-1', code: 'SPRING25', discount_pct: 25, applies_to: 'shop',
+      usage_type: 'ongoing', max_redemptions: null, once_per_customer: false,
+      min_order_aud: null, max_discount_aud: null, starts_at: null, expires_at: null,
+      issued_to_email: null, restrict_to_email: false, active: true,
+      ...overrides,
+    },
+    error: null,
+  });
+  const shopCard = () => mockMaybeSingle.mockResolvedValueOnce({
+    data: { id: 'p1', title: 'Single Card', price_aud: 50, stock_quantity: 5, status: 'active' },
+    error: null,
+  });
+  const pricePromo = (code = 'SPRING25') => request(app).post('/calculate-cart').send({
+    items: [{ type: 'shop', id: 'p1', quantity: 1 }],
+    promoCode: code,
+  });
+
+  it('applies an admin promo code’s percentage to the shop subtotal', async () => {
+    promoRow();
+    gstSettings();
+    shopCard();
+    shippingSettings(9.95, 100);
+    const res = await pricePromo('spring25');
+    expect(res.status).toBe(200);
+    expect(res.body.promoError).toBeNull();
+    // 25% of the $50 shop subtotal.
+    expect(res.body.discountAud).toBe(12.5);
+    expect(res.body.totalAud).toBe(48.97);
+  });
+
+  it('caps a promo discount at its maximum dollar amount', async () => {
+    promoRow({ discount_pct: 50, max_discount_aud: 10 });
+    gstSettings();
+    shopCard();
+    shippingSettings(9.95, 100);
+    const res = await pricePromo();
+    expect(res.body.discountAud).toBe(10);
+  });
+
+  it('reports an expired promo code without discounting', async () => {
+    promoRow({ expires_at: new Date(Date.now() - 60_000).toISOString() });
+    gstSettings();
+    shopCard();
+    shippingSettings(9.95, 100);
+    const res = await pricePromo();
+    expect(res.status).toBe(200);
+    expect(res.body.promoError).toBe('That promo code has expired.');
+    expect(res.body.discountAud).toBe(0);
+  });
+
+  it('refuses a code locked to someone else’s email', async () => {
+    promoRow({ restrict_to_email: true, issued_to_email: 'friend@example.com' });
+    gstSettings();
+    shopCard();
+    shippingSettings(9.95, 100);
+    const res = await pricePromo();
+    expect(res.body.promoError).toBe('That promo code isn’t valid for your account.');
+    expect(res.body.discountAud).toBe(0);
+  });
+
+  it('enforces a minimum spend', async () => {
+    promoRow({ min_order_aud: 80 });
+    gstSettings();
+    shopCard();
+    shippingSettings(9.95, 100);
+    const res = await pricePromo();
+    expect(res.body.promoError).toMatch(/minimum spend of \$80\.00/);
+    expect(res.body.discountAud).toBe(0);
   });
 });
 

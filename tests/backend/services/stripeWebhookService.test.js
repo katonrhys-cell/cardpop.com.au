@@ -8,6 +8,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 const mockReleaseWelcomeDiscount = vi.hoisted(() => vi.fn());
 const mockReleaseWalletCheckout = vi.hoisted(() => vi.fn());
+const mockReleasePromoRedemption = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../../src/utils/emailService.js', () => ({
@@ -19,6 +20,9 @@ vi.mock('../../../src/services/welcomeOfferService.js', () => ({
   markWelcomeDiscountRedeemed: vi.fn(), releaseWelcomeDiscount: mockReleaseWelcomeDiscount,
 }));
 vi.mock('../../../src/services/partnerService.js', () => ({ recordShopOrderReferral: vi.fn() }));
+vi.mock('../../../src/services/promoCodeService.js', () => ({
+  markPromoRedeemed: vi.fn(), releasePromoRedemption: mockReleasePromoRedemption,
+}));
 vi.mock('../../../src/services/walletService.js', () => ({
   debitWalletForOrder: vi.fn(), releaseWalletCheckout: mockReleaseWalletCheckout,
 }));
@@ -129,6 +133,14 @@ describe('handleCheckoutSessionExpired', () => {
     await handleCheckoutSessionExpired({ id: 'cs_2', metadata: { welcomeOfferId: 'wo-9' } });
 
     expect(mockReleaseWelcomeDiscount).toHaveBeenCalledWith('wo-9');
+  });
+
+  it('releases a reserved promo-code use when the abandoned session held one', async () => {
+    queueFrom(builder({ value: { data: [], error: null } }));
+
+    await handleCheckoutSessionExpired({ id: 'cs_4', metadata: { promoRedemptionId: 'red-7' } });
+
+    expect(mockReleasePromoRedemption).toHaveBeenCalledWith('red-7');
   });
 
   it('releases the wallet-checkout slot when the abandoned session was wallet-funded', async () => {

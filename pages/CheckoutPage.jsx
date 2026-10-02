@@ -215,7 +215,7 @@ const CheckoutPage = () => {
     .map(i => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1, ...(i.variant?.variant_id ? { variantId: i.variant.variant_id } : {}) }))
     .filter(i => i.id);
 
-  // Promo code (welcome offer or partner referral code). `promoCode` is the
+  // Promo code (welcome offer, admin promo code or partner referral code). `promoCode` is the
   // applied code (sent to the server for validation and pricing); `promoInput`
   // is just the field state. A ?ref=CODE partner link captured earlier in the
   // session pre-fills and auto-applies — the server rejects it harmlessly if
