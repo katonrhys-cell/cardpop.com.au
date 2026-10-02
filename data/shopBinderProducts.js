@@ -300,13 +300,13 @@ const BINDER_ROWS = [
     metaDescription:
       'Nine 35pt top loaders to a page in a zipped, archival-safe binder — the highest-capacity way to store loaded cards without unloading them. Eight colours, shipped Australia-wide.',
     intro:
-      "The nine-pocket version of the top loader binder is the one traders end up carrying. Nine loaders to a page means a full trade binder fits in a single volume rather than three, and because every card stays inside its loader, a binder that gets opened and flipped through a dozen times at an event is not putting wear on the cards themselves. Same Collector's Series construction as the rest of the range: metal zip, padded PU cover, felt lining.",
+      "The nine-pocket version of the top loader binder is the one traders end up carrying. Nine loaders to a page means a full trade binder fits in a single volume rather than three, and because every card stays inside its loader, a binder that gets opened and flipped through a dozen times at an event is not putting wear on the cards themselves. Same Collector's Series construction as the rest of the range, metal zip and padded PU cover, with velvet-lined inside covers.",
     highlights: [
       'Pockets sized for standard 35pt top loaders — nine per page',
       'The highest-capacity loaded-card layout Palms Off Gaming makes',
       'Cards stay inside their loaders, so they are never handled to be filed',
       'Full-perimeter metal zip keeps the pages sealed in transit',
-      'Padded textured PU leather cover with a polyester felt inner lining',
+      'Padded textured PU leather cover with velvet-lined inside covers',
       'Available in eight colours',
     ],
     faqs: [
@@ -492,7 +492,11 @@ export const binderSpecs = (product) => [
     ? [{ label: 'Pockets per page', value: String(product.pocketsPerPage) }]
     : []),
   { label: 'Holds', value: product.holds },
-  ...(product.range === "Collector's Series" && product.sku !== 'RB-BLK' ? collectorsSeriesBuild : []),
+  // Range-wide build rows, unless a binder's own verified spec overrides the
+  // same label (e.g. TOP-09's velvet-lined inner cover).
+  ...(product.range === "Collector's Series" && product.sku !== 'RB-BLK'
+    ? collectorsSeriesBuild.filter((row) => !(product.specs || []).some((s) => s.label === row.label))
+    : []),
   // Per-binder rows confirmed against a published listing for that exact binder.
   ...(product.specs || []),
   { label: 'Colours available', value: product.colours.map((c) => c.name).join(', ') },
@@ -508,7 +512,7 @@ const VIEW_ALT = {
   front: 'front cover',
   profile: 'side profile showing the zip',
   spread: 'opened flat showing a full page spread',
-  interior: 'inside cover and felt lining',
+  interior: 'inside cover and lining',
   pockets: 'close-up of the side-loading pockets',
   zipper: 'close-up of the metal zip pull',
   logo: 'embossed Palms Off Gaming logo',
