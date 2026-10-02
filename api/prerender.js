@@ -1087,9 +1087,9 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
 // Exact-match landing/category pages. `source` selects the data set; the rest is copy.
 const LANDINGS = {
   '/shop': {
-    title: 'The Shop | CardPop', h1: 'The Card Shop', breadcrumb: 'Shop', source: 'shop',
-    description: 'Shop official CardPop sealed products, singles and accessories. Fast shipping across Australia.',
-    intro: 'Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.',
+    title: 'The Shop | CardPop', h1: 'Card Supplies', breadcrumb: 'Shop', source: 'shop',
+    description: 'Shop trading card supplies: sleeves, toploaders, binders, storage, display and shipping. Fast shipping across Australia.',
+    intro: 'Sleeves, toploaders, binders, storage boxes, display cases and shipping supplies to protect, store and display your collection.',
   },
   '/shop/sealed-boxes': {
     title: 'Sealed Boxes | CardPop Shop', h1: 'Sealed Boxes', breadcrumb: 'Sealed Boxes', source: 'shop', productType: 'sealed',

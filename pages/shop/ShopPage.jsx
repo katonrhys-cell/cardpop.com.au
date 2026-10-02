@@ -140,15 +140,15 @@ const ShopPage = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans">
-      <SEOHead title="The Shop | CardPop" description="Shop official CardPop sealed products, singles and accessories. Fast shipping across Australia." />
+      <SEOHead title="The Shop | CardPop" description="Shop trading card supplies: sleeves, toploaders, binders, storage, display and shipping. Fast shipping across Australia." />
 
       <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-8 md:pt-10 w-full">
         <div className="flex items-center gap-3 mb-1.5">
           <ShoppingBag className="w-7 h-7 text-primary shrink-0" aria-hidden="true" />
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">The Card Shop</h1>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Card Supplies</h1>
         </div>
         <p className="text-muted-foreground mb-5">
-          Curated premium sealed boxes, rare singles, and exclusive drops sourced and verified by our experts.
+          Sleeves, toploaders, binders, storage boxes, display cases and shipping supplies to protect, store and display your collection.
         </p>
         <h2 className="sr-only">Shop by Category</h2>
         <ShopCategoryBrowse />
