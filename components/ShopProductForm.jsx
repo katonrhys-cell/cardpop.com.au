@@ -8,13 +8,15 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, X, ImagePlus, Plus, Trash2 } from 'lucide-react';
+import { Loader2, X, ImagePlus, Plus, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { variantStock } from '@/utils/shopVariants.js';
 import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
+import { normaliseSupplierUrl } from '@/utils/supplierUrl.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 
 /**
  * Stock is decremented by the Stripe webhook while this form is open, so the
@@ -56,6 +58,10 @@ const INITIAL_STATE = {
   // product row — see the migration notes. Loaded/saved separately.
   wholesale_ex_gst_aud: '',
   wholesale_inc_gst_aud: '',
+  // Where it's ordered from — also admin-only (shop_product_costs), and
+  // watched weekly for price changes (docs/supplier-price-watch.md).
+  supplier: '',
+  supplier_url: '',
   stock_quantity: '1',
   // Colour family (one product per colour): siblings share family_sku.
   family_sku: '',
@@ -85,6 +91,35 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   // its own SKU, barcode and stock; the product's stock becomes their sum.
   const [variants, setVariants] = useState([]);
   const [removedVariantIds, setRemovedVariantIds] = useState([]);
+  // Last supplier price check (read-only; written by the weekly watch).
+  const [supplierWatch, setSupplierWatch] = useState(null);
+  const [checkingSupplier, setCheckingSupplier] = useState(false);
+
+  // "Check price now": the weekly supplier watch, on demand for this product.
+  const checkSupplierPrice = async () => {
+    if (!product?.id) return;
+    setCheckingSupplier(true);
+    try {
+      const res = await apiServerClient.fetch(`/admin/shop-products/${product.id}/supplier-price-check`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Check failed (${res.status})`);
+      setSupplierWatch((prev) => ({
+        ...prev,
+        supplier_price_status: body.status,
+        supplier_price_error: body.error,
+        supplier_price_checked_at: body.checkedAt,
+        ...(body.price != null ? { supplier_price_aud: body.price, supplier_price_currency: body.currency } : {}),
+        ...(body.status === 'changed' ? { supplier_price_changed_at: body.checkedAt } : {}),
+      }));
+      if (body.status === 'changed') toast.warning(`Supplier price changed: now $${body.price.toFixed(2)} (was $${body.previousPrice.toFixed(2)})`);
+      else if (body.price != null) toast.success(`Supplier price: $${body.price.toFixed(2)}${body.currency && body.currency !== 'AUD' ? ` ${body.currency}` : ''}`);
+      else toast.error(`Couldn't read the supplier's price: ${body.error}`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCheckingSupplier(false);
+    }
+  };
   const fileInputRef = useRef(null);
   // Stock as loaded when the form opened — see stockEdited().
   const originalStockRef = useRef(null);
@@ -134,20 +169,24 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       // Cost is admin-only and in its own table; fetch it for the edit form.
       supabase
         .from('shop_product_costs')
-        .select('wholesale_ex_gst_aud, wholesale_inc_gst_aud')
+        .select('wholesale_ex_gst_aud, wholesale_inc_gst_aud, supplier, supplier_url, supplier_price_aud, supplier_price_currency, supplier_price_status, supplier_price_error, supplier_price_checked_at, supplier_price_changed_at')
         .eq('product_id', product.id)
         .maybeSingle()
         .then(({ data }) => {
+          setSupplierWatch(data?.supplier_url ? data : null);
           if (!data) return;
           setFormData((prev) => ({
             ...prev,
             wholesale_ex_gst_aud: data.wholesale_ex_gst_aud != null ? String(data.wholesale_ex_gst_aud) : '',
             wholesale_inc_gst_aud: data.wholesale_inc_gst_aud != null ? String(data.wholesale_inc_gst_aud) : '',
+            supplier: data.supplier || '',
+            supplier_url: data.supplier_url || '',
           }));
         });
     } else {
       originalStockRef.current = null;
       setFormData(INITIAL_STATE);
+      setSupplierWatch(null);
       setVariants([]);
       setRemovedVariantIds([]);
       setImages([]);
@@ -235,6 +274,13 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if ((costEx !== null && (Number.isNaN(costEx) || costEx < 0)) || (costInc !== null && (Number.isNaN(costInc) || costInc < 0))) {
       return toast.error('Wholesale cost must be a valid amount, or left blank');
     }
+    // Supplier link (optional): stored in its canonical form, tracking stripped.
+    const supplierUrlRaw = String(formData.supplier_url ?? '').trim();
+    const supplierUrl = supplierUrlRaw ? normaliseSupplierUrl(supplierUrlRaw) : null;
+    if (supplierUrlRaw && !supplierUrl) {
+      return toast.error('Supplier link must be a full web address starting with https://');
+    }
+    const supplierName = String(formData.supplier ?? '').trim() || null;
     if (costEx === null && costInc !== null) costEx = Math.round((costInc / 1.1) * 100) / 100;
     if (costInc === null && costEx !== null) costInc = Math.round(costEx * 1.1 * 100) / 100;
     const stock = parseInt(formData.stock_quantity, 10);
@@ -381,19 +427,35 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         }
       }
 
-      // Cost row: upsert when a cost was entered, remove when both cleared.
+      // Cost row: upsert when a cost or supplier link was entered, remove when
+      // all of them are cleared.
       if (productId) {
-        if (costEx !== null) {
+        if (costEx !== null || supplierUrl || supplierName) {
+          const costRow = {
+            product_id: productId,
+            wholesale_ex_gst_aud: costEx,
+            wholesale_inc_gst_aud: costInc,
+            supplier: supplierName,
+            supplier_url: supplierUrl,
+            updated_at: new Date().toISOString(),
+            updated_by: currentUser?.id ?? null,
+          };
+          // A new link starts a fresh price history: don't compare its first
+          // reading against the old page's price.
+          if (supplierUrl !== (supplierWatch?.supplier_url ?? null)) {
+            Object.assign(costRow, {
+              supplier_price_aud: null,
+              supplier_price_currency: null,
+              supplier_price_status: null,
+              supplier_price_error: null,
+              supplier_price_checked_at: null,
+              supplier_price_changed_at: null,
+            });
+          }
           const { error: costErr } = await supabase
             .from('shop_product_costs')
-            .upsert({
-              product_id: productId,
-              wholesale_ex_gst_aud: costEx,
-              wholesale_inc_gst_aud: costInc,
-              updated_at: new Date().toISOString(),
-              updated_by: currentUser?.id ?? null,
-            }, { onConflict: 'product_id' });
-          if (costErr) toast.error(`Product saved, but the wholesale cost was not: ${costErr.message}`);
+            .upsert(costRow, { onConflict: 'product_id' });
+          if (costErr) toast.error(`Product saved, but the wholesale cost / supplier link was not: ${costErr.message}`);
         } else if (product) {
           await supabase.from('shop_product_costs').delete().eq('product_id', productId);
         }
@@ -544,6 +606,72 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 <p className={`text-xs font-semibold ${m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600'}`}>
                   Gross margin at this price: {(m * 100).toFixed(0)}% (ex GST)
                 </p>
+              );
+            })()}
+          </div>
+
+          {/* Supplier — admin-only (shop_product_costs). The link is checked
+              weekly for price changes; admins get a bell notification when
+              it moves (docs/supplier-price-watch.md). */}
+          <div className="space-y-2">
+            <Label htmlFor="shop-product-supplier-url">Supplier <span className="text-muted-foreground font-normal">(admin-only, optional)</span></Label>
+            <Input
+              id="shop-product-supplier"
+              placeholder="Supplier name, e.g. Temu"
+              aria-label="Supplier name"
+              value={formData.supplier}
+              onChange={(e) => handleInputChange('supplier', e.target.value)}
+              className="bg-background"
+            />
+            <div className="flex gap-2">
+              <Input
+                id="shop-product-supplier-url"
+                type="url"
+                inputMode="url"
+                placeholder="https://… link to where you order it"
+                value={formData.supplier_url}
+                onChange={(e) => handleInputChange('supplier_url', e.target.value)}
+                className="bg-background"
+              />
+              {normaliseSupplierUrl(formData.supplier_url) && (
+                <Button type="button" variant="outline" size="icon" asChild>
+                  <a href={normaliseSupplierUrl(formData.supplier_url)} target="_blank" rel="noopener noreferrer" aria-label="Open supplier link">
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                </Button>
+              )}
+            </div>
+            {(() => {
+              const saved = supplierWatch?.supplier_url;
+              const unsaved = normaliseSupplierUrl(formData.supplier_url) !== (saved ?? null);
+              if (!saved || unsaved) {
+                return formData.supplier_url
+                  ? <p className="text-[11px] text-muted-foreground">Save the product to start the weekly price check on this link.</p>
+                  : <p className="text-[11px] text-muted-foreground">Add the page you order this from and its price is checked once a week.</p>;
+              }
+              const w = supplierWatch;
+              const when = (iso) => (iso ? new Date(iso).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null);
+              const price = w.supplier_price_aud != null
+                ? `$${Number(w.supplier_price_aud).toFixed(2)}${w.supplier_price_currency && w.supplier_price_currency !== 'AUD' ? ` ${w.supplier_price_currency}` : ''}`
+                : null;
+              const failing = w.supplier_price_status === 'unreadable' || w.supplier_price_status === 'error';
+              return (
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {!w.supplier_price_checked_at && <span className="text-muted-foreground">Not checked yet — the weekly check will pick it up.</span>}
+                  {w.supplier_price_checked_at && price && (
+                    <span className={w.supplier_price_status === 'changed' ? 'font-semibold text-amber-600' : 'text-muted-foreground'}>
+                      Supplier price {price} · checked {when(w.supplier_price_checked_at)}
+                      {w.supplier_price_changed_at ? ` · last changed ${when(w.supplier_price_changed_at)}` : ''}
+                    </span>
+                  )}
+                  {w.supplier_price_checked_at && failing && (
+                    <span className="text-destructive">Couldn&apos;t read the price on {when(w.supplier_price_checked_at)}: {w.supplier_price_error}</span>
+                  )}
+                  <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={checkSupplierPrice} disabled={checkingSupplier}>
+                    {checkingSupplier ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                    Check price now
+                  </Button>
+                </div>
               );
             })()}
           </div>

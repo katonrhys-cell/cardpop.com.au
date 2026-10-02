@@ -38,6 +38,7 @@ import shopEnquiryRouter from './shop-enquiry.js';
 import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
+import shopSupplierWatchRouter from './shop-supplier-watch.js';
 import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
@@ -192,6 +193,10 @@ export default () => {
     // Public card price pages: snapshot refresh (cron + on-demand)
     router.use('/prices', apiLimiter);
     router.use('/prices', pricesRouter);
+
+    // Weekly supplier price watch for shop products (cron, CRON_SECRET)
+    router.use('/shop-supplier-watch', apiLimiter);
+    router.use('/shop-supplier-watch', shopSupplierWatchRouter);
 
     // Local game store directory submissions
     router.use('/stores', apiLimiter);

@@ -8,13 +8,14 @@ import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema, eventRsvpsSchema, setEventOrganiserBodySchema, eventOrganiserSchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema, shopProductIdSchema, eventRsvpsSchema, setEventOrganiserBodySchema, eventOrganiserSchema } from '../schemas/adminSchemas.js';
 import { cardArtLookupKey } from '../utils/cardImageResolver.js';
 import { assertNotLiteralPrivateAddress, ssrfSafeDispatcher } from '../utils/safeFetch.js';
 import { fetch } from 'undici';
 import logger from '../utils/logger.js';
 import { sendOrderShipped } from '../utils/emailService.js';
 import { normalizeTrackingNumber, carrierLabel } from '../../utils/shipmentTracking.js';
+import { runSupplierPriceWatch } from '../services/supplierPriceWatchService.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
 
 const router = Router();
@@ -1335,6 +1336,21 @@ router.post('/affiliate-metadata', async (req, res) => {
     return res.status(502).json({ error: 'Could not reach the page. Enter the details manually.' });
   } finally {
     clearTimeout(timeout);
+  }
+});
+
+// ─── Check a shop product's supplier price now ────────────────────────────────
+// The weekly watch (services/supplierPriceWatchService.js) on demand, for one
+// product: Admin → Products' "Check price now". Reports only.
+router.post('/shop-products/:id/supplier-price-check', validateRequestParams(shopProductIdSchema), async (req, res) => {
+  try {
+    const summary = await runSupplierPriceWatch({ productIds: [req.params.id], force: true });
+    const result = summary.results[0];
+    if (!result) return res.status(404).json({ error: 'This product has no supplier link saved yet.' });
+    res.json(result);
+  } catch (err) {
+    logger.error(`[ADMIN] Supplier price check failed: ${err.message}`);
+    res.status(500).json({ error: 'Supplier price check failed' });
   }
 });
 
