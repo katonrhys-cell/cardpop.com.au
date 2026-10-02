@@ -24,6 +24,7 @@ import {
   palmsOffProductsInCategory,
 } from '@/data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
+import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -157,6 +158,7 @@ const ShopProductPage = () => {
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
   };

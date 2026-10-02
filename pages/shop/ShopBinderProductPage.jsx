@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import {
   resolveBinderProduct, binderImages, binderImageAlt, binderSpecs, BINDER_PRODUCTS,
 } from '@/data/shopBinderProducts.js';
+import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -134,6 +135,7 @@ const ShopBinderProductPage = () => {
           : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
   };
