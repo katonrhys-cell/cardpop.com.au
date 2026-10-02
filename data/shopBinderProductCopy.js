@@ -73,6 +73,7 @@ export const BINDER_PRODUCT_COPY = {
       { label: "Capacity", value: "216 × 35pt top loaders" },
       { label: "Zip pull", value: "Steel zip with O-ring pull" },
       { label: "Included", value: "Colour-matched microfibre binder cover bag" },
+      { label: "Inner cover", value: "Velvet lining" },
     ],
   },
   // Source: https://www.kmart.com.au/product/palms-off-gaming-stealth-9-pocket-zip-binder-black-110062558/
