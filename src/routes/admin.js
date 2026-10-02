@@ -8,7 +8,7 @@ import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema, eventRsvpsSchema } from '../schemas/adminSchemas.js';
 import { cardArtLookupKey } from '../utils/cardImageResolver.js';
 import { assertNotLiteralPrivateAddress, ssrfSafeDispatcher } from '../utils/safeFetch.js';
 import { fetch } from 'undici';
@@ -619,6 +619,55 @@ router.get('/offers', validateRequestQuery(getOffersSchema), async (req, res) =>
   } catch (err) {
     logger.error(`[ADMIN] Failed to list offers: ${err.message}`);
     res.status(500).json({ error: 'Failed to load offers' });
+  }
+});
+
+// ─── Who's going to an event (admin-only) ─────────────────────────────────────
+// event_rsvps rows are owner/admin-only under RLS and the public event page only
+// ever sees aggregate counts (get_event_rsvp_counts). This lists every RSVP for
+// one event with the person's name and login email so an admin can see — and
+// contact — the attendees and vendors. Email lives in profiles.email, which is
+// service-role only, hence a server route rather than a client select.
+router.get('/events/:id/rsvps', validateRequestParams(eventRsvpsSchema), async (req, res) => {
+  try {
+    const { data: rsvps, error } = await supabase
+      .from('event_rsvps')
+      .select('user_id, role, created_at, updated_at')
+      .eq('event_id', req.params.id)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+
+    // event_rsvps.user_id references auth.users, not profiles, so there is no
+    // FK for PostgREST to embed through — look the profiles up separately.
+    const ids = [...new Set((rsvps || []).map((r) => r.user_id))];
+    const profiles = {};
+    if (ids.length) {
+      const { data: rows, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, username, display_name, avatar_url, email')
+        .in('id', ids);
+      if (profileError) throw profileError;
+      for (const row of rows || []) profiles[row.id] = row;
+    }
+
+    res.json({
+      rsvps: (rsvps || []).map((r) => {
+        const p = profiles[r.user_id] || {};
+        return {
+          user_id: r.user_id,
+          role: r.role,
+          created_at: r.created_at,
+          updated_at: r.updated_at,
+          username: p.username || null,
+          display_name: p.display_name || null,
+          avatar_url: p.avatar_url || null,
+          email: p.email || null,
+        };
+      }),
+    });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list event RSVPs: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load attendees' });
   }
 });
 

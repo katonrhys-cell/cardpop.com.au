@@ -39,6 +39,10 @@ export const processRefundBodySchema = z.object({
   { message: 'A rejection reason is required when action is reject' }
 );
 
+export const eventRsvpsSchema = z.object({
+  id: z.string().uuid('Invalid event ID'),
+});
+
 export const shipOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID'),
 });
