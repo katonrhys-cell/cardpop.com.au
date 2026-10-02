@@ -136,7 +136,7 @@ const SearchBar = ({ initialQuery = '', className = '', onSearchChange, placehol
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => query.length >= 2 && setShowSuggestions(true)}
-          className="w-full pl-9 pr-10 rounded-full bg-background border-input focus-visible:ring-primary"
+          className="w-full pl-9 pr-10 rounded-full bg-background focus-visible:border-primary focus-visible:ring-primary"
           aria-label="Search items"
         />
         {query && (
