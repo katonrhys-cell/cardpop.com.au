@@ -8,6 +8,7 @@ import { BINDER_SLUGS } from '../data/shopBinderProducts.js';
 import { PALMS_OFF_PRODUCTS } from '../data/palmsOffCatalogue.js';
 import { shopProductBasePath, legacyShopProductPath } from '../utils/shopProductUrl.js';
 import { PUBLIC_SHOP_STATUSES } from '../utils/shopStock.js';
+import { shopCategoryLeaves, productInShopCategory } from '../utils/shopCategoryPages.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -25,7 +26,7 @@ const EVENTS_SINCE = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 // (even when nothing changed) trains crawlers to distrust the sitemap's dates,
 // which hurts recrawl scheduling. Bump this only when the static pages actually
 // change; DB-driven URLs below keep their real updated_at timestamps.
-const SITE_UPDATED = '2026-06-30';
+const SITE_UPDATED = '2026-10-02';
 
 // Sitemap <loc> values must be XML-escaped. Slugs come straight from the DB, so
 // a stray & (or < >) in one slug would otherwise produce invalid XML and make
@@ -48,6 +49,45 @@ const slugify = (str = '') => String(str)
   .trim()
   .replace(/\s+/g, '-')
   .replace(/-+/g, '-');
+
+// PostgREST caps a single response (1,000 rows on Supabase by default), so a
+// bare .limit(5000) would quietly stop at 1,000. Page through with .range()
+// instead, up to `max` rows. `build` returns a fresh query each call, and every
+// paged query orders on a unique tiebreaker so pages can't overlap or skip.
+// No new page starts within PAGE_RESERVE_MS of `deadline`: a big table is
+// trimmed to the pages that fit rather than losing the whole section.
+const PAGE_SIZE = 1000;
+const PAGE_RESERVE_MS = 1500;
+async function fetchPaged(build, max, deadline = Infinity) {
+  const data = [];
+  for (let from = 0; from < max; from += PAGE_SIZE) {
+    if (from > 0 && Date.now() > deadline - PAGE_RESERVE_MS) break;
+    const size = Math.min(PAGE_SIZE, max - from);
+    const { data: page, error } = await build().range(from, from + size - 1);
+    if (error) {
+      // Keep what earlier pages returned; only a first-page failure fails the
+      // section (and Promise.allSettled confines that to this section).
+      if (data.length > 0) break;
+      throw error;
+    }
+    data.push(...(page || []));
+    if (!page || page.length < size) break;
+  }
+  return { data };
+}
+
+// Per-section ceilings. A sitemap file may hold 50,000 URLs; these sum to well
+// under that. Raise them (or split into a sitemap index) as the site grows.
+const MAX_ROWS = {
+  articles: 2000,
+  listings: 10000,
+  dealers: 2000,
+  products: 3000,
+  events: 2000,
+  trackedCards: 5000,
+  stores: 3000,
+  sellerProfiles: 10000,
+};
 
 const STATIC_PAGES = [
   { loc: '/',                      lastmod: SITE_UPDATED,       freq: 'daily',   pri: '1.0' },
@@ -160,87 +200,92 @@ export default async function handler(req, res) {
 
     // The Vercel function is capped at 10s (see vercel.json). If Supabase is
     // slow the function would otherwise 504, which Google reports as a
-    // "temporary processing error". Race the DB work against a shorter budget
-    // and fall back to an empty result set so we always emit valid XML (at
-    // least the static pages) with a 200 well within the cap.
+    // "temporary processing error". Each section races its own copy of a
+    // shorter budget, so one slow table drops (or, for paged tables, trims)
+    // only that section and we always emit valid XML with a 200 well within
+    // the cap.
     const DB_BUDGET_MS = 7000;
-    const dbData = await Promise.race([
-      Promise.allSettled([
-        supabase
-          .from('blog_articles')
-          .select('slug, updated_at, published_at, created_at')
-          .eq('is_published', true)
-          .not('slug', 'is', null)
-          .order('published_at', { ascending: false })
-          .limit(200),
-        supabase
-          .from('listings')
-          .select('id, slug, title, updated_at, created_at, vault_item:vault_items(card_name)')
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('profiles')
-          .select('id, store_slug, updated_at')
-          .eq('is_sole_trader', true)
-          .eq('is_public', true)
-          // Store pages are a paid-membership perk — only advertise stores
-          // that renderDealer() will actually serve.
-          .in('subscription_tier', PAID_TIERS)
-          .limit(500),
-        supabase
-          .from('shop_products')
-          .select('id, title, slug, category, colour, family_sku, updated_at, created_at')
-          .in('status', PUBLIC_SHOP_STATUSES)
-          .order('created_at', { ascending: false })
-          .limit(500),
-        supabase
-          .from('events')
-          .select('id, slug, updated_at, created_at')
-          .eq('status', 'approved')
-          .gte('start_date', EVENTS_SINCE)
-          .order('start_date', { ascending: true })
-          .limit(500),
-        supabase
-          .from('tracked_cards')
-          .select('slug, category, updated_at, card_price_snapshots(snapshot_date)')
-          .eq('active', true)
-          .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
-          .limit(1, { referencedTable: 'card_price_snapshots' })
-          .limit(500),
-        supabase
-          .from('local_game_stores')
-          .select('city, updated_at')
-          .eq('status', 'approved')
-          .limit(500),
-        // Public seller profiles (/seller/:id) — prerendered for crawlers but
-        // previously absent from the sitemap. PAID sole traders are excluded
-        // here: their canonical is the /dealer store page (already listed
-        // above), so /seller/:id for them is a declared alternate, not a URL
-        // to advertise. A Hobby ('free') sole trader has no live store page,
-        // so their /seller page stays canonical and IS advertised — mirroring
-        // renderSeller()'s hasStore logic.
-        supabase
-          .from('profiles')
-          .select('id, updated_at, reviews_count')
-          .not('is_public', 'is', false)
-          .or('is_sole_trader.not.is.true,subscription_tier.eq.free')
-          .order('updated_at', { ascending: false })
-          .limit(1000),
-        // Seller ids that currently have an active listing — the content gate
-        // for the block above, so we only advertise profiles with something to
-        // crawl (or a review history) rather than empty shells.
-        supabase
-          .from('listings')
-          .select('seller_id')
-          .eq('status', 'active')
-          .limit(2000),
-      ]),
-      new Promise((resolve) => setTimeout(() => resolve(null), DB_BUDGET_MS)),
-    ]);
+    const deadline = Date.now() + DB_BUDGET_MS;
+    const fetchAll = (build, max) => fetchPaged(build, max, deadline);
+    let budgetTimer;
+    const budget = new Promise((_, reject) => {
+      budgetTimer = setTimeout(() => reject(new Error('sitemap section timed out')), DB_BUDGET_MS);
+    });
+    budget.catch(() => {}); // Rejection is consumed per section below.
+    const withinBudget = (query) => Promise.race([query, budget]);
+    const dbData = await Promise.allSettled([
+      fetchAll(() => supabase
+        .from('blog_articles')
+        .select('id, slug, updated_at, published_at, created_at')
+        .eq('is_published', true)
+        .not('slug', 'is', null)
+        .order('published_at', { ascending: false })
+        .order('id'), MAX_ROWS.articles),
+      // seller_id also feeds the public-seller content gate below.
+      fetchAll(() => supabase
+        .from('listings')
+        .select('id, slug, title, seller_id, updated_at, created_at, vault_item:vault_items(card_name)')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .order('id'), MAX_ROWS.listings),
+      fetchAll(() => supabase
+        .from('profiles')
+        .select('id, store_slug, updated_at')
+        .eq('is_sole_trader', true)
+        .eq('is_public', true)
+        // Store pages are a paid-membership perk — only advertise stores
+        // that renderDealer() will actually serve.
+        .in('subscription_tier', PAID_TIERS)
+        .order('id'), MAX_ROWS.dealers),
+      fetchAll(() => supabase
+        .from('shop_products')
+        .select('id, title, slug, category, colour, family_sku, updated_at, created_at')
+        .in('status', PUBLIC_SHOP_STATUSES)
+        .order('created_at', { ascending: false })
+        .order('id'), MAX_ROWS.products),
+      fetchAll(() => supabase
+        .from('events')
+        .select('id, slug, updated_at, created_at')
+        .eq('status', 'approved')
+        .gte('start_date', EVENTS_SINCE)
+        .order('start_date', { ascending: true })
+        .order('id'), MAX_ROWS.events),
+      fetchAll(() => supabase
+        .from('tracked_cards')
+        .select('id, slug, category, updated_at, card_price_snapshots(snapshot_date)')
+        .eq('active', true)
+        .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
+        .limit(1, { referencedTable: 'card_price_snapshots' })
+        .order('id'), MAX_ROWS.trackedCards),
+      fetchAll(() => supabase
+        .from('local_game_stores')
+        .select('id, city, updated_at')
+        .eq('status', 'approved')
+        .order('id'), MAX_ROWS.stores),
+      // Public seller profiles (/seller/:id) — prerendered for crawlers but
+      // previously absent from the sitemap. PAID sole traders are excluded
+      // here: their canonical is the /dealer store page (already listed
+      // above), so /seller/:id for them is a declared alternate, not a URL
+      // to advertise. A Hobby ('free') sole trader has no live store page,
+      // so their /seller page stays canonical and IS advertised — mirroring
+      // renderSeller()'s hasStore logic.
+      fetchAll(() => supabase
+        .from('profiles')
+        .select('id, updated_at, reviews_count')
+        .not('is_public', 'is', false)
+        .or('is_sole_trader.not.is.true,subscription_tier.eq.free')
+        .order('updated_at', { ascending: false })
+        .order('id'), MAX_ROWS.sellerProfiles),
+      // Admin-edited shop categories (Admin → Products → Categories), merged
+      // over the built-in leaves for the /shop/category/<slug> pages.
+      supabase
+        .from('shop_categories')
+        .select('section_slug, name, description, hidden'),
+    ].map(withinBudget));
+    clearTimeout(budgetTimer);
 
     // Promise.allSettled means one slow/failing table degrades that section
-    // only, not the whole sitemap. On timeout dbData is null → static-only.
+    // only, not the whole sitemap.
     const rows = (i) =>
       (dbData?.[i]?.status === 'fulfilled' ? dbData[i].value.data : null) ?? [];
     const articles = rows(0);
@@ -251,9 +296,10 @@ export default async function handler(req, res) {
     const trackedCards = rows(5);
     const directoryStores = rows(6);
     const sellerProfiles = rows(7);
+    const shopCategoryRows = rows(8);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
-    const activeSellerIds = new Set((rows(8) || []).map((r) => r.seller_id).filter(Boolean));
+    const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
     // A public, non-dealer profile earns a sitemap entry when it has active
     // listings to show or a review history (aggregateRating) — either way the
     // prerendered /seller page carries real, indexable content.
@@ -310,6 +356,30 @@ export default async function handler(req, res) {
     if (shopUrls.length > 0) {
       parts.push('', `  <!-- Shop products (${shopUrls.length}) -->`);
       for (const { path, lastmod } of shopUrls) {
+        parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.7'));
+      }
+    }
+
+    // Shop leaf category pages (/shop/category/<slug>), built-in plus any the
+    // admin added, minus any they hid. Only categories with at least one
+    // public product are advertised — an empty grid is thin content.
+    const categoryUrls = [];
+    for (const leaf of shopCategoryLeaves(shopCategoryRows)) {
+      const path = `/shop/category/${leaf.slug}`;
+      if (listed.has(path)) continue;
+      let lastmod = '';
+      for (const product of products) {
+        if (!productInShopCategory(product, leaf.name)) continue;
+        const updated = (product.updated_at || product.created_at || TODAY).split('T')[0];
+        if (updated > lastmod) lastmod = updated;
+      }
+      if (!lastmod) continue;
+      listed.add(path);
+      categoryUrls.push({ path, lastmod });
+    }
+    if (categoryUrls.length > 0) {
+      parts.push('', `  <!-- Shop categories (${categoryUrls.length}) -->`);
+      for (const { path, lastmod } of categoryUrls) {
         parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.7'));
       }
     }

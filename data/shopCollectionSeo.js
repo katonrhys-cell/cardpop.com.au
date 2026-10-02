@@ -45,6 +45,8 @@ export const SHOP_COLLECTION_SEO = {
       { name: 'Binders', slug: 'binders' },
       { name: 'Pages', slug: 'pages' },
       { name: 'Dividers', slug: 'dividers' },
+      { name: 'Deck Boxes', slug: 'deck-boxes' },
+      { name: 'Graded Card Cases', slug: 'graded-card-cases' },
     ],
   },
   display: {
@@ -61,6 +63,7 @@ export const SHOP_COLLECTION_SEO = {
       { name: 'Display Cases', slug: 'display-cases' },
       { name: 'Wall Mounts', slug: 'wall-mounts' },
       { name: 'Floating Frames', slug: 'floating-frames' },
+      { name: 'Playmats', slug: 'playmats' },
     ],
   },
   shipping: {
@@ -78,6 +81,8 @@ export const SHOP_COLLECTION_SEO = {
       { name: 'Cardboard Mailers', slug: 'cardboard-mailers' },
       { name: 'Packing Tape', slug: 'packing-tape' },
       { name: 'Graded Card Protectors', slug: 'graded-card-protectors' },
+      { name: 'Tag Sleeves', slug: 'tag-sleeves' },
+      { name: 'Tamper Seals', slug: 'tamper-seals' },
     ],
   },
   grading: {
