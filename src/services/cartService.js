@@ -151,6 +151,16 @@ export async function priceCart(items, userId) {
       if (error) throw error;
       if (!listing) throw httpError(404, 'A listing in your cart is no longer available');
       if (listing.seller_id === userId) throw httpError(403, 'You cannot purchase your own listing');
+      // Only buy-now ('fixed') listings with a real price can be bought from
+      // the cart. Trade-only and Expression of Interest listings stay 'active'
+      // with price_aud = null (EOI sells only through an accepted offer, which
+      // goes through the single-item checkout), and there is no auction/bidding
+      // flow — without this a null price priced as $0 and the card sold for
+      // postage alone. A null listing_type is a legacy buy-now row (same rule as
+      // utils/offerEligibility.js).
+      if ((listing.listing_type ?? 'fixed') !== 'fixed' || !(Number(listing.price_aud) > 0)) {
+        throw httpError(409, `${listing.vault_item?.card_name || 'A listing in your cart'} can't be bought outright — it isn't listed for sale at a fixed price`);
+      }
 
       const breakdown = await calculateBreakdown(listing, 'fixed');
       const itemC = Math.round(breakdown.itemPrice * 100);
@@ -214,10 +224,10 @@ export async function priceCart(items, userId) {
   // postage price, not the sum. The charge is recorded as shipping_aud on the
   // line that set it (the parcel-defining line) so the webhook can pass it
   // through to the seller's payout and refunds can reverse it per line. It is
-  // the seller's own consumer-quoted price — no commission is taken from it
-  // and no GST is added or reported on it (unlike the platform's shop fee, it
-  // is not platform revenue), and the partner free-shipping perk only ever
-  // waives the platform's shop fee above, never money owed to a seller.
+  // the seller's own consumer-quoted price — no commission is taken from it and
+  // no GST is added on top of it. The GST already INSIDE it is the seller's
+  // (their supply), so it is reported in includedGstCents and deducted from
+  // their payout alongside the card's GST, below.
   let sellerShippingCents = 0;
   const parcelLineBySeller = new Map();
   for (const line of orderLines) {

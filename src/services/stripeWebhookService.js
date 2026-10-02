@@ -134,9 +134,13 @@ async function claimListingSold(listingId) {
     .eq('id', listingId)
     .eq('status', 'active')
     .select('id');
+  // A DB error is NOT a lost race. Returning false here used to route a
+  // transient blip into the double-sale path — buyer refunded, seller never
+  // paid, card still listed. Throw instead so the webhook 500s and Stripe
+  // redelivers; only "no error, zero rows" means someone else already sold it.
   if (error) {
     logger.error(`[STRIPE] Failed to claim listing ${listingId} as sold: ${error.message}`);
-    return false;
+    throw new Error(`Listing claim failed for ${listingId}: ${error.message}`);
   }
   return Array.isArray(data) && data.length > 0;
 }
@@ -418,6 +422,47 @@ async function handleCartOrder(existing, session, stripe) {
     return;
   }
 
+  const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
+
+  // Claim every listing line FIRST, before any other side effect (wallet debit,
+  // stock decrements, payouts), because a claim can throw on a DB error and the
+  // retry has to be able to redo the whole order. The confirm CAS above already
+  // moved the order off 'pending', so a bare throw would leave Stripe's retry
+  // looking at a 'payment_confirmed' order and skipping it — half-fulfilled.
+  // So on an error: remember which listings THIS order already won (sold_claimed
+  // on the line, so the retry doesn't lose the race to itself), put the order
+  // back to 'pending', and rethrow. The retry then re-runs from the top; every
+  // step after this point is either not yet run or idempotent.
+  const claimedListingLines = [];
+  const lostListingLines = [];
+  for (const line of lines) {
+    if (line.type !== 'listing' || !line.id) continue;
+    if (line.sold_claimed === true) {
+      claimedListingLines.push(line);
+      continue;
+    }
+    let won;
+    try {
+      won = await claimListingSold(line.id);
+    } catch (claimError) {
+      const { data: reverted, error: revertErr } = await supabase.from('orders')
+        .update({ status: 'pending', order_items: lines })
+        .eq('id', existing.id)
+        .eq('status', 'payment_confirmed')
+        .select('id');
+      if (revertErr || !reverted?.length) {
+        logger.error(`[STRIPE] Could not return cart order ${existing.id} to pending after a listing-claim error (${revertErr?.message || 'no row'}) — the retry will skip it; needs manual fulfilment`);
+      }
+      throw claimError;
+    }
+    if (won) {
+      line.sold_claimed = true;
+      claimedListingLines.push(line);
+    } else {
+      lostListingLines.push(line);
+    }
+  }
+
   // Buyer opted to save this address to their account — persist it now that the
   // order is confirmed (best-effort; never blocks fulfilment).
   if (session.metadata?.saveShippingAddress === 'true') {
@@ -454,32 +499,25 @@ async function handleCartOrder(existing, session, stripe) {
     });
   }
 
-  const lines = Array.isArray(existing.order_items) ? existing.order_items : [];
   const sellerIds = new Set();
   const oversoldShopItems = [];
   let payoutsRecorded = false;
-  let fulfilledLines = 0;
 
-  // Listing lines settle in two passes: first claim every listing (the sold
-  // race decides which lines this order actually fulfils), then pay sellers.
-  // The split exists for seller postage — shipping_aud sits on one line per
-  // seller (the parcel-defining line), and if THAT line loses the race while a
-  // sibling line from the same seller wins, the postage the buyer paid must
-  // follow the parcel that still ships rather than vanish from the payout.
-  const claimedListingLines = [];
+  // Listing lines settle in two passes: every listing was claimed above (the
+  // sold race decides which lines this order actually fulfils), sellers are
+  // paid below. The split exists for seller postage — shipping_aud sits on one
+  // line per seller (the parcel-defining line), and if THAT line loses the race
+  // while a sibling line from the same seller wins, the postage the buyer paid
+  // must follow the parcel that still ships rather than vanish from the payout.
+  // A lost line was already sold (another buyer or a manual vault mark): skip
+  // its payout and flag it so the buyer gets refunded — never sell it twice.
+  for (const line of lostListingLines) {
+    await flagDoubleSale({ listingId: line.id, orderId: existing.id, buyerId: existing.buyer_id });
+  }
+  let fulfilledLines = claimedListingLines.length;
+
   for (const line of lines) {
-    if (line.type === 'listing' && line.id) {
-      // Only pay the seller if THIS order won the race to sell the item. If the
-      // listing was already sold (another buyer or a manual vault mark), skip the
-      // payout and flag it so the buyer gets refunded — never sell it twice.
-      const claimed = await claimListingSold(line.id);
-      if (!claimed) {
-        await flagDoubleSale({ listingId: line.id, orderId: existing.id, buyerId: existing.buyer_id });
-        continue;
-      }
-      fulfilledLines += 1;
-      claimedListingLines.push(line);
-    } else if (line.type === 'shop' && line.id && line.preorder) {
+    if (line.type === 'shop' && line.id && line.preorder) {
       // Pre-orders are unlimited and sold ahead of stock, so they never touch
       // stock_quantity (an at-zero decrement would also read as an oversell).
       // Admin sets real stock when the product goes back to active.
@@ -776,6 +814,12 @@ async function handleSingleItemOrder(session, stripe) {
     return;
   }
 
+  // The address Stripe collected (shipping_address_collection). Current API
+  // versions (2025-03-31+, which this SDK pins) moved it under
+  // collected_information; older sessions / API versions carry it at the top
+  // level. Without the new path every Buy Now order landed with no address.
+  const collectedShipping = session.collected_information?.shipping_details ?? session.shipping_details ?? null;
+
   const orderInsert = {
     buyer_id: userId,
     payer_name_mismatch: payerNameMismatch,
@@ -803,11 +847,11 @@ async function handleSingleItemOrder(session, stripe) {
     commission_config_id: configId || null,
     status: 'payment_confirmed',
     buyer_protection: true,
-    shipping_name: meta.shippingName || session.customer_details?.name || null,
-    shipping_address: meta.shippingAddress || session.shipping_details?.address?.line1 || null,
-    shipping_suburb: meta.shippingSuburb || session.shipping_details?.address?.city || null,
-    shipping_state: meta.shippingState || session.shipping_details?.address?.state || null,
-    shipping_postcode: meta.shippingPostcode || session.shipping_details?.address?.postal_code || null,
+    shipping_name: meta.shippingName || collectedShipping?.name || session.customer_details?.name || null,
+    shipping_address: meta.shippingAddress || collectedShipping?.address?.line1 || null,
+    shipping_suburb: meta.shippingSuburb || collectedShipping?.address?.city || null,
+    shipping_state: meta.shippingState || collectedShipping?.address?.state || null,
+    shipping_postcode: meta.shippingPostcode || collectedShipping?.address?.postal_code || null,
   };
 
   // These columns land with their migrations, but a redeploy can briefly race
@@ -834,7 +878,25 @@ async function handleSingleItemOrder(session, stripe) {
   // race, or the seller manually marked it sold), don't sell it again: flag the
   // order for a refund and stop before paying the seller or emailing anyone.
   if (listingId) {
-    const claimed = await claimListingSold(listingId);
+    let claimed;
+    try {
+      claimed = await claimListingSold(listingId);
+    } catch (claimError) {
+      // The order row above was inserted already 'payment_confirmed', so a
+      // Stripe retry would find it and skip — leaving the listing unclaimed and
+      // the seller unpaid. Remove it so the retry starts clean, then rethrow
+      // (→ 500 → redelivery). The paid-order notifications are deduped per
+      // order id, so a retry can at worst repeat them once under the new row.
+      const { error: undoErr } = await supabase
+        .from('orders')
+        .delete()
+        .eq('stripe_session_id', session.id)
+        .eq('status', 'payment_confirmed');
+      if (undoErr) {
+        logger.error(`[STRIPE] Could not remove order for session ${session.id} after a listing-claim error (${undoErr.message}) — the retry will skip it; needs manual fulfilment`);
+      }
+      throw claimError;
+    }
     if (!claimed) {
       const { data: dupOrder } = await supabase
         .from('orders')

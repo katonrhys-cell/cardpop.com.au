@@ -12,8 +12,13 @@ import logger from '../utils/logger.js';
 // When an orderId is given, the order's payout_status (and transfer id) is
 // updated to match.
 //
+// idempotencyKey (optional) is passed to Stripe on the Connect transfer, so a
+// repeated call for the same payout (e.g. an admin releasing a dispute twice)
+// returns the original transfer instead of sending the money again. Omitted, the
+// transfer is created exactly as before.
+//
 // @returns {Promise<{ status: 'transferred'|'wallet_credited'|'failed'|'none', transferId?: string, fallback?: boolean }>}
-export async function payoutSeller(stripe, { sellerId, sellerProceeds, orderId = null, listingId = null }) {
+export async function payoutSeller(stripe, { sellerId, sellerProceeds, orderId = null, listingId = null, idempotencyKey = null }) {
   if (!sellerId || !(Number(sellerProceeds) > 0)) {
     return { status: 'none' };
   }
@@ -47,12 +52,15 @@ export async function payoutSeller(stripe, { sellerId, sellerProceeds, orderId =
 
   if (sellerProfile?.stripe_connect_account_id && sellerProfile?.stripe_connect_onboarded) {
     try {
-      const transfer = await stripe.transfers.create({
+      const transferParams = {
         amount: Math.round(Number(sellerProceeds) * 100), // cents
         currency: 'aud',
         destination: sellerProfile.stripe_connect_account_id,
         metadata: { order_id: orderId || '', listing_id: listingId || '', seller_id: sellerId },
-      });
+      };
+      const transfer = idempotencyKey
+        ? await stripe.transfers.create(transferParams, { idempotencyKey })
+        : await stripe.transfers.create(transferParams);
       logger.info(`[PAYOUT] Transfer ${transfer.id} → $${sellerProceeds} AUD to ${sellerProfile.stripe_connect_account_id}`);
       if (orderId) {
         await supabase
