@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen } from 'lucide-react';
-import { useCart } from '@/hooks/useCart.jsx';
+import { useCart, maxQuantityFor } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -138,6 +138,8 @@ const ShoppingCart = () => {
                   // quantity 1 regardless (cartService), so don't offer +/-.
                   const isListing = p.type === 'listing';
                   const isSold = isListing && soldIds.has(p.id);
+                  const atMaxQuantity = item.quantity >= maxQuantityFor(item);
+                  const itemName = p.title || p.name || 'item';
 
                   return (
                     <div key={itemId} className="flex gap-4 group">
@@ -181,6 +183,7 @@ const ShoppingCart = () => {
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 -mt-1 -mr-2 shrink-0"
                             onClick={() => removeFromCart(itemId)}
+                            aria-label={`Remove ${itemName} from cart`}
                           >
                             <X className="w-4 h-4" />
                           </Button>
@@ -198,6 +201,7 @@ const ShoppingCart = () => {
                               size="icon"
                               className="h-8 w-8 rounded-none rounded-l-lg"
                               onClick={() => updateQuantity(itemId, item.quantity - 1)}
+                              aria-label={`Decrease quantity of ${itemName}`}
                             >
                               <Minus className="w-3 h-3" />
                             </Button>
@@ -209,6 +213,8 @@ const ShoppingCart = () => {
                               size="icon"
                               className="h-8 w-8 rounded-none rounded-r-lg"
                               onClick={() => updateQuantity(itemId, item.quantity + 1)}
+                              disabled={atMaxQuantity}
+                              aria-label={atMaxQuantity ? `Increase quantity of ${itemName} (maximum available reached)` : `Increase quantity of ${itemName}`}
                             >
                               <Plus className="w-3 h-3" />
                             </Button>

@@ -69,7 +69,11 @@ const CheckoutModal = ({ isOpen, onClose, listingId, transactionType = 'fixed', 
     if (!breakdown) return;
     setLoadingCheckout(true);
     try {
-      const successUrl = `${window.location.origin}/account/orders?success=1`;
+      // Land on /checkout-success with the session id: that page asks the
+      // server for the session, which also runs the fulfilment fallback
+      // (handleCheckoutSessionCompleted, single-item path included) in case
+      // the Stripe webhook never arrives. Stripe substitutes the placeholder.
+      const successUrl = `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}&single=1`;
       const cancelUrl  = window.location.href;
 
       const payload = { listingId, transactionType, successUrl, cancelUrl };

@@ -15,6 +15,22 @@ export const useCart = () => {
   return context;
 };
 
+/**
+ * Most units of a cart line the buyer may hold: 1 for a one-of-a-kind
+ * marketplace listing, the variant's stock when it's inventory-managed (the
+ * same `manage_inventory` / `inventory_quantity` addToCart's callers check),
+ * otherwise unbounded.
+ */
+export const maxQuantityFor = (item) => {
+  if (item?.product?.type === 'listing') return 1;
+  const v = item?.variant;
+  if (v?.manage_inventory) {
+    const stock = Number(v.inventory_quantity);
+    if (v.inventory_quantity != null && Number.isFinite(stock)) return Math.max(0, stock);
+  }
+  return Infinity;
+};
+
 export const CartProvider = ({ children }) => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cartItems, setCartItems] = useState(() => {
@@ -124,8 +140,12 @@ export const CartProvider = ({ children }) => {
     setCartItems(prevItems =>
       prevItems.map(item => {
         if ((item.variant?.id || item.product.id) !== itemId) return item;
-        // Marketplace listings are capped at quantity 1 (server hard-codes it)
-        return { ...item, quantity: item.product?.type === 'listing' ? 1 : quantity };
+        // Cap increases at the available stock, as addToCart does (listings are
+        // capped at 1 — the server hard-codes it). Decreases always go through,
+        // so a line already above a since-reduced stock level can still shrink.
+        if (quantity <= item.quantity) return { ...item, quantity };
+        const capped = Math.max(item.quantity, Math.min(quantity, maxQuantityFor(item)));
+        return { ...item, quantity: item.product?.type === 'listing' ? 1 : capped };
       })
     );
   }, [removeFromCart]);

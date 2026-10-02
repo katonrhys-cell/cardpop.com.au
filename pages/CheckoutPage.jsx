@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 
 // Storage path or absolute URL → CDN-aware public URL.
 const resolveImg = (path) => publicImageUrl(path);
-import { Loader2, Tag, Wallet, Lock, MapPin, CreditCard, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Loader2, Tag, Wallet, Lock, MapPin, CreditCard, ShoppingBag, ArrowRight, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -81,9 +81,14 @@ const CheckoutPage = () => {
 
   // Single-page payment reveal. Everything lives on one page; the buyer commits
   // to paying with "Review & pay", which validates the details and mounts the
-  // Stripe form — this is the commit point that seeds the Stripe session, so it
-  // isn't recreated on every keystroke while the address is being typed.
-  const [readyToPay, setReadyToPay] = useState(false);
+  // Stripe form — this is the commit point that seeds the Stripe session.
+  // The request body is SNAPSHOTTED at that moment and the details form is
+  // locked: every new body would create a fresh Checkout Session + pending
+  // order, and for wallet / welcome-code buyers the second one 409s because the
+  // first session still holds the reservation. "Edit details" unlocks the form
+  // (clearing the snapshot) so the buyer can change something deliberately.
+  const [paymentBody, setPaymentBody] = useState(null);
+  const readyToPay = paymentBody !== null;
   const paymentRef = useRef(null);
 
   useEffect(() => {
@@ -372,7 +377,8 @@ const CheckoutPage = () => {
     if (flatItems.length === 0) { toast.error('Your cart is empty!'); return; }
     if (!validateShipping()) return;
     if (!validateBilling()) return;
-    setReadyToPay(true);
+    // Freeze exactly what the buyer reviewed; later renders can't change it.
+    setPaymentBody(checkoutRequestBody);
     // Scroll the newly-revealed payment form into view (guarded — happy-dom in
     // tests has no scrollIntoView).
     setTimeout(() => paymentRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' }), 50);
@@ -430,6 +436,21 @@ const CheckoutPage = () => {
     billingBusinessName,
   ]);
 
+  // If the order itself changes after the payment form is up (e.g. an item is
+  // removed from the cart drawer), the snapshot no longer matches what the
+  // buyer is looking at — drop back to the details step so they re-review.
+  const lockedItemsKey = paymentBody ? JSON.stringify(paymentBody.items) : null;
+  useEffect(() => {
+    if (lockedItemsKey !== null && lockedItemsKey !== serverItemsKey) {
+      setPaymentBody(null);
+      toast.info?.('Your order changed — please review and pay again.');
+    }
+  }, [lockedItemsKey, serverItemsKey]);
+
+  const handleEditDetails = () => {
+    setPaymentBody(null);
+  };
+
   if (initializing) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -453,7 +474,8 @@ const CheckoutPage = () => {
       // "Edit Cart" opens the cart drawer (remove items / change quantities)
       // rather than bouncing to the marketplace. Hidden for the direct Vault
       // "buy now" flow, which isn't backed by the cart — there's nothing to edit.
-      onEditCart={directItem ? undefined : () => setIsCartOpen(true)}
+      // Also hidden once payment is locked — use "Edit details" first.
+      onEditCart={directItem || readyToPay ? undefined : () => setIsCartOpen(true)}
     />
   );
 
@@ -473,6 +495,7 @@ const CheckoutPage = () => {
               variant="ghost"
               size="sm"
               onClick={() => { setPromoCode(''); setPromoInput(''); }}
+              disabled={readyToPay}
             >
               Remove
             </Button>
@@ -492,9 +515,9 @@ const CheckoutPage = () => {
               autoComplete="off"
               className="font-mono tracking-widest uppercase"
               aria-label="Promo code"
-              disabled={useWallet}
+              disabled={useWallet || readyToPay}
             />
-            <Button type="submit" variant="outline" className="shrink-0" disabled={useWallet}>Apply</Button>
+            <Button type="submit" variant="outline" className="shrink-0" disabled={useWallet || readyToPay}>Apply</Button>
           </form>
         )}
         <p className="mt-2 text-xs text-muted-foreground">
@@ -510,6 +533,7 @@ const CheckoutPage = () => {
         <label className="flex items-center gap-3 text-sm cursor-pointer">
           <Checkbox
             checked={useWallet}
+            disabled={readyToPay}
             onCheckedChange={(checked) => {
               setUseWallet(!!checked);
               if (checked) { setPromoCode(''); setPromoInput(''); }
@@ -562,6 +586,10 @@ const CheckoutPage = () => {
           <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
             {/* ── Left: details ─────────────────────────────────────────── */}
             <div className="space-y-6">
+              {/* Details are locked while the payment form is up (see
+                  paymentBody) — a disabled fieldset disables every input,
+                  checkbox and select trigger inside it. */}
+              <fieldset disabled={readyToPay} className="m-0 min-w-0 space-y-6 border-0 p-0" data-testid="checkout-details">
               <Section step={1} icon={MapPin} title="Contact & shipping">
                 {savedAddresses.length > 0 && (
                   <div className="space-y-1">
@@ -627,6 +655,7 @@ const CheckoutPage = () => {
                   onSameAsShippingChange={setSameAsShipping}
                 />
               </Section>
+              </fieldset>
 
               <div ref={paymentRef}>
                 <Section step={3} icon={Lock} title="Payment">
@@ -647,7 +676,12 @@ const CheckoutPage = () => {
                         discount={discount}
                         total={total}
                       />
-                      <EmbeddedStripeCheckout requestBody={checkoutRequestBody} />
+                      <div className="flex justify-end">
+                        <Button variant="outline" size="sm" onClick={handleEditDetails}>
+                          <Pencil className="mr-2 h-4 w-4" /> Edit details
+                        </Button>
+                      </div>
+                      <EmbeddedStripeCheckout requestBody={paymentBody} />
                     </div>
                   ) : (
                     <div className="space-y-3">
