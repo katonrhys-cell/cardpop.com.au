@@ -48,6 +48,7 @@ export const SHOP_CATEGORY_GROUPS = [
       { name: 'Top Loaders',         slug: 'top-loaders',         Icon: CreditCard,  desc: 'Rigid PVC loaders in bulk packs' },
       { name: 'Magnetic Holders',    slug: 'magnetic-holders',    Icon: Magnet,      desc: 'One-touch magnetic cases by point size' },
       { name: 'Card Savers',         slug: 'card-savers',         Icon: ShieldCheck, desc: 'Semi-rigid holders for grading submission' },
+      { name: 'Graded Card Protectors', slug: 'graded-card-protectors', Icon: ShieldCheck, desc: 'Protective sleeves for graded slabs' },
     ],
   },
   {
@@ -93,7 +94,6 @@ export const SHOP_CATEGORY_GROUPS = [
       { name: 'Bubble Mailers',         slug: 'bubble-mailers',         Icon: Mail,        desc: 'Padded mailers in assorted sizes' },
       { name: 'Cardboard Mailers',      slug: 'cardboard-mailers',      Icon: PackageOpen, desc: 'Rigid mailers for graded slabs' },
       { name: 'Packing Tape',           slug: 'packing-tape',           Icon: Scissors,    desc: 'Clear tape for secure packaging' },
-      { name: 'Graded Card Protectors', slug: 'graded-card-protectors', Icon: ShieldCheck, desc: 'Protective sleeves for graded slabs' },
       { name: 'Tag Sleeves',            slug: 'tag-sleeves',            Icon: Tag,         desc: 'Sleeves for pricing and inventory tags' },
       { name: 'Tamper Seals',           slug: 'tamper-seals',           Icon: ShieldAlert, desc: 'Serialised tamper-evident seals' },
     ],

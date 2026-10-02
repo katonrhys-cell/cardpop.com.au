@@ -19,9 +19,9 @@ export const SHOP_COLLECTION_SEO = {
     group: 'Protection',
     title: 'Card Protection Supplies Australia — Sleeves, Toploaders & Holders | CardPop',
     description:
-      'Shop trading card protection supplies in Australia — penny sleeves, premium matte sleeves, perfect fit sleeves, top loaders, magnetic one-touch holders and semi-rigid card savers. Fast tracked shipping, priced in AUD.',
+      'Shop trading card protection supplies in Australia — penny sleeves, premium matte sleeves, perfect fit sleeves, top loaders, magnetic one-touch holders, semi-rigid card savers and graded slab protectors. Fast tracked shipping, priced in AUD.',
     intro:
-      'Protecting your cards is the first rule of the hobby, and it starts the moment a card leaves the pack. CardPop stocks the full protection chain trusted by Australian collectors — soft penny sleeves for everyday bulk, matte and gloss premium sleeves for decks, perfect-fit inners for double-sleeving, rigid top loaders, one-touch magnetic holders sized by point thickness, and semi-rigid card savers ready for grading submission. Whether you\'re safeguarding a chase alt-art or shipping a graded slab, the right sleeve or holder keeps corners sharp and surfaces flawless. Every order ships fast and tracked from within Australia, priced in AUD.',
+      'Protecting your cards is the first rule of the hobby, and it starts the moment a card leaves the pack. CardPop stocks the full protection chain trusted by Australian collectors — soft penny sleeves for everyday bulk, matte and gloss premium sleeves for decks, perfect-fit inners for double-sleeving, rigid top loaders, one-touch magnetic holders sized by point thickness, semi-rigid card savers ready for grading submission, and protective sleeves for PSA, BGS and CGC slabs. Whether you\'re safeguarding a chase alt-art or shipping a graded slab, the right sleeve or holder keeps corners sharp and surfaces flawless. Every order ships fast and tracked from within Australia, priced in AUD.',
     subs: [
       { name: 'Penny Sleeves', slug: 'penny-sleeves' },
       { name: 'Premium Sleeves', slug: 'premium-sleeves' },
@@ -29,6 +29,7 @@ export const SHOP_COLLECTION_SEO = {
       { name: 'Top Loaders', slug: 'top-loaders' },
       { name: 'Magnetic Holders', slug: 'magnetic-holders' },
       { name: 'Card Savers', slug: 'card-savers' },
+      { name: 'Graded Card Protectors', slug: 'graded-card-protectors' },
     ],
   },
   storage: {
@@ -72,15 +73,14 @@ export const SHOP_COLLECTION_SEO = {
     group: 'Shipping',
     title: 'Card Shipping Supplies Australia — Mailers, Team Bags & Tape | CardPop',
     description:
-      'Shop trading card shipping supplies in Australia — team bags, padded bubble mailers, rigid cardboard mailers, packing tape and graded slab protectors. Post cards safely with tracked AUD shipping.',
+      'Shop trading card shipping supplies in Australia — team bags, padded bubble mailers, rigid cardboard mailers, packing tape, tag sleeves and tamper seals. Post cards safely with tracked AUD shipping.',
     intro:
-      'Selling and trading means posting, and posting means packing cards so they arrive exactly as they left. CardPop stocks the essentials for safe, professional shipping — resealable team bags for sleeved cards, padded bubble mailers in every size, rigid cardboard mailers built for graded slabs, clear packing tape, and protective sleeves for PSA, BGS and CGC cases. Ship like a pro, avoid damaged-in-transit disputes, and keep your feedback spotless. All supplies ship fast and tracked from within Australia, priced in AUD.',
+      'Selling and trading means posting, and posting means packing cards so they arrive exactly as they left. CardPop stocks the essentials for safe, professional shipping — resealable team bags for sleeved cards, padded bubble mailers in every size, rigid cardboard mailers built for graded slabs, clear packing tape, and tamper-evident seals. Ship like a pro, avoid damaged-in-transit disputes, and keep your feedback spotless. All supplies ship fast and tracked from within Australia, priced in AUD.',
     subs: [
       { name: 'Team Bags', slug: 'team-bags' },
       { name: 'Bubble Mailers', slug: 'bubble-mailers' },
       { name: 'Cardboard Mailers', slug: 'cardboard-mailers' },
       { name: 'Packing Tape', slug: 'packing-tape' },
-      { name: 'Graded Card Protectors', slug: 'graded-card-protectors' },
       { name: 'Tag Sleeves', slug: 'tag-sleeves' },
       { name: 'Tamper Seals', slug: 'tamper-seals' },
     ],
