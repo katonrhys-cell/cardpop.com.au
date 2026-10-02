@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { stripePromise, hasStripeKey } from '@/lib/stripeClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
+import StripeElementsPayment from '@/components/checkout/StripeElementsPayment.jsx';
 
 /*
  * Inline Stripe payment. Renders Stripe's Embedded Checkout (card / PayPal /
@@ -16,7 +17,15 @@ import apiServerClient from '@/lib/apiServerClient.js';
  * request surfaces a clear, actionable error with a Retry button instead of the
  * blank gap Stripe leaves when its own fetch throws. On completion Stripe
  * redirects the buyer to the session's return_url (our /checkout-success page).
+ *
+ * Two renderings of the same Checkout Session:
+ *  - 'elements' (default): our own layout of Stripe Elements with an inline
+ *    Google Pay button above the card form — StripeElementsPayment.jsx.
+ *  - 'embedded': Stripe's full embedded checkout page (Google Pay still shows
+ *    inside it when the browser supports it). Build with
+ *    VITE_CHECKOUT_UI=embedded to fall back to this without a code change.
  */
+const UI_MODE = import.meta.env.VITE_CHECKOUT_UI === 'embedded' ? 'embedded' : 'elements';
 
 const EmbeddedStripeCheckout = ({ requestBody }) => {
   const [clientSecret, setClientSecret] = useState(null);
@@ -32,7 +41,7 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...requestBody,
-          uiMode: 'embedded',
+          uiMode: UI_MODE,
           returnUrl: `${window.location.origin}/checkout-success?session_id={CHECKOUT_SESSION_ID}`,
         }),
         signal,
@@ -94,6 +103,10 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
         <p className="text-sm">Loading secure payment form…</p>
       </div>
     );
+  }
+
+  if (UI_MODE === 'elements') {
+    return <StripeElementsPayment clientSecret={clientSecret} />;
   }
 
   return (

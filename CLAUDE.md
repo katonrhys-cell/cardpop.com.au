@@ -206,6 +206,7 @@ and can be cleaned up.
 | `BLOG_AUTOPUBLISH` | *(optional)* `true` publishes generated articles straight away. Default (unset) stores them unpublished for a human to review in the admin blog list |
 | `KIT_LAUNCH_FORM_ID` | Kit.com pre-launch notify list (`/launch` page) — optional, falls back to `KIT_FORM_ID` |
 | `VITE_COMING_SOON` | Pre-launch mode (build-time): `true` redirects the homepage to `/launch` |
+| `VITE_CHECKOUT_UI` | *(optional, build-time)* `embedded` renders Stripe's full Embedded Checkout page on the payment step instead of the default Stripe Elements form with the inline **Google Pay** button (`components/checkout/StripeElementsPayment.jsx`, Checkout Session `ui_mode: 'elements'`). Google Pay needs enabling in the Stripe Dashboard and `cardpop.com.au` registered under Payment method domains — see `docs/accelerated-checkout.md` |
 | `VITE_OCR_AUTOCROP` | *(optional, build-time)* `false` disables the card-rectification step that runs before card identification (`utils/analysisImage.js`). Default on — it warps the card flat so the vision models spend their whole downscale budget on the card rather than the desk around it, at the cost of putting the ~3.5 MB OpenCV wasm chunk on the default listing path. See `docs/card-identification.md` |
 | `ENCRYPTION_KEY` | MFA OTP / backup code encryption |
 | `VAPID_PUBLIC_KEY` | Web push (`src/utils/pushService.js`) — generate the pair once with `npx web-push generate-vapid-keys`. Unset = push silently disabled (fail-safe): `/push/public-key` returns null and the enable-push UI hides itself |
