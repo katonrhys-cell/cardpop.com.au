@@ -23,6 +23,7 @@ import {
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
+  { value: 'preorder', label: 'Pre-order' },
   { value: 'coming_soon', label: 'Coming soon' },
   { value: 'draft', label: 'Draft' },
   { value: 'archived', label: 'Archived' },
@@ -155,6 +156,7 @@ const ProductManagementPage = () => {
     active: products.filter(p => p.status === 'active').length,
     draft: products.filter(p => p.status === 'draft').length,
     comingSoon: products.filter(p => p.status === 'coming_soon').length,
+    preorder: products.filter(p => p.status === 'preorder').length,
     archived: products.filter(p => p.status === 'archived').length
   };
 
@@ -185,9 +187,12 @@ const ProductManagementPage = () => {
         })()}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : 'text-muted-foreground'}`}>
-          {product.status === 'coming_soon' ? 'coming soon' : product.status}
+        <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : product.status === 'preorder' ? 'text-brand-red border-brand-red/30' : 'text-muted-foreground'}`}>
+          {product.status === 'coming_soon' ? 'coming soon' : product.status === 'preorder' ? 'pre-order' : product.status}
         </Badge>
+        {product.status === 'preorder' && product.preorder_eta && (
+          <p className="mt-1 max-w-[12rem] text-[11px] leading-tight text-muted-foreground">{product.preorder_eta}</p>
+        )}
       </TableCell>
       <TableCell className="tabular-nums">{product.stock_quantity ?? '-'}</TableCell>
       <TableCell className="text-right">
@@ -224,7 +229,7 @@ const ProductManagementPage = () => {
         </Button>
       </AdminPageHeader>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         <Card role="button" tabIndex={0} aria-pressed={filters.status === 'all'} onClick={() => setParams({ status: 'all' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'all' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'all' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-primary/10 text-primary rounded-xl"><Package className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Total Products</p><p className="text-2xl font-bold">{stats.total}</p></div>
@@ -232,6 +237,10 @@ const ProductManagementPage = () => {
         <Card role="button" tabIndex={0} aria-pressed={filters.status === 'active'} onClick={() => setParams({ status: 'active' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'active' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'active' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-emerald-500/10 text-emerald-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>
           <div><p className="text-sm font-bold text-muted-foreground uppercase">Active</p><p className="text-2xl font-bold">{stats.active}</p></div>
+        </Card>
+        <Card role="button" tabIndex={0} aria-pressed={filters.status === 'preorder'} onClick={() => setParams({ status: 'preorder' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'preorder' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'preorder' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
+          <div className="p-3 bg-brand-red/10 text-brand-red rounded-xl"><BarChart3 className="w-6 h-6" /></div>
+          <div><p className="text-sm font-bold text-muted-foreground uppercase">Pre-order</p><p className="text-2xl font-bold">{stats.preorder}</p></div>
         </Card>
         <Card role="button" tabIndex={0} aria-pressed={filters.status === 'draft'} onClick={() => setParams({ status: 'draft' })} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setParams({ status: 'draft' }))} className={`p-5 rounded-2xl bg-card border shadow-sm flex items-center gap-4 cursor-pointer transition-colors hover:border-primary/50 ${filters.status === 'draft' ? 'border-primary ring-1 ring-primary' : 'border-border'}`}>
           <div className="p-3 bg-blue-500/10 text-blue-500 rounded-xl"><BarChart3 className="w-6 h-6" /></div>

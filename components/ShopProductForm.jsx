@@ -13,6 +13,10 @@ import { SHOP_CATEGORY_GROUPS, SHOP_CATEGORIES } from '@/utils/shopCategories.js
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { variantStock } from '@/utils/shopVariants.js';
+import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
+
+// One-tap estimates for the pre-order field; any free text works too.
+const PREORDER_ETA_PRESETS = ['Ships in 7–10 days', 'Ships in 1–2 weeks', 'Ships in 2–4 weeks', 'Ships in 4–6 weeks', 'Ships in 6–8 weeks'];
 
 const COLOUR_CODES = { black: 'BLK', blue: 'BLU', clear: 'CLR', green: 'GRN', jade: 'JDE', navy: 'NAV', orange: 'ORA', pink: 'PNK', purple: 'PUR', red: 'RED', rose: 'ROS', turquoise: 'TQS', white: 'WHT', yellow: 'YEL', grey: 'GRY', gray: 'GRY', silver: 'SLV', gold: 'GLD' };
 const suggestVariantSku = (productSku, colour) => {
@@ -46,6 +50,8 @@ const INITIAL_STATE = {
   category: '',
   product_type: 'sealed',
   status: 'active',
+  // Shown to buyers while status = preorder (required then).
+  preorder_eta: '',
 };
 
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB
@@ -82,6 +88,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         category: product.category || '',
         product_type: product.product_type || 'sealed',
         status: product.status || 'active',
+        preorder_eta: product.preorder_eta || '',
       });
       const existing = Array.isArray(product.images) && product.images.length
         ? product.images
@@ -200,6 +207,16 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     if (costInc === null && costEx !== null) costInc = Math.round(costEx * 1.1 * 100) / 100;
     const stock = parseInt(formData.stock_quantity, 10);
 
+    // A pre-order must say when it ships — that promise is the whole point
+    // (the DB refuses a blank one too: shop_products_preorder_eta_required).
+    const preorderEta = String(formData.preorder_eta ?? '').trim();
+    if (formData.status === 'preorder' && !preorderEta) {
+      return toast.error('Pre-orders need an estimated dispatch, e.g. "Ships in 4–6 weeks"');
+    }
+    if (preorderEta.length > PREORDER_ETA_MAX_LENGTH) {
+      return toast.error(`Estimated dispatch must be ${PREORDER_ETA_MAX_LENGTH} characters or fewer`);
+    }
+
     // Variants: every row needs a SKU; with more than one row each needs a
     // colour so shoppers can tell them apart. SKUs must be unique in the form.
     const cleanVariants = variants.map((v) => ({
@@ -259,6 +276,12 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       };
       if ((product && 'family_sku' in product) || Object.values(familyFields).some((v) => v != null)) {
         Object.assign(payload, familyFields);
+      }
+      // Same guard for the pre-order estimate: only sent once the column
+      // exists (an edited row carries it) or when one has been typed. Kept
+      // when the product goes back to active, so flipping it again is quick.
+      if ((product && 'preorder_eta' in product) || preorderEta) {
+        payload.preorder_eta = preorderEta || null;
       }
 
       let productId = product?.id ?? null;
@@ -423,6 +446,9 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 </>
               ) : (
                 <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
+              )}
+              {formData.status === 'preorder' && (
+                <p className="text-[11px] text-muted-foreground">Pre-orders are unlimited and don&apos;t use stock. Set this to what you have on hand when it arrives and you switch to Active.</p>
               )}
             </div>
           </div>
@@ -706,12 +732,46 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <SelectTrigger className="bg-background font-medium h-11"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="active">Active (visible in shop)</SelectItem>
+                <SelectItem value="preorder">Pre-order (for sale now, ships later — shows your estimate)</SelectItem>
                 <SelectItem value="coming_soon">Coming soon (visible, not for sale — enquiry button)</SelectItem>
                 <SelectItem value="draft">Draft (hidden)</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {formData.status === 'preorder' && (
+            <div className="space-y-2">
+              <Label htmlFor="shop-product-preorder-eta">Estimated dispatch *</Label>
+              <Input
+                id="shop-product-preorder-eta"
+                value={formData.preorder_eta}
+                maxLength={PREORDER_ETA_MAX_LENGTH}
+                placeholder="e.g. Ships in 4–6 weeks, or Expected mid-November"
+                onChange={(e) => handleInputChange('preorder_eta', e.target.value)}
+                className="bg-background"
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {PREORDER_ETA_PRESETS.map((preset) => (
+                  <Button
+                    key={preset}
+                    type="button"
+                    size="sm"
+                    variant={formData.preorder_eta === preset ? 'default' : 'outline'}
+                    className="h-7 rounded-full text-xs"
+                    onClick={() => handleInputChange('preorder_eta', preset)}
+                  >
+                    {preset}
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Shown on the product, in the cart and at checkout, and saved on each order so the buyer
+                keeps the estimate they bought with. Buyers pay in full now. Switch the status to Active
+                when stock arrives.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

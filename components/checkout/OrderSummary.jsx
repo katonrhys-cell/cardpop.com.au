@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
+import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 
 const LineItem = ({ label, value, bold }) => (
   <div className={`flex justify-between text-sm ${bold ? 'font-semibold text-base' : 'text-muted-foreground'}`}>
@@ -13,7 +14,7 @@ const LineItem = ({ label, value, bold }) => (
   </div>
 );
 
-const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processingFee = 0, gst = 0, gstIncluded = 0, shipping = 0, discount = 0, total = 0, onEditCart, onNext }) => {
+const OrderSummary = ({ cartItems = [], hasPreorder = false, subtotal = 0, serviceFee = 0, processingFee = 0, gst = 0, gstIncluded = 0, shipping = 0, discount = 0, total = 0, onEditCart, onNext }) => {
   return (
     <div className="space-y-4">
       <Card className="border-border shadow-sm">
@@ -32,11 +33,22 @@ const OrderSummary = ({ cartItems = [], subtotal = 0, serviceFee = 0, processing
                   {item.image && (
                     <img src={toCdnUrl(item.image)} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
                   )}
-                  <span className="flex-1 font-medium">{item.name ?? 'Card'}</span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-medium">{item.name ?? 'Card'}</span>
+                    {item.preorderEta && <PreorderNotice variant="inline" eta={item.preorderEta} className="mt-0.5" />}
+                  </span>
                   <span className="text-muted-foreground">${Number(item.price ?? 0).toFixed(2)}</span>
                 </li>
               ))}
             </ul>
+          )}
+          {hasPreorder && (
+            // Paid in full now like any order; the estimate above is per item.
+            <p className="rounded-lg border border-brand-red/30 bg-brand-red/5 p-2.5 text-xs text-muted-foreground">
+              <span className="font-semibold text-foreground">This order includes pre-order items.</span>{' '}
+              You pay for them now and we dispatch them as soon as stock arrives (estimates shown above).
+              If a pre-order can&apos;t be supplied, it&apos;s refunded in full.
+            </p>
           )}
           <Separator />
           <div className="space-y-1.5">

@@ -12,6 +12,7 @@ import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import SearchBar from '@/components/SearchBar.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 
 // How many hits to show per content type. The page favours breadth ("did the
 // site have anything?"), so a handful of the *best* matches per source beats a
@@ -77,7 +78,7 @@ async function searchListings(tokens) {
 
 async function searchShop(tokens) {
   const { data, error } = await applyTokens(
-    supabase.from('shop_products').select('*').in('status', ['active', 'coming_soon']),
+    supabase.from('shop_products').select('*').in('status', PUBLIC_SHOP_STATUSES),
     tokens, ['title'],
   ).limit(OVER_FETCH);
   if (error) throw error;

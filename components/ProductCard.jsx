@@ -17,7 +17,8 @@ import GradeBadge from '@/components/GradeBadge.jsx';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
-import { isSoldOut, isComingSoon } from '@/utils/shopStock.js';
+import { isSoldOut, isComingSoon, isPreorder, preorderEta } from '@/utils/shopStock.js';
+import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { hasVariants } from '@/utils/shopVariants.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
@@ -31,6 +32,9 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   // Coming soon wins over sold out (a pre-launch product usually has 0 stock).
   const comingSoon = isComingSoon(product);
   const soldOut = !comingSoon && isSoldOut(product);
+  // Pre-order: buyable now, ships later — ribbon + the admin's estimate.
+  // Unlimited, so isSoldOut() is never true for one.
+  const preorder = !comingSoon && !soldOut && product.source === 'shop' && isPreorder(product);
   // A sold marketplace listing — or a vault row carrying its listing embed
   // (VAULT_ITEM_CARD_SELECT) — stays visible, pilled "Sold", never purchasable.
   // Distinct from `soldOut`, which is shop stock.
@@ -93,6 +97,13 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             <Badge className="shadow-md font-extrabold uppercase tracking-wider bg-brand-charcoal text-white hover:bg-brand-charcoal border-0">
               Coming soon
             </Badge>
+          </div>
+        )}
+
+        {/* Pre-order ribbon — top right */}
+        {preorder && (
+          <div className="absolute top-3 right-3 z-10">
+            <PreorderBadge className="shadow-md" />
           </div>
         )}
 
@@ -207,6 +218,8 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             <BnplMessage amount={product.price ?? product.price_aud ?? product.askingPrice ?? product.estimatedValue} className="-mt-1" />
           )}
 
+          {preorder && <PreorderNotice variant="inline" eta={preorderEta(product)} className="-mt-1" />}
+
           {isSold ? null : comingSoon ? (
             <>
               <Button
@@ -256,7 +269,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
               className="w-full rounded-xl font-bold"
               onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddToCart(product); }}
             >
-              <ShoppingCart className="w-4 h-4 mr-2" /> Add to Cart
+              <ShoppingCart className="w-4 h-4 mr-2" /> {preorder ? 'Pre-order' : 'Add to Cart'}
             </Button>
           )}
 

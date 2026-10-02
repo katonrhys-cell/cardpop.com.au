@@ -12,6 +12,7 @@ import {
 } from '../data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
+import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js';
 import { colourListText } from '../utils/colourSwatch.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
@@ -638,10 +639,10 @@ async function renderListing(supabase, id, slugParam) {
 async function renderShopProductBySlug(supabase, categorySlug, productSlug, colour) {
   const columns = 'id, slug, category, colour, family_sku, status';
   let { data: rows } = await supabase.from('shop_products').select(columns)
-    .in('status', ['active', 'coming_soon']).eq('slug', productSlug);
+    .in('status', PUBLIC_SHOP_STATUSES).eq('slug', productSlug);
   if (!rows?.length) {
     ({ data: rows } = await supabase.from('shop_products').select(columns)
-      .in('status', ['active', 'coming_soon'])
+      .in('status', PUBLIC_SHOP_STATUSES)
       .like('slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}-%`)
       .not('family_sku', 'is', null));
     rows = (rows || []).filter((r) => shopLineSlug(r) === productSlug);
@@ -669,7 +670,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     .eq('id', id)
     .maybeSingle();
 
-  const isPublic = product && ['active', 'coming_soon'].includes(product.status);
+  const isPublic = product && PUBLIC_SHOP_STATUSES.includes(product.status);
   if (isPublic && !canonicalPath && shopProductBasePath(product)) {
     return { status: 301, location: `${BASE_URL}${shopProductPath(product)}` };
   }
@@ -677,7 +678,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   const slug = product?.title ? slugify(product.title) : (slugParam || 'product');
   const canonical = canonicalPath ? `${BASE_URL}${canonicalPath}` : `${BASE_URL}/product/shop/${id}/${slug}`;
 
-  if (!product || !['active', 'coming_soon'].includes(product.status)) {
+  if (!product || !PUBLIC_SHOP_STATUSES.includes(product.status)) {
     return notFound({
       title: 'Product Unavailable | CardPop',
       description: 'This product is no longer available in the CardPop shop.',
@@ -690,7 +691,10 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   const categoryUrl = shopCategorySlug(product) ? `${BASE_URL}/shop/category/${shopCategorySlug(product)}` : null;
   const image = absUrl(product.images?.[0] || product.image_url);
   const price = product.price_aud;
-  const inStock = product.stock_quantity == null || product.stock_quantity > 0;
+  // Pre-orders are unlimited, so they're always available.
+  const inStock = product.status === 'preorder' || product.stock_quantity == null || product.stock_quantity > 0;
+  // Sold now, shipped when stock arrives: schema.org has a value for exactly that.
+  const preorder = product.status === 'preorder';
   const description = product.description
     || `${name}${product.category ? ` — ${product.category}` : ''} available from the CardPop official store. Fast shipping across Australia.`;
 
@@ -707,7 +711,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
           '@type': 'Offer',
           price: Number(price).toFixed(2),
           priceCurrency: 'AUD',
-          availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+          availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
           itemCondition: 'https://schema.org/NewCondition',
           url: canonical,
           seller: { '@type': 'Organization', name: 'CardPop' },
@@ -730,7 +734,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${categoryUrl ? `<a href="${categoryUrl}">${esc(product.category)}</a> / ` : ''}${esc(name)}</nav>
   <h1>${esc(name)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
-  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>` : ''}
+  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${!inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>` : ''}
   ${product.category ? `<p>${esc(product.category)}</p>` : ''}
   ${descriptionParagraphs(product.description).map((p) => `<p>${esc(p)}</p>`).join('\n  ')}
 </main>`;
@@ -824,10 +828,11 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
-  const inStock = (row?.stock_quantity ?? 0) > 0;
+  const inStock = row?.status === 'preorder' || (row?.stock_quantity ?? 0) > 0;
   // Enquiry-only until a price is set: the page is complete and indexable
   // without one, but no Offer is emitted for a product that can't be bought.
-  const isPurchasable = row?.status === 'active' && price != null;
+  const isPurchasable = isPurchasableStatus(row?.status) && price != null;
+  const preorder = row?.status === 'preorder';
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -845,7 +850,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
         url: canonical,
         priceCurrency: 'AUD',
         price: price.toFixed(2),
-        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
       },
@@ -878,7 +883,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   <h1>${esc(product.title)}</h1>
   <img src="${esc(images[0])}" alt="${esc(binderImageAlt(product, product.imageFiles[0]))}" />
   ${isPurchasable
-    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>`
+    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${!inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>`
     : rrp != null ? `<p>RRP A$${esc(rrp.toFixed(2))}</p>` : ''}
   <p><a href="${BASE_URL}/signup">Enquire now</a></p>
   <p>${esc(product.intro)}</p>
@@ -947,8 +952,9 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   const rrp = row && row.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
-  const inStock = ((row && row.stock_quantity) || 0) > 0;
-  const isPurchasable = row && row.status === 'active' && price != null;
+  const inStock = row?.status === 'preorder' || ((row && row.stock_quantity) || 0) > 0;
+  const isPurchasable = row && isPurchasableStatus(row.status) && price != null;
+  const preorder = row?.status === 'preorder';
   // Product copy wins where it exists; the product type's shared copy is the
   // fallback. FAQs stay type-level — they are genuinely shared within a type.
   const description = product.metaDescription
@@ -972,7 +978,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
         url: canonical,
         priceCurrency: 'AUD',
         price: price.toFixed(2),
-        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia\u2122' },
       },
@@ -1004,7 +1010,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   <h1>${esc(product.title)}</h1>
   <img src="${esc(images[0])}" alt="${esc(palmsOffImageAlt(product, product.imagePaths[0]))}" />
   ${isPurchasable
-    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${inStock ? 'In stock' : 'Out of stock'}</p>`
+    ? `<p><strong>A$${esc(price.toFixed(2))}</strong> — ${!inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>`
     : rrp != null ? `<p>RRP A$${esc(rrp.toFixed(2))}</p>` : ''}
   <p><a href="${BASE_URL}/signup">Enquire now</a></p>
   <p>${esc(intro)}</p>
@@ -1066,7 +1072,7 @@ async function renderLanding(supabase, path) {
 
   let items = [];
   if (cfg.source === 'shop') {
-    let q = supabase.from('shop_products').select('id, title, slug, category, colour, family_sku, price_aud, images, image_url').in('status', ['active', 'coming_soon']);
+    let q = supabase.from('shop_products').select('id, title, slug, category, colour, family_sku, price_aud, images, image_url').in('status', PUBLIC_SHOP_STATUSES);
     if (cfg.productType) q = q.eq('product_type', cfg.productType);
     const { data } = await q.order('created_at', { ascending: false }).limit(50);
     items = (data || []).map(p => ({

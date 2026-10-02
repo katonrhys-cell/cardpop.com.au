@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -137,11 +137,13 @@ const ShopSealedBoxesPage = () => {
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
       grade: product.grade || null,
+      ...preorderCartFields(product),
     };
     const cartVariant = {
       id: product.id,
       price_in_cents: priceInCents,
-      manage_inventory: product.stock_quantity != null,
+      // Pre-orders are unlimited, so the cart doesn't cap them by stock.
+      manage_inventory: !hasUnlimitedStock(product) && product.stock_quantity != null,
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999);

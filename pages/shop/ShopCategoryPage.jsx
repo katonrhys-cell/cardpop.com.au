@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -155,11 +155,13 @@ const ShopCategoryPage = () => {
       image: product.images?.[0] || product.image_url || product.card_image || null,
       grading_company: product.grading_company || null,
       grade: product.grade || null,
+      ...preorderCartFields(product),
     };
     const cartVariant = {
       id: product.id,
       price_in_cents: priceInCents,
-      manage_inventory: product.stock_quantity != null,
+      // Pre-orders are unlimited, so the cart doesn't cap them by stock.
+      manage_inventory: !hasUnlimitedStock(product) && product.stock_quantity != null,
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999)
@@ -227,9 +229,11 @@ const ShopCategoryPage = () => {
             '@type': 'Offer',
             priceCurrency: 'AUD',
             price: price.toFixed(2),
-            availability: (p.stock_quantity == null || p.stock_quantity > 0)
-              ? 'https://schema.org/InStock'
-              : 'https://schema.org/OutOfStock',
+            availability: p.status === 'preorder'
+              ? 'https://schema.org/PreOrder'
+              : (p.stock_quantity == null || p.stock_quantity > 0)
+                ? 'https://schema.org/InStock'
+                : 'https://schema.org/OutOfStock',
             url: `${SITE_ORIGIN}${shopProductPath(p)}`,
           },
         };

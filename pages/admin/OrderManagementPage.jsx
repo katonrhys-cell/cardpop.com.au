@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
 import ShipOrderDialog from '@/components/admin/ShipOrderDialog.jsx';
+import { orderPreorderLines, isAwaitingPreorderStock } from '@/utils/shopStock.js';
 
 const STATUS_BADGE = {
   pending:           'bg-muted text-muted-foreground border-border',
@@ -287,6 +288,7 @@ const OrderManagementPage = () => {
     if (statusFilter === 'all')              return true;
     if (statusFilter === 'refund_requested') return o.refund_status === 'requested';
     if (statusFilter === 'refund_approved')  return o.refund_status === 'approved';
+    if (statusFilter === 'preorder_awaiting') return isAwaitingPreorderStock(o);
     return o.status === statusFilter;
   });
 
@@ -331,6 +333,7 @@ const OrderManagementPage = () => {
               <SelectItem value="cancelled">Cancelled</SelectItem>
               <SelectItem value="refund_requested">⚠ Refund Requested</SelectItem>
               <SelectItem value="refund_approved">✓ Refund Approved</SelectItem>
+              <SelectItem value="preorder_awaiting">Pre-orders awaiting stock</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -395,6 +398,16 @@ const OrderManagementPage = () => {
                     <Badge variant="outline" className={`text-xs font-bold ${STATUS_BADGE[order.status] || 'bg-muted text-muted-foreground'}`}>
                       {order.status?.replace(/_/g, ' ') || 'pending'}
                     </Badge>
+                    {orderPreorderLines(order).length > 0 && (
+                      // Paid pre-order lines can't ship until stock arrives.
+                      <Badge
+                        variant="outline"
+                        className="ml-1.5 text-[10px] font-bold uppercase tracking-wider text-brand-red border-brand-red/40"
+                        title={orderPreorderLines(order).map((l) => `${l.title || 'Item'}: ${l.preorder_eta || 'ships when stock arrives'}`).join('\n')}
+                      >
+                        Pre-order
+                      </Badge>
+                    )}
                     {order.tracking_number && (
                       <p className="text-[11px] font-mono text-muted-foreground mt-1" title={order.shipping_notified_at ? 'Customer emailed' : 'Customer not emailed'}>
                         {order.tracking_number}{order.shipping_notified_at ? ' ✉' : ''}

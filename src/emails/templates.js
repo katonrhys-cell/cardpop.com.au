@@ -150,7 +150,7 @@ const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 function invoiceBlock(invoice, orderId) {
   const rows = (invoice.items || [])
     .map(it => `<tr>
-<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${esc(it.name)}${it.quantity > 1 ? ` <span style="color:#9CA3AF;">× ${Number(it.quantity)}</span>` : ''}</td>
+<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${esc(it.name)}${it.quantity > 1 ? ` <span style="color:#9CA3AF;">× ${Number(it.quantity)}</span>` : ''}${it.preorderEta ? `<br><span style="font-size:12px;font-weight:700;color:#CE1126;">Pre-order &middot; ${esc(it.preorderEta)}</span>` : ''}</td>
 <td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;text-align:right;white-space:nowrap;">${money(it.total)} AUD</td>
 </tr>`)
     .join('');
@@ -196,6 +196,14 @@ ${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:70
 </div>`;
 }
 
+// Shown when any invoice line is a pre-order: paid now, dispatched later.
+function preorderNote(invoice) {
+  if (!(invoice?.items || []).some((it) => it.preorderEta)) return '';
+  return `<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;padding:14px 18px;margin:0 0 20px;font-size:14px;color:#374151;">
+<strong style="color:#111827;">Your order includes pre-order items.</strong> They're paid for and reserved for you, and we'll dispatch them as soon as stock arrives (estimates above). You'll get a tracking email when they ship. If a pre-order can't be supplied, it's refunded in full.
+</div>`;
+}
+
 // Google's brand guidelines only cover their own wallet by name; other
 // values resolveWalletType() can return (e.g. 'link') get no special label.
 const WALLET_LABELS = { google_pay: 'Google Pay', apple_pay: 'Apple Pay' };
@@ -222,6 +230,7 @@ ${meta}
 ${paidWithLine}
 ${businessBlock(invoice)}
 ${invoiceBlock(invoice, orderId)}
+${preorderNote(invoice)}
 ${isTaxInvoice ? (() => { const gstTotal = Number(invoice.gst || 0) + Number(invoice.gstIncluded || 0); return `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${gstTotal > 0 ? ` Total includes GST of ${money(gstTotal)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>`; })() : ''}
 <p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
   } else {
@@ -251,10 +260,12 @@ ${summaryTable([
 // Internal heads-up sent to the admin contact for every confirmed order, so
 // sales are visible without watching the dashboard. Links to Order Management,
 // not a customer-facing page.
-export function orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName }) {
+export function orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }) {
   const rows = [
     ['Order', `#${String(orderId || '').slice(0, 8).toUpperCase() || '—'}`],
     ['Items', esc(itemsSummary) || '—'],
+    // Pre-order lines can't ship yet — flagged so they aren't packed early.
+    ...(preorderSummary ? [['Pre-order', esc(preorderSummary)]] : []),
     ['Buyer', [buyerName, buyerEmail].filter(Boolean).map(esc).join(' · ') || '—'],
   ];
   if (sellerName) rows.push(['Seller', esc(sellerName)]);
@@ -265,8 +276,8 @@ ${summaryTable(rows)}
 <p>Open Order Management to view the full details, buyer address, and fulfilment status.</p>`;
 
   return cpEmail(
-    `New order received — $${Number(total || 0).toFixed(2)} AUD`,
-    'New Order',
+    `New ${preorderSummary ? 'pre-order' : 'order'} received — $${Number(total || 0).toFixed(2)} AUD`,
+    preorderSummary ? 'New Pre-order' : 'New Order',
     'A new order has come in',
     body,
     'https://cardpop.com.au/admin/orders',

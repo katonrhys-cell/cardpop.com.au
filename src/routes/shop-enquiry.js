@@ -4,6 +4,7 @@ import logger from '../utils/logger.js';
 import { sendShopEnquiry } from '../utils/emailService.js';
 import { verifyTurnstileToken } from '../utils/turnstile.js';
 import { shopProductPath } from '../../utils/shopProductUrl.js';
+import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
 
 const router = Router();
 
@@ -58,7 +59,7 @@ router.post('/', async (req, res) => {
       .eq('id', productId)
       .maybeSingle();
     if (lookupError) throw lookupError;
-    if (!product || !['active', 'coming_soon'].includes(product.status)) {
+    if (!product || !PUBLIC_SHOP_STATUSES.includes(product.status)) {
       return res.status(404).json({ error: 'Unknown product.' });
     }
 

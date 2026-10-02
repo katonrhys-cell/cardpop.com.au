@@ -14,6 +14,7 @@ import BnplMessage from '@/components/BnplMessage.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
+import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 
 // Storage path or absolute URL → CDN-aware public URL.
 const resolveImg = (path) => publicImageUrl(path);
@@ -170,6 +171,7 @@ const ShoppingCart = () => {
                             </Link>
                             {set && <p className="text-xs text-muted-foreground mt-0.5">{set}</p>}
                             {gradeLabel && <p className="text-xs font-semibold text-primary mt-0.5">{gradeLabel}</p>}
+                            {p.preorder && <PreorderNotice variant="inline" eta={p.preorderEta || 'Ships when stock arrives'} className="mt-1" />}
                             {!year && !set && !gradeLabel && item.variant?.title && item.variant.title !== 'Default Title' && (
                               <p className="text-sm text-muted-foreground mt-1">{item.variant.title}</p>
                             )}
