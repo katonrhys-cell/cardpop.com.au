@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Renders the studio product images for the CardPop Magnetic Metal Slab Case
-// (35pt, one shop product per colour — SKU family CP-METAL-SLAB-35PT).
+// (PSA size, 35pt, one shop product per colour — SKU family CP-METAL-SLAB-PSA35).
 //
 //   node scripts/render-metal-slab-images.mjs
 //
@@ -16,18 +16,16 @@ import sharp from 'sharp';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 
+// The five colours the supplier stocks in the PSA size (its swatches: Black,
+// Green, Purple, Red, Silvery — Blue and Gold are listed but unavailable).
 export const METAL_SLAB_COLOURS = [
-  { name: 'Black',  code: 'BLK', hex: '#1C1D20' },
-  { name: 'Silver', code: 'SLV', hex: '#C4C8CE' },
-  { name: 'Gold',   code: 'GLD', hex: '#C9A24A' },
-  { name: 'Red',    code: 'RED', hex: '#B3182A' },
-  { name: 'Blue',   code: 'BLU', hex: '#1F4FA8' },
-  { name: 'Orange', code: 'ORG', hex: '#E0701F' },
-  { name: 'Purple', code: 'PUR', hex: '#6B3FA0' },
-  { name: 'Green',  code: 'GRN', hex: '#2F8A4C' },
+  { name: 'Black',  code: 'BLK', hex: '#2B2C30' },
+  { name: 'Green',  code: 'GRN', hex: '#6DB845' },
+  { name: 'Purple', code: 'PUR', hex: '#8B62B8' },
+  { name: 'Red',    code: 'RED', hex: '#B8232B' },
+  { name: 'Silver', code: 'SLV', hex: '#B9BDC3' },
 ];
 
-const OUT = path.resolve('public/images/shop/metal-slab-case');
 const SIZE = 1200;
 
 // ── colour helpers ──────────────────────────────────────────────────────────
@@ -37,17 +35,20 @@ const mix = (a, b, t) => rgbToHex(hexToRgb(a).map((v, i) => v + (hexToRgb(b)[i] 
 const light = (h, t) => mix(h, '#ffffff', t);
 const dark = (h, t) => mix(h, '#000000', t);
 
-// Aluminium face: a brushed linear sweep with a hot specular band.
+// Brushed metal rim: a linear sweep with a hot specular band.
 function metal(hex) {
-  return `linear-gradient(135deg, ${light(hex, 0.38)} 0%, ${hex} 22%, ${dark(hex, 0.28)} 46%, ${light(hex, 0.52)} 58%, ${hex} 72%, ${dark(hex, 0.35)} 100%)`;
+  return `linear-gradient(135deg, ${light(hex, 0.42)} 0%, ${hex} 20%, ${dark(hex, 0.3)} 44%, ${light(hex, 0.55)} 56%, ${hex} 70%, ${dark(hex, 0.38)} 100%)`;
 }
 function metalEdge(hex) {
-  return `linear-gradient(90deg, ${dark(hex, 0.45)} 0%, ${hex} 35%, ${light(hex, 0.3)} 55%, ${dark(hex, 0.3)} 100%)`;
+  return `linear-gradient(90deg, ${dark(hex, 0.4)} 0%, ${hex} 30%, ${light(hex, 0.38)} 50%, ${hex} 70%, ${dark(hex, 0.35)} 100%)`;
 }
 
-// ── the case (front face) ───────────────────────────────────────────────────
-// 440 × 700 px ≈ the outer footprint of a standard graded slab case.
-const W = 440, H = 700, T = 34; // width, height, thickness
+// ── the case ────────────────────────────────────────────────────────────────
+// Drawn to the supplier's measurements at 5.12 px/mm: outer 86 × 142 mm, a
+// thin metal rim around a full glass face, inner 81 × 136 mm × 7 mm deep.
+const PX = 5.12;
+const W = Math.round(86 * PX), H = Math.round(142 * PX), T = Math.round(10 * PX);
+const RIM_X = Math.round(((86 - 81) / 2) * PX), RIM_Y = Math.round(((142 - 136) / 2) * PX);
 
 function cardArt() {
   return `
@@ -60,6 +61,7 @@ function cardArt() {
   </div>`;
 }
 
+// A generic graded slab (no grading-company branding) filling the window.
 function slab() {
   return `
   <div class="slab">
@@ -72,22 +74,22 @@ function slab() {
   </div>`;
 }
 
-function caseFace(hex, { magnets = true, glass = true } = {}) {
+function caseFace(hex) {
   return `
   <div class="face" style="background:${metal(hex)}">
     <div class="brush"></div>
-    <div class="bevel"></div>
-    ${magnets ? '<i class="mag m1"></i><i class="mag m2"></i><i class="mag m3"></i><i class="mag m4"></i>' : ''}
-    <div class="window">${slab()}${glass ? '<div class="glass"></div>' : ''}</div>
+    <div class="window">${slab()}<div class="glass"></div></div>
   </div>`;
 }
 
-// A 3D box: front face plus right/left/top edges so angled shots show depth.
-function caseBox(hex, transform, extra = '') {
+// A 3D box: front face plus edges so angled shots show depth. The right edge
+// carries the finger notch used to open the case.
+function caseBox(hex, transform) {
   return `
-  <div class="box" style="transform:${transform};${extra}">
+  <div class="box" style="transform:${transform}">
     ${caseFace(hex)}
-    <div class="edge right" style="background:${metalEdge(hex)}"><div class="seam"></div></div>
+    <div class="back" style="background:${metal(hex)}"></div>
+    <div class="edge right" style="background:${metalEdge(hex)}"><div class="seam"></div><div class="notch"></div></div>
     <div class="edge left" style="background:${metalEdge(hex)}"><div class="seam"></div></div>
     <div class="edge top" style="background:${metalEdge(hex)}"><div class="seam h"></div></div>
     <div class="edge bottom" style="background:${metalEdge(hex)}"><div class="seam h"></div></div>
@@ -104,17 +106,14 @@ html,body{width:${SIZE}px;height:${SIZE}px;overflow:hidden;font-family:'Helvetic
   background:radial-gradient(ellipse at center,rgba(0,0,0,.34) 0%,rgba(0,0,0,.12) 45%,rgba(0,0,0,0) 72%);filter:blur(6px)}
 .charcoal .floor{background:radial-gradient(ellipse at center,rgba(0,0,0,.7) 0%,rgba(0,0,0,.25) 45%,rgba(0,0,0,0) 72%)}
 .box{position:relative;width:${W}px;height:${H}px;transform-style:preserve-3d}
-.face{position:absolute;inset:0;border-radius:26px;transform:translateZ(${T / 2}px);overflow:hidden;
-  box-shadow:inset 0 2px 1px rgba(255,255,255,.55),inset 0 -2px 2px rgba(0,0,0,.35)}
+.face{position:absolute;inset:0;border-radius:24px;transform:translateZ(${T / 2}px);overflow:hidden;
+  box-shadow:inset 0 2px 1px rgba(255,255,255,.6),inset 0 -2px 2px rgba(0,0,0,.35)}
+.back{position:absolute;inset:0;border-radius:24px;transform:translateZ(${-T / 2}px) rotateY(180deg)}
 .brush{position:absolute;inset:0;opacity:.18;mix-blend-mode:overlay;
   background:repeating-linear-gradient(90deg,rgba(255,255,255,.6) 0 1px,rgba(0,0,0,.25) 1px 2px,rgba(255,255,255,.1) 2px 4px)}
-.bevel{position:absolute;inset:6px;border-radius:21px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35),inset 0 0 0 2px rgba(0,0,0,.18)}
-.mag{position:absolute;width:16px;height:16px;border-radius:50%;
-  background:radial-gradient(circle at 35% 30%,#f4f4f4 0%,#9a9da3 40%,#4d5056 100%);box-shadow:0 1px 1px rgba(0,0,0,.5),inset 0 0 0 1px rgba(0,0,0,.25)}
-.m1{left:13px;top:13px}.m2{right:13px;top:13px}.m3{left:13px;bottom:13px}.m4{right:13px;bottom:13px}
-.window{position:absolute;left:34px;top:34px;right:34px;bottom:34px;border-radius:12px;overflow:hidden;
-  background:#e9eef2;box-shadow:inset 0 3px 8px rgba(0,0,0,.45),0 0 0 2px rgba(0,0,0,.25)}
-.slab{position:absolute;inset:8px;border-radius:9px;background:linear-gradient(160deg,#f8fbfd,#dfe6eb);
+.window{position:absolute;left:${RIM_X}px;top:${RIM_Y}px;right:${RIM_X}px;bottom:${RIM_Y}px;border-radius:12px;overflow:hidden;
+  background:#e9eef2;box-shadow:0 0 0 4px #141518,inset 0 2px 6px rgba(0,0,0,.4)}
+.slab{position:absolute;inset:4px;border-radius:9px;background:linear-gradient(160deg,#f8fbfd,#dfe6eb);
   box-shadow:inset 0 0 0 3px rgba(255,255,255,.9),inset 0 0 0 5px rgba(150,165,175,.35)}
 .label{position:absolute;left:16px;right:16px;top:16px;height:92px;border-radius:5px;background:#fbfbf8;
   box-shadow:0 0 0 2px #2c2d31 inset;padding:12px 14px;color:#1d1e21}
@@ -125,7 +124,7 @@ html,body{width:${SIZE}px;height:${SIZE}px;overflow:hidden;font-family:'Helvetic
 .lab-r span{font-size:10px;letter-spacing:1.5px}
 .barcode{position:absolute;left:14px;bottom:10px;width:150px;height:18px;
   background:repeating-linear-gradient(90deg,#1d1e21 0 2px,transparent 2px 4px,#1d1e21 4px 5px,transparent 5px 8px)}
-.well{position:absolute;left:28px;right:28px;top:126px;bottom:24px;border-radius:6px;
+.well{position:absolute;left:30px;right:30px;top:128px;bottom:30px;border-radius:6px;
   background:linear-gradient(180deg,#d4dce2,#eef2f5);box-shadow:inset 0 2px 6px rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center}
 .card{width:252px;height:352px;border-radius:12px;padding:10px;background:linear-gradient(145deg,#f3d26b,#c99a2e 45%,#f6dc7e 70%,#b8871f);box-shadow:0 3px 8px rgba(0,0,0,.35)}
 .card-in{width:100%;height:100%;border-radius:6px;background:#f6efe1;padding:8px;display:flex;flex-direction:column;gap:8px}
@@ -144,10 +143,15 @@ html,body{width:${SIZE}px;height:${SIZE}px;overflow:hidden;font-family:'Helvetic
 .glass{position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(118deg,rgba(255,255,255,0) 18%,rgba(255,255,255,.55) 24%,rgba(255,255,255,.08) 34%,rgba(255,255,255,0) 52%,rgba(255,255,255,.22) 62%,rgba(255,255,255,0) 70%)}
 .edge{position:absolute;overflow:hidden}
-.edge.right{width:${T}px;height:${H - 30}px;top:15px;right:${-T / 2}px;transform:rotateY(90deg)}
-.edge.left{width:${T}px;height:${H - 30}px;top:15px;left:${-T / 2}px;transform:rotateY(-90deg)}
-.edge.top{height:${T}px;width:${W - 30}px;left:15px;top:${-T / 2}px;transform:rotateX(90deg)}
-.edge.bottom{height:${T}px;width:${W - 30}px;left:15px;bottom:${-T / 2}px;transform:rotateX(-90deg)}
+.edge.right{width:${T}px;height:${H - 34}px;top:17px;right:${-T / 2}px;transform:rotateY(90deg)}
+.edge.left{width:${T}px;height:${H - 34}px;top:17px;left:${-T / 2}px;transform:rotateY(-90deg)}
+.edge.top{height:${T}px;width:${W - 34}px;left:17px;top:${-T / 2}px;transform:rotateX(90deg)}
+.edge.bottom{height:${T}px;width:${W - 34}px;left:17px;bottom:${-T / 2}px;transform:rotateX(-90deg)}
+.notch{position:absolute;left:50%;top:50%;width:14px;height:74px;margin:-37px 0 0 -7px;border-radius:7px;background:#0d0d0f;box-shadow:inset 0 2px 3px rgba(0,0,0,.9),0 1px 0 rgba(255,255,255,.3)}
+.dim{position:absolute;font-weight:700;font-size:20px;color:#2b2c30;letter-spacing:.5px}
+.dim small{display:block;font-weight:500;font-size:13px;color:#6b6d72;letter-spacing:1px;text-transform:uppercase}
+.arrow{position:absolute;background:#CE1126}
+.arrow.h{height:2px}.arrow.v{width:2px}
 .seam{position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(0,0,0,.55);box-shadow:1px 0 0 rgba(255,255,255,.25)}
 .seam.h{left:0;right:0;top:50%;bottom:auto;width:auto;height:2px;margin:-1px 0 0}
 .badge{position:absolute;left:60px;top:56px;font-weight:800;font-size:22px;letter-spacing:3px;color:#2b2c30;text-transform:uppercase}
@@ -167,55 +171,71 @@ const page = (bg, inner) => `<!doctype html><html><head><meta charset="utf-8"><s
 <body><div class="stage ${bg}">${inner}</div></body></html>`;
 
 // ── scenes ──────────────────────────────────────────────────────────────────
+const NOTE = 'Display sample shown · graded card and slab not included';
 const scenes = {
   // 1. Hero: front-on, slight turn, studio sweep.
   front: (c) => page('studio', `
-    <div class="badge">Magnetic Metal Slab Case<small>${c.name} · 35pt · fits standard graded slabs</small></div>
+    <div class="badge">Magnetic Metal Slab Case<small>${c.name} · PSA size · 35pt</small></div>
     <div class="tag">PRE-ORDER</div>
     <div class="floor"></div>
-    ${caseBox(c.hex, 'translateY(-10px) rotateY(-14deg) rotateX(4deg) scale(1.08)')}
-    <div class="note">Display sample shown · graded card and slab not included</div>`),
+    ${caseBox(c.hex, 'translateY(-10px) rotateY(-16deg) rotateX(4deg) scale(1.08)')}
+    <div class="note">${NOTE}</div>`),
 
-  // 2. Three-quarter angle: shows the frame depth and the magnetic seam.
+  // 2. Three-quarter angle: shows the rim depth and the finger notch.
   angle: (c) => page('studio', `
-    <div class="badge">Metal frame · magnetic lock<small>Two-piece aluminium shell that closes with a click</small></div>
+    <div class="badge">Metal frame · magnetic lock<small>Thin metal rim, glass front and back, finger notch to open</small></div>
     <div class="floor" style="width:700px"></div>
-    ${caseBox(c.hex, 'translateY(-10px) rotateY(-42deg) rotateX(10deg) rotateZ(-2deg) scale(1.05)')}
-    <div class="note">Display sample shown · graded card and slab not included</div>`),
+    ${caseBox(c.hex, 'translateY(-10px) rotateY(-50deg) rotateX(8deg) rotateZ(-2deg) scale(1.05)')}
+    <div class="note">${NOTE}</div>`),
 
-  // 3. Feature callouts on a front-on case.
+  // 3. Feature callouts on a front-on case (the supplier's stated features).
   features: (c) => page('studio', `
     <div class="floor"></div>
-    <div class="call l" style="left:70px;top:300px">Tempered glass window<span>Clear, scratch-resistant face over your slab</span></div>
-    <div class="call l" style="left:70px;top:640px">Magnetic closure<span>Multi-point magnets hold both halves shut</span></div>
-    <div class="call r" style="right:70px;top:230px">Aluminium metal frame<span>Rigid aluminium shell guards the slab's edges</span></div>
-    <div class="call r" style="right:70px;top:720px">Stackable<span>Flat front and back so cases stack neatly</span></div>
+    <div class="call l" style="left:60px;top:300px">High-alumina glass<span>Clear front and back over the whole slab</span></div>
+    <div class="call l" style="left:60px;top:660px">Multi-point magnetic lock<span>Closes snugly to keep out dust</span></div>
+    <div class="call r" style="right:60px;top:230px">Metal frame<span>Light, rigid rim around the slab's edges</span></div>
+    <div class="call r" style="right:60px;top:560px">UV-resistant<span>Helps slow fading on display</span></div>
+    <div class="call r" style="right:60px;top:820px">Stackable<span>Flat faces stack neatly</span></div>
     ${caseBox(c.hex, 'scale(0.98)')}
-    <div class="note">${c.name} · fits standard 35pt graded slabs (PSA, BGS, CGC)</div>`),
+    <div class="note">${c.name} · sized for PSA slabs</div>`),
 
-  // 4. Stacked on a charcoal surface, lifestyle mood.
+  // 4. Dimensions, from the supplier's drawing.
+  size: (c) => page('studio', `
+    <div class="badge">Dimensions<small>Sized for PSA graded slabs</small></div>
+    <div class="floor"></div>
+    <div class="arrow h" style="left:${600 - W / 2}px;width:${W}px;top:${600 - H / 2 - 40}px"></div>
+    <div class="dim" style="left:0;right:0;text-align:center;top:${600 - H / 2 - 92}px">86 mm<small>outer width</small></div>
+    <div class="arrow v" style="left:${600 - W / 2 - 40}px;height:${H}px;top:${600 - H / 2}px"></div>
+    <div class="dim" style="right:${600 + W / 2 + 56}px;top:580px;text-align:right">142 mm<small>outer height</small></div>
+    <div class="dim" style="left:${600 + W / 2 + 50}px;top:470px">81 × 136 mm<small>inner opening</small></div>
+    <div class="dim" style="left:${600 + W / 2 + 50}px;top:560px">7 mm<small>inner depth</small></div>
+    ${caseBox(c.hex, 'none')}
+    <div class="note">Measure a non-PSA slab before ordering · BGS slabs are larger</div>`),
+
+  // 5. Stacked on a charcoal surface, lifestyle mood.
   stack: (c) => page('charcoal', `
     <div class="badge">Built to stack<small>Keep a run of slabs tidy on the shelf</small></div>
     <div class="floor" style="width:820px;bottom:170px"></div>
-    <div style="position:relative;width:${W}px;height:${H}px;transform-style:preserve-3d;transform:rotateX(62deg) rotateZ(-28deg) translateY(40px) scale(1.05)">
-      ${[0, 1, 2].map((i) => `<div style="position:absolute;inset:0;transform-style:preserve-3d;transform:translateZ(${i * (T + 4)}px) rotateZ(${(i - 1) * 1.5}deg)">${caseBox(c.hex, 'none')}</div>`).join('')}
+    <div style="position:relative;width:${W}px;height:${H}px;transform-style:preserve-3d;transform:rotateX(62deg) rotateZ(-28deg) translateY(40px) scale(1.0)">
+      ${[0, 1, 2].map((i) => `<div style="position:absolute;inset:0;transform-style:preserve-3d;transform:translateZ(${i * (T + 2)}px) rotateZ(${(i - 1) * 1.5}deg)">${caseBox(c.hex, 'none')}</div>`).join('')}
     </div>
     <div class="note">Three ${c.name.toLowerCase()} cases shown · sold individually</div>`),
 };
 
 const lineup = () => page('studio', `
-  <div class="badge">Magnetic Metal Slab Case<small>Eight colours · 35pt</small></div>
-  <div class="floor" style="width:1100px;bottom:420px"></div>
-  <div style="position:relative;width:1100px;height:560px;transform:translateY(-30px)">
-    ${METAL_SLAB_COLOURS.map((c, i) => `<div style="position:absolute;left:${i * 122}px;top:0;transform-style:preserve-3d;transform:scale(0.62) rotateY(-24deg);transform-origin:top left">${caseBox(c.hex, 'none')}</div>`).join('')}
+  <div class="badge">Magnetic Metal Slab Case<small>${METAL_SLAB_COLOURS.length} colours · PSA size · 35pt</small></div>
+  <div class="floor" style="width:1100px;bottom:330px"></div>
+  <div style="position:relative;width:1080px;height:${Math.round(H * 0.7)}px;transform:translate(45px,-40px)">
+    ${METAL_SLAB_COLOURS.map((c, i) => `<div style="position:absolute;left:${i * 170}px;top:0;transform-style:preserve-3d;transform:scale(0.7) rotateY(-22deg);transform-origin:top left">${caseBox(c.hex, 'none')}</div>`).join('')}
   </div>
-  <div class="note" style="bottom:200px;font-size:20px;color:#2b2c30;font-weight:700;letter-spacing:2px">${METAL_SLAB_COLOURS.map((c) => c.name.toUpperCase()).join(' · ')}</div>
+  <div class="note" style="bottom:220px;font-size:20px;color:#2b2c30;font-weight:700;letter-spacing:2px">${METAL_SLAB_COLOURS.map((c) => c.name.toUpperCase()).join(' · ')}</div>
   <div class="note">Display samples shown · graded card and slab not included</div>`);
 
-export const metalSlabSku = (c) => `CP-METAL-SLAB-35PT-${c.code}`;
+export const METAL_SLAB_FAMILY_SKU = 'CP-METAL-SLAB-PSA35';
+export const metalSlabSku = (c) => `${METAL_SLAB_FAMILY_SKU}-${c.code}`;
 export const metalSlabImagePath = (c, view) => `/images/shop/metal-slab-case/${c.name.toLowerCase()}/${metalSlabSku(c).toLowerCase()}_${view}.jpg`;
-export const METAL_SLAB_LINEUP_PATH = '/images/shop/metal-slab-case/cp-metal-slab-35pt_colours.jpg';
-export const METAL_SLAB_VIEWS = ['front', 'angle', 'features', 'stack'];
+export const METAL_SLAB_LINEUP_PATH = '/images/shop/metal-slab-case/cp-metal-slab-psa35_colours.jpg';
+export const METAL_SLAB_VIEWS = ['front', 'angle', 'features', 'size', 'stack'];
 
 async function shoot(browser, html, file) {
   const p = await browser.newPage({ viewport: { width: SIZE, height: SIZE }, deviceScaleFactor: 1 });
