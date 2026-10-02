@@ -4,6 +4,7 @@ import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } fro
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
+import CardImage from '@/components/CardImage.jsx';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
@@ -439,14 +440,25 @@ const ShopProductPage = () => {
                 <Link
                   key={other.slug}
                   to={`/shop/${category.slug}/${other.slug}`}
-                  className="group rounded-2xl border border-border bg-card p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                  className="group flex flex-col rounded-2xl border border-border bg-card overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all"
                 >
-                  <p className="font-bold leading-snug text-foreground group-hover:text-primary transition-colors">
-                    {other.shortTitle}
-                  </p>
-                  <span className="mt-2 inline-flex items-center text-sm text-primary">
-                    View <ChevronRight className="h-4 w-4" />
-                  </span>
+                  <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
+                    {other.imagePaths?.length > 0 && (
+                      <CardImage
+                        src={palmsOffImages(other)[0]}
+                        alt={palmsOffImageAlt(other, other.imagePaths[0])}
+                        imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
+                      />
+                    )}
+                  </div>
+                  <div className="flex flex-1 flex-col p-4">
+                    <p className="font-bold leading-snug text-foreground group-hover:text-primary transition-colors">
+                      {other.shortTitle}
+                    </p>
+                    <span className="mt-auto inline-flex items-center pt-2 text-sm text-primary">
+                      View <ChevronRight className="h-4 w-4" />
+                    </span>
+                  </div>
                 </Link>
               ))}
             </div>
