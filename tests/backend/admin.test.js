@@ -229,6 +229,23 @@ describe('PATCH /refunds/:id', () => {
     expect(refundsUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ retained_fee_aud: 7.3, refund_amount_aud: 105 }));
   });
 
+  it('approves a CardPop Shop order refund for the full total — nothing retained', async () => {
+    const refundsUpdate = makeBuilder({ error: null });
+    queueFrom(
+      makeBuilder({ data: { id: 'r1', order_id: 'o1', buyer_id: 'b1', status: 'pending', order: {
+        total_aud: 51.37, platform_fee_aud: 0, processing_fee_aud: 1.32,
+        order_items: [{ type: 'shop', id: 'p1', seller_id: null, line_total_aud: 40.05 }],
+      } }, error: null }),
+      refundsUpdate,
+      makeBuilder({ error: null }),
+      makeBuilder({ error: null }),
+    );
+    const res = await request(app).patch('/admin/refunds/r1').send({ action: 'approve' });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ status: 'approved', refundAmount: 51.37 });
+    expect(refundsUpdate.update).toHaveBeenCalledWith(expect.objectContaining({ retained_fee_aud: 0, refund_amount_aud: 51.37 }));
+  });
+
   it('requires a reason to reject', async () => {
     const res = await request(app).patch('/admin/refunds/r1').send({ action: 'reject' });
     expect(res.status).toBe(400);

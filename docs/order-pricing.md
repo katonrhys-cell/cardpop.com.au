@@ -112,6 +112,16 @@ platform that fee on top of the goods coming back. `processRefund()`
 commission + GST. Orders placed before the column existed carry 0 and behave
 exactly as they did.
 
+**Except CardPop Shop orders.** The shop return policy registered in Google
+Merchant Center promises no restocking fee (`utils/shopReturnPolicy.js`), so an
+order whose `order_items` lines are all `type: 'shop'` is refunded its whole
+`total_aud` — CardPop absorbs Stripe's fee. A mixed cart keeps the commission
+share and only the marketplace portion of the processing fee (pro-rated by the
+listing lines + their postage + commission over the pre-fee total), so its shop
+goods still come back in full. The arithmetic is `computeRefundAmounts()` in
+`utils/refundAmounts.js`, shared by the request quote (`routes/refunds.js`),
+admin approval (`routes/admin.js`), `processRefund()` and Account → Orders.
+
 ## Australia only
 
 CardPop sells and ships within Australia only, enforced in three places:

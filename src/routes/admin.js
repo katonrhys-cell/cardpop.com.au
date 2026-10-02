@@ -377,7 +377,7 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
 
   try {
     const { data: refund, error: fetchErr } = await supabase
-      .from('refunds').select('*, order:orders!order_id(total_aud, platform_fee_aud, processing_fee_aud)').eq('id', id).single();
+      .from('refunds').select('*, order:orders!order_id(total_aud, platform_fee_aud, processing_fee_aud, order_items)').eq('id', id).single();
     if (fetchErr || !refund) return res.status(404).json({ error: 'Refund not found' });
 
     // Only a pending request can be approved/rejected. Re-approving an

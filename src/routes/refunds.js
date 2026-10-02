@@ -37,7 +37,7 @@ router.post('/request', async (req, res) => {
 
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('id, buyer_id, seller_id, status, refund_status, total_aud, item_price_aud, platform_fee_aud, gst_aud, processing_fee_aud')
+    .select('id, buyer_id, seller_id, status, refund_status, total_aud, item_price_aud, platform_fee_aud, gst_aud, processing_fee_aud, order_items')
     .eq('id', orderId)
     .maybeSingle();
   if (orderErr) {
