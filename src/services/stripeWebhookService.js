@@ -861,9 +861,11 @@ async function handleSingleItemOrder(session, stripe) {
   }
 
   if (meta.offerId) {
+    // paid_at closes the offer's payment window: the expire_stale_offers()
+    // sweep skips paid offers, and resolveOfferPrice refuses a second checkout.
     await supabase
       .from('offers')
-      .update({ status: 'accepted' })
+      .update({ status: 'accepted', paid_at: new Date().toISOString() })
       .eq('id', meta.offerId);
   }
 

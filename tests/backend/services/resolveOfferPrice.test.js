@@ -38,9 +38,24 @@ describe('resolveOfferPrice', () => {
     expect(await resolve()).toEqual({ itemPrice: 4500 });
   });
 
-  it('still honours an accepted offer after its 48-hour window — the buyer is bound to pay', async () => {
+  it('still honours an accepted offer after its original response window (expires_at) — only the payment window applies', async () => {
     mockOffer.mockResolvedValue({ data: offer({ expires_at: new Date(Date.now() - HOUR).toISOString() }) });
     expect(await resolve()).toEqual({ itemPrice: 4000 });
+  });
+
+  it('prices an accepted offer inside its payment window', async () => {
+    mockOffer.mockResolvedValue({ data: offer({ payment_due_at: new Date(Date.now() + HOUR).toISOString() }) });
+    expect(await resolve()).toEqual({ itemPrice: 4000 });
+  });
+
+  it('refuses an accepted offer whose 48-hour payment window has closed', async () => {
+    mockOffer.mockResolvedValue({ data: offer({ payment_due_at: new Date(Date.now() - HOUR).toISOString() }) });
+    expect(await resolve()).toEqual({ error: 'The payment window for this offer has closed' });
+  });
+
+  it('refuses an offer that has already been paid for', async () => {
+    mockOffer.mockResolvedValue({ data: offer({ paid_at: new Date().toISOString() }) });
+    expect(await resolve()).toEqual({ error: 'This offer has already been paid for' });
   });
 
   it('refuses a counter whose 48-hour window has lapsed', async () => {

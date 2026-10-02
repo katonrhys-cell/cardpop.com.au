@@ -57,6 +57,13 @@ export const getDisputesSchema = z.object({
   status: z.enum(['open', 'all', 'resolved_released', 'resolved_kept']).optional(),
 });
 
+// Admin -> Offers. 'open' = pending or countered (waiting on a response);
+// 'awaiting_payment' = accepted but not yet paid; 'paid' = checkout completed.
+export const OFFER_ADMIN_FILTERS = ['all', 'open', 'pending', 'countered', 'awaiting_payment', 'paid', 'declined', 'expired', 'withdrawn'];
+export const getOffersSchema = z.object({
+  status: z.enum(OFFER_ADMIN_FILTERS).optional(),
+});
+
 export const resolveDisputeSchema = z.object({
   id: z.string().min(1, 'Dispute ID is required'),
 });

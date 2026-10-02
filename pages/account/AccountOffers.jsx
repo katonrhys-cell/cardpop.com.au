@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { apiServerClient } from '@/lib/apiServerClient.js';
+import { offerDisplayStatus } from '@/utils/offerEligibility.js';
 
 // Lazy: only needed once a buyer pays for an accepted offer.
 const CheckoutModal = lazy(() => import('@/components/CheckoutModal.jsx'));
@@ -23,6 +25,7 @@ const STATUS_CONFIG = {
   countered: { label: 'Countered', className: 'bg-violet-500/10 text-violet-700 border-violet-500/20' },
   expired:   { label: 'Expired',   className: 'bg-muted text-muted-foreground border-border' },
   withdrawn: { label: 'Withdrawn', className: 'bg-muted text-muted-foreground border-border' },
+  paid:      { label: 'Paid',      className: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
 };
 
 const formatCurrency = (val) => `$${(Number(val) || 0).toFixed(2)}`;
@@ -37,11 +40,17 @@ const formatDateTime = (ts) =>
 // or counter one — so derive it here too, and a pending offer (or a seller's
 // counter) past its expires_at never shows live Accept/Counter buttons in the
 // gap before the sweep runs.
-const effectiveStatus = (offer) =>
-  (offer.status === 'pending' || offer.status === 'countered')
-    && offer.expires_at && new Date(offer.expires_at) <= new Date()
-    ? 'expired'
-    : offer.status;
+//
+// Likewise an accepted offer whose 48-hour payment window (payment_due_at)
+// closed unpaid has lapsed; one the webhook stamped paid_at on is done.
+const effectiveStatus = (offer) => offerDisplayStatus(offer);
+
+// Button intent → PATCH /offers/:id action. A buyer's "accept"/"decline" is
+// always a response to the seller's counter.
+const API_ACTION = {
+  received: { accepted: 'accept', declined: 'decline' },
+  sent: { accepted: 'accept_counter', declined: 'decline_counter', withdrawn: 'withdraw' },
+};
 
 const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onPay }) => {
   const isReceived = perspective === 'received';
@@ -98,7 +107,10 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
         )}
         {status === 'accepted' && !isReceived && listingActive && (
           <p className="text-xs text-muted-foreground mt-2">
-            The seller accepted your offer — you've agreed to buy at {formatCurrency(agreedAmount)}. Please complete payment.
+            Deal agreed at {formatCurrency(agreedAmount)} — you're committed to buy.
+            {offer.payment_due_at && (
+              <> Please pay by <strong className="text-foreground">{formatDateTime(offer.payment_due_at)}</strong> or the deal lapses.</>
+            )}
           </p>
         )}
 
@@ -175,7 +187,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
 
       {status === 'accepted' && isReceived && listingActive && (
         <div className="shrink-0 self-start sm:self-center text-xs text-muted-foreground italic">
-          Waiting on the buyer's payment
+          Waiting on the buyer's payment{offer.payment_due_at ? ` (due ${formatDateTime(offer.payment_due_at)})` : ''}
         </div>
       )}
 
@@ -298,23 +310,34 @@ const AccountOffers = () => {
 
   useEffect(() => { fetchOffers(); }, [fetchOffers]);
 
+  // Responses go through the backend (not a direct table write) so the other
+  // side is emailed; RLS and the lifecycle trigger still enforce every move.
+  const respond = async (offerId, body) => {
+    const res = await apiServerClient.fetch(`/offers/${offerId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Action failed.');
+    return data;
+  };
+
   const handleAction = async (offerId, newStatus, perspective) => {
     const keyMap = { accepted: 'accept', declined: 'decline', withdrawn: 'withdraw' };
     setActionLoading(`${offerId}_${keyMap[newStatus]}`);
     try {
-      const updateData = { status: newStatus, updated_at: new Date().toISOString() };
-      if (newStatus === 'accepted' || newStatus === 'declined') {
-        updateData.responded_at = new Date().toISOString();
-      }
-      const ownerColumn = perspective === 'received' ? 'seller_id' : 'buyer_id';
-      const { error } = await supabase
-        .from('offers')
-        .update(updateData)
-        .eq('id', offerId)
-        .eq(ownerColumn, currentUser.id);
-      if (error) throw error;
-      const messages = { accepted: 'Offer accepted!', declined: 'Offer declined.', withdrawn: 'Offer withdrawn.' };
-      toast.success(messages[newStatus]);
+      const action = API_ACTION[perspective]?.[newStatus];
+      if (!action) throw new Error('Action failed.');
+      await respond(offerId, { action });
+      const messages = {
+        accept: 'Offer accepted — the buyer has 48 hours to pay.',
+        decline: 'Offer declined.',
+        accept_counter: 'Counter accepted — please pay within 48 hours.',
+        decline_counter: 'Counter declined.',
+        withdraw: 'Offer withdrawn.',
+      };
+      toast.success(messages[action]);
       fetchOffers();
     } catch (err) {
       toast.error(err.message || 'Action failed.');
@@ -334,14 +357,11 @@ const AccountOffers = () => {
     if (!amt || amt <= 0) { toast.error('Enter a valid counter amount'); return; }
     setCounterSaving(true);
     try {
-      const { error } = await supabase.from('offers').update({
-        status: 'countered',
-        counter_amount_aud: amt,
-        counter_message: counterMessage.trim() || null,
-        updated_at: new Date().toISOString(),
-      }).eq('id', counterOffer.id)
-        .eq('seller_id', currentUser.id);
-      if (error) throw error;
+      await respond(counterOffer.id, {
+        action: 'counter',
+        counterAmountAud: amt,
+        counterMessage: counterMessage.trim() || null,
+      });
       toast.success('Counter offer sent!');
       setCounterOffer(null);
       fetchOffers();

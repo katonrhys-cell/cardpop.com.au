@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -272,6 +272,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Verification" description="Review user verification requests." icon={ShieldCheck} link="/admin/verification" />
           <ManagementBox title="Reports & Moderation" description="Triage scam, counterfeit and abuse reports." icon={Flag} link="/admin/reports" />
           <ManagementBox title="Chat Moderation" description="Search and review member conversations." icon={MessagesSquare} link="/admin/messages" />
+          <ManagementBox title="Offers" description="Every marketplace offer — open, awaiting payment, paid or lapsed." icon={HandCoins} link="/admin/offers" />
           <ManagementBox title="Chargebacks" description="Review payment disputes and frozen payouts." icon={CreditCard} link="/admin/disputes" />
           <ManagementBox title="Revenue Breakdown" description="Every sale behind total revenue — dates, amounts, fees and GST." icon={DollarSign} link="/admin/revenue" />
           <ManagementBox title="Finance & Tax" description="Profit on shop sales, GST by BAS quarter, stock valuation and accountant exports." icon={DollarSign} link="/admin/finance" />

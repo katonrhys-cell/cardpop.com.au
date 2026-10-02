@@ -550,6 +550,97 @@ ${listingUrl ? `<p style="font-size:13px;color:#6B7280;">Listing: <a href="${esc
   );
 }
 
+// ─── Offer responses (accept / decline / counter / withdraw) ─────────────────
+
+/**
+ * Every response to an offer, emailed to the party who didn't act. `kind`:
+ *   accepted          → buyer: the seller accepted, pay by the deadline
+ *   counter_accepted  → buyer (their own accept of the counter): pay by the
+ *                       deadline; and seller: the buyer accepted, awaiting payment
+ *   countered         → buyer: the seller countered, respond by the deadline
+ *   declined          → buyer: the seller declined
+ *   counter_declined  → seller: the buyer declined the counter
+ *   withdrawn         → seller: the buyer withdrew
+ * `audience` is 'buyer' or 'seller' (only counter_accepted goes to both).
+ */
+export function offerUpdateEmail({ kind, audience, recipientName, cardName, amountAud, counterAmountAud, counterMessage, deadline, listingUrl }) {
+  const card = esc(cardName || 'the card');
+  const agreed = counterAmountAud != null ? counterAmountAud : amountAud;
+  const rows = [['Card', card]];
+  let preheader;
+  let title;
+  let body;
+  let cta = ['https://cardpop.com.au/account/offers', 'View Offer'];
+
+  if ((kind === 'accepted' || kind === 'counter_accepted') && audience === 'buyer') {
+    rows.push(['Agreed price', `${money(agreed)} AUD`, true]);
+    if (deadline) rows.push(['Pay by', esc(deadline)]);
+    title = 'Offer Accepted — Time to Pay';
+    preheader = `Your ${money(agreed)} deal on ${card} is agreed. Pay by ${esc(deadline || 'the deadline')}.`;
+    body = `<p>${kind === 'accepted'
+      ? 'Good news — the seller accepted your offer.'
+      : 'You accepted the seller\'s counter offer.'}</p>
+${summaryTable(rows)}
+<p><strong>You're committed to buy at this price.</strong> Please complete payment within 48 hours${deadline ? ` (by ${esc(deadline)})` : ''}. If you don't pay in time the deal lapses, the seller is free to sell to someone else, and it's recorded against your account.</p>`;
+    cta = ['https://cardpop.com.au/account/offers', 'Pay Now'];
+  } else if (kind === 'counter_accepted') {
+    rows.push(['Agreed price', `${money(agreed)} AUD`, true]);
+    if (deadline) rows.push(['Buyer must pay by', esc(deadline)]);
+    title = 'Counter Offer Accepted';
+    preheader = `The buyer accepted your ${money(agreed)} counter on ${card}.`;
+    body = `<p>The buyer accepted your counter offer. You've agreed to sell at this price.</p>
+${summaryTable(rows)}
+<p>They have 48 hours to pay. We'll email you when it sells so you can ship it. If they don't pay in time, the deal lapses and your listing is free to sell again.</p>`;
+  } else if (kind === 'countered') {
+    rows.push(['Your offer', `${money(amountAud)} AUD`]);
+    rows.push(['Seller\'s counter', `${money(counterAmountAud)} AUD`, true]);
+    if (deadline) rows.push(['Respond by', esc(deadline)]);
+    title = 'Counter Offer Received';
+    preheader = `The seller countered with ${money(counterAmountAud)} on ${card}.`;
+    const quoted = counterMessage
+      ? `<p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#111827;">Their message</p>
+<div style="background:#F9FAFB;border-left:3px solid #E63946;border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">${esc(counterMessage)}</div>`
+      : '';
+    body = `<p>The seller has made you a counter offer.</p>
+${summaryTable(rows)}
+${quoted}
+<p>You have 48 hours to accept or decline it. If you accept, you're committed to buy at the counter price and will have 48 hours to pay. If you don't respond, it expires.</p>`;
+    cta = ['https://cardpop.com.au/account/offers', 'Respond to Counter'];
+  } else if (kind === 'declined') {
+    rows.push(['Your offer', `${money(amountAud)} AUD`]);
+    title = 'Offer Declined';
+    preheader = `Your offer on ${card} wasn't accepted.`;
+    body = `<p>The seller declined your offer, so you're no longer bound by it.</p>
+${summaryTable(rows)}
+<p>You're welcome to make a new offer or buy it now if it's still listed.</p>`;
+    if (listingUrl) cta = [esc(listingUrl), 'View Listing'];
+  } else if (kind === 'counter_declined') {
+    rows.push(['Your counter', `${money(counterAmountAud)} AUD`]);
+    title = 'Counter Offer Declined';
+    preheader = `The buyer declined your counter on ${card}.`;
+    body = `<p>The buyer declined your counter offer. Your listing is still live for other buyers.</p>
+${summaryTable(rows)}`;
+  } else if (kind === 'withdrawn') {
+    rows.push(['Their offer', `${money(amountAud)} AUD`]);
+    title = 'Offer Withdrawn';
+    preheader = `The buyer withdrew their offer on ${card}.`;
+    body = `<p>The buyer withdrew their offer before you responded. No action is needed.</p>
+${summaryTable(rows)}`;
+  } else {
+    throw new Error(`Unknown offer email kind: ${kind}`);
+  }
+
+  return cpEmail(
+    preheader,
+    title,
+    `Hi ${esc(recipientName || 'there')},`,
+    body,
+    cta[0],
+    cta[1],
+    'You are receiving this because of an offer on CardPop.',
+  );
+}
+
 // ─── Offer made (admin alert) ────────────────────────────────────────────────
 
 /** Admin heads-up for every offer made on the marketplace. */

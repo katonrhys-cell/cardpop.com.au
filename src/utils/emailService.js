@@ -17,6 +17,7 @@ import {
   offerReceivedEmail,
   offerPlacedEmail,
   offerAdminNoticeEmail,
+  offerUpdateEmail,
   shopEnquiryEmail,
   orderShippedEmail,
 } from '../emails/templates.js';
@@ -202,6 +203,29 @@ export async function sendOfferAdminNotice({ to, ...details }) {
     subject: `New offer — $${Number(details.amountAud || 0).toFixed(2)} AUD on ${details.cardName || 'a listing'}`,
     html: offerAdminNoticeEmail(details),
   });
+}
+
+const OFFER_UPDATE_SUBJECTS = {
+  accepted: (d) => `Your offer on ${d.cardName || 'a card'} was accepted — please pay by ${d.deadline || 'the deadline'}`,
+  counter_accepted: (d) => (d.audience === 'buyer'
+    ? `Counter accepted — please pay for ${d.cardName || 'your card'} by ${d.deadline || 'the deadline'}`
+    : `The buyer accepted your counter on ${d.cardName || 'your listing'}`),
+  countered: (d) => `Counter offer on ${d.cardName || 'a card'}: $${Number(d.counterAmountAud || 0).toFixed(2)} AUD`,
+  declined: (d) => `Your offer on ${d.cardName || 'a card'} was declined`,
+  counter_declined: (d) => `The buyer declined your counter on ${d.cardName || 'your listing'}`,
+  withdrawn: (d) => `An offer on ${d.cardName || 'your listing'} was withdrawn`,
+};
+
+/**
+ * A response to an offer (accept / decline / counter / withdraw), emailed to
+ * the other party. Pairs with the notify_on_offer_updated bell notification.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOfferUpdate({ to, ...details }) {
+  const subject = OFFER_UPDATE_SUBJECTS[details.kind];
+  if (!subject) throw new Error(`Unknown offer email kind: ${details.kind}`);
+  return send({ to, subject: subject(details), html: offerUpdateEmail(details) });
 }
 
 export async function sendRefundIssued({ sellerEmail, sellerName, refundAmount, retainedFee, orderId }) {
