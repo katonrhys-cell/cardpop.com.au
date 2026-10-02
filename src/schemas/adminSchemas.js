@@ -43,6 +43,14 @@ export const eventRsvpsSchema = z.object({
   id: z.string().uuid('Invalid event ID'),
 });
 
+export const setEventOrganiserBodySchema = z.object({
+  identifier: z.string().trim().min(1, 'Username or email is required').max(320),
+});
+
+export const eventOrganiserSchema = z.object({
+  userId: z.string().uuid('Invalid user ID'),
+});
+
 export const shipOrderSchema = z.object({
   id: z.string().uuid('Invalid order ID'),
 });

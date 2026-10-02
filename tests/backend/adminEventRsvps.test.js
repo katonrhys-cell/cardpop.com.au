@@ -38,7 +38,8 @@ vi.mock('../../src/middleware/requireAal2.js', () => ({
 
 import adminRouter from '../../src/routes/admin.js';
 
-// GET /admin/events/:id/rsvps — the admin "Who's going" list.
+// GET /admin/events/:id/rsvps — the admin "Who's going" list — plus the
+// organiser-access routes it drives (link organiser, verify / unverify).
 
 const app = express();
 app.use(express.json());
@@ -58,16 +59,24 @@ function makeBuilder(result) {
 }
 
 const EVENT_ID = '11111111-1111-4111-8111-111111111111';
+const ORG_ID = '22222222-2222-4222-8222-222222222222';
 
+// Results are queued per table (queries on different tables run in parallel,
+// so their relative order isn't meaningful); each from(table) takes the next.
+let byTable;
 let builders;
-function queue(...results) {
+function queue(results) {
+  byTable = Object.fromEntries(Object.entries(results).map(([t, list]) => [t, [...list]]));
   builders = [];
   mockSupabase.from.mockImplementation((table) => {
-    const b = makeBuilder(results[builders.length]);
+    const next = byTable[table]?.shift();
+    if (!next) throw new Error(`Unexpected query on ${table}`);
+    const b = makeBuilder(next);
     builders.push({ table, b });
     return b;
   });
 }
+const built = (table) => builders.filter((x) => x.table === table).map((x) => x.b);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -75,40 +84,50 @@ beforeEach(() => {
 });
 
 describe('GET /admin/events/:id/rsvps', () => {
-  it('lists every RSVP for the event with name and email', async () => {
-    queue(
-      { data: [
+  it('lists every RSVP for the event with name and email, plus the organiser', async () => {
+    queue({
+      event_rsvps: [{ data: [
         { user_id: 'u1', role: 'buyer', created_at: '2026-09-01T00:00:00Z', updated_at: null },
         { user_id: 'u2', role: 'vendor', created_at: '2026-09-02T00:00:00Z', updated_at: null },
-      ], error: null },
-      { data: [
-        { id: 'u1', username: 'ash', display_name: 'Ash K', avatar_url: null, email: 'ash@example.com' },
-        { id: 'u2', username: 'misty', display_name: null, avatar_url: 'a.png', email: 'misty@example.com' },
-      ], error: null },
-    );
+      ], error: null }],
+      events: [{ data: { id: EVENT_ID, organiser_id: ORG_ID }, error: null }],
+      profiles: [
+        { data: [
+          { id: 'u1', username: 'ash', display_name: 'Ash K', avatar_url: null, email: 'ash@example.com' },
+          { id: 'u2', username: 'misty', display_name: null, avatar_url: 'a.png', email: 'misty@example.com' },
+        ], error: null },
+        { data: { id: ORG_ID, username: 'collectors', display_name: "Collector's Paradise", is_admin: false }, error: null },
+      ],
+      event_organiser_verifications: [{ data: { user_id: ORG_ID }, error: null }],
+    });
 
     const res = await request(app).get(`/admin/events/${EVENT_ID}/rsvps`);
 
     expect(res.status).toBe(200);
-    expect(builders.map((x) => x.table)).toEqual(['event_rsvps', 'profiles']);
-    expect(builders[0].b.calls).toContainEqual(['eq', 'event_id', EVENT_ID]);
-    expect(builders[1].b.calls).toContainEqual(['in', 'id', ['u1', 'u2']]);
+    expect(built('event_rsvps')[0].calls).toContainEqual(['eq', 'event_id', EVENT_ID]);
+    expect(built('profiles')[0].calls).toContainEqual(['in', 'id', ['u1', 'u2']]);
     expect(res.body.rsvps).toEqual([
       expect.objectContaining({ user_id: 'u1', role: 'buyer', display_name: 'Ash K', email: 'ash@example.com' }),
       expect.objectContaining({ user_id: 'u2', role: 'vendor', username: 'misty', email: 'misty@example.com' }),
     ]);
+    expect(res.body.organiser).toEqual({
+      id: ORG_ID, username: 'collectors', display_name: "Collector's Paradise", is_admin: false, verified: true,
+    });
   });
 
-  it('returns an empty list without a profile lookup when nobody has RSVP\'d', async () => {
-    queue({ data: [], error: null });
+  it('returns an empty list and no organiser without extra lookups', async () => {
+    queue({
+      event_rsvps: [{ data: [], error: null }],
+      events: [{ data: { id: EVENT_ID, organiser_id: null }, error: null }],
+    });
     const res = await request(app).get(`/admin/events/${EVENT_ID}/rsvps`);
     expect(res.status).toBe(200);
-    expect(res.body.rsvps).toEqual([]);
-    expect(builders).toHaveLength(1);
+    expect(res.body).toEqual({ organiser: null, rsvps: [] });
+    expect(builders).toHaveLength(2);
   });
 
   it('rejects a non-uuid event id', async () => {
-    queue();
+    queue({});
     const res = await request(app).get('/admin/events/not-a-uuid/rsvps');
     expect(res.status).toBe(400);
     expect(mockSupabase.from).not.toHaveBeenCalled();
@@ -116,15 +135,99 @@ describe('GET /admin/events/:id/rsvps', () => {
 
   it('is admin-only', async () => {
     mockIsAdminUser.mockResolvedValue(false);
-    queue();
+    queue({});
     const res = await request(app).get(`/admin/events/${EVENT_ID}/rsvps`);
     expect(res.status).toBe(403);
     expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 
   it('answers 500 when the lookup fails', async () => {
-    queue({ data: null, error: { message: 'boom' } });
+    queue({
+      event_rsvps: [{ data: null, error: { message: 'boom' } }],
+      events: [{ data: null, error: null }],
+    });
     const res = await request(app).get(`/admin/events/${EVENT_ID}/rsvps`);
     expect(res.status).toBe(500);
+  });
+});
+
+describe('PATCH /admin/events/:id/organiser', () => {
+  it('links the account matching a username', async () => {
+    queue({
+      profiles: [
+        { data: [{ id: ORG_ID }], error: null },
+        { data: { id: ORG_ID, username: 'collectors', display_name: null, is_admin: false }, error: null },
+      ],
+      events: [{ data: { id: EVENT_ID, organiser_id: ORG_ID }, error: null }],
+      event_organiser_verifications: [{ data: null, error: null }],
+    });
+
+    const res = await request(app).patch(`/admin/events/${EVENT_ID}/organiser`).send({ identifier: '@collectors' });
+
+    expect(res.status).toBe(200);
+    expect(built('profiles')[0].calls).toContainEqual(['ilike', 'username', 'collectors']);
+    expect(built('events')[0].calls).toContainEqual(['update', { organiser_id: ORG_ID }]);
+    expect(built('events')[0].calls).toContainEqual(['eq', 'id', EVENT_ID]);
+    expect(res.body.organiser).toMatchObject({ id: ORG_ID, verified: false });
+  });
+
+  it('looks up by email (lower-cased, LIKE wildcards escaped) when given one', async () => {
+    queue({
+      profiles: [
+        { data: [{ id: ORG_ID }], error: null },
+        { data: { id: ORG_ID, username: null, display_name: null, is_admin: false }, error: null },
+      ],
+      events: [{ data: { id: EVENT_ID, organiser_id: ORG_ID }, error: null }],
+      event_organiser_verifications: [{ data: null, error: null }],
+    });
+    const res = await request(app).patch(`/admin/events/${EVENT_ID}/organiser`).send({ identifier: 'Jo_Shows@Example.com' });
+    expect(res.status).toBe(200);
+    expect(built('profiles')[0].calls).toContainEqual(['ilike', 'email', 'jo\\_shows@example.com']);
+  });
+
+  it('404s when no account matches', async () => {
+    queue({ profiles: [{ data: [], error: null }] });
+    const res = await request(app).patch(`/admin/events/${EVENT_ID}/organiser`).send({ identifier: 'nobody' });
+    expect(res.status).toBe(404);
+  });
+
+  it('refuses an ambiguous match', async () => {
+    queue({ profiles: [{ data: [{ id: 'a' }, { id: 'b' }], error: null }] });
+    const res = await request(app).patch(`/admin/events/${EVENT_ID}/organiser`).send({ identifier: 'dupe' });
+    expect(res.status).toBe(409);
+  });
+
+  it('requires an identifier', async () => {
+    queue({});
+    const res = await request(app).patch(`/admin/events/${EVENT_ID}/organiser`).send({ identifier: '  ' });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe('PUT / DELETE /admin/event-organisers/:userId', () => {
+  it('verifies an organiser, recording the admin', async () => {
+    queue({ event_organiser_verifications: [{ data: null, error: null }] });
+    const res = await request(app).put(`/admin/event-organisers/${ORG_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ verified: true });
+    expect(built('event_organiser_verifications')[0].calls[0]).toEqual([
+      'upsert', { user_id: ORG_ID, verified_by: 'admin-1' }, { onConflict: 'user_id', ignoreDuplicates: true },
+    ]);
+  });
+
+  it('removes a verification', async () => {
+    queue({ event_organiser_verifications: [{ data: null, error: null }] });
+    const res = await request(app).delete(`/admin/event-organisers/${ORG_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ verified: false });
+    expect(built('event_organiser_verifications')[0].calls).toContainEqual(['eq', 'user_id', ORG_ID]);
+  });
+
+  it('is admin-only', async () => {
+    mockIsAdminUser.mockResolvedValue(false);
+    queue({});
+    const res = await request(app).put(`/admin/event-organisers/${ORG_ID}`);
+    expect(res.status).toBe(403);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 });

@@ -8,7 +8,7 @@ import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema, eventRsvpsSchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema, eventRsvpsSchema, setEventOrganiserBodySchema, eventOrganiserSchema } from '../schemas/adminSchemas.js';
 import { cardArtLookupKey } from '../utils/cardImageResolver.js';
 import { assertNotLiteralPrivateAddress, ssrfSafeDispatcher } from '../utils/safeFetch.js';
 import { fetch } from 'undici';
@@ -622,6 +622,25 @@ router.get('/offers', validateRequestQuery(getOffersSchema), async (req, res) =>
   }
 });
 
+// The account linked to an event as its organiser, and whether an admin has
+// verified them (which lets them see the event's vendor list).
+async function loadEventOrganiser(userId) {
+  if (!userId) return null;
+  const [{ data: profile, error }, { data: verification, error: vError }] = await Promise.all([
+    supabase.from('profiles').select('id, username, display_name, is_admin').eq('id', userId).maybeSingle(),
+    supabase.from('event_organiser_verifications').select('user_id').eq('user_id', userId).maybeSingle(),
+  ]);
+  if (error) throw error;
+  if (vError) throw vError;
+  return {
+    id: userId,
+    username: profile?.username || null,
+    display_name: profile?.display_name || null,
+    is_admin: profile?.is_admin === true,
+    verified: !!verification,
+  };
+}
+
 // ─── Who's going to an event (admin-only) ─────────────────────────────────────
 // event_rsvps rows are owner/admin-only under RLS and the public event page only
 // ever sees aggregate counts (get_event_rsvp_counts). This lists every RSVP for
@@ -630,12 +649,16 @@ router.get('/offers', validateRequestQuery(getOffersSchema), async (req, res) =>
 // service-role only, hence a server route rather than a client select.
 router.get('/events/:id/rsvps', validateRequestParams(eventRsvpsSchema), async (req, res) => {
   try {
-    const { data: rsvps, error } = await supabase
-      .from('event_rsvps')
-      .select('user_id, role, created_at, updated_at')
-      .eq('event_id', req.params.id)
-      .order('created_at', { ascending: true });
+    const [{ data: rsvps, error }, { data: event, error: eventError }] = await Promise.all([
+      supabase
+        .from('event_rsvps')
+        .select('user_id, role, created_at, updated_at')
+        .eq('event_id', req.params.id)
+        .order('created_at', { ascending: true }),
+      supabase.from('events').select('id, organiser_id').eq('id', req.params.id).maybeSingle(),
+    ]);
     if (error) throw error;
+    if (eventError) throw eventError;
 
     // event_rsvps.user_id references auth.users, not profiles, so there is no
     // FK for PostgREST to embed through — look the profiles up separately.
@@ -651,6 +674,7 @@ router.get('/events/:id/rsvps', validateRequestParams(eventRsvpsSchema), async (
     }
 
     res.json({
+      organiser: await loadEventOrganiser(event?.organiser_id),
       rsvps: (rsvps || []).map((r) => {
         const p = profiles[r.user_id] || {};
         return {
@@ -668,6 +692,76 @@ router.get('/events/:id/rsvps', validateRequestParams(eventRsvpsSchema), async (
   } catch (err) {
     logger.error(`[ADMIN] Failed to list event RSVPs: ${err.message}`);
     res.status(500).json({ error: 'Failed to load attendees' });
+  }
+});
+
+// ─── Link an organiser account to an event ────────────────────────────────────
+// Events an admin creates are stamped with the admin as organiser_id, so the
+// real organiser's CardPop account has to be linked by hand. Identified by
+// username or login email. The linked organiser can then edit the event while
+// it's pending, manage its information board and — once verified — see its
+// vendor list.
+router.patch('/events/:id/organiser', validateRequestParams(eventRsvpsSchema), validateRequestBody(setEventOrganiserBodySchema), async (req, res) => {
+  const identifier = req.body.identifier.trim();
+  try {
+    // "@handle" is a username; "name@domain" is an email.
+    const column = /^[^@\s]+@[^@\s]+$/.test(identifier) ? 'email' : 'username';
+    const value = column === 'email' ? identifier.toLowerCase() : identifier.replace(/^@/, '');
+    const { data: matches, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .ilike(column, value.replace(/[\\%_]/g, (c) => `\\${c}`))
+      .limit(2);
+    if (error) throw error;
+    if (!matches?.length) return res.status(404).json({ error: `No CardPop account found for ${identifier}` });
+    if (matches.length > 1) return res.status(409).json({ error: `More than one account matches ${identifier}` });
+
+    const { data: updated, error: updateError } = await supabase
+      .from('events')
+      .update({ organiser_id: matches[0].id })
+      .eq('id', req.params.id)
+      .select('id, organiser_id')
+      .maybeSingle();
+    if (updateError) throw updateError;
+    if (!updated) return res.status(404).json({ error: 'Event not found' });
+
+    logger.info(`[ADMIN] ${req.user.id} linked organiser ${matches[0].id} to event ${req.params.id}`);
+    res.json({ organiser: await loadEventOrganiser(updated.organiser_id) });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to set event organiser: ${err.message}`);
+    res.status(500).json({ error: 'Failed to link organiser' });
+  }
+});
+
+// ─── Verify / unverify an event organiser ─────────────────────────────────────
+// A verified organiser can see the vendor list for the events they organise
+// (GET /events/:id/vendors). Applies to the account, so to all their events.
+router.put('/event-organisers/:userId', validateRequestParams(eventOrganiserSchema), async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('event_organiser_verifications')
+      .upsert({ user_id: req.params.userId, verified_by: req.user.id }, { onConflict: 'user_id', ignoreDuplicates: true });
+    if (error) throw error;
+    logger.info(`[ADMIN] ${req.user.id} verified event organiser ${req.params.userId}`);
+    res.json({ verified: true });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to verify organiser: ${err.message}`);
+    res.status(500).json({ error: 'Failed to verify organiser' });
+  }
+});
+
+router.delete('/event-organisers/:userId', validateRequestParams(eventOrganiserSchema), async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('event_organiser_verifications')
+      .delete()
+      .eq('user_id', req.params.userId);
+    if (error) throw error;
+    logger.info(`[ADMIN] ${req.user.id} unverified event organiser ${req.params.userId}`);
+    res.json({ verified: false });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to unverify organiser: ${err.message}`);
+    res.status(500).json({ error: 'Failed to remove organiser verification' });
   }
 });
 
