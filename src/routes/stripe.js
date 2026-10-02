@@ -20,6 +20,15 @@ import {
   partnerDiscountCents,
   buildPartnerDiscount,
 } from '../services/partnerService.js';
+import {
+  findPromoCode,
+  validatePromoCode,
+  promoDiscountCents,
+  buildPromoDiscount,
+  reservePromoCode,
+  attachPromoSession,
+  releasePromoRedemption,
+} from '../services/promoCodeService.js';
 import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
@@ -168,11 +177,16 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
     // items (see partnerDiscountCents below). An invalid code doesn't fail the
     // whole calculation: the UI shows `promoError` inline and the undiscounted
     // totals stay correct.
+    // Admin-issued promo codes (Admin → Promo Codes) are checked before
+    // partner codes; the two share a namespace, so at most one matches.
     let partner = null;
+    let promo = null;
     let promoError = null;
     if (userId && code && !isWelcomeCodeFormat(code)) {
       try {
-        partner = await validatePartnerCode(userId, code);
+        const found = await findPromoCode(code);
+        if (found) promo = await validatePromoCode(found, { userId, email: req.user?.email });
+        else partner = await validatePartnerCode(userId, code);
       } catch (promoErr) {
         if (!promoErr.statusCode) throw promoErr;
         promoError = promoErr.message;
@@ -182,8 +196,8 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
     const priced = await priceCart(items, userId);
 
     // Preview the promo discount without creating any Stripe objects. Codes in
-    // the POP-XXXX-XXXX shape are personal welcome offers; anything else is a
-    // partner referral code (discounts shop items only).
+    // the POP-XXXX-XXXX shape are personal welcome offers; anything else is an
+    // admin promo code or a partner referral code (discounts shop items only).
     let discountCents = 0;
     let walletBalanceCents = 0;
     let walletAppliedCents = 0;
@@ -195,6 +209,13 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
         try {
           const offer = await validateWelcomeDiscount(userId, code);
           discountCents = welcomeDiscountCents(offer, priced.itemsCents);
+        } catch (promoErr) {
+          if (!promoErr.statusCode) throw promoErr;
+          promoError = promoErr.message;
+        }
+      } else if (promo) {
+        try {
+          discountCents = promoDiscountCents(promo, priced);
         } catch (promoErr) {
           if (!promoErr.statusCode) throw promoErr;
           promoError = promoErr.message;
@@ -245,6 +266,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
   // inside try is not visible in catch). A guest has no user id.
   const userId = req.user?.id || null;
   let walletSlotHeldForCleanup = false;
+  // A promo-code reservation we still own (released on any failure before the
+  // session exists; after that the completion/expiry webhook owns it).
+  let promoRedemptionHeld = null;
   try {
     const { items, successUrl, cancelUrl, returnUrl, uiMode, shippingAddress, promoCode, useWalletBalance, billingDetails, email: guestEmailInput, subscribeNewsletter, saveShippingAddress } = req.body;
 
@@ -323,10 +347,13 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
-    // Resolve a partner referral code up front. An invalid code throws here
-    // exactly as it did when it was validated further down.
+    // Resolve an admin promo code or partner referral code up front (promo
+    // codes first — the two share a namespace). An invalid code throws here.
     const promoCodeText = typeof promoCode === 'string' ? promoCode.trim() : '';
-    const partner = userId && promoCodeText && !isWelcomeCodeFormat(promoCodeText)
+    const sharedCode = userId && promoCodeText && !isWelcomeCodeFormat(promoCodeText);
+    const promoFound = sharedCode ? await findPromoCode(promoCodeText) : null;
+    const promo = promoFound ? await validatePromoCode(promoFound, { userId, email }) : null;
+    const partner = sharedCode && !promo
       ? await validatePartnerCode(userId, promoCodeText)
       : null;
 
@@ -348,6 +375,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     let discountCents = 0;
     let welcomeOfferId = null;
     let partnerMeta = {};
+    let promoMeta = {};
     let walletCents = 0;
     let walletCustomerId = null;
     // walletSlotHeldForCleanup is declared at the top of the handler (so the
@@ -368,6 +396,21 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
           discounts = [{ coupon: built.couponId }];
           discountCents = built.discountCents;
           welcomeOfferId = offer.id;
+        }
+      } else if (promo) {
+        // Claim one use of the code first (row-locked in the DB, so a
+        // single-use or capped code can't be spent by two checkouts at once),
+        // then mint the session's coupon.
+        const cents = promoDiscountCents(promo, { itemsCents, orderLines, grandCents });
+        promoRedemptionHeld = await reservePromoCode(promo, { userId, email, discountCents: cents });
+        const built = await buildPromoDiscount(stripe, promo, cents);
+        if (built) {
+          discounts = [{ coupon: built.couponId }];
+          discountCents = built.discountCents;
+          promoMeta = { promoRedemptionId: promoRedemptionHeld, promoCode: promo.code };
+        } else {
+          await releasePromoRedemption(promoRedemptionHeld);
+          promoRedemptionHeld = null;
         }
       } else {
         // `partner` was resolved (and validated) above — an invalid code threw
@@ -480,6 +523,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
         ...(wantsAddressSaved ? { saveShippingAddress: 'true' } : {}),
         ...(welcomeOfferId ? { welcomeOfferId } : {}),
         ...partnerMeta,
+        ...promoMeta,
         ...(walletCents > 0 ? { walletCents: String(walletCents) } : {}),
         ...(business ? { billingAbn: business.abn, billingBusinessName: business.name } : {}),
       },
@@ -560,6 +604,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // webhook now owns releasing the wallet reservation, so the failure path
     // below must not release it.
     walletSlotHeldForCleanup = false;
+    if (promoRedemptionHeld) {
+      await attachPromoSession(promoRedemptionHeld, session.id);
+      promoRedemptionHeld = null;
+    }
 
     logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100}, ${elementsUi ? 'elements' : embedded ? 'embedded' : 'hosted'})`);
     res.json({
@@ -571,6 +619,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // We claimed the wallet slot but never handed it to a live session — free it
     // now so a failed attempt doesn't lock the buyer out until the TTL.
     if (walletSlotHeldForCleanup) await releaseWalletCheckout(userId);
+    if (promoRedemptionHeld) await releasePromoRedemption(promoRedemptionHeld);
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
     res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });

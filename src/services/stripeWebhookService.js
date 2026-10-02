@@ -5,6 +5,7 @@ import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
 import { recordShopOrderReferral } from './partnerService.js';
+import { markPromoRedeemed, releasePromoRedemption } from './promoCodeService.js';
 import { debitWalletForOrder, releaseWalletCheckout } from './walletService.js';
 import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
@@ -593,6 +594,12 @@ async function handleCartOrder(existing, session, stripe) {
   if (session.metadata?.welcomeOfferId && fulfilledLines > 0) {
     await markWelcomeDiscountRedeemed(session.metadata.welcomeOfferId, existing.id);
   }
+  // Same rule for an admin promo code: count the use only when something
+  // actually sold, otherwise hand the (possibly single-use) code back.
+  if (session.metadata?.promoRedemptionId) {
+    if (fulfilledLines > 0) await markPromoRedeemed(session.metadata.promoRedemptionId, existing.id);
+    else await releasePromoRedemption(session.metadata.promoRedemptionId);
+  }
 
   // Persist the per-line payout records so refunds/disputes can reverse them.
   if (payoutsRecorded) {
@@ -1058,6 +1065,10 @@ async function handleCheckoutSessionExpired(session) {
   // the buyer can use it on a later order.
   if (session.metadata?.welcomeOfferId) {
     await releaseWelcomeDiscount(session.metadata.welcomeOfferId);
+  }
+  // Likewise an admin promo code's reserved use.
+  if (session.metadata?.promoRedemptionId) {
+    await releasePromoRedemption(session.metadata.promoRedemptionId);
   }
   // Likewise free the wallet-checkout slot so an abandoned wallet checkout
   // doesn't block the buyer until the reservation TTL lapses.

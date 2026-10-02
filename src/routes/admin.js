@@ -15,6 +15,7 @@ import { fetch } from 'undici';
 import logger from '../utils/logger.js';
 import { sendOrderShipped } from '../utils/emailService.js';
 import { normalizeTrackingNumber, carrierLabel } from '../../utils/shipmentTracking.js';
+import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
 
 const router = Router();
 
@@ -563,6 +564,60 @@ async function releaseCartLinePayouts(order, lines, reversedLines, disputeId) {
   await supabase.from('orders').update({ order_items: lines, payout_status: status }).eq('id', order.id);
   return { status, lines: reversedLines.length, transferred, walletCredited, failed };
 }
+
+// ─── Promo codes (Admin → Promo Codes) ───────────────────────────────────────
+// Create/edit/deactivate checkout promo codes and see every use. Writes go
+// through the service role here (the tables have no client write policies).
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const promoError = (res, err, action) => {
+  if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+  logger.error(`[ADMIN] Failed to ${action} promo code: ${err.message}`);
+  return res.status(500).json({ error: `Failed to ${action} promo code` });
+};
+const requirePromoId = (req, res, next) =>
+  (UUID_RE.test(req.params.id) ? next() : res.status(400).json({ error: 'Invalid promo code id' }));
+
+router.get('/promo-codes', async (_req, res) => {
+  try {
+    res.json({ codes: await listPromoCodes() });
+  } catch (err) {
+    promoError(res, err, 'load');
+  }
+});
+
+router.post('/promo-codes', async (req, res) => {
+  try {
+    res.status(201).json({ code: await createPromoCode(req.body || {}, req.user.id) });
+  } catch (err) {
+    promoError(res, err, 'create');
+  }
+});
+
+router.patch('/promo-codes/:id', requirePromoId, async (req, res) => {
+  try {
+    res.json({ code: await updatePromoCode(req.params.id, req.body || {}, req.user.id) });
+  } catch (err) {
+    promoError(res, err, 'update');
+  }
+});
+
+router.delete('/promo-codes/:id', requirePromoId, async (req, res) => {
+  try {
+    await deletePromoCode(req.params.id, req.user.id);
+    res.json({ success: true });
+  } catch (err) {
+    promoError(res, err, 'delete');
+  }
+});
+
+router.get('/promo-codes/:id/redemptions', requirePromoId, async (req, res) => {
+  try {
+    res.json({ redemptions: await listPromoRedemptions(req.params.id) });
+  } catch (err) {
+    promoError(res, err, 'load usage for');
+  }
+});
 
 // ─── Offers ──────────────────────────────────────────────────────────────────
 // Every marketplace offer, with both parties' contact details, for oversight

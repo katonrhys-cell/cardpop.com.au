@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -278,6 +278,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Finance & Tax" description="Profit on shop sales, GST by BAS quarter, stock valuation and accountant exports." icon={DollarSign} link="/admin/finance" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
+          <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
         </div>
       </div>
 
