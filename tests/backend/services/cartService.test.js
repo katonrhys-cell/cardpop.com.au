@@ -435,8 +435,25 @@ describe('priceCart — pre-orders', () => {
     expect(result.lineItems[0].price_data.product_data.name).toBe('Booster Box');
   });
 
-  it('caps pre-orders at the allocation (stock_quantity)', async () => {
-    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ stock_quantity: 1 }), error: null }));
+  it('takes unlimited pre-orders, whatever stock_quantity says', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ stock_quantity: 0 }), error: null }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 50 }], 'buyer-1');
+    expect(result.orderLines[0]).toMatchObject({ quantity: 50, preorder: true });
+  });
+
+  it('ignores variant stock on a pre-order too', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: preorderRow({ stock_quantity: 0, variants: [{ id: 'v1', sku: 'S-RED', colour: 'Red', stock_quantity: 0, price_aud: null, status: 'active' }] }),
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 4, variantId: 'v1' }], 'buyer-1');
+    expect(result.orderLines[0]).toMatchObject({ variant_id: 'v1', quantity: 4, preorder: true });
+  });
+
+  it('still caps an active product by stock', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ status: 'active', stock_quantity: 1 }), error: null }));
 
     await expect(priceCart([{ type: 'shop', id: 'p9', quantity: 2 }], 'buyer-1'))
       .rejects.toMatchObject({ statusCode: 409 });

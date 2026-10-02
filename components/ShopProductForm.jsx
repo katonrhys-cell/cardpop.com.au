@@ -16,7 +16,7 @@ import { variantStock } from '@/utils/shopVariants.js';
 import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
 
 // One-tap estimates for the pre-order field; any free text works too.
-const PREORDER_ETA_PRESETS = ['Ships in 1–2 weeks', 'Ships in 2–4 weeks', 'Ships in 4–6 weeks', 'Ships in 6–8 weeks'];
+const PREORDER_ETA_PRESETS = ['Ships in 7–10 days', 'Ships in 1–2 weeks', 'Ships in 2–4 weeks', 'Ships in 4–6 weeks', 'Ships in 6–8 weeks'];
 
 const COLOUR_CODES = { black: 'BLK', blue: 'BLU', clear: 'CLR', green: 'GRN', jade: 'JDE', navy: 'NAV', orange: 'ORA', pink: 'PNK', purple: 'PUR', red: 'RED', rose: 'ROS', turquoise: 'TQS', white: 'WHT', yellow: 'YEL', grey: 'GRY', gray: 'GRY', silver: 'SLV', gold: 'GLD' };
 const suggestVariantSku = (productSku, colour) => {
@@ -438,7 +438,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               <Input id="shop-product-price" required type="number" step="0.01" min="0" value={formData.price_aud} onChange={(e) => handleInputChange('price_aud', e.target.value)} className="bg-background tabular-nums" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="shop-product-stock">{formData.status === 'preorder' ? 'Pre-order Quantity' : 'Stock Quantity'}</Label>
+              <Label htmlFor="shop-product-stock">Stock Quantity</Label>
               {variants.length > 0 ? (
                 <>
                   <Input id="shop-product-stock" type="number" value={variants.reduce((s, v) => s + variantStock(v), 0)} disabled className="bg-muted tabular-nums" />
@@ -448,7 +448,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 <Input id="shop-product-stock" type="number" min="0" value={formData.stock_quantity} onChange={(e) => handleInputChange('stock_quantity', e.target.value)} className="bg-background tabular-nums" />
               )}
               {formData.status === 'preorder' && (
-                <p className="text-[11px] text-muted-foreground">How many can be pre-ordered. Each sale counts it down; at 0 the product shows sold out.</p>
+                <p className="text-[11px] text-muted-foreground">Pre-orders are unlimited and don&apos;t use stock. Set this to what you have on hand when it arrives and you switch to Active.</p>
               )}
             </div>
           </div>

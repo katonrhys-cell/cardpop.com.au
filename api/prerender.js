@@ -691,7 +691,8 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   const categoryUrl = shopCategorySlug(product) ? `${BASE_URL}/shop/category/${shopCategorySlug(product)}` : null;
   const image = absUrl(product.images?.[0] || product.image_url);
   const price = product.price_aud;
-  const inStock = product.stock_quantity == null || product.stock_quantity > 0;
+  // Pre-orders are unlimited, so they're always available.
+  const inStock = product.status === 'preorder' || product.stock_quantity == null || product.stock_quantity > 0;
   // Sold now, shipped when stock arrives: schema.org has a value for exactly that.
   const preorder = product.status === 'preorder';
   const description = product.description
@@ -827,7 +828,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   const rrp = row?.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
-  const inStock = (row?.stock_quantity ?? 0) > 0;
+  const inStock = row?.status === 'preorder' || (row?.stock_quantity ?? 0) > 0;
   // Enquiry-only until a price is set: the page is complete and indexable
   // without one, but no Offer is emitted for a product that can't be bought.
   const isPurchasable = isPurchasableStatus(row?.status) && price != null;
@@ -951,7 +952,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   const rrp = row && row.retail_price_aud != null && Number(row.retail_price_aud) > 0
     ? Number(row.retail_price_aud)
     : null;
-  const inStock = ((row && row.stock_quantity) || 0) > 0;
+  const inStock = row?.status === 'preorder' || ((row && row.stock_quantity) || 0) > 0;
   const isPurchasable = row && isPurchasableStatus(row.status) && price != null;
   const preorder = row?.status === 'preorder';
   // Product copy wins where it exists; the product type's shared copy is the

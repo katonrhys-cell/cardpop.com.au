@@ -479,6 +479,11 @@ async function handleCartOrder(existing, session, stripe) {
       }
       fulfilledLines += 1;
       claimedListingLines.push(line);
+    } else if (line.type === 'shop' && line.id && line.preorder) {
+      // Pre-orders are unlimited and sold ahead of stock, so they never touch
+      // stock_quantity (an at-zero decrement would also read as an oversell).
+      // Admin sets real stock when the product goes back to active.
+      fulfilledLines += 1;
     } else if (line.type === 'shop' && line.id) {
       // An RPC *error* must not count as fulfilled: data is null on error, so
       // checking only `ok === false` would silently skip the stock decrement

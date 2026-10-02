@@ -371,7 +371,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       toast.error('Please choose a colour first.');
       return;
     }
-    if (chosenVariant && !variantInStock(chosenVariant)) {
+    const unlimited = source === 'shop' && isPreorder(product);
+    if (chosenVariant && !unlimited && !variantInStock(chosenVariant)) {
       toast.error(`${chosenVariant.colour || 'That colour'} is sold out.`);
       return;
     }
@@ -400,6 +401,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
           manage_inventory: product.stockQuantity !== null,
           inventory_quantity: product.stockQuantity
         };
+    // Unlimited pre-orders: the cart must not cap them by stock.
+    if (unlimited) cartVariant.manage_inventory = false;
     addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
       .then(() => {
         toast.success(cartProduct.preorder ? 'Pre-order added to cart' : 'Added to cart', {
@@ -469,7 +472,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Pre-order: on sale now, dispatched when stock arrives (admin's estimate).
   const preorder = isShop && isPreorder(product);
   const eta = preorder ? preorderEta(product) : '';
-  const outOfStock = isShop && !comingSoon && product.stockQuantity !== null && product.stockQuantity <= 0;
+  const outOfStock = isShop && !comingSoon && !preorder && product.stockQuantity !== null && product.stockQuantity <= 0;
   // Expression of Interest: no fixed price — the seller published a target
   // range and buyers negotiate through offers.
   const isEOI = !isShop && product.listing_type === 'Expression of Interest';
@@ -737,7 +740,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   const sibling = family.find((f) => f.id === v.id);
                   if (sibling) navigate(familyProductPath(sibling));
                 }}
-                showAvailability={!comingSoon}
+                showAvailability={!comingSoon && !preorder}
                 className="mb-6"
               />
             )}
@@ -747,7 +750,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 product={product}
                 value={selectedVariantId}
                 onChange={(v) => setSelectedVariantId(v.id)}
-                showAvailability={!comingSoon}
+                showAvailability={!comingSoon && !preorder}
                 className="mb-6"
               />
             )}
@@ -808,9 +811,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {preorder ? 'Pre-order Now' : 'Add to Cart'}
                 </Button>
-                {product.stockQuantity !== null && (
+                {!preorder && product.stockQuantity !== null && (
                   <p className="text-sm text-center font-medium text-muted-foreground">
-                    {product.stockQuantity} available {preorder ? 'to pre-order' : 'in stock'}
+                    {product.stockQuantity} available in stock
                   </p>
                 )}
               </div>

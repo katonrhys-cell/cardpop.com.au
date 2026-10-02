@@ -14,7 +14,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import { resolveShopCollection } from '@/data/shopCollectionConfigs.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
-import { isSoldOut, isComingSoon, isPreorder, PUBLIC_SHOP_STATUSES, preorderCartFields } from '@/utils/shopStock.js';
+import { isSoldOut, isComingSoon, isPreorder, PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { DEFAULT_FACET_KEYS, filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
@@ -293,7 +293,8 @@ const ShopCollectionPage = () => {
     const cartVariant = {
       id: product.id,
       price_in_cents: priceInCents,
-      manage_inventory: product.stock_quantity != null,
+      // Pre-orders are unlimited, so the cart doesn't cap them by stock.
+      manage_inventory: !hasUnlimitedStock(product) && product.stock_quantity != null,
       inventory_quantity: product.stock_quantity,
     };
     addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999)

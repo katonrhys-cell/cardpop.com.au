@@ -32,8 +32,8 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   // Coming soon wins over sold out (a pre-launch product usually has 0 stock).
   const comingSoon = isComingSoon(product);
   const soldOut = !comingSoon && isSoldOut(product);
-  // Pre-order: buyable now, ships later — ribbon + the admin's estimate. A
-  // pre-order whose allocation has run out is just "Sold out".
+  // Pre-order: buyable now, ships later — ribbon + the admin's estimate.
+  // Unlimited, so isSoldOut() is never true for one.
   const preorder = !comingSoon && !soldOut && product.source === 'shop' && isPreorder(product);
   // A sold marketplace listing — or a vault row carrying its listing embed
   // (VAULT_ITEM_CARD_SELECT) — stays visible, pilled "Sold", never purchasable.

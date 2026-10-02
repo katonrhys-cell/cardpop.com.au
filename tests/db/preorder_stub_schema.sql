@@ -17,7 +17,9 @@ create table public.profiles (id uuid primary key, is_admin boolean default fals
 create table public.shop_products (
   id uuid primary key default uuid_generate_v4(),
   title text not null,
+  brand text,
   price_aud numeric not null default 0,
+  updated_at timestamptz default now(),
   stock_quantity integer,
   status text not null default 'active' check (status in ('active','draft','archived'))
 );

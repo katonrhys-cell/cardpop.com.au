@@ -9,6 +9,8 @@
  */
 export function isSoldOut(product) {
   if (!product) return false;
+  // Pre-orders are unlimited — sold ahead of stock, so never "sold out".
+  if (isPreorder(product)) return false;
   const qty = product.stock_quantity ?? product.stockQuantity;
   if (qty === null || qty === undefined || qty === '') return false;
   const n = Number(qty);
@@ -69,6 +71,14 @@ export function preorderEta(product) {
   const raw = product?.preorder_eta ?? product?.preorderEta ?? '';
   const text = typeof raw === 'string' ? raw.trim() : '';
   return text || PREORDER_ETA_FALLBACK;
+}
+
+/**
+ * True when the cart should not cap this product by stock_quantity. Pre-orders
+ * are unlimited; everything else is capped by its stock as before.
+ */
+export function hasUnlimitedStock(product) {
+  return isPreorder(product);
 }
 
 /**

@@ -60,8 +60,10 @@ const ShopBinderProductPage = () => {
   // With colour variants the buyable unit is the chosen variant.
   const variants = activeVariants(row);
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
-  const inStock = variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0;
-  const anyVariantInStock = variants.length > 0 ? variants.some(variantInStock) : inStock;
+  // Pre-orders are unlimited: available whatever stock_quantity says.
+  const unlimited = isPreorder(row);
+  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0);
+  const anyVariantInStock = unlimited || (variants.length > 0 ? variants.some(variantInStock) : inStock);
   // The CTA flips itself. While a product has no price (or is still `draft`) it
   // is enquiry-only: the button sends people to sign up, and the page is
   // complete — and indexable — without a price. The moment a price is set and
@@ -91,6 +93,8 @@ const ShopBinderProductPage = () => {
           manage_inventory: row.stock_quantity !== null,
           inventory_quantity: row.stock_quantity,
         };
+    // Unlimited pre-orders: the cart must not cap them by stock.
+    if (unlimited) cartVariant.manage_inventory = false;
     addToCart(
       {
         id: row.id, source: 'shop', type: 'shop',
@@ -239,7 +243,7 @@ const ShopBinderProductPage = () => {
                 product={{ variants: familyAsVariants(family) }}
                 value={selectedId}
                 onChange={(v) => setSelectedId(v.id)}
-                showAvailability={!isComingSoon}
+                showAvailability={!isComingSoon && !unlimited}
                 className="mt-6"
               />
             )}
@@ -249,6 +253,7 @@ const ShopBinderProductPage = () => {
                 product={row}
                 value={selectedVariantId}
                 onChange={(v) => setSelectedVariantId(v.id)}
+                showAvailability={!unlimited}
                 className="mt-6"
               />
             )}

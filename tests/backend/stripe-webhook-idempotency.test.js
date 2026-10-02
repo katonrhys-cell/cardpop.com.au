@@ -335,6 +335,37 @@ describe('webhook payment_status gating', () => {
   });
 });
 
+describe('webhook pre-order lines', () => {
+  it('fulfils a pre-order line without touching stock (pre-orders are unlimited)', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: { object: { id: 'cs_pre', payment_status: 'paid', amount_total: 11000, payment_intent: 'pi_pre' } },
+    });
+    const pendingOrder = {
+      id: 'order-pre-1', status: 'pending', total_aud: 110, buyer_id: 'buyer-1',
+      order_items: [
+        { type: 'shop', id: 'p-pre', quantity: 3, seller_id: null, preorder: true, preorder_eta: 'Ships in 7–10 days' },
+        { type: 'shop', id: 'p1', quantity: 1, seller_id: null },
+      ],
+    };
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.single) return { data: pendingOrder, error: null };
+      if (ctx.table === 'orders' && ctx.op === 'update') return { data: [{ id: pendingOrder.id }], error: null };
+      if (ctx.table === 'profiles' && ctx.single) return { data: { email: null, display_name: 'Buyer' }, error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+
+    expect(res.status).toBe(200);
+    const decrements = rpcCalls.filter(c => c.name === 'decrement_shop_stock');
+    // Only the in-stock line decrements; the pre-order line is skipped.
+    expect(decrements).toHaveLength(1);
+    expect(decrements[0].args).toMatchObject({ p_id: 'p1' });
+    expect(rpcCalls.find(c => c.name === 'decrement_shop_variant_stock')).toBeUndefined();
+  });
+});
+
 // ─── DB error on the confirm CAS must retry (500), not be treated as done ──────
 
 describe('webhook confirm-CAS error handling', () => {

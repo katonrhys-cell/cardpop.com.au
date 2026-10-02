@@ -12,7 +12,7 @@ import ProductCard from '@/components/ProductCard.jsx';
 import OrderSummary from '@/components/checkout/OrderSummary.jsx';
 import {
   PUBLIC_SHOP_STATUSES, PURCHASABLE_SHOP_STATUSES, isPurchasableStatus, isPreorder, preorderEta,
-  preorderCartFields, orderPreorderLines, isAwaitingPreorderStock,
+  preorderCartFields, orderPreorderLines, isAwaitingPreorderStock, isSoldOut, hasUnlimitedStock,
 } from '@/utils/shopStock.js';
 import { availability } from '@/utils/shopFacets.js';
 
@@ -47,6 +47,13 @@ describe('pre-order status helpers', () => {
     expect(preorderEta({ status: 'active', preorder_eta: 'stale text' })).toBe('');
   });
 
+  it('is never sold out and never capped by stock', () => {
+    expect(isSoldOut({ ...base, stock_quantity: 0 })).toBe(false);
+    expect(isSoldOut({ ...base, status: 'active', stock_quantity: 0 })).toBe(true);
+    expect(hasUnlimitedStock(base)).toBe(true);
+    expect(hasUnlimitedStock({ ...base, status: 'active' })).toBe(false);
+  });
+
   it('only adds cart fields for a pre-order', () => {
     expect(preorderCartFields(base)).toEqual({ preorder: true, preorderEta: 'Ships in 4–6 weeks' });
     expect(preorderCartFields({ ...base, status: 'active' })).toEqual({});
@@ -66,7 +73,7 @@ describe('pre-order status helpers', () => {
 
   it('gets its own Availability filter option', () => {
     expect(availability(base)).toBe('pre-order');
-    expect(availability({ ...base, stock_quantity: 0 })).toBe('sold-out');
+    expect(availability({ ...base, stock_quantity: 0 })).toBe('pre-order');
     expect(availability({ ...base, status: 'active' })).toBe('in-stock');
   });
 });
@@ -85,10 +92,13 @@ describe('ProductCard pre-order state', () => {
     expect(onAddToCart).toHaveBeenCalledWith(expect.objectContaining({ id: base.id }));
   });
 
-  it('shows Sold out (not Pre-order) once the allocation runs out', () => {
-    renderCard({ ...base, stock_quantity: 0 });
-    expect(screen.getByLabelText(/sold out/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Ships in 4–6 weeks/)).not.toBeInTheDocument();
+  it('never shows Sold out — pre-orders are unlimited, even at 0 stock', () => {
+    const onAddToCart = vi.fn();
+    renderCard({ ...base, stock_quantity: 0 }, onAddToCart);
+    expect(screen.queryByLabelText(/sold out/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Ships in 4–6 weeks/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^pre-order$/i }));
+    expect(onAddToCart).toHaveBeenCalled();
   });
 });
 

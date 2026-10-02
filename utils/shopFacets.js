@@ -75,7 +75,7 @@ export const AVAILABILITY = [
 export function availability(p) {
   if (p?.status === 'coming_soon') return 'coming-soon';
   if (isSoldOut(p)) return 'sold-out';
-  // A pre-order with allocation left is buyable but not "in stock" — it gets
+  // A pre-order (unlimited) is buyable but not "in stock" — it gets
   // its own option so in-stock means ships now.
   return p?.status === 'preorder' ? 'pre-order' : 'in-stock';
 }

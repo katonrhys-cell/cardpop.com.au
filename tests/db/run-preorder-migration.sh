@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Applies the shop pre-order migration to a throwaway Postgres database on top
+# Applies the shop pre-order migrations to a throwaway Postgres database on top
 # of a stub of the shop schema, then runs behavioural checks.
 #
 #   PGHOST=/var/tmp PGPORT=55432 PGUSER=postgres tests/db/run-preorder-migration.sh
@@ -18,3 +18,8 @@ run supabase/migrations/20261002000345_shop_products_preorder_status.sql
 # Re-applying must be a no-op (db push can re-run a straggler).
 run supabase/migrations/20261002000345_shop_products_preorder_status.sql
 psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/preorder_status.test.sql
+# Palms Off data migration: seed rows, apply (twice), check.
+psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/palms_off_preorder_seed.sql
+run supabase/migrations/20261002023756_palms_off_preorder_7_10_days.sql
+run supabase/migrations/20261002023756_palms_off_preorder_7_10_days.sql
+psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/palms_off_preorder.test.sql

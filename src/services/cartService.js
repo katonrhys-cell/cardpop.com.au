@@ -80,8 +80,8 @@ export async function priceCart(items, userId) {
       // `active` and `preorder` are both on sale; anything else (coming soon,
       // draft, archived) is refused however the cart line got here.
       if (!product || !isPurchasableStatus(product.status)) throw httpError(404, 'A shop product in your cart is unavailable');
-      // Pre-orders are charged now and dispatched when stock arrives. Stock is
-      // the pre-order allocation, so the checks below still cap them.
+      // Pre-orders are charged now and dispatched when stock arrives. They are
+      // unlimited: stock is ignored here and never decremented by the webhook.
       const preorder = isPreorder(product);
       const eta = preorder ? preorderEta(product) : '';
 
@@ -94,8 +94,8 @@ export async function priceCart(items, userId) {
         const wanted = typeof raw?.variantId === 'string' ? raw.variantId : null;
         variant = wanted ? variants.find((v) => v.id === wanted) : (variants.length === 1 ? variants[0] : null);
         if (!variant) throw httpError(wanted ? 404 : 400, wanted ? `That colour of ${product.title} is unavailable` : `Please choose a colour for ${product.title}`);
-        if (variant.stock_quantity < quantity) throw httpError(409, `Not enough stock for ${product.title}${variant.colour ? ` — ${variant.colour}` : ''}`);
-      } else if (product.stock_quantity < quantity) {
+        if (!preorder && variant.stock_quantity < quantity) throw httpError(409, `Not enough stock for ${product.title}${variant.colour ? ` — ${variant.colour}` : ''}`);
+      } else if (!preorder && product.stock_quantity < quantity) {
         throw httpError(409, `Not enough stock for ${product.title}`);
       }
       const lineTitle = variant?.colour ? `${product.title} — ${variant.colour}` : product.title;

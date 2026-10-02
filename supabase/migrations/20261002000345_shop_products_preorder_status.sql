@@ -7,10 +7,9 @@
 -- stamps `preorder: true` + the ETA onto the order line so the receipt, the
 -- buyer's order history and Admin → Order Management all say it is a pre-order.
 --
--- Stock works as the pre-order allocation: stock_quantity is how many units are
--- available to pre-order (e.g. what was ordered from the supplier). Checkout
--- decrements it as usual, so pre-orders can never exceed the allocation, and
--- at 0 the product shows "Sold out" with the enquiry button.
+-- Pre-orders are unlimited: stock_quantity is ignored while a product is on
+-- pre-order (the cart doesn't cap it, the webhook doesn't decrement it, and it
+-- never shows as sold out).
 --
 -- When stock arrives the admin flips the product to `active`.
 --
@@ -72,4 +71,4 @@ create policy "shop_product_variants_select" on public.shop_product_variants for
   );
 
 comment on column public.shop_products.status is
-  'active = on sale; preorder = on sale before stock arrives (shows preorder_eta, stock_quantity is the pre-order allocation); coming_soon = shown publicly with an enquiry button, not purchasable; draft = hidden; archived = retired.';
+  'active = on sale; preorder = on sale before stock arrives (shows preorder_eta, unlimited — stock is ignored); coming_soon = shown publicly with an enquiry button, not purchasable; draft = hidden; archived = retired.';
