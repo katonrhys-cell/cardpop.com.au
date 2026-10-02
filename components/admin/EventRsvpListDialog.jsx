@@ -16,6 +16,7 @@ import { Download, Store, Users, AlertTriangle } from 'lucide-react';
 import apiServerClient from '@/lib/apiServerClient';
 import { toCsv } from '@/utils/finance.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import EventOrganiserAccess from '@/components/admin/EventOrganiserAccess.jsx';
 
 // Admin list of everyone who has RSVP'd to an event — attendees ("buyer") and
 // vendors. The raw event_rsvps rows are hidden from the public by RLS, and
@@ -43,6 +44,7 @@ function downloadCsv(filename, text) {
 
 const EventRsvpListDialog = ({ event, onClose }) => {
   const [rsvps, setRsvps] = useState([]);
+  const [organiser, setOrganiser] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState(null);
   const [tab, setTab] = useState('all');
@@ -53,13 +55,17 @@ const EventRsvpListDialog = ({ event, onClose }) => {
     setIsLoading(true);
     setLoadError(null);
     setRsvps([]);
+    setOrganiser(null);
     setTab('all');
     (async () => {
       try {
         const res = await apiServerClient.fetch(`/admin/events/${event.id}/rsvps`);
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(body.error || 'Failed to load attendees');
-        if (!cancelled) setRsvps(body.rsvps || []);
+        if (!cancelled) {
+          setRsvps(body.rsvps || []);
+          setOrganiser(body.organiser || null);
+        }
       } catch (err) {
         if (!cancelled) setLoadError(err.message || 'Failed to load attendees');
       } finally {
@@ -85,6 +91,10 @@ const EventRsvpListDialog = ({ event, onClose }) => {
           <DialogTitle>Who's going</DialogTitle>
           <DialogDescription className="line-clamp-2">{event?.title}</DialogDescription>
         </DialogHeader>
+
+        {!isLoading && !loadError && event?.id && (
+          <EventOrganiserAccess eventId={event.id} organiser={organiser} onChange={setOrganiser} />
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Tabs value={tab} onValueChange={setTab}>

@@ -61,3 +61,26 @@ mirrored in the UI (`components/events/EventInfoBoard.jsx`).
 authors without exposing `events.organiser_id` (hidden from `events_public`) or
 raw `event_rsvps` rows (owner/admin-only RLS). Shared helpers:
 `lib/eventBoard.js` (tests: `tests/frontend/eventBoard.test.js`).
+
+## Who's going: admin list and verified organisers
+
+RSVP rows (`event_rsvps`) are owner/admin-only under RLS; the public only ever
+sees counts. Two server routes expose the people behind those counts:
+
+- **Admins**: Admin → Event Management → the people icon on an event opens
+  *Who's going* (`components/admin/EventRsvpListDialog.jsx`, backed by
+  `GET /admin/events/:id/rsvps`): attendees and vendors with name, username,
+  email and RSVP date, plus CSV export.
+- **Verified organisers**: the same dialog has an *Organiser account* box
+  (`components/admin/EventOrganiserAccess.jsx`). An admin links the real
+  organiser's CardPop account to the event by username or email
+  (`PATCH /admin/events/:id/organiser` — admin-created events otherwise carry
+  the admin as `organiser_id`) and switches on **Verified organiser**
+  (`PUT`/`DELETE /admin/event-organisers/:userId`, stored in
+  `event_organiser_verifications`; migration
+  `20261002114651_event_organiser_verifications.sql`). Verification is per
+  account, so it covers every event they organise. A verified organiser gets a
+  **Vendors** button per event in Account → My Events
+  (`components/events/OrganiserVendorsDialog.jsx`, `GET /events/:id/vendors`),
+  which requires `organiser_id = caller` **and** a verification row. Organisers
+  see vendors only — names and profiles, **never emails** — and not attendees.

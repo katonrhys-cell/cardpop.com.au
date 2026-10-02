@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
+import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -25,6 +26,8 @@ const AccountEvents = () => {
   const [loadError, setLoadError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
+  const [isVerifiedOrganiser, setIsVerifiedOrganiser] = useState(false);
+  const [vendorsEvent, setVendorsEvent] = useState(null);
 
   const fetchMyEvents = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -48,6 +51,20 @@ const AccountEvents = () => {
   }, [currentUser?.id]);
 
   useEffect(() => { fetchMyEvents(); }, [fetchMyEvents]);
+
+  // A verified organiser (set by an admin) can see the vendor list for their
+  // events. RLS lets a user read only their own verification row.
+  useEffect(() => {
+    if (!currentUser?.id) return undefined;
+    let cancelled = false;
+    supabase
+      .from('event_organiser_verifications')
+      .select('user_id')
+      .eq('user_id', currentUser.id)
+      .maybeSingle()
+      .then(({ data }) => { if (!cancelled) setIsVerifiedOrganiser(!!data); });
+    return () => { cancelled = true; };
+  }, [currentUser?.id]);
 
   const openSubmit = () => { setEditingEvent(null); setIsModalOpen(true); };
   const openEdit = (event) => { setEditingEvent(event); setIsModalOpen(true); };
@@ -124,6 +141,11 @@ const AccountEvents = () => {
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">
+                  {isVerifiedOrganiser && (
+                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setVendorsEvent(event)}>
+                      <Store className="w-3.5 h-3.5" /> Vendors
+                    </Button>
+                  )}
                   {event.status === 'pending_review' && (
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
                       <Pencil className="w-3.5 h-3.5" /> Edit
@@ -142,6 +164,8 @@ const AccountEvents = () => {
           })}
         </div>
       )}
+
+      <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
 
       <EventFormModal
         isOpen={isModalOpen}
