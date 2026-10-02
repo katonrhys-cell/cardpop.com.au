@@ -99,6 +99,43 @@ describe('POST /create-cart-checkout — pending order row', () => {
   });
 });
 
+describe('POST /create-cart-checkout — ui modes', () => {
+  const RETURN = 'https://cardpop.com.au/checkout-success?session_id={CHECKOUT_SESSION_ID}';
+
+  it("creates an 'elements' session (inline Google Pay) that returns a client secret", async () => {
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', client_secret: 'cs_1_secret' });
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: ITEMS, uiMode: 'elements', returnUrl: RETURN, shippingAddress: ADDRESS,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.clientSecret).toBe('cs_1_secret');
+    const [[args]] = mockStripe.checkout.sessions.create.mock.calls;
+    expect(args.ui_mode).toBe('elements');
+    expect(args.return_url).toBe(RETURN);
+    expect(args.success_url).toBeUndefined();
+    // Google Pay rides on 'card' — the same pinned list as every other mode.
+    expect(args.payment_method_types).toContain('card');
+    expect(ordersInserts).toHaveLength(1);
+  });
+
+  it("keeps 'embedded' on Stripe's full embedded page", async () => {
+    mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', client_secret: 'cs_1_secret' });
+    await request(app).post('/create-cart-checkout').send({
+      items: ITEMS, uiMode: 'embedded', returnUrl: RETURN, shippingAddress: ADDRESS,
+    });
+    const [[args]] = mockStripe.checkout.sessions.create.mock.calls;
+    expect(args.ui_mode).toBe('embedded_page');
+  });
+
+  it("requires a returnUrl for 'elements'", async () => {
+    const res = await request(app).post('/create-cart-checkout').send({
+      items: ITEMS, uiMode: 'elements', shippingAddress: ADDRESS,
+    });
+    expect(res.status).toBe(400);
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('wallet preview matches checkout', () => {
   it('caps the preview at the total minus Stripe\'s 50¢ minimum, exactly like checkout', async () => {
     wallet.balanceCents = 50000; // covers the whole $107.50 order

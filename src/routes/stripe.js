@@ -278,9 +278,14 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       : null;
 
     // 'embedded' renders Stripe's payment form inline on our own page (no
-    // redirect away); 'hosted' redirects to Stripe's own checkout page. Both
-    // create an identical Checkout Session — only how the buyer sees it differs.
-    const embedded = uiMode === 'embedded';
+    // redirect away); 'elements' does the same but with Stripe Elements we lay
+    // out ourselves (an inline Google Pay button above the card form — see
+    // components/checkout/StripeElementsPayment.jsx); 'hosted' redirects to
+    // Stripe's own checkout page. All three create an identical Checkout
+    // Session — only how the buyer sees it differs — so pricing, the pending
+    // order and checkout.session.completed fulfilment are shared.
+    const elementsUi = uiMode === 'elements';
+    const embedded = uiMode === 'embedded' || elementsUi;
 
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: 'items is required' });
@@ -457,8 +462,11 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // mode is now 'embedded_page' ('embedded' is rejected by current API
       // versions). @stripe/react-stripe-js v6 / stripe-js v9 consume the same
       // client_secret this returns via createEmbeddedCheckoutPage().
+      // 'elements' (formerly 'custom') is the Checkout Elements SDK mode that
+      // lets the page mount the Express Checkout Element (Google Pay) and the
+      // Payment Element itself against this same session.
       ...(embedded
-        ? { ui_mode: 'embedded_page', return_url: returnUrl }
+        ? { ui_mode: elementsUi ? 'elements' : 'embedded_page', return_url: returnUrl }
         : { success_url: successUrl, cancel_url: cancelUrl }),
       ...(billingCustomerId ? { customer: billingCustomerId } : { customer_email: email }),
       // Business buyers get an itemised tax invoice carrying their ABN.
@@ -553,7 +561,7 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // below must not release it.
     walletSlotHeldForCleanup = false;
 
-    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100}, ${embedded ? 'embedded' : 'hosted'})`);
+    logger.info(`[STRIPE] Cart session created: ${session.id} (${orderLines.length} items, $${grandCents / 100}, ${elementsUi ? 'elements' : embedded ? 'embedded' : 'hosted'})`);
     res.json({
       ...(embedded ? { clientSecret: session.client_secret } : { url: session.url }),
       sessionId: session.id,

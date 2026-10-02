@@ -21,8 +21,13 @@ the **functional equivalent** through Stripe.
 
 ## What we offer instead (and where it's controlled)
 
-The embedded checkout (`components/checkout/EmbeddedStripeCheckout.jsx`) renders
-Stripe's Embedded Checkout on our own page. The Checkout Session **pins**
+The checkout's payment step (`components/checkout/EmbeddedStripeCheckout.jsx`)
+renders the Stripe payment form on our own page. By default it uses a Checkout
+Session in `ui_mode: 'elements'` and lays the form out with Stripe Elements
+(`components/checkout/StripeElementsPayment.jsx`): an **inline "Buy with Google
+Pay" button** (Stripe's Express Checkout Element) above the card/PayPal form —
+see "Inline Google Pay button" below. `VITE_CHECKOUT_UI=embedded` (build-time)
+falls back to Stripe's full Embedded Checkout page. The Checkout Session **pins**
 `payment_method_types` (`src/utils/checkoutPaymentMethods.js`), so Stripe
 presents exactly what is pinned — not everything enabled on the account:
 
@@ -69,9 +74,9 @@ Google publishes brand guidelines for how Google Pay may be shown
 (developers.google.com/pay/api/web/guides/brand-guidelines). Three different
 things on CardPop are covered by them:
 
-1. **The actual "Buy with Google Pay" button** — rendered by Stripe itself
-   inside `EmbeddedStripeCheckout.jsx`'s iframe when Google Pay is enabled in
-   the Stripe Dashboard (see the table above). Stripe is a certified Google
+1. **The actual "Buy with Google Pay" button** — rendered by Stripe's Express
+   Checkout Element inline on the payment step (`StripeElementsPayment.jsx`)
+   when Google Pay is enabled in the Stripe Dashboard (see the table above). Stripe is a certified Google
    Pay processor and draws Google's own button asset there, so this is
    already fully compliant with no code on our side to maintain.
 2. **The small "we accept…" trust row** — `GooglePayMark` in
@@ -104,7 +109,47 @@ things on CardPop are covered by them:
    remote/inline images by default, so an image there would often just be a
    broken box).
 
-## Possible follow-up: one-tap Express Checkout button
+## Inline Google Pay button
+
+Implemented per https://docs.stripe.com/google-pay (web). Google's *Android*
+tutorial (`developers.google.com/pay/api/android/...`) is for native Android
+apps and doesn't apply to a website; on the web Stripe draws Google's own
+button for us.
+
+- **Server**: `POST /stripe/create-cart-checkout` with `uiMode: 'elements'`
+  creates the **same** Checkout Session as the embedded page (same pricing,
+  pinned `card,paypal` methods, pending order row, `checkout.session.completed`
+  fulfilment) with `ui_mode: 'elements'`, and returns its `clientSecret`.
+- **Client**: `StripeElementsPayment.jsx` mounts `CheckoutElementsProvider`
+  (`@stripe/react-stripe-js/checkout`) with that secret, then an
+  `ExpressCheckoutElement` (`googlePay: 'always'`, `buttonType: 'buy'`, black
+  theme, Apple Pay on Apple devices) above a `PaymentElement` for card and
+  PayPal. Both confirm via `checkout.confirm()`, which redirects to
+  `/checkout-success?session_id=…`. Wallets are hidden from the Payment
+  Element so Google Pay isn't offered twice.
+- Google Pay is a card payment wearing a wallet, so nothing new is needed in
+  the webhook: `resolveWalletType` already stores `payment_wallet_type =
+  'google_pay'` and the receipt says "Paid with Google Pay".
+
+**Stripe Dashboard prerequisites (no code):**
+
+1. Settings → Payment methods → **Google Pay** (and Apple Pay) switched **on**.
+2. Settings → **Payment method domains** → add `cardpop.com.au` (and
+   `www.cardpop.com.au` if served). Elements will not show wallet buttons on an
+   unregistered domain. Apple Pay additionally needs the domain verified.
+3. `VITE_STRIPE_PUBLISHABLE_KEY` set (already required).
+
+**Testing:** in test mode, open checkout in Chrome signed in to a Google
+account with a card saved to Google Pay — the button uses Stripe's test card
+behind the scenes and no real charge is made. Preview deployments
+(`*.vercel.app`) need their domain registered too, or the button won't show.
+
+The CSP allows `https://js.stripe.com` and `https://*.js.stripe.com` frames,
+and `Permissions-Policy: payment=(self "https://js.stripe.com")` delegates the
+Payment Request API to Stripe's iframes — both are required for the wallet
+button.
+
+## Possible follow-up: one-tap Express Checkout button on product pages
 
 A Shop-Pay-style **express button on the cart / product page** (tap Apple Pay /
 Google Pay / Link and pay without the full form) is possible with Stripe's
