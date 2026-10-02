@@ -101,6 +101,8 @@ export async function priceCart(items, userId) {
       const lineTitle = variant?.colour ? `${product.title} — ${variant.colour}` : product.title;
       // The Stripe Checkout page and Stripe receipt show this name,
       // so a pre-order says so (with its estimate) at the moment of payment.
+      // GET /stripe/session/:id matches "(Pre-order — " to keep pre-orders out
+      // of the Google Customer Reviews survey — keep the two in step.
       const stripeName = preorder ? `${lineTitle} (Pre-order — ${eta})` : lineTitle;
 
       // The advertised shop price is GST-inclusive, so the buyer pays exactly

@@ -54,6 +54,5 @@
 - [API catalog](https://cardpop.com.au/.well-known/api-catalog): RFC 9727 linkset describing the public API.
 - [OpenAPI description](https://cardpop.com.au/openapi.json): OpenAPI 3.1 description of the public API.
 - [Agent skills index](https://cardpop.com.au/.well-known/agent-skills/index.json): Discoverable SKILL.md docs for AI agents (Agent Skills Discovery RFC).
-- [AI catalog](https://cardpop.com.au/.well-known/ai-catalog.json): Agentic Resource Discovery (ARD) manifest listing the MCP server and agent skills.
 - [Sitemap](https://cardpop.com.au/sitemap.xml): XML sitemap of indexable pages.
 - [Security policy](https://cardpop.com.au/.well-known/security.txt): How to report security issues (RFC 9116).

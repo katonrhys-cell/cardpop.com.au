@@ -14,6 +14,7 @@ import { PaymentBadge } from '@/components/checkout/PaymentMethodSelector.jsx';
 import { GooglePayMark } from '@/components/checkout/PaymentMarks.jsx';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
+import { renderSurveyOptIn } from '@/lib/googleCustomerReviews.js';
 
 // Post-purchase account creation for guests. The order is already placed and
 // paid — this just lets the shopper turn their guest checkout into a real
@@ -156,6 +157,18 @@ const CheckoutSuccessPage = () => {
 
     return () => { cancelled = true; };
   }, [sessionId, singleItem, clearCart]);
+
+  // Google Customer Reviews: once payment is confirmed, offer Google's survey
+  // opt-in. Pre-orders are skipped — they ship weeks out, and the survey would
+  // arrive long before the parcel.
+  useEffect(() => {
+    if (status !== 'paid' || !sessionData?.customerEmail || sessionData.hasPreorder) return;
+    renderSurveyOptIn({
+      orderId: sessionData.id || sessionId,
+      email: sessionData.customerEmail,
+      deliveryCountry: sessionData.deliveryCountry,
+    });
+  }, [status, sessionData, sessionId]);
 
   if (status === 'verifying') {
     return (
