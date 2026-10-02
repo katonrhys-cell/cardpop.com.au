@@ -41,7 +41,7 @@ function categoryLabel(product) {
 }
 
 // Status order used when sorting by status — the order an admin works through.
-const STATUS_ORDER = { active: 0, coming_soon: 1, draft: 2, archived: 3 };
+const STATUS_ORDER = { active: 0, preorder: 1, coming_soon: 2, draft: 3, archived: 4 };
 
 // Value readers per sortable column. `ctx.costs` is the admin-only cost map
 // keyed by product id (shop_product_costs rows).

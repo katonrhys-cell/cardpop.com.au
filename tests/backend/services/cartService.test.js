@@ -402,3 +402,87 @@ describe('priceCart — colour variants', () => {
     expect(result.itemsCents).toBe(10000);
   });
 });
+
+describe('priceCart — pre-orders', () => {
+  const preorderRow = (over = {}) => ({
+    id: 'p9', title: 'Booster Box', price_aud: 120, stock_quantity: 10,
+    status: 'preorder', preorder_eta: 'Ships in 4–6 weeks', ...over,
+  });
+
+  it('sells a pre-order like an active product and snapshots the estimate on the line', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow(), error: null }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 2 }], 'buyer-1');
+
+    expect(result.itemsCents).toBe(24000);
+    expect(result.hasPreorder).toBe(true);
+    expect(result.orderLines[0]).toMatchObject({
+      type: 'shop', id: 'p9', title: 'Booster Box', quantity: 2,
+      preorder: true, preorder_eta: 'Ships in 4–6 weeks',
+    });
+    // The buyer sees it on the Stripe page too.
+    expect(result.lineItems[0].price_data.product_data.name).toBe('Booster Box (Pre-order — Ships in 4–6 weeks)');
+  });
+
+  it('leaves active products unmarked', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ status: 'active' }), error: null }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 1 }], 'buyer-1');
+
+    expect(result.hasPreorder).toBe(false);
+    expect(result.orderLines[0]).not.toHaveProperty('preorder');
+    expect(result.orderLines[0]).not.toHaveProperty('preorder_eta');
+    expect(result.lineItems[0].price_data.product_data.name).toBe('Booster Box');
+  });
+
+  it('takes unlimited pre-orders, whatever stock_quantity says', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ stock_quantity: 0 }), error: null }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 50 }], 'buyer-1');
+    expect(result.orderLines[0]).toMatchObject({ quantity: 50, preorder: true });
+  });
+
+  it('ignores variant stock on a pre-order too', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({
+      data: preorderRow({ stock_quantity: 0, variants: [{ id: 'v1', sku: 'S-RED', colour: 'Red', stock_quantity: 0, price_aud: null, status: 'active' }] }),
+      error: null,
+    }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 4, variantId: 'v1' }], 'buyer-1');
+    expect(result.orderLines[0]).toMatchObject({ variant_id: 'v1', quantity: 4, preorder: true });
+  });
+
+  it('still caps an active product by stock', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ status: 'active', stock_quantity: 1 }), error: null }));
+
+    await expect(priceCart([{ type: 'shop', id: 'p9', quantity: 2 }], 'buyer-1'))
+      .rejects.toMatchObject({ statusCode: 409 });
+  });
+
+  it('still refuses coming-soon products', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ status: 'coming_soon' }), error: null }));
+
+    await expect(priceCart([{ type: 'shop', id: 'p9', quantity: 1 }], 'buyer-1'))
+      .rejects.toMatchObject({ statusCode: 404 });
+  });
+
+  it('falls back to a generic estimate if a pre-order somehow has none', async () => {
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: preorderRow({ preorder_eta: '   ' }), error: null }));
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 1 }], 'buyer-1');
+    expect(result.orderLines[0].preorder_eta).toBe('Ships when stock arrives');
+  });
+
+  it('retries without preorder_eta when the column is not migrated yet', async () => {
+    const missing = rowBuilder({ data: null, error: { message: 'column shop_products.preorder_eta does not exist' } });
+    const legacy = rowBuilder({ data: preorderRow({ status: 'active', preorder_eta: undefined }), error: null });
+    mockSupabase.from.mockReturnValueOnce(missing).mockReturnValueOnce(legacy);
+
+    const result = await priceCart([{ type: 'shop', id: 'p9', quantity: 1 }], 'buyer-1');
+
+    expect(missing.select.mock.calls[0][0]).toContain('preorder_eta');
+    expect(legacy.select.mock.calls[0][0]).not.toContain('preorder_eta');
+    expect(result.itemsCents).toBe(12000);
+    expect(result.hasPreorder).toBe(false);
+  });
+});

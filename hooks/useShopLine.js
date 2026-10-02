@@ -38,12 +38,17 @@ export default function useShopLine({ slug, sku, enabled = true }) {
     let cancelled = false;
     setLoading(true);
     Promise.all([
-      supabase
-        .from('shop_products')
-        .select(`id, title, price_aud, retail_price_aud, stock_quantity, status, ${VARIANTS_SELECT}`)
-        .eq('slug', slug)
-        .maybeSingle()
-        .then(({ data }) => data || null, () => null),
+      (async () => {
+        const run = (extra) => supabase
+          .from('shop_products')
+          .select(`id, title, price_aud, retail_price_aud, stock_quantity, status${extra}, ${VARIANTS_SELECT}`)
+          .eq('slug', slug)
+          .maybeSingle();
+        let { data, error } = await run(', preorder_eta');
+        // Deploy-before-migration window: load the row without the estimate.
+        if (error && /preorder_eta/.test(error.message || '')) ({ data, error } = await run(''));
+        return error ? null : (data || null);
+      })().catch(() => null),
       fetchFamily(supabase, sku, PUBLIC_SHOP_STATUSES),
     ]).then(([singleRow, siblings]) => {
       if (cancelled) return;

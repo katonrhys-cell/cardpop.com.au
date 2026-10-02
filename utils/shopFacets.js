@@ -67,13 +67,17 @@ export function priceBand(p) {
 
 export const AVAILABILITY = [
   { value: 'in-stock', label: 'In stock' },
+  { value: 'pre-order', label: 'Pre-order' },
   { value: 'coming-soon', label: 'Coming soon' },
   { value: 'sold-out', label: 'Sold out' },
 ];
 
 export function availability(p) {
   if (p?.status === 'coming_soon') return 'coming-soon';
-  return isSoldOut(p) ? 'sold-out' : 'in-stock';
+  if (isSoldOut(p)) return 'sold-out';
+  // A pre-order (unlimited) is buyable but not "in stock" — it gets
+  // its own option so in-stock means ships now.
+  return p?.status === 'preorder' ? 'pre-order' : 'in-stock';
 }
 
 /** Selling below the manufacturer RRP. */

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare, Clock } from 'lucide-react';
+import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare, Clock, CalendarClock } from 'lucide-react';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -32,7 +32,8 @@ import { sellerFromProfile, OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js'
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
-import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta } from '@/utils/shopStock.js';
+import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFamily.js';
@@ -371,7 +372,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       toast.error('Please choose a colour first.');
       return;
     }
-    if (chosenVariant && !variantInStock(chosenVariant)) {
+    const unlimited = source === 'shop' && isPreorder(product);
+    if (chosenVariant && !unlimited && !variantInStock(chosenVariant)) {
       toast.error(`${chosenVariant.colour || 'That colour'} is sold out.`);
       return;
     }
@@ -388,6 +390,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       set: product.set || product.set_name || product.card_set || product.era || product.collection || null,
       grading_company: product.grading_company || product.gradingCompany || null,
       grade: product.grade || null,
+      // Pre-orders carry their estimate into the cart drawer; checkout re-reads
+      // the authoritative value from the server.
+      ...(source === 'shop' && isPreorder(product) ? { preorder: true, preorderEta: preorderEta(product) } : {}),
     };
     const cartVariant = chosenVariant
       ? toCartVariant(product, chosenVariant)
@@ -397,9 +402,11 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
           manage_inventory: product.stockQuantity !== null,
           inventory_quantity: product.stockQuantity
         };
+    // Unlimited pre-orders: the cart must not cap them by stock.
+    if (unlimited) cartVariant.manage_inventory = false;
     addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
       .then(() => {
-        toast.success('Added to cart', {
+        toast.success(cartProduct.preorder ? 'Pre-order added to cart' : 'Added to cart', {
           action: {
             label: 'View Cart',
             onClick: () => setIsCartOpen(true)
@@ -463,7 +470,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   const shopCategory = isShop ? findShopCategory(shopCategorySlug(product)) : null;
   const isSold = !isShop && product.status === 'sold';
   const comingSoon = isShop && product.status === 'coming_soon';
-  const outOfStock = isShop && !comingSoon && product.stockQuantity !== null && product.stockQuantity <= 0;
+  // Pre-order: on sale now, dispatched when stock arrives (admin's estimate).
+  const preorder = isShop && isPreorder(product);
+  const eta = preorder ? preorderEta(product) : '';
+  const outOfStock = isShop && !comingSoon && !preorder && product.stockQuantity !== null && product.stockQuantity <= 0;
   // Expression of Interest: no fixed price — the seller published a target
   // range and buyers negotiate through offers.
   const isEOI = !isShop && product.listing_type === 'Expression of Interest';
@@ -475,6 +485,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   const statusBadge = isShop 
     ? (comingSoon
         ? { label: 'Coming Soon', config: { className: 'bg-brand-charcoal text-white', icon: Clock } }
+        : preorder
+        ? { label: 'Pre-order', config: { className: 'bg-brand-red text-white', icon: CalendarClock } }
         : { label: product.visibility === 'public' ? 'Shop + Marketplace' : 'Shop Only', config: { className: 'bg-primary text-primary-foreground', icon: Store } })
     : (() => {
         const config = getVaultListingBadge(product.listing_type);
@@ -729,7 +741,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   const sibling = family.find((f) => f.id === v.id);
                   if (sibling) navigate(familyProductPath(sibling));
                 }}
-                showAvailability={!comingSoon}
+                showAvailability={!comingSoon && !preorder}
                 className="mb-6"
               />
             )}
@@ -739,7 +751,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 product={product}
                 value={selectedVariantId}
                 onChange={(v) => setSelectedVariantId(v.id)}
-                showAvailability={!comingSoon}
+                showAvailability={!comingSoon && !preorder}
                 className="mb-6"
               />
             )}
@@ -791,15 +803,16 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
               </div>
             ) : isShop ? (
               <div className="flex flex-col gap-3 mb-8">
+                {preorder && <PreorderNotice eta={eta} />}
                 <Button 
                   size="lg" 
                   className="w-full h-14 rounded-xl font-bold text-lg shadow-md hover:shadow-lg transition-all"
                   onClick={handleAddToCart}
                 >
                   <ShoppingCart className="w-5 h-5 mr-2" />
-                  Add to Cart
+                  {preorder ? 'Pre-order Now' : 'Add to Cart'}
                 </Button>
-                {product.stockQuantity !== null && (
+                {!preorder && product.stockQuantity !== null && (
                   <p className="text-sm text-center font-medium text-muted-foreground">
                     {product.stockQuantity} available in stock
                   </p>

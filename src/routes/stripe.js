@@ -214,6 +214,8 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
 
     res.json({
       items:       priced.orderLines,
+      // Any pre-order line in the cart: checkout shows the dispatch notice.
+      hasPreorder: priced.hasPreorder === true,
       subtotalAud: priced.itemsCents / 100,
       commissionAud: priced.commissionCents / 100,
       // gstAud is GST added on top (marketplace listings); includedGstAud is the

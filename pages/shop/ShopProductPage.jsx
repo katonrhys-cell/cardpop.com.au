@@ -14,6 +14,8 @@ import { colourListText, familyAsVariants, productImages, sortColourNames } from
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
 import { Badge } from '@/components/ui/badge';
+import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
+import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
@@ -79,11 +81,17 @@ const ShopProductPage = () => {
   // With colour variants the buyable unit is the chosen variant.
   const variants = activeVariants(row);
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
-  const inStock = variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0;
-  const anyVariantInStock = variants.length > 0 ? variants.some(variantInStock) : inStock;
+  // Pre-orders are unlimited: available whatever stock_quantity says.
+  const unlimited = isPreorder(row);
+  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0);
+  const anyVariantInStock = unlimited || (variants.length > 0 ? variants.some(variantInStock) : inStock);
   // Same self-flipping CTA as the binder pages: enquiry-only until priced and
   // active, then Add to cart with an Offer. Stock arriving is an admin edit.
-  const isPurchasable = row?.status === 'active' && price != null;
+  // `preorder` is bought exactly like `active` — it only adds the label and
+  // the admin's dispatch estimate.
+  const isPurchasable = isPurchasableStatus(row?.status) && price != null;
+  const preorder = isPurchasable && isPreorder(row);
+  const eta = preorder ? preorderEta(row) : '';
   // Admin-flagged pre-launch: shown, not buyable; the CTA opens the enquiry form.
   const isComingSoon = row?.status === 'coming_soon';
 
@@ -104,16 +112,19 @@ const ShopProductPage = () => {
           manage_inventory: row.stock_quantity !== null,
           inventory_quantity: row.stock_quantity,
         };
+    // Unlimited pre-orders: the cart must not cap them by stock.
+    if (unlimited) cartVariant.manage_inventory = false;
     addToCart(
       {
         id: row.id, source: 'shop', type: 'shop',
         title: lineTitle, price: unitPrice, image: images[0] || null,
+        ...(preorder ? { preorder: true, preorderEta: eta } : {}),
       },
       cartVariant,
       1,
       cartVariant.inventory_quantity ?? 999,
     ).then(() => {
-      toast.success('Added to cart', {
+      toast.success(preorder ? 'Pre-order added to cart' : 'Added to cart', {
         action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
       });
     });
@@ -143,7 +154,7 @@ const ShopProductPage = () => {
         url: canonical,
         priceCurrency: 'AUD',
         price: price.toFixed(2),
-        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
       },
@@ -214,9 +225,13 @@ const ShopProductPage = () => {
                       ${rrp.toFixed(2)}
                     </span>
                   )}
-                  <Badge variant={anyVariantInStock ? 'default' : 'destructive'}>
-                    {anyVariantInStock ? (variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'This colour'} sold out` : 'In stock') : 'Sold out'}
-                  </Badge>
+                  {preorder && anyVariantInStock && !(variants.length > 0 && chosenVariant && !inStock) ? (
+                    <PreorderBadge />
+                  ) : (
+                    <Badge variant={anyVariantInStock ? 'default' : 'destructive'}>
+                      {anyVariantInStock ? (variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'This colour'} sold out` : 'In stock') : 'Sold out'}
+                    </Badge>
+                  )}
                 </>
               ) : isComingSoon ? (
                 <>
@@ -234,6 +249,8 @@ const ShopProductPage = () => {
               ) : null}
             </div>
 
+            {preorder && anyVariantInStock && <PreorderNotice eta={eta} className="mt-4" />}
+
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
               {intro}
             </p>
@@ -248,7 +265,7 @@ const ShopProductPage = () => {
 
                 onChange={(v) => setSelectedId(v.id)}
 
-                showAvailability={!isComingSoon}
+                showAvailability={!isComingSoon && !unlimited}
 
                 className="mt-6"
 
@@ -262,6 +279,7 @@ const ShopProductPage = () => {
                 product={row}
                 value={selectedVariantId}
                 onChange={(v) => setSelectedVariantId(v.id)}
+                showAvailability={!unlimited}
                 className="mt-6"
               />
             )}
@@ -284,7 +302,7 @@ const ShopProductPage = () => {
                 </>
               ) : isPurchasable && anyVariantInStock ? (
                 <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
-                  <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : 'Add to cart'}
+                  <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
                 </Button>
               ) : isPurchasable ? (
                 // Sold out: 0 stock on an otherwise live product. Offer an

@@ -297,6 +297,21 @@ const CheckoutPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartItems, directItem, promoCode, useWallet]);
 
+  // Pre-order labels come from the server's priced lines (authoritative status
+  // and estimate at this moment), falling back to what the cart remembered.
+  const preorderEtaById = new Map(
+    (pricing?.items || [])
+      .filter((l) => l?.type === 'shop' && l.preorder)
+      .map((l) => [l.id, l.preorder_eta || 'Ships when stock arrives']),
+  );
+  const summaryItems = flatItems.map((i, idx) => {
+    const fromServer = preorderEtaById.get(i.id);
+    const p = checkoutItems[idx]?.product || {};
+    const preorderEta = pricing ? fromServer : (fromServer || (p.preorder ? (p.preorderEta || 'Ships when stock arrives') : undefined));
+    return preorderEta ? { ...i, preorderEta } : i;
+  });
+  const hasPreorder = summaryItems.some((i) => i.preorderEta);
+
   const clientSubtotal = flatItems.reduce((acc, i) => acc + i.price * i.quantity, 0);
   const subtotal = pricing?.subtotalAud ?? clientSubtotal;
   // Platform commission and GST are distinct charges (and distinct Stripe line
@@ -425,7 +440,8 @@ const CheckoutPage = () => {
 
   const orderSummary = (
     <OrderSummary
-      cartItems={flatItems}
+      cartItems={summaryItems}
+      hasPreorder={hasPreorder}
       subtotal={subtotal}
       serviceFee={serviceFee}
       processingFee={processingFee}
