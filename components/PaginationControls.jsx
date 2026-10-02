@@ -5,12 +5,19 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
   if (totalPages <= 1) return null;
 
+  // Changing page swaps the whole grid, so the controls (at the bottom) would
+  // otherwise leave the shopper staring at the footer of the new page.
+  const goToPage = (page) => {
+    onPageChange(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="flex items-center justify-center gap-2 mt-12 mb-8">
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(currentPage - 1)}
+        onClick={() => goToPage(currentPage - 1)}
         disabled={currentPage === 1}
         className="gap-1"
         aria-label="Previous page"
@@ -33,7 +40,7 @@ const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
                 variant={currentPage === page ? "default" : "ghost"}
                 size="sm"
                 className={`w-9 h-9 p-0 ${currentPage === page ? 'pointer-events-none' : ''}`}
-                onClick={() => onPageChange(page)}
+                onClick={() => goToPage(page)}
                 aria-label={`Page ${page}`}
                 aria-current={currentPage === page ? "page" : undefined}
               >
@@ -53,7 +60,7 @@ const PaginationControls = ({ currentPage, totalPages, onPageChange }) => {
       <Button
         variant="outline"
         size="sm"
-        onClick={() => onPageChange(currentPage + 1)}
+        onClick={() => goToPage(currentPage + 1)}
         disabled={currentPage === totalPages}
         className="gap-1"
         aria-label="Next page"
