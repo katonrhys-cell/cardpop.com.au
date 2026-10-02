@@ -489,3 +489,36 @@ describe('webhook event-id dedup', () => {
     expect(rec.payload).toMatchObject({ event_id: 'evt_new', type: 'checkout.session.expired' });
   });
 });
+
+// ─── Offer checkout: closes the offer's payment window ────────────────────────
+
+describe('webhook — paying for an accepted offer', () => {
+  it('stamps paid_at on the offer so the expiry sweep skips it and it cannot be paid twice', async () => {
+    mockStripe.webhooks.constructEvent.mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_offer', amount_total: 10000, payment_intent: 'pi_offer',
+          metadata: {
+            userId: 'buyer-1', listingId: 'l1', sellerId: 'seller-1', offerId: 'offer-1',
+            itemPrice: '100', commissionPct: '0', commissionAud: '0', gstAud: '0',
+            sellerProceedsAud: '100', configId: '',
+          },
+        },
+      },
+    });
+    state.respond = (ctx) => {
+      if (ctx.table === 'orders' && ctx.op === 'insert') return { data: { id: 'ord-1' }, error: null };
+      // The listing flips to sold (a non-empty result means no double sale).
+      if (ctx.table === 'listings' && ctx.op === 'update') return { data: [{ id: 'l1' }], error: null };
+      return { data: null, error: null };
+    };
+
+    const res = await postWebhook();
+    expect(res.status).toBe(200);
+    const offerUpdate = dbCalls.find((c) => c.table === 'offers' && c.op === 'update');
+    expect(offerUpdate).toBeDefined();
+    expect(offerUpdate.filters).toEqual({ id: 'offer-1' });
+    expect(offerUpdate.payload).toEqual({ status: 'accepted', paid_at: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/) });
+  });
+});

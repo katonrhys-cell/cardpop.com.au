@@ -45,7 +45,7 @@ do $$ begin
   assert (select count(*) from public.notifications where related_id = '00000000-0000-0000-0000-000000000201' and user_id = '00000000-0000-0000-0000-00000000000a') = 1, 'admin@cardpop.com.au notified';
   assert (select count(*) from public.notifications where related_id = '00000000-0000-0000-0000-000000000201' and user_id = '00000000-0000-0000-0000-00000000000d') = 1, 'every admin notified';
   assert (select count(*) from public.notifications where related_id = '00000000-0000-0000-0000-000000000201' and user_id = '00000000-0000-0000-0000-00000000000b') = 0, 'buyer not notified of own offer';
-  assert (select link from public.notifications where related_id = '00000000-0000-0000-0000-000000000201' and user_id = '00000000-0000-0000-0000-00000000000a') = '/product/marketplace/00000000-0000-0000-0000-000000000101', 'admin link goes to the listing';
+  assert (select link from public.notifications where related_id = '00000000-0000-0000-0000-000000000201' and user_id = '00000000-0000-0000-0000-00000000000a') = '/admin/offers', 'admin link goes to Admin -> Offers';
 end $$;
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false) \g /dev/null

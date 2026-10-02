@@ -8,7 +8,7 @@ import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
-import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema } from '../schemas/adminSchemas.js';
+import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema } from '../schemas/adminSchemas.js';
 import { cardArtLookupKey } from '../utils/cardImageResolver.js';
 import { assertNotLiteralPrivateAddress, ssrfSafeDispatcher } from '../utils/safeFetch.js';
 import { fetch } from 'undici';
@@ -556,6 +556,64 @@ async function releaseCartLinePayouts(order, lines, reversedLines) {
   await supabase.from('orders').update({ order_items: lines, payout_status: status }).eq('id', order.id);
   return { status, lines: reversedLines.length, transferred, walletCredited, failed };
 }
+
+// ─── Offers ──────────────────────────────────────────────────────────────────
+// Every marketplace offer, with both parties' contact details, for oversight
+// of the binding-offer flow (who offered, who responded, who didn't pay).
+// Offers RLS only lets the buyer and seller read a row, so this goes through
+// the service role behind the admin gate.
+
+const OFFER_ADMIN_SELECT = `
+  id, listing_id, buyer_id, seller_id, amount_aud, counter_amount_aud, message, counter_message,
+  status, expires_at, payment_due_at, paid_at, responded_at, binding_acknowledged_at, created_at,
+  listing:listings(id, status, price_aud, listing_type, vault_item:vault_items(card_name)),
+  buyer:profiles!buyer_id(id, display_name, username, email),
+  seller:profiles!seller_id(id, display_name, username, email)
+`;
+
+const applyOfferFilter = (query, status) => {
+  switch (status) {
+    case 'open': return query.in('status', ['pending', 'countered']);
+    case 'awaiting_payment': return query.eq('status', 'accepted').is('paid_at', null);
+    case 'paid': return query.not('paid_at', 'is', null);
+    case 'pending': case 'countered': case 'declined': case 'expired': case 'withdrawn':
+      return query.eq('status', status);
+    default: return query;
+  }
+};
+
+router.get('/offers', validateRequestQuery(getOffersSchema), async (req, res) => {
+  const status = req.query.status || 'all';
+  try {
+    const count = (filter) => applyOfferFilter(
+      supabase.from('offers').select('id', { count: 'exact', head: true }),
+      filter,
+    );
+    const [list, open, awaiting, paid, expired] = await Promise.all([
+      applyOfferFilter(
+        supabase.from('offers').select(OFFER_ADMIN_SELECT).order('created_at', { ascending: false }).limit(200),
+        status,
+      ),
+      count('open'),
+      count('awaiting_payment'),
+      count('paid'),
+      count('expired'),
+    ]);
+    if (list.error) throw list.error;
+    res.json({
+      offers: list.data || [],
+      counts: {
+        open: open.count ?? 0,
+        awaiting_payment: awaiting.count ?? 0,
+        paid: paid.count ?? 0,
+        expired: expired.count ?? 0,
+      },
+    });
+  } catch (err) {
+    logger.error(`[ADMIN] Failed to list offers: ${err.message}`);
+    res.status(500).json({ error: 'Failed to load offers' });
+  }
+});
 
 router.get('/disputes', validateRequestQuery(getDisputesSchema), async (req, res) => {
   const { status } = req.query;
