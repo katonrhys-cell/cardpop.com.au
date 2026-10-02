@@ -16,6 +16,7 @@ vi.mock('@supabase/supabase-js', () => {
       gt: vi.fn(() => b),
       gte: vi.fn(() => b),
       like: vi.fn(() => b),
+      ilike: vi.fn(() => b),
       not: vi.fn(() => b),
       order: vi.fn(() => b),
       limit: vi.fn(() => b),
@@ -282,6 +283,44 @@ describe('prerender shop products', () => {
     const { status, body } = await run('/shop/binders/binder-12-pocket-premium');
     expect(status).toBe(200);
     expect(body).toContain('https://cardpop.com.au/shop/binders/binder-12-pocket-premium');
+  });
+});
+
+describe('prerender shop category pages', () => {
+  it('renders a built-in category with its products, breadcrumb and self-canonical', async () => {
+    state.listResult = { data: [
+      { id: UUID, title: 'Ultra Pro Penny Sleeves (100)', slug: 'ultra-pro-penny-sleeves', category: 'Penny Sleeves', price_aud: 2.5 },
+    ] };
+    const { status, body } = await run('/shop/category/penny-sleeves');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Penny Sleeves</h1>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/shop/category/penny-sleeves" />');
+    expect(body).toContain('Ultra Pro Penny Sleeves (100)');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+    expect(body).toContain('https://cardpop.com.au/shop/protection');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('serves an empty category but keeps it out of the index', async () => {
+    state.listResult = { data: [] };
+    const { status, body } = await run('/shop/category/top-loaders');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Top Loaders</h1>');
+    expect(body).toContain('noindex');
+  });
+
+  it('serves a category an admin added', async () => {
+    state.listResult = { data: [{ section_slug: 'storage', name: 'Card Tins', hidden: false }] };
+    const { status, body } = await run('/shop/category/card-tins');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Card Tins</h1>');
+    expect(body).toContain('https://cardpop.com.au/shop/storage');
+  });
+
+  it('does not claim a category an admin hid', async () => {
+    state.listResult = { data: [{ section_slug: 'protection', name: 'Penny Sleeves', hidden: true }] };
+    const { body } = await run('/shop/category/penny-sleeves');
+    expect(body).not.toContain('<h1>Penny Sleeves</h1>');
   });
 });
 

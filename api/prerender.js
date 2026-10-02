@@ -13,6 +13,7 @@ import {
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
 import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js';
+import { shopCategoryLeaves } from '../utils/shopCategoryPages.js';
 import { colourListText } from '../utils/colourSwatch.js';
 import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopReturnPolicy.js';
 
@@ -3087,6 +3088,91 @@ ${productsHtml || '    <li>No products in stock right now — check back soon or
   return htmlDoc({ title, description, canonical, jsonLdItems, bodyHtml });
 }
 
+// ── Shop leaf category pages (/shop/category/:slug) ──────────────────────────
+// Penny Sleeves, Top Loaders, … — the pages the Shop menu and the collection
+// pages above link to. Built-in leaves plus the admin's shop_categories edits,
+// so a hidden category isn't served and a custom one is.
+async function renderShopCategory(supabase, rawSlug) {
+  const { data: categoryRows } = await supabase
+    .from('shop_categories')
+    .select('section_slug, name, description, hidden');
+  const leaf = shopCategoryLeaves(categoryRows || []).find((c) => c.slug === rawSlug);
+  if (!leaf) return null; // Not a shop category — let the SPA handle it.
+
+  const canonical = `${BASE_URL}/shop/category/${leaf.slug}`;
+  const groupUrl = `${BASE_URL}/shop/${leaf.groupSlug}`;
+  const title = `${leaf.name} Australia | Buy ${leaf.name} Online | CardPop`;
+  const description = leaf.desc
+    ? `${leaf.desc}. Shop ${leaf.name.toLowerCase()} on CardPop — fast tracked shipping within Australia, priced in AUD.`
+    : `Shop ${leaf.name.toLowerCase()} for trading cards on CardPop — fast tracked shipping within Australia, priced in AUD.`;
+
+  // Same match the category page uses (shop_products.category ILIKE name).
+  // Category names are restricted to plain characters by the shop_categories
+  // CHECK constraint, so no LIKE escaping is needed.
+  const { data } = await supabase
+    .from('shop_products')
+    .select('id, title, slug, category, colour, family_sku, price_aud, images, image_url')
+    .in('status', PUBLIC_SHOP_STATUSES)
+    .ilike('category', `%${leaf.name}%`)
+    .order('created_at', { ascending: false })
+    .limit(50);
+  const products = data || [];
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Shop', item: `${BASE_URL}/shop` },
+      { '@type': 'ListItem', position: 3, name: leaf.groupName, item: groupUrl },
+      { '@type': 'ListItem', position: 4, name: leaf.name, item: canonical },
+    ],
+  };
+
+  const jsonLdItems = [
+    { '@context': 'https://schema.org', '@type': 'CollectionPage', name: title, description, url: canonical },
+    breadcrumb,
+  ];
+  if (products.length > 0) {
+    jsonLdItems.push({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `${leaf.name} products`,
+      numberOfItems: products.length,
+      itemListElement: products.map((p, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        name: p.title || 'Product',
+        url: `${BASE_URL}${shopProductPath(p)}`,
+      })),
+    });
+  }
+
+  const productsHtml = products.map((p) => {
+    const name = p.title || 'Product';
+    return `    <li><a href="${BASE_URL}${esc(shopProductPath(p))}">${esc(name)}</a>`
+      + `${p.price_aud > 0 ? ` — A$${esc(Number(p.price_aud).toFixed(2))}` : ''}</li>`;
+  }).join('\n');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / <a href="${groupUrl}">${esc(leaf.groupName)}</a> / ${esc(leaf.name)}</nav>
+  <h1>${esc(leaf.name)}</h1>
+  <p>${esc(description)}</p>
+  <h2>${esc(leaf.name)} (${products.length})</h2>
+  <ul>
+${productsHtml || '    <li>Nothing in stock in this category right now — check back soon or browse all supplies.</li>'}
+  </ul>
+  <p><a href="${groupUrl}">More ${esc(leaf.groupName.toLowerCase())}</a> · <a href="${BASE_URL}/shop">Browse all card supplies</a></p>
+</main>`;
+
+  // An empty category is still a real page (the menu links to it), but keep
+  // it out of the index until it has something to show.
+  return htmlDoc({
+    title, description, canonical, jsonLdItems, bodyHtml,
+    ...(products.length === 0 ? { robots: 'noindex, follow' } : {}),
+  });
+}
+
 async function renderSeller(supabase, param) {
   const canonicalSelf = `${BASE_URL}/seller/${param}`;
   if (!UUID_RE.test(param)) {
@@ -3326,6 +3412,14 @@ export default async function handler(req, res) {
 
     if (LANDINGS[rawPath]) {
       return sendDoc(res, await renderLanding(supabase, rawPath));
+    }
+
+    // Shop leaf category pages. Bots reach these through the generic
+    // /shop/:category/:slug rewrite, so claim them before the product matcher.
+    const shopCategoryMatch = rawPath.match(/^\/shop\/category\/([^/?#]+)\/?$/);
+    if (shopCategoryMatch) {
+      const doc = await renderShopCategory(supabase, safeDecode(shopCategoryMatch[1]));
+      if (doc) return sendDoc(res, doc);
     }
 
     // Product pages inside the product-type taxonomy: /shop/<type>/<product>.
