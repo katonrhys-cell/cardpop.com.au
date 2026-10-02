@@ -639,6 +639,16 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       ? (paymentMethod.type === 'card' ? paymentMethod.card?.wallet?.type ?? null : (paymentMethod.type === 'link' ? 'link' : null))
       : null;
 
+    // Google Customer Reviews opt-in on the success page: where the parcel is
+    // going, and whether any line is a pre-order (cartService names those
+    // "… (Pre-order — <eta>)") — a pre-order arrives weeks later, so the page
+    // skips the survey rather than have Google ask before it's delivered.
+    const shippingAddress = session.collected_information?.shipping_details?.address
+      || session.shipping_details?.address
+      || session.customer_details?.address
+      || null;
+    const hasPreorder = items.some((item) => /\(Pre-order — /.test(item.name));
+
     res.json({
       id:            session.id,
       status:        session.payment_status,
@@ -647,6 +657,8 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       customerName:  session.customer_details?.name || null,
       walletType,
       items,
+      deliveryCountry: shippingAddress?.country || null,
+      hasPreorder,
     });
   } catch (err) {
     // Stripe throws StripeInvalidRequestError for unknown/malformed ids —
