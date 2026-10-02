@@ -225,11 +225,11 @@ const ProductManagementPage = () => {
         })()}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className={`bg-background capitalize ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : product.status === 'preorder' ? 'text-brand-red border-brand-red/30' : 'text-muted-foreground'}`}>
+        <Badge variant="outline" className={`bg-background capitalize whitespace-nowrap ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : product.status === 'preorder' ? 'text-brand-red border-brand-red/30' : 'text-muted-foreground'}`}>
           {product.status === 'coming_soon' ? 'coming soon' : product.status === 'preorder' ? 'pre-order' : product.status}
         </Badge>
         {product.status === 'preorder' && product.preorder_eta && (
-          <p className="mt-1 max-w-[12rem] text-[11px] leading-tight text-muted-foreground">{product.preorder_eta}</p>
+          <p className="mt-1 max-w-[12rem] truncate whitespace-nowrap text-[11px] leading-tight text-muted-foreground" title={product.preorder_eta}>{product.preorder_eta}</p>
         )}
       </TableCell>
       <TableCell className="tabular-nums">{product.stock_quantity ?? '-'}</TableCell>
