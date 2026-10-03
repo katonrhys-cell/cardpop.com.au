@@ -27,6 +27,7 @@ import {
   resolveBinderProduct, binderImages, binderImageAlt, binderSpecs, BINDER_PRODUCTS,
 } from '@/data/shopBinderProducts.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
+import { isEligibleProductLd } from '@/utils/seoUtils.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -177,7 +178,7 @@ const ShopBinderProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={binderImageAlt(product, product.imageFiles[0])}
-        structuredData={[productLd.offers ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">
