@@ -47,6 +47,7 @@ import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/
 import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 import { trackViewItem } from '@/lib/analytics.js';
 import { identityRequiredForAmount } from '@/utils/marketplaceIdentity.js';
+import BuyerProtection from '@/components/BuyerProtection.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -965,6 +966,11 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>
                     <Lock className="w-5 h-5 mr-2" /> Private Item
                   </Button>
+                )}
+
+                {/* The promise, at the point of decision (utils/buyerProtectionPolicy.js). */}
+                {!isSold && source !== 'vault' && (
+                  <BuyerProtection compact kind={isShop ? 'shop' : 'marketplace'} className="pt-1" />
                 )}
               </div>
             )}

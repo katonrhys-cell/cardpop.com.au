@@ -2,7 +2,8 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { authMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
-import { computeRefundAmounts, getRefundRetentionPct } from '../services/refundAmounts.js';
+import { computeRefundAmounts, getRefundPolicyOptions } from '../services/refundAmounts.js';
+import { refundWindow } from '../../utils/buyerProtectionPolicy.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -37,7 +38,7 @@ router.post('/request', async (req, res) => {
 
   const { data: order, error: orderErr } = await supabase
     .from('orders')
-    .select('id, buyer_id, seller_id, status, refund_status, total_aud, item_price_aud, platform_fee_aud, gst_aud, processing_fee_aud, order_items')
+    .select('id, buyer_id, seller_id, status, refund_status, total_aud, item_price_aud, platform_fee_aud, gst_aud, processing_fee_aud, order_items, created_at, shipped_at')
     .eq('id', orderId)
     .maybeSingle();
   if (orderErr) {
@@ -54,11 +55,18 @@ router.post('/request', async (req, res) => {
   if (order.refund_status) {
     return res.status(409).json({ error: 'A refund request already exists for this order.' });
   }
+  // The policy window (utils/buyerProtectionPolicy.js) — the same rule the
+  // Request Refund button follows, enforced here so it can't be skipped.
+  const window = refundWindow(order);
+  if (window.state !== 'open') {
+    return res.status(409).json({ error: window.reason, code: window.state === 'closed' ? 'REFUND_WINDOW_CLOSED' : 'REFUND_WINDOW_NOT_OPEN' });
+  }
 
   const notesText = typeof notes === 'string' ? notes.slice(0, 1000).trim() : '';
   // Estimate shown to the buyer/admin — the same arithmetic the approval and
   // processing paths use, so the quoted figure matches what is actually sent.
-  const { retainedFee, refundAmount } = computeRefundAmounts(order, await getRefundRetentionPct());
+  const { retentionPct, retainProcessingFee } = await getRefundPolicyOptions();
+  const { retainedFee, refundAmount } = computeRefundAmounts(order, retentionPct, { retainProcessingFee });
 
   const { error: insErr } = await supabase.from('refunds').insert({
     order_id: order.id,

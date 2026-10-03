@@ -34,6 +34,7 @@ import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
 import { trackViewItem } from '@/lib/analytics.js';
+import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -338,9 +339,13 @@ const ShopProductPage = () => {
                   />
                 </>
               ) : isPurchasable && anyVariantInStock ? (
-                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
-                  <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
-                </Button>
+                <>
+                  <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
+                    <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
+                  </Button>
+                  {/* The returns promise at the point of decision (utils/shopReturnPolicy.js). */}
+                  <BuyerProtection compact kind="shop" className="mt-3" />
+                </>
               ) : isPurchasable ? (
                 // Sold out: 0 stock on an otherwise live product. Offer an
                 // enquiry that emails admin instead of a dead button.

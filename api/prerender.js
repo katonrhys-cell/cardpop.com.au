@@ -16,6 +16,8 @@ import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js
 import { shopCategoryLeaves } from '../utils/shopCategoryPages.js';
 import { colourListText } from '../utils/colourSwatch.js';
 import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopReturnPolicy.js';
+import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerProtectionPolicy.js';
+import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
@@ -1815,44 +1817,48 @@ const STATIC_CONTENT = {
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }],
     h1: 'Frequently Asked Questions',
     intro: 'Find answers to common questions about buying, selling, and vaulting on CardPop™.',
+    // Keep in step with pages/info/FAQPage.jsx — no cloaking.
     faqs: [
-      { q: 'How does the CardPop™ Vault work?', a: 'The Vault is our secure storage facility. When you buy a card, you can choose to send it to your Vault instead of your home. This lets you instantly relist the card for sale without paying shipping fees, or hold it securely as an investment.' },
-      { q: 'What are the selling fees on CardPop™?', a: 'We charge a flat 8% commission on all successful sales. There are no listing fees. If you sell an item directly from your Vault, the commission is reduced to 6%.' },
-      { q: 'How do I get paid when I sell an item on CardPop™?', a: 'Funds from successful sales are added to your CardPop™ Wallet balance. You can use this balance to purchase other items on the platform, or withdraw it to your nominated bank account at any time.' },
-      { q: 'Are trades protected on CardPop™?', a: 'Yes. When you agree to a trade, both parties send their items to our authentication center. We verify the condition and authenticity of all items before forwarding them to their final destinations.' },
+      { q: 'Do I need an account to buy?', a: 'Not for CardPop Shop products — supplies, binders and sealed stock check out as a guest. Cards bought from other collectors on the marketplace need a free account (it’s how the seller reaches you and how your Buyer Protection is tied to the order); you can create it at checkout and come straight back. Larger marketplace orders also ask for a one-time ID check through Stripe.' },
+      { q: 'What does shipping cost and how long does it take?', a: 'CardPop Shop orders ship tracked within Australia: a flat rate under the free-shipping threshold and free above it, dispatched within 2 business days. Marketplace cards ship at the postage the seller sets, shown on the listing and in your cart before you pay; sellers are expected to post within a week. See the Shipping page for the current rates.' },
+      { q: 'What if a card arrives and it isn’t what was described?', a: PROTECTION_COPY.marketplaceSummary },
+      { q: 'Can I return a card because I changed my mind?', a: `Not a marketplace card — a sale between collectors is binding once the card is as advertised. New CardPop Shop products can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days of delivery for any reason, unused and in their packaging.` },
+      { q: 'What happens if the seller never posts my card?', a: PROTECTION_COPY.notShippedSummary },
+      { q: 'How does the CardPop™ Vault work?', a: 'The Vault is your digital collection on CardPop™. Add a card by photographing it — our card identification fills in the details for you — then track its estimated value, show it off on your public profile, and list it for sale in a couple of clicks. Your cards stay with you; the Vault keeps the record, the photos and the market data in one place.' },
+      { q: 'What are the selling fees on CardPop™?', a: 'There are no listing fees — you only pay a commission when an item actually sells. The exact commission for your sale is shown in the price breakdown before you confirm, and again on the order once it completes, so there are never surprise deductions.' },
+      { q: 'How do I get paid when I sell an item on CardPop™?', a: 'Sales are paid out to your Stripe-connected bank account once the order completes. Until you connect a payout account, proceeds are held in your CardPop™ Wallet and released when you do.' },
+      { q: 'Can I trade cards with other collectors on CardPop™?', a: 'Not yet. Card-for-card trading is on the roadmap and is switched off until it’s ready — listings are for sale only. When it launches, trades will run through CardPop™ so your transaction history and Buyer Protection apply.' },
     ],
   },
 
   '/safe-buying': {
     title: "Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™",
-    description: 'Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and a 14-day Buyer Protection Guarantee.',
+    description: `Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described or doesn't arrive.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Safe Buying', path: '/safe-buying' }],
     h1: 'Why CardPop Is Safe: Buyer Protection & Secure Payments',
     intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
+    // Keep in step with pages/info/SafeBuyingPage.jsx — no cloaking.
     sections: [
       { h2: 'Every payment is secure', paras: [
-        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link, all in Australian dollars.',
+        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay, all in Australian dollars.',
       ] },
-      { h2: 'Buyer protection on every order', paras: [
-        'Every purchase is backed by our 14-day Buyer Protection Guarantee. If your item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. You’re never left out of pocket for an order that goes wrong.',
-      ] },
+      { h2: 'Buyer protection on every order', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
       { h2: 'You only trade with verified people', paras: [
         'What makes CardPop safer than open marketplaces and social-media groups is that real, verified people stand behind every account. Sellers confirm their identity with a government-issued ID and a matching selfie through Stripe Identity before they can sell. Verified accounts carry a Verified badge, so you always know who you’re buying from — and fraudsters and throwaway accounts have nowhere to hide.',
       ] },
-      { h2: 'Authentication for high-value cards', paras: [
-        'For high-value cards and trades, we offer middleman authentication: items ship to our facility where experts verify authenticity and condition before forwarding to the buyer. Both sides transact with total confidence.',
-      ] },
       { h2: 'How to buy safely on CardPop', items: [
-        { text: 'Buy from verified sellers — look for the Verified badge on seller profiles.' },
+        { text: 'Buy from verified sellers — look for the Verified badge and the seller’s rating on the listing.' },
+        { text: 'Read the photos and condition carefully — a marketplace sale is binding when the card matches its listing, so check the grade, the set and the card number before you pay.' },
         { text: 'Pay through CardPop’s Stripe checkout — never send money off-platform, so your Buyer Protection always applies.' },
-        { text: 'Use authentication for big-ticket cards — add middleman authentication for peace of mind on high-value purchases.' },
+        { text: `Check the card the day it arrives — you have ${MP.claimWindowDaysFromDelivery} days from delivery to report a problem, with photos.` },
         { text: 'Keep communication on-platform — it keeps a record and keeps you protected.' },
       ] },
     ],
     faqs: [
-      { q: 'Is CardPop a safe place to buy trading cards?', a: 'Yes. Every order is paid through Stripe’s PCI-DSS Level 1 checkout, backed by a 14-day Buyer Protection Guarantee, and sellers are identity-verified through Stripe Identity — so you buy Pokémon, Magic and sports cards from real, verified Australian sellers with a full refund if anything goes wrong.' },
-      { q: 'Where is the safest place to buy Pokémon cards in Australia?', a: 'CardPop is built specifically for safe trading-card transactions in Australia: secure Stripe payments in AUD, ID-verified sellers, buyer protection on every order, and optional middleman authentication for high-value cards — protections general marketplaces and social-media groups don’t offer.' },
-      { q: 'What if my card never arrives or isn’t as described?', a: 'You’re covered by our 14-day Buyer Protection Guarantee. Open a case through our resolution process and, if the item didn’t arrive or was significantly not as described, you’ll receive a full refund.' },
+      { q: 'Is CardPop a safe place to buy trading cards?', a: `Yes. Every order is paid through Stripe’s PCI-DSS Level 1 checkout, backed by ${MP.name}, and sellers are identity-verified through Stripe Identity — so you buy Pokémon, Magic and sports cards from real, verified Australian sellers with a full refund if the card isn’t as described or doesn’t arrive.` },
+      { q: 'Where is the safest place to buy Pokémon cards in Australia?', a: 'CardPop is built specifically for safe trading-card transactions in Australia: secure Stripe payments in AUD, ID-verified sellers, buyer protection on every order and a binding-sale rule that keeps bad-faith buyers and sellers out — protections general marketplaces and social-media groups don’t offer.' },
+      { q: 'What if my card never arrives or isn’t as described?', a: `You’re covered by ${MP.name}. Report it within ${MP.claimWindowDaysFromDelivery} days of delivery — or after ${MP.notShippedClaimAfterDays} days if it was never posted — and, once approved, you’re refunded in full: the card, postage and every fee.` },
+      { q: 'Can I change my mind after buying a card?', a: `A marketplace sale is binding when the card is as advertised, so there are no change-of-mind returns on cards bought from other collectors. New CardPop Shop products can be returned within ${SHOP_RETURN_POLICY.windowDays} days for any reason.` },
       { q: 'How do I know the seller is genuine?', a: 'Sellers verify their identity with a government ID and a matching selfie through Stripe Identity before they can sell. Verified accounts carry a Verified badge, so you’re never trading with an anonymous or throwaway account.' },
       { q: 'Are my payment details secure?', a: 'Yes. Payments are processed entirely on Stripe’s encrypted, PCI-DSS-compliant checkout. Your card details are never stored on or transmitted through CardPop’s servers.' },
     ],
@@ -1902,12 +1908,13 @@ const STATIC_CONTENT = {
 
   '/returns': {
     title: 'Returns & Refund Policy | CardPop',
-    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, plus buyer protection and refunds on marketplace purchases.`,
+    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, and ${MP.name}: a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery when a marketplace card isn't as described or doesn't arrive.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Returns & Refunds', path: '/returns' }],
     h1: 'Returns & Refunds',
-    intro: 'How returns, exchanges and refunds work for CardPop Shop products and marketplace purchases.',
+    intro: 'How returns, exchanges and refunds work for CardPop Shop products and cards bought from other collectors on the marketplace.',
+    // Keep in step with pages/info/ReturnsPage.jsx — no cloaking.
     sections: [
-      { h2: 'Overview', paras: [`CardPop sells two kinds of items, each with its own returns policy: new CardPop Shop products sold by CardPop itself, which can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days for any reason, and marketplace purchases from other CardPop sellers, which are covered by buyer protection. Returns are available within Australia. Nothing in this policy limits your rights under the Australian Consumer Law.`] },
+      { h2: 'Overview', paras: [`CardPop sells two kinds of items, each with its own policy: new CardPop Shop products sold by CardPop itself, which can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days of delivery for any reason, and marketplace purchases from other CardPop collectors, where a sale is binding if the card is as advertised and ${MP.name} refunds you in full if it isn’t or never arrives. Returns are available within Australia. Nothing in this policy limits your rights under the Australian Consumer Law.`] },
       { h2: 'CardPop Shop returns & exchanges (new products)', items: [
         { text: `Return window: ${SHOP_RETURN_POLICY.windowDays} days from the day your order is delivered.` },
         { text: 'Defective and non-defective items: we accept returns of faulty items and change-of-mind returns. For a change-of-mind return the item must be new and unused, in its original condition and packaging.' },
@@ -1917,59 +1924,69 @@ const STATIC_CONTENT = {
         { text: `Refund processing time: once your return arrives and has been checked, your refund is processed within ${SHOP_RETURN_POLICY.refundProcessingDays} days to your original payment method.` },
       ] },
       { h2: 'How to return or exchange a Shop product', paras: [`Within ${SHOP_RETURN_POLICY.windowDays} days of delivery, email support@cardpop.com.au with your order number, the item(s) you are returning and whether you would like a refund or an exchange. We reply with the return address and instructions; post the item back well packed with your order number included. Once it arrives we process your refund within ${SHOP_RETURN_POLICY.refundProcessingDays} days, or send out your exchange.`] },
-      { h2: 'Marketplace purchases', paras: ['Buyer protection applies to all marketplace purchases. Request a refund within 30 days of purchase through your account. Requests are reviewed within 2 business days; if approved, the refund is issued to your original payment method. Because marketplace cards are sold by individual sellers, the change-of-mind returns offered on CardPop Shop products don’t apply to marketplace purchases.'] },
-      { h2: 'Platform fee retention on marketplace refunds', paras: ['When a marketplace refund is issued, 50% of the platform fee is non-refundable (it covers Stripe processing costs CardPop can’t recover). The other 50% of the fee plus the full item price is returned. Example — on a $100 sale with a $3 platform fee: $100.00 item price refunded, $1.50 (50% of the fee) refunded, $1.50 retained, for $101.50 AUD returned. This policy is shown before every purchase.'] },
-      { h2: 'Eligible marketplace refund reasons', items: [
-        { text: 'Item not received within a reasonable timeframe.' },
-        { text: 'Item significantly not as described (wrong card or wrong condition grade).' },
-        { text: 'Item arrived damaged in transit (photo evidence of packaging required).' },
-        { text: 'Item proven counterfeit.' },
-        { text: 'Seller cancelled the order after payment.' },
-      ] },
-      { h2: 'Non-eligible marketplace refund reasons', items: [
-        { text: 'Change of mind or buyer’s remorse.' },
-        { text: 'Market price fluctuations after purchase.' },
-        { text: 'Minor subjective condition discrepancies on raw (ungraded) cards.' },
-        { text: 'Requests made more than 30 days after purchase.' },
-      ] },
-      { h2: 'How to request a marketplace refund', paras: ['Go to My Account → Orders, find the order and click Request Refund, select the reason and provide details or photos. CardPop reviews within 2 business days and notifies you by email and in-app. If approved, the refund is issued via Stripe and takes 5–10 business days to appear.'] },
-      { h2: 'Seller obligations', paras: ['Sellers must accurately describe item condition and grade. If a refund is approved due to misrepresentation, the seller’s proceeds may be clawed back at CardPop’s discretion; repeat violations may result in account suspension.'] },
+      { h2: `Marketplace purchases — ${MP.name}`, paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
+      { h2: 'What you get back', paras: ['An approved claim refunds everything you paid on the order: the card’s price, the seller’s postage, CardPop’s service fee and the payment-processing fee. Nothing is retained. Example — a $100 card with $10 postage, a $3 service fee and a $2.50 processing fee returns $115.50 AUD.'] },
+      { h2: 'When a claim is approved', items: MP.eligibleReasons.map((text) => ({ text })) },
+      { h2: 'When a claim isn’t', items: [...MP.ineligibleReasons.map((text) => ({ text })), { text: `Requests made after the window — ${MP.claimWindowDaysFromDelivery} days from delivery, and never more than ${MP.hardCapDaysFromPurchase} days after purchase.` }] },
+      { h2: 'How to make a claim', paras: [PROTECTION_COPY.processSummary] },
+      { h2: 'Seller obligations', paras: [`Sellers must describe condition and grade accurately, post within ${MP.notShippedClaimAfterDays} days using a tracked service, and carry the risk of a parcel that doesn’t arrive. Where a claim is approved, the seller’s payout for that order is reversed. Repeat misdescription leads to account suspension.`] },
       { h2: 'Disputes', paras: ['If buyer and seller can’t resolve an issue directly, contact CardPop support with the order number and evidence. The team mediates and makes a binding decision within 5 business days.'] },
     ],
   },
 
   '/shipping': {
     title: 'Shipping Information | CardPop',
-    description: "Learn about CardPop's shipping policies, rates and delivery times for Australian orders.",
+    description: `CardPop ships within Australia. Shop orders: $15 flat, free from $100, tracked. Marketplace cards ship at the seller's listed postage, posted within ${MP.notShippedClaimAfterDays} days.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Shipping', path: '/shipping' }],
     h1: 'Shipping Information',
-    intro: 'Everything you need to know about how we deliver your cards safely.',
+    intro: 'How CardPop Shop orders and marketplace cards get to you, what it costs, and how long it takes.',
+    // Keep in step with pages/info/ShippingPage.jsx (which reads the live
+    // shipping settings; the defaults are quoted here) — no cloaking.
     sections: [
-      { h2: 'Domestic shipping (Australia)', items: [
-        { text: 'Standard Tracked: $8.95 (3–5 business days).' },
-        { text: 'Express Tracked: $12.95 (1–2 business days).' },
-        { text: 'Signature Required: additional $2.95 (recommended for high-value items).' },
+      { h2: 'CardPop Shop orders', items: [
+        { text: 'Orders under $100: $15 flat-rate tracked shipping, charged once per order.' },
+        { text: 'Orders of $100 or more: free tracked shipping.' },
+        { text: 'Dispatch: within 2 business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout).' },
+        { text: 'Delivery: typically 3–7 business days with Australia Post, depending on where you are.' },
+      ], paras: ['The $100 threshold is based on the CardPop Shop items in your cart. All prices include GST.'] },
+      { h2: 'Marketplace cards (bought from other collectors)', items: [
+        { text: 'Postage: set by each seller and shown on the listing and in your cart before you pay; many sellers offer free postage.' },
+        { text: `Dispatch: sellers are expected to post within ${MP.notShippedClaimAfterDays} days of your order, using a tracked service, and to mark the order as posted with the tracking number — you get an email with the tracking link.` },
+        { text: `If it isn’t posted in time: after ${MP.notShippedClaimAfterDays} days with no tracking you can report the order as not received from My Account → Orders and be refunded in full.` },
+        { text: 'If it goes missing: a tracked parcel that never arrives is the seller’s loss, not yours — see Buyer Protection on the Returns page.' },
       ] },
-      { h2: 'International shipping', paras: ['We currently ship to New Zealand, the USA, Canada and the UK. International rates are calculated at checkout based on weight and destination.'] },
-      { h2: 'Packaging standards', paras: ['Single cards are shipped in a penny sleeve, top loader and team bag, secured between rigid cardboard to prevent bending. Graded cards are shipped in protective sleeves with bubble wrap.'] },
-      { h2: 'Vault transfers', paras: ['Items purchased and sent directly to your CardPop Vault incur zero shipping fees. You only pay shipping when you request a physical withdrawal from your vault.'] },
+      { h2: 'Carriers and tracking', paras: [`Tracking links on CardPop support ${Object.values(CARRIERS).filter((c) => c.trackUrl).map((c) => c.label).join(', ')}. Every shipped order shows its carrier and tracking number in My Account → Orders, and the shipped email carries the same link.`] },
+      { h2: 'Where we ship', paras: ['We currently ship to Australian addresses only, and accept payment from Australian-issued cards and PayPal.'] },
+      { h2: 'Packaging standards', paras: ['Single cards are shipped in a penny sleeve and top loader (or team bag), secured between rigid cardboard to prevent bending in transit. Graded cards are shipped in protective sleeves with bubble wrap. Sealed product is boxed, not bagged. Sellers are held to the same standard — a card that arrives damaged because it was poorly packed is covered by Buyer Protection.'] },
     ],
+    links: [{ text: 'Returns & Refunds', href: '/returns' }],
   },
 
   '/trust-safety': {
     title: 'Trust & Safety | CardPop™',
-    description: "CardPop™'s trust and safety policies — how we protect buyers and sellers in the Australian trading card community.",
+    description: `How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Trust & Safety', path: '/trust-safety' }],
     h1: 'Trust & Safety',
-    intro: 'How we protect every buyer and seller in our community.',
+    intro: 'Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe.',
+    // Keep in step with pages/info/TrustSafetyPage.jsx — no cloaking.
     sections: [
-      { h2: 'Buyer protection', paras: ['Payments are processed securely through Stripe, and every order is backed by a 14-day Buyer Protection Guarantee. If an item doesn’t arrive in the expected timeframe or is significantly not as described, you can request a full refund through the resolution process.'] },
-      { h2: 'Seller protection', paras: ['Sellers are protected against fraudulent chargebacks and false claims, provided they ship to the verified address with tracking and signature confirmation.'] },
-      { h2: 'Authentication services', paras: ['For high-value items and trades we offer middleman authentication — items are shipped to CardPop’s facility where experts verify authenticity and condition before forwarding to the buyer.'] },
+      { h2: 'Secure payments', paras: ['Every purchase on CardPop is processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.'] },
+      { h2: 'Buyer protection', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
+      { h2: 'Seller protection', paras: ['Sellers are protected against fraudulent chargebacks and false claims. Ship to the buyer’s checkout address with tracking (signature on delivery for high-value cards), mark the order posted with the tracking number, and you’re covered — a would-be scammer can’t claim “item not received” against a tracked, delivered parcel. A sale is binding, so a buyer can’t return a card that matches its listing because they changed their mind.'] },
+      { h2: 'Verified identity', paras: ['Real people stand behind every account. Before anyone can sell, they verify their identity through Stripe Identity: a photograph of a government-issued ID and a matching selfie. Buyers need a free account for any marketplace card and complete the same one-time check for larger orders. Stripe performs the check and confirms the match — CardPop never stores your document images.'] },
       { h2: 'Community guidelines', paras: ['We have a zero-tolerance policy for fraud, harassment and market manipulation. Violators are permanently banned from the platform.'] },
+    ],
+    faqs: [
+      { q: 'Is my card information safe on CardPop?', a: 'Yes. Payments are processed by Stripe, a PCI-DSS Level 1 certified provider. Card details are entered inside Stripe’s encrypted checkout and are never stored on or transmitted through CardPop’s servers.' },
+      { q: 'What payment methods can I use?', a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.' },
+      { q: 'What happens if my card never arrives or is not as described?', a: `You’re covered by ${MP.name}. Report it from My Account → Orders within ${MP.claimWindowDaysFromDelivery} days of delivery (or after ${MP.notShippedClaimAfterDays} days if the seller never posts it). If the card is significantly not as described, damaged, counterfeit or missing, you’re refunded in full — the card, postage and every fee — to your original payment method.` },
+      { q: 'Can I return a marketplace card if I change my mind?', a: 'No. A marketplace sale is binding once the card is as advertised — you’re buying from another collector, not a shop. Change-of-mind returns apply to new CardPop Shop products only.' },
+      { q: 'When do I have to verify my ID?', a: 'To sell, always. To buy a marketplace card, you need a free account; a one-time Stripe Identity check (government ID plus a matching selfie) is asked for on larger marketplace orders. Stripe performs the check and CardPop never stores your document images.' },
+      { q: 'How are sellers protected?', a: 'As long as you ship to the buyer’s checkout address with tracking (and signature on delivery for high-value cards) and mark the order posted, you’re protected against fraudulent chargebacks and false “item not received” claims.' },
     ],
     links: [
       { text: 'How to buy safely on CardPop', href: '/safe-buying' },
+      { text: 'Returns & Refunds', href: '/returns' },
       { text: 'Browse the Marketplace', href: '/marketplace' },
     ],
   },

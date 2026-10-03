@@ -2,7 +2,7 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import stripe from '../utils/stripeClient.js';
 import { payoutSeller } from '../services/payoutService.js';
-import { computeRefundAmounts, getRefundRetentionPct } from '../services/refundAmounts.js';
+import { computeRefundAmounts, getRefundPolicyOptions } from '../services/refundAmounts.js';
 import { namesMatch } from '../services/identityService.js';
 import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
@@ -410,7 +410,8 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
     // set commission_aud/gst_aud to 0 (or inflated total_paid_aud) could
     // otherwise escape the fee retention entirely. Uses the same arithmetic as
     // processRefund, so the amount quoted here is the amount Stripe sends.
-    const { retainedFee, refundAmount } = computeRefundAmounts(refund.order, await getRefundRetentionPct());
+    const { retentionPct, retainProcessingFee } = await getRefundPolicyOptions();
+    const { retainedFee, refundAmount } = computeRefundAmounts(refund.order, retentionPct, { retainProcessingFee });
 
     const { error } = await supabase.from('refunds')
       .update({ status: 'approved', admin_notes: admin_notes || null, retained_fee_aud: retainedFee, refund_amount_aud: refundAmount })

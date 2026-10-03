@@ -11,13 +11,16 @@
 //   Returns: defective and non-defective (change of mind) products
 //   Exchanges: accepted
 //   Product condition: new only
-//   Window: 5 days
+//   Window: 14 days (was 5 until 2026-10-03 — update Merchant Center to match)
 //   Method: by mail; return label: customer responsibility
 //   Restocking fee: none
 //   Refund processing time: 7 days
+//
+// Marketplace cards have their own, different rules (binding sale, no change
+// of mind, full refund when the seller is at fault) — utils/buyerProtectionPolicy.js.
 export const SHOP_RETURN_POLICY = Object.freeze({
   country: 'AU',
-  windowDays: 5,
+  windowDays: 14,
   refundProcessingDays: 7,
   acceptsChangeOfMind: true,
   acceptsExchanges: true,

@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 import CardPopBrand from '@/components/CardPopBrand.jsx';
+import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
 import {
   ShieldHalf,
   ShieldCheck,
   BadgeCheck,
   Lock,
-  RefreshCw,
   PackageCheck,
   Users,
 } from 'lucide-react';
@@ -19,7 +19,9 @@ import {
 // verify who's on the other end of a trade. Copy is deliberately accurate to
 // the integrations we run: Stripe for order checkout (PCI-DSS hosted payment,
 // with PayPal and wallets offered as methods), Stripe for membership
-// billing, and Stripe Identity for the ID check at registration.
+// billing, and Stripe Identity for the ID check. Every protection figure is
+// read from utils/buyerProtectionPolicy.js so this page can never promise a
+// window or a refund the Returns page and the refund code don't deliver.
 
 // Stripe brand mark — white parallelogram, shown on Stripe's blurple tile
 // (per Stripe's brand assets). Drawn inline so no external asset is fetched.
@@ -40,13 +42,13 @@ const PILLARS = [
   },
   {
     icon: ShieldCheck,
-    title: '14-day Buyer Protection',
-    body: 'If your item doesn’t arrive or isn’t as described, request a full refund through our resolution process — every eligible order is covered.',
+    title: MP.name,
+    body: `${PROTECTION_COPY.marketplaceOneLine} Report it within ${MP.claimWindowDaysFromDelivery} days of delivery and every dollar comes back, fees included.`,
   },
   {
     icon: BadgeCheck,
-    title: 'ID Verification',
-    body: 'Sellers must be verified to sell and trade — every seller confirms their identity with a government ID and selfie through Stripe Identity, so you only ever deal with a verified human.',
+    title: 'ID-verified sellers',
+    body: 'Every seller confirms their identity with a government ID and selfie through Stripe Identity before they can sell, so you only ever deal with a verified person.',
   },
 ];
 
@@ -82,12 +84,16 @@ const FAQ = [
     a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.',
   },
   {
-    q: 'What happens if my order never arrives or is not as described?',
-    a: 'You’re covered by our 14-day Buyer Protection Guarantee. Open a case through our resolution process and, if the item didn’t arrive or was significantly not as described, you’ll receive a full refund.',
+    q: 'What happens if my card never arrives or is not as described?',
+    a: `You’re covered by ${MP.name}. Report it from My Account → Orders within ${MP.claimWindowDaysFromDelivery} days of delivery (or after ${MP.notShippedClaimAfterDays} days if the seller never posts it). If the card is significantly not as described, damaged, counterfeit or missing, you’re refunded in full — the card, postage and every fee — to your original payment method.`,
   },
   {
-    q: 'Why do I have to verify my ID when I register?',
-    a: 'Identity verification is handled by Stripe Identity — you photograph a government ID and take a matching selfie. It keeps fraudsters and duplicate accounts off the platform, so every member trades with a verified person. Stripe performs the check; CardPop never stores your document images.',
+    q: 'Can I return a marketplace card if I change my mind?',
+    a: 'No. A marketplace sale is binding once the card is as advertised — you’re buying from another collector, not a shop. Change-of-mind returns apply to new CardPop Shop products only.',
+  },
+  {
+    q: 'When do I have to verify my ID?',
+    a: `To sell, always. To buy a marketplace card, you need a free account; a one-time Stripe Identity check (government ID plus a matching selfie) is asked for on larger marketplace orders. Stripe performs the check and CardPop never stores your document images.`,
   },
   {
     q: 'How are sellers protected?',
@@ -119,7 +125,7 @@ const TrustSafetyPage = () => {
     >
       <SEOHead
         title="Trust & Safety — Secure Payments & Buyer Protection | CardPop™"
-        description="How CardPop protects you: PCI-DSS payments via Stripe, a 14-day Buyer Protection Guarantee, seller chargeback protection, and Stripe Identity ID verification at registration."
+        description={`How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`}
         structuredData={faqStructuredData}
       />
 
@@ -134,16 +140,14 @@ const TrustSafetyPage = () => {
       <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay</strong>. All traffic is protected by 256-bit SSL end to end.</p>
 
       <SectionHeading icon={ShieldCheck}>Buyer Protection</SectionHeading>
-      <p>Every order is backed by our <strong>14-day Buyer Protection Guarantee</strong>. If an item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. Your payment is only ever released to the seller once the transaction completes cleanly, so you’re never left out of pocket for an order that goes wrong.</p>
+      <p>{PROTECTION_COPY.marketplaceSummary}</p>
+      <p>{PROTECTION_COPY.notShippedSummary} Full terms, including how to make a claim: <Link to="/returns#marketplace" className="font-semibold text-primary hover:underline">Returns &amp; Refunds</Link>.</p>
 
       <SectionHeading icon={PackageCheck}>Seller Protection</SectionHeading>
-      <p>Sellers are protected against fraudulent chargebacks and false claims. As long as you ship to the buyer’s <strong>verified address with tracking and signature confirmation</strong>, you’re covered — a would-be scammer can’t claim “item not received” against a signed, tracked delivery.</p>
+      <p>Sellers are protected against fraudulent chargebacks and false claims. Ship to the buyer’s <strong>checkout address with tracking</strong> (signature on delivery for high-value cards), mark the order posted with the tracking number, and you’re covered — a would-be scammer can’t claim “item not received” against a tracked, delivered parcel. A sale is binding, so a buyer can’t return a card that matches its listing because they changed their mind.</p>
 
-      <SectionHeading icon={BadgeCheck}>Verified Identity at Registration</SectionHeading>
-      <p>What sets <CardPopBrand /> apart from open marketplaces is that <strong>real people stand behind every account</strong>. During registration, members verify their identity through <strong>Stripe Identity</strong>: you photograph a government-issued ID (passport or driver licence) and take a matching selfie. Stripe performs the check and confirms the match — <strong>CardPop never stores your document images</strong>. Verified accounts earn the <strong>Verified badge</strong> that buyers and sellers look for, and selling requires a verified identity. The result is a community where fraudsters and throwaway accounts have nowhere to hide.</p>
-
-      <SectionHeading icon={RefreshCw}>Authentication Services</SectionHeading>
-      <p>For high-value items and trades, we offer <strong>middleman authentication</strong>. Items are shipped to our facility where experts verify authenticity and condition before forwarding to the buyer — so both sides can transact with total confidence.</p>
+      <SectionHeading icon={BadgeCheck}>Verified Identity</SectionHeading>
+      <p>What sets <CardPopBrand /> apart from open marketplaces is that <strong>real people stand behind every account</strong>. Before anyone can sell, they verify their identity through <strong>Stripe Identity</strong>: a photograph of a government-issued ID (passport or driver licence) and a matching selfie. Buyers need a free account for any marketplace card and complete the same one-time check for larger orders. Stripe performs the check and confirms the match — <strong>CardPop never stores your document images</strong>. Verified accounts carry the <strong>Verified badge</strong>. The result is a community where fraudsters and throwaway accounts have nowhere to hide.</p>
 
       <SectionHeading icon={Users}>Community Guidelines</SectionHeading>
       <p>We maintain a <strong>zero-tolerance policy</strong> for fraud, harassment, and market manipulation. Users found violating these guidelines are permanently banned from the platform.</p>
