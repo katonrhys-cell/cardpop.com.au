@@ -557,6 +557,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 record itself. Shop products have none and stay Classic. */}
             <ProductImageCarousel
               images={product.images}
+              video={product.vault_item?.card_video || product.card_video || null}
               record={product}
               displayStyle={product.vault_item?.display_style || product.display_style}
             />
