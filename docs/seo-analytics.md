@@ -25,6 +25,49 @@ Sentry (errors + performance traces) also runs but isn't visitor analytics.
   destination page's `<title>` (Helmet) so events carry the right title.
 - GA is skipped entirely in dev, on localhost, and in e2e runs.
 
+### Ecommerce events (the conversion funnel)
+
+`lib/analytics.js` sends the standard GA4 ecommerce events, all in AUD:
+
+| Event | Fired from | When |
+|---|---|---|
+| `view_item` | `pages/ProductDetailPage.jsx`, `pages/shop/ShopProductPage.jsx`, `pages/shop/ShopBinderProductPage.jsx` | a product/listing page loads |
+| `add_to_cart` | `hooks/useCart.jsx` (`addToCart`) | any add-to-cart, whichever button |
+| `begin_checkout` | `pages/CheckoutPage.jsx` | checkout opens with items (once per distinct cart) |
+| `add_payment_info` | `pages/CheckoutPage.jsx` | "Review & Pay" passes validation and the payment form appears |
+| `purchase` | `pages/CheckoutSuccessPage.jsx` | the Stripe session reports `paid`; `transaction_id` = session id, deduplicated in `sessionStorage` so a reload never double-counts |
+
+Items are normalised by `toGaItem()` (`item_category` = Shop / Marketplace,
+`affiliation` = seller id for listings). In GA4 → Admin → Events, mark
+`purchase` as a **key event**; the Monetization reports then show funnel
+drop-off (view → cart → checkout → purchase) and revenue by channel.
+
+**Stripe return attribution:** add `stripe.com` (and `js.stripe.com`,
+`checkout.stripe.com`) under GA4 Admin → Data streams → Configure tag settings
+→ *List unwanted referrals*, otherwise a purchase that bounced through Stripe
+is credited to a "stripe.com / referral" session.
+
+### Advertising tags (consent-gated)
+
+Both are dormant until their build-time env vars exist in Vercel, **and** load
+only after the visitor clicks *Accept all* in the cookie bar
+(`components/CookieConsentBanner.jsx`, state in `lib/consent.js`). *Essentials
+only* leaves them off; *Cookie settings* in the footer shows the bar again.
+
+| Tag | Env vars | What it gets |
+|---|---|---|
+| Google Ads conversion tracking | `VITE_GOOGLE_ADS_ID` (`AW-…`), `VITE_GOOGLE_ADS_PURCHASE_LABEL` | `config` on consent, a `conversion` event per purchase with value + `transaction_id` |
+| Meta Pixel (`lib/metaPixel.js`) | `VITE_META_PIXEL_ID` | `PageView` per route, `ViewContent`, `AddToCart`, `InitiateCheckout`, `AddPaymentInfo`, `Purchase` (with `eventID` = session id for dedup against a future Conversions API) |
+
+GA4 itself runs regardless, with Google Consent Mode v2 defaults
+(`analytics_storage: granted`, `ad_storage` / `ad_user_data` /
+`ad_personalization: denied`) that flip to granted on acceptance — so Google
+Ads models conversions for non-consenting visitors instead of dropping them.
+The CSP in `vercel.json` allows `www.googleadservices.com` and
+`connect.facebook.net` / `www.facebook.com` for these. The privacy policy's
+cookies section (`pages/PrivacyPolicyPage.jsx` → "7. Cookies") describes all
+three tags; keep it in step if a tag is added or removed.
+
 ### ⚠️ One-time GA4 admin step (avoid double-counting)
 
 Because the app sends its own SPA `page_view` events, GA4's built-in history

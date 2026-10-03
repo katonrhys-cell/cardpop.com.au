@@ -4,6 +4,7 @@ import { Twitter, Instagram, Facebook, Youtube, ShieldCheck } from 'lucide-react
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
+import { resetConsent } from '@/lib/consent.js';
 
 const DiscordIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -110,6 +111,7 @@ const Footer = () => {
               <li><Link to="/returns" className="hover:text-primary transition-colors">Returns & Refunds</Link></li>
               <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
               <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+              <li><button type="button" onClick={resetConsent} className="hover:text-primary transition-colors">Cookie settings</button></li>
               <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
               <li><Link to="/trust-safety" className="hover:text-primary transition-colors">Buyer Protection & Safety</Link></li>
               <li><Link to="/sitemap" className="hover:text-primary transition-colors">Sitemap</Link></li>

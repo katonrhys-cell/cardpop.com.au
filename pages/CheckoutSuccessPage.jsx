@@ -15,6 +15,7 @@ import { GooglePayMark } from '@/components/checkout/PaymentMarks.jsx';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { renderSurveyOptIn } from '@/lib/googleCustomerReviews.js';
+import { trackPurchase } from '@/lib/analytics.js';
 
 // Post-purchase account creation for guests. The order is already placed and
 // paid — this just lets the shopper turn their guest checkout into a real
@@ -148,6 +149,17 @@ const CheckoutSuccessPage = () => {
         setSessionData(data);
         const paid = data.status === 'paid' || data.status === 'no_payment_required';
         setStatus(paid ? 'paid' : 'unpaid');
+        if (paid) {
+          // GA4 / Google Ads / Meta purchase — deduped per session id inside
+          // trackPurchase, so a reload of this page can't double-count a sale.
+          trackPurchase({
+            transactionId: sessionId,
+            value: (data.amountTotal || 0) / 100,
+            items: (data.items || []).map((item) => ({
+              id: item.name, name: item.name, price: (item.unitAmount || 0) / 100, quantity: item.quantity || 1,
+            })),
+          });
+        }
         // Only empty the cart once payment is actually confirmed.
         if (paid && !singleItem) clearCart();
       })

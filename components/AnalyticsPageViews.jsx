@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { trackPageView } from '@/lib/analytics.js';
+import { trackMetaPageView } from '@/lib/metaPixel.js';
 
 // Sends a GA4 page_view for the initial route and every client-side
 // navigation. gtag's automatic page_view is disabled (lib/analytics.js) so
@@ -29,6 +30,7 @@ const AnalyticsPageViews = () => {
       if (observer) observer.disconnect();
       if (timer) clearTimeout(timer);
       trackPageView(path);
+      trackMetaPageView();
     };
 
     if (titleEl) {
