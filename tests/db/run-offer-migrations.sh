@@ -19,9 +19,12 @@ run supabase/migrations/20260921210000_offers_bind_seller_to_listing.sql
 run supabase/migrations/20260928071118_listings_accept_offers_by_default.sql
 run supabase/migrations/20260928071648_binding_offers_lifecycle.sql
 run supabase/migrations/20260929211351_offer_payment_deadline.sql
+run supabase/migrations/20261003034818_eoi_offer_window_and_open_ended_range.sql
 # Re-applying must be a no-op (db push can re-run a straggler).
 run supabase/migrations/20260928071118_listings_accept_offers_by_default.sql
 run supabase/migrations/20260928071648_binding_offers_lifecycle.sql
 run supabase/migrations/20260929211351_offer_payment_deadline.sql
+run supabase/migrations/20261003034818_eoi_offer_window_and_open_ended_range.sql
 psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/offers_lifecycle.test.sql
 psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/offers_payment.test.sql
+psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/offers_window.test.sql

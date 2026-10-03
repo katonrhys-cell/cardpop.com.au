@@ -10,6 +10,7 @@ import { apiServerClient } from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { formatOfferRange } from '@/utils/offerEligibility.js';
 
 const QUICK_PERCENTAGES = [
   { label: '90%', pct: 0.9 },
@@ -37,6 +38,8 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
   const rangeMin = listing?.price_min_aud != null ? Number(listing.price_min_aud) : null;
   const rangeMax = listing?.price_max_aud != null ? Number(listing.price_max_aud) : null;
   const isRange = listingPrice <= 0 && (rangeMin != null || rangeMax != null);
+  // A minimum with no ceiling — "offers from $X".
+  const isOpenEnded = isRange && rangeMin != null && rangeMax == null;
   const numericAmount = parseFloat(amount) || 0;
   const savings = listingPrice - numericAmount;
   const savingsPct = listingPrice > 0 ? (savings / listingPrice) * 100 : 0;
@@ -72,7 +75,9 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
       toast.error('Please confirm you understand your offer is binding');
       return;
     }
-    const sanityCap = isRange ? (rangeMax ?? rangeMin) : listingPrice;
+    // Offers bind, so catch a fat-fingered amount. An open-ended range has no
+    // ceiling to anchor on, so it allows more headroom above the minimum.
+    const sanityCap = isOpenEnded ? rangeMin * 2 : (isRange ? (rangeMax ?? rangeMin) : listingPrice);
     if (sanityCap > 0 && numericAmount > sanityCap * 1.5) {
       toast.error('Offer amount seems unusually high');
       return;
@@ -165,7 +170,7 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
                   </p>
                   <p className="text-2xl font-extrabold tabular-nums">
                     {isRange
-                      ? `$${(rangeMin ?? rangeMax).toFixed(2)}${rangeMax != null && rangeMin != null ? ` – $${rangeMax.toFixed(2)}` : ''}`
+                      ? formatOfferRange(rangeMin, rangeMax)
                       : `$${listingPrice.toFixed(2)}`}
                   </p>
                 </div>
@@ -177,7 +182,7 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
                     </p>
                     {isRange ? (
                       withinRange ? (
-                        <p className="text-xs text-emerald-600 font-bold">Within the seller's range</p>
+                        <p className="text-xs text-emerald-600 font-bold">{isOpenEnded ? "Meets the seller's minimum" : "Within the seller's range"}</p>
                       ) : (
                         <p className="text-xs text-amber-600 font-bold">
                           {rangeMin != null && numericAmount < rangeMin ? "Below the seller's range" : "Above the seller's range"}
@@ -194,7 +199,13 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
               <div>
                 <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Quick select</p>
                 <div className="grid grid-cols-3 gap-2">
-                  {(isRange
+                  {(isOpenEnded
+                    ? [
+                        { label: 'Minimum', value: rangeMin },
+                        { label: '+10%', value: rangeMin * 1.1 },
+                        { label: '+25%', value: rangeMin * 1.25 },
+                      ]
+                    : isRange
                     ? [
                         { label: 'Low End', value: rangeMin ?? rangeMax },
                         { label: 'Middle', value: ((rangeMin ?? rangeMax) + (rangeMax ?? rangeMin)) / 2 },

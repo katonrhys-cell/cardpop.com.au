@@ -616,7 +616,9 @@ async function renderListing(supabase, id, slugParam) {
     ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${soldOut ? '' : (listing.accepts_offers ? ' (offers accepted)' : '')}</p>`
     : (listing.price_min_aud != null && listing.price_max_aud != null
       ? `<p><strong>Seeking offers: A$${esc(Number(listing.price_min_aud).toFixed(2))} – A$${esc(Number(listing.price_max_aud).toFixed(2))}</strong></p>`
-      : '')}
+      : listing.price_min_aud != null
+        ? `<p><strong>Seeking offers from A$${esc(Number(listing.price_min_aud).toFixed(2))}</strong></p>`
+        : '')}
   ${setLine ? `<p>${esc(setLine)}</p>` : ''}
   <ul>
     ${condition ? `<li>Condition: ${esc(condition)}</li>` : ''}

@@ -66,6 +66,7 @@ import { prepareAnalysisImages } from '@/utils/analysisImage.js';
 import { shouldPromptForBack, missingBackFields, backPhotoPromptText } from '@/utils/backPhotoPrompt.js';
 import { useCardScanLog, buildScanPayload } from '@/hooks/useCardScanLog.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
+import { openDateToTimestamp, closeDateToTimestamp, timestampToOpenDate, timestampToCloseDate, todayDateInput } from '@/utils/offerWindowDates.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
 import SellerPayoutEstimate from '@/components/SellerPayoutEstimate.jsx';
@@ -101,7 +102,7 @@ const WIZARD_STEPS = [
   { key: 'photos',  title: 'Photos',  fields: ['cardImage'] },
   { key: 'details', title: 'Details', fields: ['hierarchy', 'cardName', 'year'] },
   { key: 'value',   title: 'Value',   fields: ['estimatedValue'] },
-  { key: 'publish', title: 'List it', fields: ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'tradeValue'] },
+  { key: 'publish', title: 'List it', fields: ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'offerOpenDate', 'offerCloseDate', 'tradeValue'] },
 ];
 
 const FULL_FORM_PREF_KEY = 'cardpop.listingFormMode';
@@ -310,6 +311,8 @@ const AddEditCardPage = () => {
     listingType:    'private',
     offerMin:       '',
     offerMax:       '',
+    offerOpenDate:  '',
+    offerCloseDate: '',
     displayStyle:   'classic',
   };
 
@@ -325,7 +328,7 @@ const AddEditCardPage = () => {
     // Editing a field clears its inline error (blur re-validates). Changing
     // the listing type also drops price errors that may no longer apply.
     setErrors(prev => {
-      const dependents = key === 'listingType' ? ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'tradeValue'] : [];
+      const dependents = key === 'listingType' ? ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'offerOpenDate', 'offerCloseDate', 'tradeValue'] : [];
       const stale = [key, ...dependents].filter(k => k in prev);
       if (!stale.length) return prev;
       const next = { ...prev };
@@ -703,7 +706,7 @@ const AddEditCardPage = () => {
         // separate from estimated_value_aud (a reference comp, not a floor).
         supabase
           .from('listings')
-          .select('price_min_aud, price_max_aud, price_aud, shipping_cost_aud')
+          .select('price_min_aud, price_max_aud, price_aud, shipping_cost_aud, offers_open_at, offers_close_at')
           .eq('vault_item_id', id)
           .neq('status', 'archived')
           .maybeSingle()
@@ -713,6 +716,8 @@ const AddEditCardPage = () => {
               ...f,
               offerMin: data.price_min_aud != null ? String(data.price_min_aud) : f.offerMin,
               offerMax: data.price_max_aud != null ? String(data.price_max_aud) : f.offerMax,
+              offerOpenDate: data.offers_open_at ? timestampToOpenDate(data.offers_open_at) : f.offerOpenDate,
+              offerCloseDate: data.offers_close_at ? timestampToCloseDate(data.offers_close_at) : f.offerCloseDate,
               askingPrice: data.price_aud != null ? String(data.price_aud) : f.askingPrice,
               // 0 (free shipping) renders as an empty field, matching how the
               // seller left it — the input's placeholder already reads "free".
@@ -1539,6 +1544,8 @@ const AddEditCardPage = () => {
             shippingCost: formData.shippingCost || null,
             offerMin: formData.offerMin || null,
             offerMax: formData.offerMax || null,
+            offersOpenAt: openDateToTimestamp(formData.offerOpenDate),
+            offersCloseAt: closeDateToTimestamp(formData.offerCloseDate),
           },
         }),
       });
@@ -4059,7 +4066,8 @@ const AddEditCardPage = () => {
                           value={formData.offerMin}
                           onChange={e => set('offerMin', e.target.value)}
                           onBlur={() => validateFieldOnBlur('offerMin')}
-                          placeholder="Min"
+                          placeholder="Min *"
+                          aria-label="Minimum offer"
                           className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMin ? 'border-destructive' : 'border-input'}`}
                         />
                       </div>
@@ -4074,7 +4082,8 @@ const AddEditCardPage = () => {
                           value={formData.offerMax}
                           onChange={e => set('offerMax', e.target.value)}
                           onBlur={() => validateFieldOnBlur('offerMax')}
-                          placeholder="Max"
+                          placeholder="No max"
+                          aria-label="Maximum offer (optional)"
                           className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMax ? 'border-destructive' : 'border-input'}`}
                         />
                       </div>
@@ -4084,6 +4093,40 @@ const AddEditCardPage = () => {
                     )}
                     <p className="text-xs text-muted-foreground">
                       Buyers see this range and make offers — you can accept, decline or counter each one from your account.
+                      Leave the maximum blank to take offers from your minimum upwards.
+                    </p>
+
+                    <Label className="font-bold flex items-center gap-1.5 pt-2">
+                      Offer Dates <span className="font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="offerOpenDate"
+                        type="date"
+                        value={formData.offerOpenDate}
+                        max={formData.offerCloseDate || undefined}
+                        onChange={e => set('offerOpenDate', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('offerOpenDate')}
+                        aria-label="Offers open"
+                        className={`flex h-11 w-full flex-1 rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerOpenDate ? 'border-destructive' : 'border-input'}`}
+                      />
+                      <span className="text-muted-foreground font-bold">–</span>
+                      <input
+                        id="offerCloseDate"
+                        type="date"
+                        value={formData.offerCloseDate}
+                        min={formData.offerOpenDate && formData.offerOpenDate > todayDateInput() ? formData.offerOpenDate : todayDateInput()}
+                        onChange={e => set('offerCloseDate', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('offerCloseDate')}
+                        aria-label="Offers close"
+                        className={`flex h-11 w-full flex-1 rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerCloseDate ? 'border-destructive' : 'border-input'}`}
+                      />
+                    </div>
+                    {(errors.offerOpenDate || errors.offerCloseDate) && (
+                      <p className="text-xs text-destructive">{errors.offerOpenDate || errors.offerCloseDate}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Only take offers between these dates. Leave the first blank to open now, and the second blank for no closing date.
                     </p>
                   </div>
                 )}
