@@ -126,6 +126,19 @@ describe('orderShippedEmail', () => {
   });
 });
 
+describe('orderShippedEmail — review invitation', () => {
+  it('invites a review of shop products when asked', () => {
+    const html = orderShippedEmail({ buyerName: 'Sam', orderRef: 'ABCD1234', carrier: 'auspost', trackingNumber: '33AB1234', invitesReview: true });
+    expect(html).toContain('review the products from your order');
+    expect(html).toContain('https://cardpop.com.au/account/orders');
+  });
+
+  it('says nothing about reviews by default (marketplace-only orders)', () => {
+    const html = orderShippedEmail({ buyerName: 'Sam', orderRef: 'ABCD1234', carrier: 'auspost', trackingNumber: '33AB1234' });
+    expect(html).not.toContain('review the products');
+  });
+});
+
 describe('offerReceivedEmail — binding terms', () => {
   it('tells the seller the buyer is bound and the offer lapses after 48 hours', () => {
     const html = offerReceivedEmail({ sellerName: 'Kat', cardName: 'A card', amountAud: 10 });

@@ -17,6 +17,9 @@ import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, vari
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
+import useShopReviews from '@/hooks/useShopReviews.js';
+import ProductReviews from '@/components/shop/ProductReviews.jsx';
+import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { Badge } from '@/components/ui/badge';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
@@ -64,6 +67,9 @@ const ShopProductPage = () => {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
+  // Colours of one line share their reviews (family_sku = the line SKU).
+  const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
+  const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
 
   // Not a catalogue product: any other shop product (e.g. CardPop house
   // products) is served at the same /shop/<category>/<slug> shape.
@@ -158,6 +164,7 @@ const ShopProductPage = () => {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: category.name,
     url: canonical,
+    ...productReviewsLd(reviewStats, shopReviews),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -423,6 +430,8 @@ const ShopProductPage = () => {
             </div>
           </section>
         )}
+
+        <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
         <section className="mt-14 max-w-3xl">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>

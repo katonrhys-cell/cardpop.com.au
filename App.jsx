@@ -230,6 +230,7 @@ const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryA
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const PromoCodesAdminPage = lazy(() => import('@/pages/admin/PromoCodesAdminPage.jsx'));
+const ProductReviewsAdminPage = lazy(() => import('@/pages/admin/ProductReviewsAdminPage.jsx'));
 const BusinessAffiliateLinksAdminPage = lazy(() => import('@/pages/admin/BusinessAffiliateLinksAdminPage.jsx'));
 const ShopAffiliateProductsAdminPage = lazy(() => import('@/pages/admin/ShopAffiliateProductsAdminPage.jsx'));
 const CardArtManagementPage = lazy(() => import('@/pages/admin/CardArtManagementPage.jsx'));
@@ -548,6 +549,7 @@ const App = () => {
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
+                          <Route path="product-reviews" element={<ProductReviewsAdminPage />} />
                           <Route path="building-your-business" element={<BusinessAffiliateLinksAdminPage />} />
                           <Route path="shop-affiliate-products" element={<ShopAffiliateProductsAdminPage />} />
                           <Route path="card-art" element={<CardArtManagementPage />} />

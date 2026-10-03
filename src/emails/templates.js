@@ -679,7 +679,7 @@ export function offerAdminNoticeEmail({ offerId, cardName, amountAud, askingPric
  * buyers have no account to log into); with no carrier link it falls back to
  * the order list. Item titles are seller-supplied, so they go through `esc`.
  */
-export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, trackingNumber }) {
+export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, trackingNumber, invitesReview = false }) {
   const url = trackingUrl(carrier, trackingNumber);
   const number = normalizeTrackingNumber(trackingNumber);
   const rows = [['Order', esc(orderRef)]];
@@ -695,7 +695,10 @@ export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, tr
 ${summaryTable(rows)}
 <p>${url
     ? `Tracking can take up to 24 hours to show the first scan. You can follow your parcel any time with the button below${carrier === 'auspost' ? ' or in the Australia Post app' : ''}.`
-    : `Use the tracking number above on ${esc(carrierLabel(carrier))}'s website to follow your parcel.`}</p>`;
+    : `Use the tracking number above on ${esc(carrierLabel(carrier))}'s website to follow your parcel.`}</p>${invitesReview
+    ? `
+<p>Once it arrives, we'd love to hear what you think. You can review the products from your order in <a href="https://cardpop.com.au/account/orders" style="color:#E63946;text-decoration:none;">Account → Orders</a> — it helps other collectors choose.</p>`
+    : ''}`;
 
   return cpEmail(
     `Your CardPop order has shipped — tracking ${esc(number)}.`,

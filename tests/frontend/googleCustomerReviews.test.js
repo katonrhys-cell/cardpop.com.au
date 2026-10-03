@@ -4,6 +4,7 @@ import {
   isBadgeEligiblePath,
   normaliseDeliveryCountry,
   renderSurveyOptIn,
+  surveyProducts,
 } from '@/lib/googleCustomerReviews.js';
 
 describe('estimatedDeliveryDate', () => {
@@ -56,5 +57,20 @@ describe('normaliseDeliveryCountry', () => {
     for (const bad of [null, undefined, '', 'AUS', 'A', '12', 'zz']) {
       expect(normaliseDeliveryCountry(bad)).toBe('AU');
     }
+  });
+});
+
+describe('surveyProducts', () => {
+  it('keeps valid GTINs as { gtin } objects, de-duplicated', () => {
+    expect(surveyProducts(['1209202001436', ' 396483852909 ', '1209202001436']))
+      .toEqual([{ gtin: '1209202001436' }, { gtin: '396483852909' }]);
+  });
+
+  it('drops anything that is not a GTIN shape', () => {
+    expect(surveyProducts(['', null, 'abc', '12345', '12345678901234567'])).toEqual([]);
+  });
+
+  it('is empty when no list is given', () => {
+    expect(surveyProducts(undefined)).toEqual([]);
   });
 });

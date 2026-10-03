@@ -40,6 +40,9 @@ import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFa
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
+import useShopReviews from '@/hooks/useShopReviews.js';
+import ProductReviews from '@/components/shop/ProductReviews.jsx';
+import { isGtin, productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
 import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
@@ -321,6 +324,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Shop colour family: the other colours of this product line, each its own
   // product. Picking one navigates to that colour's page.
   const familySku = source === 'shop' ? product?.family_sku : null;
+  // Reviews are shared across a product's colours (family_sku), else per product.
+  const reviewPool = source === 'shop' && product ? reviewPoolKey({ familySku: product.family_sku, productId: product.id }) : null;
+  const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
   useEffect(() => {
     let cancelled = false;
     if (!familySku) { setFamily([]); return undefined; }
@@ -532,6 +538,16 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             : source === 'shop'
               ? (canonicalPath || shopProductBasePath(product) || legacyShopProductPath(product))
               : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
+          structuredData={isShop && Number(reviewStats?.review_count) > 0 ? {
+            '@context': 'https://schema.org',
+            '@type': 'Product',
+            name: product.name,
+            image: product.images,
+            sku: product.sku || product.id,
+            ...(isGtin(product.barcode) ? { gtin: String(product.barcode) } : {}),
+            description: product.description?.split(/\n\s*\n/)[0] || product.name,
+            ...productReviewsLd(reviewStats, shopReviews),
+          } : undefined}
         />
 
         {/* Breadcrumb gives a reliable upward path for visitors who land here
@@ -964,6 +980,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             </div>
           )}
         </div>
+
+        {isShop && (
+          <ProductReviews title={product.name} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
+        )}
       </div>
     </div>
   );

@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { format, differenceInDays } from 'date-fns';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
+import WriteProductReviewModal from '@/components/shop/WriteProductReviewModal.jsx';
+import { shopLinesOf } from '@/utils/productReviews.js';
 import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import { orderPreorderLines } from '@/utils/shopStock.js';
@@ -24,6 +26,12 @@ import { computeRefundAmounts } from '@/utils/refundAmounts.js';
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
 // src/routes/seller-ratings.js.
 const REVIEWABLE_STATUSES = ['shipped', 'completed', 'refunded'];
+
+// Shop-product reviews need the parcel to have shipped (enforced by the
+// shop_product_reviews insert trigger) — a refund alone isn't enough.
+const PRODUCT_REVIEWABLE_STATUSES = ['shipped', 'completed'];
+
+const PRODUCT_REVIEW_STATE_LABEL = { pending: 'awaiting approval', published: 'published', rejected: 'not published' };
 
 const REFUND_REASONS = [
   { value: 'item_not_received',      label: 'Item not received' },
@@ -172,7 +180,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
+const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewRequest, reviewed, productReviews }) => {
   const refundQuote = computeRefundAmounts(order);
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
@@ -184,6 +192,7 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
   const canReview   = !reviewed
     && !!order.seller_id
     && REVIEWABLE_STATUSES.includes(order.status);
+  const reviewableProducts = PRODUCT_REVIEWABLE_STATUSES.includes(order.status) ? shopLinesOf(order) : [];
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
@@ -244,6 +253,34 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
               {order.tracking_number}
             </a>
           ) : <span className="font-mono font-semibold text-foreground">{order.tracking_number}</span>}
+        </div>
+      )}
+
+      {/* Product reviews — shop items on a shipped order */}
+      {reviewableProducts.length > 0 && (
+        <div className="space-y-2">
+          {reviewableProducts.map((line) => {
+            const state = productReviews?.get(`${order.id}:${line.id}`);
+            return (
+              <div key={line.id} className="flex items-center justify-between gap-3 text-xs bg-muted/30 rounded-xl p-3">
+                <span className="font-medium text-foreground truncate">{line.title}</span>
+                {state ? (
+                  <span className="flex items-center gap-1 font-semibold text-emerald-600 shrink-0">
+                    <CheckCircle2 className="w-4 h-4" /> Reviewed — {PRODUCT_REVIEW_STATE_LABEL[state] || state}
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl font-bold gap-1.5 text-xs h-8 shrink-0"
+                    onClick={() => onProductReviewRequest({ orderId: order.id, productId: line.id, title: line.title })}
+                  >
+                    <Star className="w-3.5 h-3.5" /> Review product
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -324,12 +361,15 @@ const AccountOrders = () => {
   const [refundTarget, setRefundTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewedOrderIds, setReviewedOrderIds] = useState(() => new Set());
+  const [productReviewTarget, setProductReviewTarget] = useState(null);
+  // `${order_id}:${product_id}` → review status, for this buyer's product reviews.
+  const [productReviews, setProductReviews] = useState(() => new Map());
 
   const fetchOrders = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
     try {
-      const [{ data, error }, givenRes] = await Promise.all([
+      const [{ data, error }, givenRes, { data: ownProductReviews }] = await Promise.all([
         supabase
           .from('orders')
           .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
@@ -340,9 +380,14 @@ const AccountOrders = () => {
         // Best-effort: if it fails, buttons still show and the server's
         // duplicate check remains the backstop.
         apiServerClient.fetch('/seller-ratings/mine/given').catch(() => null),
+        // This buyer's own product reviews (RLS: own rows only). Best-effort.
+        supabase.from('shop_product_reviews').select('order_id, product_id, status')
+          .eq('reviewer_id', currentUser.id)
+          .then((r) => r, () => ({ data: null })),
       ]);
       if (error) throw error;
       setOrders(data || []);
+      setProductReviews(new Map((ownProductReviews || []).map((r) => [`${r.order_id}:${r.product_id}`, r.status])));
       if (givenRes?.ok) {
         const { ratings } = await givenRes.json();
         setReviewedOrderIds(new Set((ratings || []).map(r => r.order_id).filter(Boolean)));
@@ -427,6 +472,8 @@ const AccountOrders = () => {
               onRefundRequest={setRefundTarget}
               onReviewRequest={setReviewTarget}
               reviewed={reviewedOrderIds.has(order.id)}
+              productReviews={productReviews}
+              onProductReviewRequest={setProductReviewTarget}
             />
           ))}
         </div>
@@ -437,6 +484,14 @@ const AccountOrders = () => {
           order={refundTarget}
           onClose={() => setRefundTarget(null)}
           onSuccess={fetchOrders}
+        />
+      )}
+
+      {productReviewTarget && (
+        <WriteProductReviewModal
+          target={productReviewTarget}
+          onClose={() => setProductReviewTarget(null)}
+          onSuccess={t => setProductReviews(prev => new Map(prev).set(`${t.orderId}:${t.productId}`, 'pending'))}
         />
       )}
 

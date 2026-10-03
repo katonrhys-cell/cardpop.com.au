@@ -237,6 +237,31 @@ describe('prerender shop products', () => {
     expect(body).toContain('/product/shop/' + UUID + '/pokemon-scarlet-violet-booster-box');
   });
 
+  it('adds aggregateRating and review JSON-LD when the product has published reviews', async () => {
+    // The mock answers every single-row query with state.result, so the one
+    // object doubles as the product row and its review_stats row.
+    state.result = { data: {
+      id: UUID, title: 'Zip Binder', price_aud: 30, stock_quantity: 5, product_type: 'supplies', status: 'active',
+      review_count: 3, average_rating: 4.67,
+    } };
+    state.listResult = { data: [
+      { rating: 5, title: 'Great', body: 'Holds heaps', reviewer_name: 'Sam', created_at: '2026-10-01T00:00:00Z' },
+    ] };
+    const { body } = await run('/product/shop/' + UUID + '/zip-binder');
+    expect(body).toContain('"@type":"AggregateRating"');
+    expect(body).toContain('"ratingValue":"4.7"');
+    expect(body).toContain('"reviewCount":3');
+    expect(body).toContain('"@type":"Review"');
+  });
+
+  it('emits no rating markup for a product without reviews', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Zip Binder', price_aud: 30, stock_quantity: 5, product_type: 'supplies', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/zip-binder');
+    expect(body).not.toContain('AggregateRating');
+  });
+
   it('renders each description paragraph and uses the first as the meta description', async () => {
     state.result = { data: {
       id: UUID, title: 'Penny Sleeves - 100 Pack', price_aud: 4, stock_quantity: 5,
