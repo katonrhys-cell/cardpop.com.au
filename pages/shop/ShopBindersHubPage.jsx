@@ -116,12 +116,13 @@ const ShopBindersHubPage = () => {
                   <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     {product.range}
                     {product.pocketsPerPage ? ` · ${product.pocketsPerPage} pocket` : ''}
+                    {product.capacity ? ` · ${product.capacity.slots} slots` : ''}
                   </p>
                   <p className="font-bold leading-snug text-foreground group-hover:text-primary transition-colors">
                     {product.shortTitle}
                   </p>
                   <p className="text-sm text-muted-foreground line-clamp-2">
-                    Holds {product.holds}. {product.colours.length}{' '}
+                    Holds {product.capacityText || product.holds}. {product.colours.length}{' '}
                     {product.colours.length === 1 ? 'colour' : 'colours'}.
                   </p>
                   <span className="mt-auto inline-flex items-center pt-2 text-sm font-semibold text-primary">
