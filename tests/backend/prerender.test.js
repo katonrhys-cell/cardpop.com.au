@@ -137,11 +137,15 @@ describe('prerender blog articles', () => {
 describe('prerender marketplace listings', () => {
   it('renders an active listing with Product + Offer JSON-LD', async () => {
     state.result = { data: {
-      id: UUID, slug: 'charizard-base-set', title: 'Charizard Base Set',
-      description: 'A holographic Charizard.', price_aud: 1499.95, status: 'active',
-      condition: 'PSA 9', grade: '9', grading_company: 'PSA', accepts_offers: true,
-      images: ['https://cdn.test/charizard.jpg'],
-      vault_item: { card_name: 'Charizard', set_name: 'Base Set', year: 1999 },
+      // Real row shape: the card's details live on the vault item, never on
+      // the listing (which has no title/description/images columns).
+      id: UUID, slug: 'charizard-base-set', price_aud: 1499.95, status: 'active',
+      grading_company: 'PSA', accepts_offers: true,
+      vault_item: {
+        card_name: 'Charizard', set_name: 'Base Set', year: 1999,
+        condition: 'Near Mint', grade: '9', grading_company: 'PSA',
+        vault_images: [{ storage_path: 'https://cdn.test/charizard.jpg' }],
+      },
       seller: { username: 'ash', store_slug: 'ash-cards', display_name: 'Ash Cards' },
     } };
     const { status, body } = await run('/marketplace/' + UUID + '/charizard-base-set');
@@ -151,14 +155,16 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('"price":"1499.95"');
     expect(body).toContain('schema.org/InStock');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/marketplace/' + UUID + '/charizard-base-set" />');
-    expect(body).toContain('Charizard Base Set');
+    expect(body).toContain('<h1>Charizard</h1>');
+    expect(body).toContain('Base Set · 1999');
+    expect(body).toContain('Grade: PSA 9');
   });
 
   it('renders a sold listing as a real page marked SoldOut', async () => {
     // A sold card stays on the site — visible, marked Sold, not purchasable —
     // so its page has genuine content and must not be a 404 (or a soft 404).
     state.result = { data: {
-      id: UUID, slug: 'sold-card', title: 'Sold Card', price_aud: 400, status: 'sold',
+      id: UUID, slug: 'sold-card', price_aud: 400, status: 'sold',
       accepts_offers: true,
       vault_item: { card_name: 'Victor Wembanyama', set_name: 'Topps Chrome', year: 2023 },
       seller: { username: 'kat', display_name: 'Kat' },
