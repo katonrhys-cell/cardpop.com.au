@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import { compressImage } from '@/utils/compressImage.js';
+import { uploadShopImages, MAX_IMAGE_BYTES } from '@/utils/uploadProductImages.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,11 +75,10 @@ const INITIAL_STATE = {
   preorder_eta: '',
 };
 
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB
-
 const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // { done, total } while uploading
   const [formData, setFormData] = useState(INITIAL_STATE);
   // Each entry is either a File (new upload) or { isExisting: true, url } (kept).
   const [images, setImages] = useState([]);
@@ -228,22 +227,15 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  const uploadNewImages = async () => {
-    const urls = [];
-    for (const entry of images) {
-      if (entry.isExisting) {
-        urls.push(entry.url);
-        continue;
-      }
-      const compressed = await compressImage(entry);
-      const ext = compressed.name?.split('.').pop() || 'jpg';
-      const path = `shop-products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
-      if (upErr) throw new Error(`Image upload failed: ${upErr.message}`);
-      urls.push(supabase.storage.from('media').getPublicUrl(path).data.publicUrl);
-    }
-    return urls;
-  };
+  // Uploads run through the shared shop pipeline (utils/uploadProductImages.js)
+  // so a single product gets exactly what a bulk import gets: a hi-res WebP
+  // plus the companion `.opt.thumb.webp` grid thumbnail, uploaded in parallel
+  // with retries. Writing the pair here is what lets shop grids serve a 480 px
+  // tile instead of the full product photo.
+  const uploadNewImages = () =>
+    uploadShopImages(images, {
+      onProgress: (done, total) => setUploadProgress({ done, total }),
+    });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -471,6 +463,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       }
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -956,7 +949,9 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel} disabled={loading} className="rounded-xl">Cancel</Button>}
         <Button type="submit" disabled={loading} className="font-bold rounded-xl active:scale-[0.98]">
           {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-          {product ? 'Update Product' : 'Create Product'}
+          {uploadProgress && uploadProgress.total > 0
+            ? `Uploading images ${uploadProgress.done}/${uploadProgress.total}…`
+            : product ? 'Update Product' : 'Create Product'}
         </Button>
       </div>
     </form>
