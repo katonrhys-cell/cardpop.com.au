@@ -13,6 +13,7 @@ seller is already rated through `seller_ratings`.
 | Reads (published only) | straight from Supabase in `hooks/useShopReviews.js` |
 | Stars + list on product pages | `components/shop/ProductReviews.jsx` on `ShopProductPage`, `ShopBinderProductPage`, `ProductDetailPage` (house products) |
 | "Review product" button | Account → Orders (`pages/account/AccountOrders.jsx`, `components/shop/WriteProductReviewModal.jsx`) |
+| Prompt to review | the order-shipped email (`POST /admin/orders/:id/ship`) adds a "review your products" paragraph when the order has a shop line (`invitesReview`) |
 | Moderation queue | Admin → Product Reviews (`/admin/product-reviews`) |
 | Structured data | `utils/productReviews.js` `productReviewsLd()` — SPA JSON-LD and `api/prerender.js` |
 

@@ -154,11 +154,11 @@ export async function sendRefundProcessed({ buyerEmail, buyerName, refundAmount,
  *
  * @returns {Promise<boolean>} whether the email was actually sent
  */
-export async function sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber }) {
+export async function sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber, invitesReview = false }) {
   return send({
     to: buyerEmail,
     subject: `Your CardPop order ${orderRef} has shipped`,
-    html: orderShippedEmail({ buyerName, orderRef, items, carrier, trackingNumber }),
+    html: orderShippedEmail({ buyerName, orderRef, items, carrier, trackingNumber, invitesReview }),
   });
 }
 

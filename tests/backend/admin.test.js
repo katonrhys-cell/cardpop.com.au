@@ -486,6 +486,23 @@ describe('POST /orders/:id/ship', () => {
     expect(notification.insert).toHaveBeenCalledWith(expect.objectContaining({ user_id: 'buyer-1', related_id: ORDER_ID }));
   });
 
+  it('invites a review only when the order has shop products', async () => {
+    const send = async (order_items) => {
+      mockSendOrderShipped.mockClear();
+      queueFrom(
+        makeBuilder({ data: { ...paidOrder, order_items }, error: null }),
+        makeBuilder({ data: { id: ORDER_ID, status: 'shipped' }, error: null }),
+        makeBuilder({ data: { email: 'sam@example.com', display_name: 'Sam' }, error: null }),
+        makeBuilder(), makeBuilder(), makeBuilder(),
+      );
+      mockSendOrderShipped.mockResolvedValue(true);
+      await request(app).post(`/admin/orders/${ORDER_ID}/ship`).send({ carrier: 'auspost', tracking_number: '33AB1234567' });
+      return mockSendOrderShipped.mock.calls[0][0];
+    };
+    expect((await send([{ type: 'shop', id: 'p1', title: 'Binder' }])).invitesReview).toBe(true);
+    expect((await send([{ type: 'listing', id: 'l1', title: 'Card' }])).invitesReview).toBe(false);
+  });
+
   it('uses the guest email on the order and skips the email when notify is false', async () => {
     queueFrom(
       makeBuilder({ data: { ...paidOrder, buyer_id: null, buyer_email: 'guest@example.com' }, error: null }),

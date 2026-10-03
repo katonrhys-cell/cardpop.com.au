@@ -490,7 +490,9 @@ router.post('/orders/:id/ship', validateRequestParams(shipOrderSchema), validate
       if (!buyerEmail) {
         emailError = 'No email address on file for this buyer';
       } else {
-        emailed = await sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber });
+        // Shop products can be reviewed once shipped — say so in the email.
+        const invitesReview = lines.some((l) => l?.type === 'shop');
+        emailed = await sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber, invitesReview });
         if (emailed) {
           updated.shipping_notified_at = now;
           await supabase.from('orders').update({ shipping_notified_at: now }).eq('id', id)
