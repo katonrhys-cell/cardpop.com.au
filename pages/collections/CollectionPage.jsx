@@ -22,7 +22,8 @@ import SoldBadge from '@/components/SoldBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
-import { CARD_VARIANTS, getCardVariants } from '@/lib/cardVariants.js';
+import { CARD_VARIANTS, getCardVariants, FOIL_VARIANT } from '@/lib/cardVariants.js';
+import { genericVariantChips, getAutographLabel } from '@/lib/cardAttributeLabels.js';
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -70,6 +71,21 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
   const grade = listing.grade;
   const gradingCompany = listing.grading_company;
 
+  // Eyebrow line: the set the card belongs to (what the card is), falling back
+  // to the collection. Marketplace-sourced rows carry `category` instead.
+  const eyebrow = listing.set_name || listing.category || listing.collectionType || listing.collection || '—';
+  const detailBits = [listing.year, listing.card_number ? `#${listing.card_number}` : null].filter(Boolean);
+  // Finish chips — a selected Foil / Holo must be visible on the tile. `variant`
+  // is a comma-separated string on vault rows.
+  const variantList = listing.variant
+    ? String(listing.variant).split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+  const finishChips = genericVariantChips(variantList)
+    .filter(v => v !== FOIL_VARIANT)
+    .slice(0, 2);
+  const isFoil = !!listing.is_foil || variantList.some(v => /holo|foil/i.test(v));
+  const autoLabel = getAutographLabel(listing);
+
   return (
     <Link
       to={detailPath}
@@ -105,11 +121,32 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
       </div>
       <div className="p-3 flex flex-col gap-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground line-clamp-1">
-          {listing.category || listing.collectionType || '—'}
+          {eyebrow}
         </p>
         <p className="text-sm font-bold leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
           {title}
         </p>
+        {detailBits.length > 0 && (
+          <p className="text-[11px] text-muted-foreground line-clamp-1">{detailBits.join(' · ')}</p>
+        )}
+        {(isFoil || finishChips.length > 0 || autoLabel || listing.is_rookie) && (
+          <div className="flex flex-wrap gap-1">
+            {isFoil && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold leading-none border border-yellow-400/50 bg-yellow-400/10 text-yellow-800 dark:text-yellow-300">
+                <Sparkles className="w-2.5 h-2.5" /> {finishChips.find(v => /holo|foil/i.test(v)) ?? 'Holo'}
+              </span>
+            )}
+            {finishChips.filter(v => !/holo|foil/i.test(v)).map(v => (
+              <span key={v} className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none border border-primary/30 bg-primary/5 text-primary">{v}</span>
+            ))}
+            {autoLabel && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none border border-border bg-muted/50 text-foreground">Auto</span>
+            )}
+            {listing.is_rookie && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none bg-amber-100 text-amber-900">RC</span>
+            )}
+          </div>
+        )}
         <p
           className={`text-base font-extrabold tabular-nums mt-auto ${isSold ? 'line-through opacity-60' : ''}`}
           style={{ color: isSold ? undefined : accentHex }}
