@@ -51,6 +51,28 @@ pass `CHROMIUM_PATH` if Playwright's bundled browser isn't installed). Replace
 them with real photographs in Admin → Products once stock arrives. If Blue or
 Gold come back, add them to the script's colour list and add a migration.
 
+## Acryshield acrylic cases
+
+Migration `20261003010203_acryshield_cases_preorder.sql` adds nine Acryshield
+products from the Palms Off Gaming range as pre-orders, with the estimate "Ships
+in 5–7 days". Eight are cases in **Display Cases** (Prismatic Evolutions SPC,
+Japanese Collection Box, WOTC Theme Deck, Mew Ultra Premium Collection, Elite
+Trainer Box, Booster Box, Japanese High Class Booster Box and Japanese Standard
+Booster Box). The ninth is the PSA Graded Card Stand in **Acrylic Stands**.
+Brand is `Acryshield`.
+
+Each is priced at the manufacturer RRP. The wholesale cost from the Palms Off
+trade price list is stored in `shop_product_costs`, so Admin → Products shows
+the margin.
+
+Before stock arrives, two things need doing in Admin → Products:
+
+- **SKUs** are placeholders (`ACRYSHIELD-…`). Replace them with Palms Off's
+  SKUs once you have them.
+- **Photos** were cropped from the supplier's listing and are small, served
+  from `public/images/shop/acryshield/`. Upload the supplier's full-size
+  images when you can get them.
+
 ## What the buyer sees
 
 | Where | What |
