@@ -1,18 +1,55 @@
 
 import React, { useState } from 'react';
-import { ImageOff } from 'lucide-react';
+import { ImageOff, Play } from 'lucide-react';
 import { cn } from '@/lib/utils.js';
 import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
-import { getCardImage } from '@/utils/imageUrl.js';
+import { getCardImage, publicImageUrl, publicVideoUrl } from '@/utils/imageUrl.js';
+import { videoPosterPath } from '@/utils/cardVideo.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 
 // The detail-page hero image is the LCP on listing/product pages, so it's loaded
 // eagerly at high priority and served responsively (480/800/1200 w, auto-WebP).
 const MAIN_SIZES = '(min-width: 1024px) 700px, 90vw';
 
-const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameClassName = 'bg-white dark:bg-zinc-950' }) => {
+// The seller's optional clip, as a thumbnail with a play badge. The poster is a
+// pre-generated frame; if it's missing the badge sits on a dark tile.
+const VideoThumb = ({ videoPath, frameClassName, active, onClick }) => {
+  const [posterFailed, setPosterFailed] = useState(false);
+  const poster = posterFailed ? null : publicImageUrl(videoPosterPath(videoPath));
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Play video"
+      className={cn(
+        "relative w-20 h-20 shrink-0 rounded-xl overflow-hidden border-2 transition-all duration-200 snap-start bg-black",
+        frameClassName,
+        active
+          ? "border-primary ring-2 ring-primary/20 ring-offset-2 ring-offset-background"
+          : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"
+      )}
+    >
+      {poster && (
+        <img
+          src={poster}
+          alt=""
+          loading="lazy"
+          onError={() => setPosterFailed(true)}
+          className="w-full h-full object-cover"
+        />
+      )}
+      <span className="absolute inset-0 flex items-center justify-center">
+        <span className="bg-black/60 rounded-full p-1.5">
+          <Play className="w-4 h-4 text-white fill-white" />
+        </span>
+      </span>
+    </button>
+  );
+};
+
+const ProductImageCarousel = ({ images = [], video = null, record = null, displayStyle, frameClassName = 'bg-white dark:bg-zinc-950' }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [microscopeOpen, setMicroscopeOpen] = useState(false);
 
@@ -24,7 +61,11 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
   };
 
   const validImages = Array.isArray(images) ? images : (images ? [images] : []);
-  const mainSource = validImages.length > 0 ? sourceFor(validImages[activeIndex]) : null;
+  // The video, when there is one, is the last slot after the photos. Its index
+  // equals validImages.length, so photo indices are unchanged.
+  const videoIndex = video && validImages.length > 0 ? validImages.length : -1;
+  const videoActive = videoIndex !== -1 && activeIndex === videoIndex;
+  const mainSource = validImages.length > 0 && !videoActive ? sourceFor(validImages[activeIndex]) : null;
   const main = getCardImage(mainSource, { widths: [480, 800, 1200], quality: 78 });
 
   // A vault listing carries the seller's chosen display style. Anything other
@@ -39,7 +80,7 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
   const style = normalizeStyle(displayStyle);
   const useShowcase = style !== DEFAULT_STYLE && activeIndex === 0;
 
-  if (validImages.length === 0 || !main.src) {
+  if (validImages.length === 0 || (!videoActive && !main.src)) {
     return (
       <div className="w-full aspect-[4/5] md:aspect-square bg-muted/40 rounded-3xl border border-border flex flex-col items-center justify-center text-muted-foreground">
         <ImageOff className="w-16 h-16 mb-4 opacity-20" />
@@ -50,7 +91,21 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Main Image with Microscope */}
+      {videoActive ? (
+        <div className="relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden bg-black shadow-sm">
+          <video
+            key={video}
+            src={publicVideoUrl(video)}
+            poster={publicImageUrl(videoPosterPath(video)) || undefined}
+            controls
+            autoPlay
+            loop
+            playsInline
+            preload="metadata"
+            className="absolute inset-0 w-full h-full object-contain"
+          />
+        </div>
+      ) : (
       <div
         onClick={() => setMicroscopeOpen(true)}
         className={cn("relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden cursor-zoom-in group shadow-sm", frameClassName)}
@@ -96,6 +151,7 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
           </svg>
         </div>
       </div>
+      )}
 
       {/* The magnifier needs full resolution — give it the untransformed original. */}
       <CardMicroscope
@@ -106,7 +162,7 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
       />
 
       {/* Thumbnails */}
-      {validImages.length > 1 && (
+      {(validImages.length > 1 || videoIndex !== -1) && (
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x">
           {validImages.map((img, idx) => {
             const thumb = getCardImage(sourceFor(img), { widths: [80, 160] });
@@ -133,6 +189,14 @@ const ProductImageCarousel = ({ images = [], record = null, displayStyle, frameC
               </button>
             );
           })}
+          {videoIndex !== -1 && (
+            <VideoThumb
+              videoPath={video}
+              frameClassName={frameClassName}
+              active={videoActive}
+              onClick={() => setActiveIndex(videoIndex)}
+            />
+          )}
         </div>
       )}
     </div>

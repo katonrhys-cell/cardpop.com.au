@@ -202,3 +202,27 @@ describe('validateVaultItemRow', () => {
     expect(errors).toHaveProperty('estimatedValue');
   });
 });
+
+describe('card_video', () => {
+  it('accepts a video path inside the caller\'s own folder', () => {
+    const { row, pathErrors } = build({ card_video: `${USER}/1784500000001-video.mp4` });
+    expect(row.card_video).toBe(`${USER}/1784500000001-video.mp4`);
+    expect(pathErrors).toEqual([]);
+  });
+
+  it('rejects a video path in someone else\'s folder', () => {
+    const { row, pathErrors } = build({ card_video: 'other-user/1-video.mp4' });
+    expect(pathErrors.length).toBe(1);
+    expect(row).not.toHaveProperty('card_video');
+  });
+
+  it('rejects a non-video extension', () => {
+    const { pathErrors } = build({ card_video: `${USER}/payload.html` });
+    expect(pathErrors.length).toBe(1);
+  });
+
+  it('leaves the stored video alone when omitted and clears it on explicit null', () => {
+    expect(build({}, { isEdit: true }).row).not.toHaveProperty('card_video');
+    expect(build({ card_video: null }, { isEdit: true }).row.card_video).toBeNull();
+  });
+});
