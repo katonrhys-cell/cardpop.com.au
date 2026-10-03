@@ -58,7 +58,7 @@ async function searchListings(tokens) {
   const { data, error } = await applyTokens(
     supabase
       .from('listings')
-      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
       // Sold cards stay in the results, badged "Sold" by MarketplaceListingCard
       // — a card that sold is still the card someone searched for. Only
       // 'archived' is genuinely off the site.

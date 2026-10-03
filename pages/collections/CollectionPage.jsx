@@ -523,7 +523,7 @@ const CollectionPage = () => {
 
       let q = supabase.from('listings')
         .select(
-          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
+          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug)`,
           { count: 'estimated' }
         )
         // Sold listings stay in the grid, badged "Sold" (not purchasable).

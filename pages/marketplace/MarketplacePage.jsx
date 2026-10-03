@@ -410,7 +410,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`, { count: 'estimated' })
+          .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`, { count: 'estimated' })
           // Show sold items too (badged "Sold") — they stay on the marketplace
           // until an admin archives them. Only 'archived' is hidden here.
           .in('status', ['active', 'sold'])
