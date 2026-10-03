@@ -417,7 +417,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!images/|assets/).*)",
       "destination": "/app.html"
     }
   ],

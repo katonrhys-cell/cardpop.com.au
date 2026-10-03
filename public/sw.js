@@ -21,7 +21,13 @@ const CACHE_NAMES = {
   // a fabricated 503 — so every uncached /assets/ file failed to load until the
   // origin's storage was cleared by hand. Dropping the cache reclaims the space
   // on the first navigation after this deploy.
-  STATIC: 'cardpop-static-v6',
+  // STATIC v7: a missing /images/ or /assets/ file used to come back as the
+  // SPA's app.html with a 200, and cacheFirst stored that HTML under the
+  // image's URL — so a product photo requested in the moment between a
+  // migration pointing at it and the deploy shipping it stayed broken on that
+  // device forever. cacheStatic now refuses HTML; the bump evicts copies
+  // already stored.
+  STATIC: 'cardpop-static-v7',
   DYNAMIC: 'cardpop-dynamic-v5',
   PAGES: 'cardpop-pages-v5',
   IMAGES: 'cardpop-images-v1',
@@ -154,6 +160,10 @@ const isCacheableSize = (response) => {
 // preview and Apply all failed together) on a perfectly good connection.
 const cacheStatic = async (request, response) => {
   if (!isCacheableSize(response)) return;
+  // A static asset is never HTML. An HTML 200 here is the SPA fallback
+  // standing in for a file that doesn't exist (yet) — serve it, but never
+  // pin it under the asset's URL.
+  if ((response.headers.get('Content-Type') || '').includes('text/html')) return;
   try {
     const cache = await caches.open(CACHE_NAMES.STATIC);
     await cache.put(request, response);

@@ -95,6 +95,23 @@ describe('service worker cacheFirst', () => {
     expect(stored).toHaveLength(0);
   });
 
+  // Regression: a product photo requested before the deploy that ships it got
+  // the SPA's app.html back as a 200, which was stored under the image URL and
+  // served as a broken image from then on.
+  it('serves but does not store the HTML app shell standing in for a missing file', async () => {
+    const { cacheFirst, stored } = loadServiceWorker({
+      fetchImpl: async () => new Response('<!doctype html><div id="root"></div>', {
+        status: 200,
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+      }),
+    });
+
+    const res = await cacheFirst(new Request('https://cardpop.com.au/images/shop/new-product_front.jpg'));
+
+    expect(res.status).toBe(200);
+    expect(stored).toHaveLength(0);
+  });
+
   it('returns an offline response only when the network itself fails', async () => {
     const { cacheFirst } = loadServiceWorker({
       fetchImpl: async () => { throw new TypeError('Failed to fetch'); },
