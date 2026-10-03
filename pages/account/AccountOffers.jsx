@@ -13,7 +13,7 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient } from '@/lib/apiServerClient.js';
-import { offerDisplayStatus } from '@/utils/offerEligibility.js';
+import { offerDisplayStatus, formatOfferRange } from '@/utils/offerEligibility.js';
 
 // Lazy: only needed once a buyer pays for an accepted offer.
 const CheckoutModal = lazy(() => import('@/components/CheckoutModal.jsx'));
@@ -86,9 +86,7 @@ const OfferCard = ({ offer, perspective, onAction, actionLoading, onCounter, onP
           <p className="text-xs text-muted-foreground mb-2">Listed at {formatCurrency(listingPrice)}</p>
         ) : (offer.listing?.price_min_aud != null || offer.listing?.price_max_aud != null) && (
           <p className="text-xs text-muted-foreground mb-2">
-            Seller seeking {formatCurrency(offer.listing.price_min_aud ?? offer.listing.price_max_aud)}
-            {offer.listing.price_max_aud != null && offer.listing.price_min_aud != null
-              && ` – ${formatCurrency(offer.listing.price_max_aud)}`}
+            Seller's range: {formatOfferRange(offer.listing.price_min_aud, offer.listing.price_max_aud)}
           </p>
         )}
 

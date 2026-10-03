@@ -1,5 +1,7 @@
 
 import React, { useState, lazy, Suspense } from 'react';
+import { offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
+import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 import { Link } from 'react-router-dom';
 import { Heart, ZoomIn } from 'lucide-react';
 // Lazy: the zoom modal drags framer-motion with it — load it only on demand.
@@ -219,12 +221,17 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
           <div className="flex items-center justify-between">
             {listing.listing_type === 'expression_of_interest' ? (
               <span className={`font-extrabold tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'} ${listing.price_min_aud != null && listing.price_max_aud != null ? 'text-base' : 'text-xl'}`}>
-                {listing.price_min_aud != null && listing.price_max_aud != null
-                  ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
-                  : 'Open to offers'}
+                {formatOfferRange(listing.price_min_aud, listing.price_max_aud) ?? 'Open to offers'}
                 {/* sky-700 (not 600): at 10px bold on the white card face, axe holds this
     to the normal-text 4.5:1 contrast bar, which sky-600 misses (4.09:1). */}
-<span className="block text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">Seeking offers</span>
+<span className="block text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
+                  {(() => {
+                    const state = offerWindowState(listing);
+                    if (state === 'upcoming') return describeOfferWindow(listing, state);
+                    if (state === 'closed') return 'Offers closed';
+                    return 'Seeking offers';
+                  })()}
+                </span>
               </span>
             ) : (
               <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>

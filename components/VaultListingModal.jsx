@@ -9,6 +9,10 @@ import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.js
 import { isSellingEntitlementError, isListingQuotaError } from '@/utils/listingErrors.js';
 import { listingsPerMonthForTier } from '@/config/plans.js';
 import {
+  openDateToTimestamp, closeDateToTimestamp, timestampToOpenDate, timestampToCloseDate,
+  todayDateInput, validateOfferWindowDates,
+} from '@/utils/offerWindowDates.js';
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -87,6 +91,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
   const [price, setPrice] = useState('');
   const [rangeMin, setRangeMin] = useState('');
   const [rangeMax, setRangeMax] = useState('');
+  const [offerOpenDate, setOfferOpenDate] = useState('');
+  const [offerCloseDate, setOfferCloseDate] = useState('');
   const [tradeWants, setTradeWants] = useState('');
   const [loading, setLoading] = useState(false);
   const [priceRange, setPriceRange] = useState(null);
@@ -99,6 +105,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     setPrice(product?.estimated_value_aud ? String(product.estimated_value_aud) : '');
     setRangeMin('');
     setRangeMax('');
+    setOfferOpenDate('');
+    setOfferCloseDate('');
     setTradeWants('');
     setPriceRange(null);
     setHasActiveListing(false);
@@ -108,7 +116,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     // the seller can mark it Sold / relist it (guards against orphaned state).
     supabase
       .from('listings')
-      .select('id, status, price_min_aud, price_max_aud')
+      .select('id, status, price_min_aud, price_max_aud, offers_open_at, offers_close_at')
       .eq('vault_item_id', product.id)
       .neq('status', 'archived')
       .maybeSingle()
@@ -117,6 +125,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
         setListingStatus(data?.status ?? null);
         if (data?.price_min_aud != null) setRangeMin(String(data.price_min_aud));
         if (data?.price_max_aud != null) setRangeMax(String(data.price_max_aud));
+        if (data?.offers_open_at) setOfferOpenDate(timestampToOpenDate(data.offers_open_at));
+        if (data?.offers_close_at) setOfferCloseDate(timestampToCloseDate(data.offers_close_at));
       });
 
     // Fetch price range from DB if we have a CardSight card ID
@@ -181,18 +191,30 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
     }
 
     if (selected.needsRange) {
+      // The minimum is required; the maximum is optional ("offers from $X").
       const min = Number(rangeMin);
+      const hasMax = rangeMax.trim() !== '';
       const max = Number(rangeMax);
-      if (!rangeMin || isNaN(min) || min <= 0 || !rangeMax || isNaN(max) || max <= 0) {
-        toast.error('Please enter the price range you are looking for.');
+      if (!rangeMin || isNaN(min) || min <= 0) {
+        toast.error('Please enter the minimum offer you are looking for.');
         return;
       }
-      if (max < min) {
+      if (hasMax && (isNaN(max) || max <= 0)) {
+        toast.error('Please enter a valid maximum, or leave it blank for no upper limit.');
+        return;
+      }
+      if (hasMax && max < min) {
         toast.error('The maximum of your price range must be at least the minimum.');
         return;
       }
-      if (effectiveFloor !== null && max < effectiveFloor) {
+      if (hasMax && effectiveFloor !== null && max < effectiveFloor) {
         toast.error('The top of this price range is below the minimum allowed for this listing. Please raise it.');
+        return;
+      }
+      const windowErrors = validateOfferWindowDates(offerOpenDate, offerCloseDate);
+      const windowError = windowErrors.offerOpenDate || windowErrors.offerCloseDate;
+      if (windowError) {
+        toast.error(windowError);
         return;
       }
     }
@@ -222,7 +244,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           // seller wants offers in, and flag the listing as offer-enabled so
           // the marketplace "Make Offer" filter picks it up.
           price_min_aud: selected.needsRange ? Number(rangeMin) : null,
-          price_max_aud: selected.needsRange ? Number(rangeMax) : null,
+          price_max_aud: selected.needsRange && rangeMax.trim() !== '' ? Number(rangeMax) : null,
+
           // EOI is offers-only, so force the flag on. Every other type leaves
           // it alone: a new row takes the column default (true — buy-now
           // listings take offers alongside Buy Now), and an existing row keeps
@@ -230,6 +253,13 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
           // Trade-only listings are excluded from offers by listing_type, not
           // this flag.
           ...(selected.needsRange ? { accepts_offers: true } : {}),
+          // Optional window the EOI takes offers in — blank = open now / no
+          // closing date. Only written for EOI (only EOI reads it), so other
+          // listing types never depend on the columns existing.
+          ...(selected.needsRange ? {
+            offers_open_at: openDateToTimestamp(offerOpenDate),
+            offers_close_at: closeDateToTimestamp(offerCloseDate),
+          } : {}),
           trade_wants: selected.needsTrade ? (tradeWants.trim() || null) : null,
           listed_at: new Date().toISOString(),
         };
@@ -470,7 +500,7 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
             <div className="space-y-4 border border-border rounded-xl p-4 bg-muted/20">
               {selected.needsRange && (
                 <div className="space-y-1.5">
-                  <Label className="text-sm font-semibold">Price range you're looking for (AUD) *</Label>
+                  <Label className="text-sm font-semibold">Price range you're looking for (AUD)</Label>
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -480,7 +510,8 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
                         step="0.01"
                         value={rangeMin}
                         onChange={e => setRangeMin(e.target.value)}
-                        placeholder="Min"
+                        placeholder="Min *"
+                        aria-label="Minimum offer"
                         className="pl-9 bg-background"
                       />
                     </div>
@@ -493,13 +524,42 @@ const VaultListingModal = ({ isOpen, onClose, product, onUpdate }) => {
                         step="0.01"
                         value={rangeMax}
                         onChange={e => setRangeMax(e.target.value)}
-                        placeholder="Max"
+                        placeholder="No max"
+                        aria-label="Maximum offer (optional)"
                         className={`pl-9 bg-background ${effectiveFloor !== null && rangeMax !== '' && Number(rangeMax) < effectiveFloor ? 'border-destructive' : ''}`}
                       />
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Buyers will see this range and make offers — you can accept, decline or counter each one.
+                    Leave the maximum blank to take offers from your minimum upwards.
+                  </p>
+                </div>
+              )}
+              {selected.needsRange && (
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-semibold">Offer dates <span className="font-normal text-muted-foreground">(optional)</span></Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="date"
+                      value={offerOpenDate}
+                      onChange={e => setOfferOpenDate(e.target.value)}
+                      max={offerCloseDate || undefined}
+                      aria-label="Offers open"
+                      className="flex-1 bg-background"
+                    />
+                    <span className="text-muted-foreground font-bold">–</span>
+                    <Input
+                      type="date"
+                      value={offerCloseDate}
+                      onChange={e => setOfferCloseDate(e.target.value)}
+                      min={offerOpenDate && offerOpenDate > todayDateInput() ? offerOpenDate : todayDateInput()}
+                      aria-label="Offers close"
+                      className="flex-1 bg-background"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Only take offers between these dates. Leave the first blank to open now, and the second blank for no closing date.
                   </p>
                 </div>
               )}

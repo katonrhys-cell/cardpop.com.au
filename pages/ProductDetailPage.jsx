@@ -40,7 +40,8 @@ import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFa
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
-import { listingTakesOffers } from '@/utils/offerEligibility.js';
+import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
+import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -480,7 +481,15 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Buy-now listings take offers alongside Buy Now unless the seller turned
   // Accept Offers off; EOI always does; trade-only and auctions never.
   const canOffer = !isShop && !isSold && source === 'marketplace'
-    && listingTakesOffers({ listing_type: product.db_listing_type, accepts_offers: product.accepts_offers });
+    && listingTakesOffers({
+      listing_type: product.db_listing_type,
+      accepts_offers: product.accepts_offers,
+      offers_open_at: product.offers_open_at,
+      offers_close_at: product.offers_close_at,
+    });
+  // EOI offer window — optional dates the seller takes offers between.
+  const eoiWindow = isEOI ? offerWindowState(product) : 'open';
+  const eoiWindowNote = isEOI && !isSold ? describeOfferWindow(product, eoiWindow) : null;
   
   const statusBadge = isShop 
     ? (comingSoon
@@ -644,14 +653,19 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Seller Is Looking For</p>
                   <div className="flex items-end gap-3">
                     <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
-                      {product.price_min_aud != null && product.price_max_aud != null
-                        ? `$${Number(product.price_min_aud).toFixed(2)} – $${Number(product.price_max_aud).toFixed(2)}`
-                        : 'Open to offers'}
+                      {formatOfferRange(product.price_min_aud, product.price_max_aud) ?? 'Open to offers'}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1.5">
-                    This card is listed as an expression of interest — make an offer in (or near) this range.
+                    {product.price_min_aud != null && product.price_max_aud == null
+                      ? 'This card is listed as an expression of interest — make an offer from this amount up.'
+                      : 'This card is listed as an expression of interest — make an offer in (or near) this range.'}
                   </p>
+                  {eoiWindowNote && (
+                    <p className={`text-sm font-semibold mt-1.5 flex items-center gap-1.5 ${eoiWindow === 'open' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      <CalendarClock className="w-4 h-4" /> {eoiWindowNote}
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
@@ -857,6 +871,16 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                     {isEOI ? <HandCoins className="w-5 h-5 mr-2" /> : <Tag className="w-5 h-5 mr-2" />}
                     Make an Offer
                   </Button>
+                )}
+
+                {isEOI && !isSold && eoiWindow !== 'open' && (
+                  <div className="text-center p-4 rounded-xl bg-muted/50 border border-border">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {eoiWindow === 'upcoming'
+                        ? `${eoiWindowNote} — check back then to make an offer.`
+                        : 'Offers on this card have closed.'}
+                    </p>
+                  </div>
                 )}
 
                 {settings.enable_trading !== false &&

@@ -190,6 +190,27 @@ describe('validateVaultItemRow', () => {
     expect(errors).toHaveProperty('offerMax');
   });
 
+  it('allows an Expression of Interest with a minimum and no maximum', () => {
+    const { row } = build({ listing_type: 'Expression of Interest' });
+    const errors = validateVaultItemRow(row, { pricing: { offerMin: 100, offerMax: null }, isEdit: false });
+    expect(errors).not.toHaveProperty('offerMin');
+    expect(errors).not.toHaveProperty('offerMax');
+  });
+
+  it('rejects an Expression of Interest offer window that closes before it opens', () => {
+    const { row } = build({ listing_type: 'Expression of Interest' });
+    const errors = validateVaultItemRow(row, {
+      pricing: { offerMin: 100, offersOpenAt: '2026-11-10T00:00:00Z', offersCloseAt: '2026-11-05T00:00:00Z' },
+      isEdit: false,
+    });
+    expect(errors).toHaveProperty('offerCloseDate');
+    const ok = validateVaultItemRow(row, {
+      pricing: { offerMin: 100, offersOpenAt: '2026-11-01T00:00:00Z', offersCloseAt: '2026-11-15T00:00:00Z' },
+      isEdit: false,
+    });
+    expect(ok).not.toHaveProperty('offerCloseDate');
+  });
+
   it('blocks setting the estimated value below the locked base value on edit', () => {
     const { row } = buildVaultItemRow(
       { ...baseItem, estimated_value_aud: 10 },

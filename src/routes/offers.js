@@ -21,7 +21,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import { sendOfferReceived, sendOfferPlaced, sendOfferAdminNotice, sendOfferUpdate } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import logger from './../utils/logger.js';
-import { listingTakesOffers, OFFER_WINDOW_HOURS } from '../../utils/offerEligibility.js';
+import { listingTakesOffers, offerWindowState, OFFER_WINDOW_HOURS } from '../../utils/offerEligibility.js';
 
 const router = express.Router();
 
@@ -118,7 +118,7 @@ router.post('/', authMiddleware, async (req, res) => {
   // public data, and this read must not depend on what the caller can see).
   const { data: listing, error: listingError } = await supabase
     .from('listings')
-    .select('id, seller_id, status, listing_type, accepts_offers')
+    .select('id, seller_id, status, listing_type, accepts_offers, offers_open_at, offers_close_at')
     .eq('id', listingId)
     .maybeSingle();
   if (listingError) {
@@ -129,6 +129,9 @@ router.post('/', authMiddleware, async (req, res) => {
     return res.status(404).json({ error: 'Listing not found or no longer active' });
   }
   if (!listingTakesOffers(listing)) {
+    const offerWindow = listing.listing_type === 'expression_of_interest' ? offerWindowState(listing) : 'open';
+    if (offerWindow === 'upcoming') return res.status(400).json({ error: 'This listing is not taking offers yet' });
+    if (offerWindow === 'closed') return res.status(400).json({ error: 'Offers on this listing have closed' });
     return res.status(400).json({ error: "This listing isn't accepting offers" });
   }
   const resolvedSellerId = listing.seller_id;

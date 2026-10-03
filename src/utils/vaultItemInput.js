@@ -236,5 +236,16 @@ export const validateVaultItemRow = (row, { pricing = {}, isEdit = false, existi
     hasImage: !!(row.card_image || existing?.card_image),
     requireImage: true,
   };
-  return validateListingForm(formShape, ctx);
+  const errors = validateListingForm(formShape, ctx);
+  // The EOI offer window arrives as timestamps (the browser converts the
+  // seller's local dates), so it is checked here rather than by the form
+  // rules, which work on the date inputs.
+  if (row.listing_type === 'Expression of Interest') {
+    const open = pricing.offersOpenAt ? new Date(pricing.offersOpenAt) : null;
+    const close = pricing.offersCloseAt ? new Date(pricing.offersCloseAt) : null;
+    if (open && Number.isNaN(open.getTime())) errors.offerOpenDate = 'Enter a valid opening date';
+    if (close && Number.isNaN(close.getTime())) errors.offerCloseDate = 'Enter a valid closing date';
+    else if (open && close && close <= open) errors.offerCloseDate = 'The closing date must be on or after the opening date';
+  }
+  return errors;
 };
