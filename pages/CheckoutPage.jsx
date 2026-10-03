@@ -179,11 +179,14 @@ const CheckoutPage = () => {
   const checkoutItems = directItem ? [directItem] : cartItems;
 
   // Marketplace (peer-to-peer 'listing') items require an identity-verified
-  // buyer; CardPop Shop items don't. Items default to 'listing' when untyped.
-  // When the order contains a marketplace item and the buyer isn't a verified
-  // account, we gate the whole checkout up front — the server enforces the same
-  // rule (requireIdentityForMarketplacePurchase), so this is UX, not the guard.
-  const hasMarketplaceItem = checkoutItems.some((i) => (i.product?.type || 'listing') === 'listing');
+  // buyer; CardPop Shop items and Official CardPop Store listings don't. Items
+  // default to 'listing' when untyped. When the order contains a gated item and
+  // the buyer isn't a verified account, we gate the whole checkout up front —
+  // the server enforces the same rule (requireIdentityForMarketplacePurchase),
+  // so this is UX, not the guard.
+  const hasMarketplaceItem = checkoutItems.some(
+    (i) => (i.product?.type || 'listing') === 'listing' && !i.product?.officialStore,
+  );
   const marketplaceBlocked = hasMarketplaceItem && !profileLoading && !(currentUser && isIdentityVerified);
 
   // Flatten cart items into a display-friendly shape for child components

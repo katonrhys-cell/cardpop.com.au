@@ -39,7 +39,7 @@ const MarketplacePurchaseGate = ({ returnPath }) => {
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
           Marketplace items are sold by other collectors, so we verify every buyer and seller with a
           quick ID + selfie check — handled securely by Stripe. It keeps the marketplace safe for
-          everyone. CardPop Shop items don't require this.
+          everyone. CardPop Shop items and Official CardPop Store cards don't require this.
         </p>
 
         {isAuthenticated ? (

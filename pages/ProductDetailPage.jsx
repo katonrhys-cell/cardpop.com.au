@@ -383,6 +383,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       source,
       // Server-side checkout discriminator: shop products vs marketplace listings.
       type: source === 'shop' ? 'shop' : 'listing',
+      // Official CardPop Store listings are open to anyone (guests included),
+      // like the Shop. Checkout reads this to skip the ID gate; the server
+      // re-checks the seller itself (requireIdentityForMarketplacePurchase).
+      ...(source !== 'shop' && seller?.type === 'official' ? { officialStore: true } : {}),
       title: product.name,
       price: priceInCents / 100,
       image: product.images?.[0] || null,

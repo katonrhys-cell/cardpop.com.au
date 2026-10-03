@@ -21,7 +21,12 @@ vi.mock('../../src/middleware/auth.js', () => ({
   optionalAuthMiddleware: (req, _res, next) => { req.user = { id: 'buyer-1', email: 'b@example.com' }; next(); },
 }));
 vi.mock('../../src/middleware/requireEmailVerified.js', () => ({ requireEmailVerified: (_q, _s, n) => n() }));
-vi.mock('../../src/middleware/requireIdentityForPurchase.js', () => ({ requireIdentityForMarketplacePurchase: (_q, _s, n) => n() }));
+// `gate.officialStore` simulates the identity gate recognising an Official
+// CardPop Store order (it sets req.officialStoreOrder).
+const gate = vi.hoisted(() => ({ officialStore: false }));
+vi.mock('../../src/middleware/requireIdentityForPurchase.js', () => ({
+  requireIdentityForMarketplacePurchase: (req, _s, n) => { if (gate.officialStore) req.officialStoreOrder = true; n(); },
+}));
 vi.mock('../../src/utils/purchaseVelocity.js', () => ({ checkPurchaseVelocity: vi.fn(async () => ({ allowed: true })) }));
 vi.mock('../../src/utils/returnUrl.js', () => ({ invalidReturnUrl: () => null }));
 vi.mock('../../src/utils/addressValidation.js', () => ({
@@ -68,6 +73,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
 });
 
 import stripeRouter from '../../src/routes/stripe.js';
+import { checkPurchaseVelocity } from '../../src/utils/purchaseVelocity.js';
 
 const app = express();
 app.use(express.json());
@@ -80,6 +86,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   ordersInserts.length = 0;
   wallet.balanceCents = 0;
+  gate.officialStore = false;
+  checkPurchaseVelocity.mockResolvedValue({ allowed: true });
   mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.test/cs_1' });
   mockStripe.coupons.create.mockResolvedValue({ id: 'coupon_1' });
 });
@@ -160,5 +168,26 @@ describe('wallet preview matches checkout', () => {
     const preview = await request(app).post('/calculate-cart').send({ items: ITEMS, useWalletBalance: true });
     expect(preview.body.walletAppliedAud).toBe(20);
     expect(preview.body.totalAud).toBe(87.5);
+  });
+});
+
+describe('POST /create-cart-checkout — buyer purchase limits', () => {
+  const BODY = { items: ITEMS, successUrl: 'https://cardpop.com.au/s', cancelUrl: 'https://cardpop.com.au/c', shippingAddress: ADDRESS };
+  const BLOCKED = { allowed: false, reason: 'per_order', message: 'limited' };
+
+  it('applies the limits to a community-listing order', async () => {
+    checkPurchaseVelocity.mockResolvedValue(BLOCKED);
+    const res = await request(app).post('/create-cart-checkout').send(BODY);
+    expect(res.status).toBe(429);
+    expect(res.body.code).toBe('velocity_limit');
+  });
+
+  it('skips the limits for an Official CardPop Store order', async () => {
+    gate.officialStore = true;
+    checkPurchaseVelocity.mockResolvedValue(BLOCKED);
+    const res = await request(app).post('/create-cart-checkout').send(BODY);
+    expect(res.status).toBe(200);
+    expect(checkPurchaseVelocity).not.toHaveBeenCalled();
+    expect(ordersInserts).toHaveLength(1);
   });
 });

@@ -175,6 +175,26 @@ describe('CheckoutPage — marketplace identity gate', () => {
     await screen.findByText('fill-shipping');
     expect(screen.queryByText(/verify your identity to buy on the marketplace/i)).not.toBeInTheDocument();
   });
+
+  it('does NOT gate an Official CardPop Store listing for a guest', async () => {
+    h.auth = { currentUser: null, isIdentityVerified: false, profileLoading: false };
+    h.cartItems = [{ product: { id: 'l1', type: 'listing', officialStore: true, title: 'Charizard', price: 100 }, quantity: 1, variant: null }];
+    renderCheckout();
+    await screen.findByText('fill-shipping');
+    expect(screen.queryByText(/verify your identity to buy on the marketplace/i)).not.toBeInTheDocument();
+  });
+
+  it('still gates a guest when the cart mixes an official and a community listing', async () => {
+    h.auth = { currentUser: null, isIdentityVerified: false, profileLoading: false };
+    h.cartItems = [
+      { product: { id: 'l1', type: 'listing', officialStore: true, title: 'Charizard', price: 100 }, quantity: 1, variant: null },
+      { product: { id: 'l2', type: 'listing', title: 'Pikachu', price: 20 }, quantity: 1, variant: null },
+    ];
+    renderCheckout();
+    await waitFor(() =>
+      expect(screen.getByText(/verify your identity to buy on the marketplace/i)).toBeInTheDocument(),
+    );
+  });
 });
 
 // ─── full checkout flow ──────────────────────────────────────────────────────

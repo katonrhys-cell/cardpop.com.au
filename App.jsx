@@ -356,7 +356,8 @@ const App = () => {
                         <Route path="/shop/:groupSlug" element={<ShopCollectionRoute />} />
 
                         {/* Checkout */}
-                        {/* Guest checkout: anyone can buy from the shop / marketplace.
+                        {/* Guest checkout: anyone can buy from the Shop and Official CardPop
+                            Store listings; community listings need a verified ID (CheckoutPage).
                             Account creation is offered after payment on the success page. */}
                         <Route path="/checkout/:cardId?" element={<CheckoutPage />} />
                         <Route path="/checkout-success" element={<CheckoutSuccessPage />} />
