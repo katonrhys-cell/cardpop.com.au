@@ -14,6 +14,9 @@ import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, vari
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
+import useShopReviews from '@/hooks/useShopReviews.js';
+import ProductReviews from '@/components/shop/ProductReviews.jsx';
+import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { Badge } from '@/components/ui/badge';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
@@ -43,6 +46,9 @@ const ShopBinderProductPage = () => {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
+  // Colours of one line share their reviews (family_sku = the line SKU).
+  const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
+  const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
 
   // Not a catalogue binder (e.g. a CardPop house binder): same URL shape,
   // generic product page.
@@ -125,6 +131,7 @@ const ShopBinderProductPage = () => {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: 'Binders',
     url: canonical,
+    ...productReviewsLd(reviewStats, shopReviews),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -377,6 +384,8 @@ const ShopBinderProductPage = () => {
             </div>
           </section>
         )}
+
+        <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
         {/* ── Specifications ──────────────────────────────────────────────── */}
         <section className="mt-14 max-w-3xl">

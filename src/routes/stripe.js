@@ -3,6 +3,7 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
+import { gtinsForSession } from '../utils/orderGtins.js';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
@@ -697,6 +698,9 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       || session.customer_details?.address
       || null;
     const hasPreorder = items.some((item) => /\(Pre-order — /.test(item.name));
+    // Barcodes of the shop products bought — lets Google attach product
+    // reviews to them. Empty for marketplace cards (no GTIN) or any failure.
+    const gtins = session.payment_status === 'paid' ? await gtinsForSession(supabase, sessionId) : [];
 
     res.json({
       id:            session.id,
@@ -708,6 +712,7 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       items,
       deliveryCountry: shippingAddress?.country || null,
       hasPreorder,
+      gtins,
     });
   } catch (err) {
     // Stripe throws StripeInvalidRequestError for unknown/malformed ids —

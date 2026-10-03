@@ -16,6 +16,7 @@ import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js
 import { shopCategoryLeaves } from '../utils/shopCategoryPages.js';
 import { colourListText } from '../utils/colourSwatch.js';
 import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopReturnPolicy.js';
+import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -710,6 +711,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     description: toText(description, 1000),
     ...(product.category ? { category: product.category } : {}),
     brand: { '@type': 'Brand', name: 'CardPop' },
+    ...(await loadShopReviewLd(supabase, { familySku: product.family_sku, productId: product.family_sku ? null : product.id })),
     ...(price > 0
       ? { offers: {
           '@type': 'Offer',
@@ -809,6 +811,42 @@ function renderBindersHub() {
   });
 }
 
+// ── Product reviews (shop_product_reviews) ──────────────────────────────────
+//
+// Published, verified-purchase reviews of a shop product — shared across a
+// colour line (pool = family_sku, else the product id; utils/productReviews.js).
+// Returns the schema.org aggregateRating/review properties for the Product, or
+// {} when there are none or the table isn't there yet: rating markup must only
+// ever describe reviews the page actually shows (components/shop/ProductReviews.jsx).
+async function loadShopReviewLd(supabaseClient, { familySku, productId, slug }) {
+  try {
+    const poolFor = async () => {
+      const pools = [];
+      if (familySku) pools.push(reviewPoolKey({ familySku }));
+      if (productId) pools.push(reviewPoolKey({ productId }));
+      else if (slug) {
+        // A catalogue line with no colour family pools by its own product id.
+        const { data: row } = await supabaseClient.from('shop_products').select('id').eq('slug', slug).maybeSingle();
+        if (row?.id) pools.push(reviewPoolKey({ productId: row.id }));
+      }
+      return pools.filter(Boolean);
+    };
+    for (const pool of await poolFor()) {
+      const [stats, list] = await Promise.all([
+        supabaseClient.from('shop_product_review_stats').select('review_count, average_rating').eq('pool_key', pool).maybeSingle(),
+        supabaseClient.from('shop_product_reviews')
+          .select('rating, title, body, reviewer_name, created_at')
+          .eq('pool_key', pool).eq('status', 'published')
+          .order('created_at', { ascending: false }).limit(10),
+      ]);
+      if (stats.error || !stats.data) continue;
+      const ld = productReviewsLd(stats.data, list.error ? [] : (list.data || []));
+      if (ld.aggregateRating) return ld;
+    }
+  } catch { /* reviews are non-critical */ }
+  return {};
+}
+
 // ── Commercial data for a catalogue line page ───────────────────────────────
 //
 // Mirrors hooks/useShopLine.js: a line is either a colour family (one public
@@ -896,6 +934,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: 'Binders',
     url: canonical,
+    ...(await loadShopReviewLd(supabaseClient, { familySku: product.sku, slug: product.slug })),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -1015,6 +1054,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: category.name,
     url: canonical,
+    ...(await loadShopReviewLd(supabaseClient, { familySku: product.sku, slug: product.slug })),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',

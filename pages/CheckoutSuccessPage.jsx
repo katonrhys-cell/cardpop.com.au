@@ -167,6 +167,7 @@ const CheckoutSuccessPage = () => {
       orderId: sessionData.id || sessionId,
       email: sessionData.customerEmail,
       deliveryCountry: sessionData.deliveryCountry,
+      gtins: sessionData.gtins,
     });
   }, [status, sessionData, sessionId]);
 

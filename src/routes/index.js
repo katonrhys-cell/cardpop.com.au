@@ -24,6 +24,7 @@ import vaultRouter from './vault.js';
 import photoTemplateRouter from './photo-template.js';
 import searchSuggestionsRouter from './search-suggestions.js';
 import sellerRatingsRouter from './seller-ratings.js';
+import shopReviewsRouter from './shop-reviews.js';
 import listingStatsRouter from './listing-stats.js';
 import pushRouter from './push.js';
 import pointsRouter from './points.js';
@@ -163,6 +164,8 @@ export default () => {
     // Marketplace feature routes with API rate limiting
     router.use('/seller-ratings', apiLimiter);
     router.use('/seller-ratings', sellerRatingsRouter);
+    router.use('/shop-reviews', apiLimiter);
+    router.use('/shop-reviews', shopReviewsRouter);
 
     router.use('/listing-stats', apiLimiter);
     router.use('/listing-stats', listingStatsRouter);
