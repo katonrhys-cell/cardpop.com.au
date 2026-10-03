@@ -93,7 +93,7 @@ const SoleTraderStorePage = () => {
         const resolvedId = profile.id;
         const [marketplaceRes, vaultRes] = await Promise.all([
           supabase.from('listings')
-            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
             // Sold cards stay on the storefront, badged "Sold".
             .eq('seller_id', resolvedId).in('status', ['active', 'sold'])
             .order('created_at', { ascending: false }).limit(24),
