@@ -793,7 +793,7 @@ function renderBindersHub() {
   <h1>Palms Off Gaming Binders</h1>
   <p>Palms Off Gaming build binders around one idea: a card should not be able to fall out. Every zip binder in the range uses side-loading pockets that open toward the spine rather than the top, a metal zip that runs the full perimeter, and archival pockets that are acid-free and PVC-free.</p>
   <ul>
-    ${BINDER_PRODUCTS.map((p) => `<li><a href="${BASE_URL}/shop/binders/${p.slug}">${esc(p.title)}</a> — ${esc(p.range)}${p.pocketsPerPage ? `, ${p.pocketsPerPage} pockets per page` : ''}</li>`).join('\n    ')}
+    ${BINDER_PRODUCTS.map((p) => `<li><a href="${BASE_URL}/shop/binders/${p.slug}">${esc(p.title)}</a> — ${esc(p.range)}${p.pocketsPerPage ? `, ${p.pocketsPerPage} pockets per page` : ''}${p.capacityText ? `, holds ${esc(p.capacityText)}` : ''}</li>`).join('\n    ')}
   </ul>
 </main>`;
 

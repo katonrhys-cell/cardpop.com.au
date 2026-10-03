@@ -9,6 +9,7 @@ import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
+import BinderCapacityPicker from '@/components/shop/BinderCapacityPicker.jsx';
 import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
@@ -250,6 +251,8 @@ const ShopBinderProductPage = () => {
                 className="mt-6"
               />
             )}
+
+            <BinderCapacityPicker sku={product.sku} colour={row?.colour} className="mt-6" />
 
             {isPurchasable && variants.length > 0 && (
               <VariantPicker

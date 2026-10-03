@@ -24,6 +24,7 @@
 
 import { BINDER_PRODUCT_COPY } from './shopBinderProductCopy.js';
 import { colourHex } from '../utils/colourSwatch.js';
+import { binderCapacity, binderCapacityText } from '../utils/binderCapacity.js';
 
 // The bucket name contains spaces, so every path segment has to be encoded.
 // encodeURIComponent would eat the "/" separators, hence the per-segment map.
@@ -492,6 +493,14 @@ export const binderSpecs = (product) => [
     ? [{ label: 'Pockets per page', value: String(product.pocketsPerPage) }]
     : []),
   { label: 'Holds', value: product.holds },
+  // Pages + capacity come from utils/binderCapacity.js, the one source shared
+  // with the capacity picker and the grid filter.
+  ...(product.capacity
+    ? [
+      { label: 'Pages', value: product.capacity.pages },
+      { label: 'Capacity', value: product.capacityText },
+    ]
+    : []),
   // Range-wide build rows, unless a binder's own verified spec overrides the
   // same label (e.g. TOP-09's velvet-lined inner cover).
   ...(product.range === "Collector's Series" && product.sku !== 'RB-BLK'
@@ -536,7 +545,14 @@ export const binderImageAlt = (product, file) => {
 export const BINDER_PRODUCTS = BINDER_ROWS.map((product) => ({
   ...product,
   ...(BINDER_PRODUCT_COPY[product.sku] || {}),
+  capacity: binderCapacity(product.sku),
+  capacityText: binderCapacityText(product.sku),
 }));
+
+const BY_SKU = Object.fromEntries(BINDER_PRODUCTS.map((p) => [p.sku, p]));
+
+/** Catalogue binder for a line SKU, or null. */
+export const binderProductBySku = (sku) => BY_SKU[String(sku || '').toUpperCase()] || null;
 
 const BY_SLUG = Object.fromEntries(BINDER_PRODUCTS.map((p) => [p.slug, p]));
 
