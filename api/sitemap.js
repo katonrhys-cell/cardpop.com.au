@@ -224,7 +224,7 @@ export default async function handler(req, res) {
       // seller_id also feeds the public-seller content gate below.
       fetchAll(() => supabase
         .from('listings')
-        .select('id, slug, title, seller_id, updated_at, created_at, vault_item:vault_items(card_name)')
+        .select('id, slug, seller_id, updated_at, created_at, vault_item:vault_items(card_name)')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .order('id'), MAX_ROWS.listings),
@@ -426,7 +426,7 @@ export default async function handler(req, res) {
         const lastmod = (listing.updated_at || listing.created_at || TODAY).split('T')[0];
         // Descriptive, keyword-rich slug from the card name — matches the client
         // and prerender canonicals so the sitemap doesn't advertise a weaker URL.
-        const urlSlug = listing.slug || slugify(listing.title || listing.vault_item?.card_name) || 'listing';
+        const urlSlug = listing.slug || slugify(listing.vault_item?.card_name) || 'listing';
         parts.push(xmlUrl(`${BASE_URL}/marketplace/${listing.id}/${urlSlug}`, lastmod, 'weekly', '0.6'));
       }
     }
