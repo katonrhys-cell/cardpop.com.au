@@ -24,6 +24,8 @@ import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
+import { sellerFromProfile } from '@/lib/sellerIdentity.js';
 
 const MarketplaceListingCard = ({ listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -72,6 +74,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
 
   const sellerObj = listing.seller;
   const sellerId = listing.seller_id || sellerObj?.id;
+  const sellerInfo = sellerFromProfile(sellerObj, sellerId);
   const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
   const detailPath = `/marketplace/${listing.id}/${titleSlug}`;
   const isSold = listing.status === 'sold';
@@ -253,8 +256,10 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                {sellerObj?.avatar_url ? (
-                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
+                {sellerInfo.type === 'official' ? (
+                  <CardPopLogo variant="icon" iconClassName="w-4 h-5" />
+                ) : sellerInfo.logoUrl ? (
+                  <img src={toCdnUrl(sellerInfo.logoUrl)} alt={sellerInfo.business_name} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
                 )}
@@ -262,9 +267,9 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
-                    {sellerObj?.display_name || sellerObj?.username || 'Community Seller'}
+                    {sellerObj ? sellerInfo.business_name : 'Community Seller'}
                   </span>
-                  {isVerified(sellerObj?.is_verified) && <VerifiedBadge size="sm" />}
+                  {isVerified(sellerInfo.is_verified) && <VerifiedBadge size="sm" />}
                   {sellerObj?.seller_tier && sellerObj.seller_tier !== 'none' && (
                     <SellerTierBadge tier={sellerObj.seller_tier} size="xs" />
                   )}

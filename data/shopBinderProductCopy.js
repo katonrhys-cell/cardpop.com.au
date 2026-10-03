@@ -16,8 +16,6 @@ export const BINDER_PRODUCT_COPY = {
       "Choose this over the 9- or 12-pocket versions if the binder is a showcase: a favourite artist's run, a set of illustration rares, a personal collection you hand to friends. If your cards already live in top loaders, the 4-pocket top loader binder is the better match. Store it upright on a shelf like a book, with the zip closed, rather than lying under other binders, which presses the pages and can leave pocket outlines on the cards.",
     ],
     specs: [
-      { label: "Pages", value: "20 side-loading pages" },
-      { label: "Capacity", value: "160 cards" },
       { label: "Exterior", value: "Water-resistant textured PU leather" },
     ],
   },
@@ -31,8 +29,6 @@ export const BINDER_PRODUCT_COPY = {
       "This is the binder to pick when the aim is a tidy, readable collection. The 4-pocket version shows fewer cards at a larger scale, and the 12-pocket fits more in at the cost of breathing room. Against the Stealth 9-pocket, this one has the textured cover and the Collector's Series branding; the Stealth is smooth and plain. Keep it upright when stored, away from heat and direct sun, and wipe the water-resistant exterior with a dry cloth if it gets dusty.",
     ],
     specs: [
-      { label: "Pages", value: "20 side-loading pages" },
-      { label: "Capacity", value: "360 cards" },
       { label: "Exterior", value: "Water-resistant textured PU leather" },
     ],
   },
@@ -46,8 +42,6 @@ export const BINDER_PRODUCT_COPY = {
       "Pick this one when the problem is quantity: large modern sets with hundreds of cards, bulk rares, or trade stock you want sorted and portable. Against the Stealth 12-pocket, it offers the textured Collector's Series cover in all eight colours rather than a plain smooth finish. A binder this full is heavy, so store it upright and supported, not leaning, and avoid stacking other binders on top, which can press the pockets onto the cards.",
     ],
     specs: [
-      { label: "Pages", value: "20 side-loading pages" },
-      { label: "Capacity", value: "480 cards" },
       { label: "Pocket size", value: "68 × 95 mm" },
       { label: "Exterior", value: "Water-resistant textured PU leather" },
     ],
@@ -69,8 +63,6 @@ export const BINDER_PRODUCT_COPY = {
       "Choose this when you carry or store a lot of loaded cards: a trade binder for events, a queue of cards waiting on a grading submission, or a run of singles you would rather not handle out of their loaders. The 4-pocket top loader binder shows fewer cards in a larger frame; this one is about capacity. Keep it in its cover bag when stored, upright, and remember that 216 loaders make for a heavy binder, so carry it by the spine rather than by one cover.",
     ],
     specs: [
-      { label: "Pages", value: "12 double-sided pages, 3 × 3 layout" },
-      { label: "Capacity", value: "216 × 35pt top loaders" },
       { label: "Zip pull", value: "Steel zip with O-ring pull" },
       { label: "Included", value: "Colour-matched microfibre binder cover bag" },
       { label: "Inner cover", value: "Velvet lining" },
@@ -85,8 +77,6 @@ export const BINDER_PRODUCT_COPY = {
       "Choose Stealth over the Collector's Series 9-pocket if you want to customise the binder or simply prefer a plain look. Card fit is the same: bare, penny-sleeved or perfect-fit sleeved cards suit it best, and double-sleeved cards will fill it faster. Wipe the smooth exterior with a soft dry cloth, as it shows fingerprints more than a textured finish, and store it upright out of direct sun so the colour does not fade unevenly.",
     ],
     specs: [
-      { label: "Pages", value: "20 side-loading pages" },
-      { label: "Capacity", value: "360 cards" },
       { label: "Cover", value: "Smooth water-resistant PU leather, no exterior logos" },
       { label: "Closure", value: "Steel zip" },
       { label: "Inner cover", value: "Polyester felt lining" },
@@ -102,8 +92,6 @@ export const BINDER_PRODUCT_COPY = {
       "Pick this over the Stealth 9-pocket when you need capacity, and over the Collector's Series 12-pocket when you want a plain or customised exterior. Bare and single-sleeved cards are the best fit at twelve to a page; double-sleeved cards make for a thick, heavy binder. Fingerprints show more readily on a smooth finish, so wipe it with a dry cloth now and then, and store it upright, out of direct sun.",
     ],
     specs: [
-      { label: "Pages", value: "20 side-loading pages" },
-      { label: "Capacity", value: "480 cards" },
       { label: "Cover", value: "Smooth water-resistant PU leather, no exterior logos" },
       { label: "Closure", value: "Steel zip" },
       { label: "Inner cover", value: "Polyester felt lining" },

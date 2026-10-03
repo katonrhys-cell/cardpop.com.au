@@ -73,6 +73,33 @@ What the backend adds on top of RLS:
   `{ fields: { cardName: '…', … } }` keyed by the form's field names, so the
   page highlights the same inputs either way.
 
+## Optional card video
+
+A seller can attach **one video of up to 10 seconds** to a card. It sits in the
+listing's thumbnail strip after the photos (play badge on a poster frame) and
+plays in the main frame when clicked (`components/ProductImageCarousel.jsx`).
+
+- **Storage**: same `vault-images` bucket and same client-direct upload as
+  photos — `<ownerId>/<timestamp>-video.<ext>`, with a JPEG poster frame at
+  `<path minus ext>.poster.jpg` (`utils/cardVideo.js` `videoPosterPath`, no extra
+  column). The path is stored in `vault_items.card_video`
+  (`20261003035125_vault_card_video.sql`, which also adds `video/mp4|webm|quicktime`
+  to the bucket's allowed MIME types; the 20 MB per-object cap is unchanged).
+- **The 10 s limit is enforced in the form** (`readVideoDuration` →
+  `videoDurationError`, 0.3 s tolerance for phones) because storage can't read
+  duration; size/type are also checked client-side and bounded by the bucket.
+  The server (`vaultItemInput.js`) checks the path is inside the caller's folder
+  and has a video extension. It does not re-measure duration — a determined
+  seller bypassing the form can upload a longer clip, capped at 20 MB.
+- **Edit semantics**: `card_video` omitted = keep, explicit `null` = remove.
+  Replaced/removed objects are not deleted from storage (same as photos today).
+- **Playback** uses the canonical Supabase URL (`publicVideoUrl`), not the image
+  CDN Worker, so byte-range requests behave. `vercel.json`'s CSP carries
+  `media-src 'self' blob: <supabase host>` — without it the browser blocks both
+  playback and the local preview.
+- iPhone `.mov` clips are HEVC by default; Safari plays them, but Chrome/Firefox
+  may not. "Most Compatible" camera format (H.264) avoids this.
+
 ## Response contract
 
 ```jsonc

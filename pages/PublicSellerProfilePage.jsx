@@ -50,7 +50,7 @@ const PublicSellerProfilePage = () => {
         // Fetch Marketplace listings (with full vault_item and seller data)
         const { data: marketplaceData } = await supabase
           .from('listings')
-          .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+          .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
           .eq('seller_id', userId)
           // Sold cards stay on the storefront, badged "Sold" — a seller's
           // sales history is part of what a buyer is judging.
