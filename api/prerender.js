@@ -645,7 +645,7 @@ async function renderListing(supabase, id, slugParam) {
 
   return htmlDoc({ title, description, canonical, ogImage: image,
     // Google rejects a Product with no offers/review/aggregateRating.
-    jsonLdItems: [product.offers ? product : null, breadcrumb].filter(Boolean), bodyHtml });
+    jsonLdItems: [isEligibleProductLd(product) ? product : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // `canonicalPath` is set when rendering at the canonical /shop/<category>/<slug>
@@ -764,7 +764,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   // The first paragraph of a shop description is written to stand alone as the
   // meta description; the rest is page body only.
   const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
-  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd.offers ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
+  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -822,6 +822,10 @@ function renderBindersHub() {
     bodyHtml,
   });
 }
+
+// Google rejects a Product unless it has offers, review or aggregateRating, so
+// a Product node without one of them is dropped rather than emitted.
+function isEligibleProductLd(ld) { return Boolean(ld && (ld.offers || ld.aggregateRating || ld.review)); }
 
 // ── Product reviews (shop_product_reviews) ──────────────────────────────────
 //
@@ -1016,7 +1020,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     ogImage: images[0],
     ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
     ogType: 'product',
-    jsonLdItems: [productLd.offers ? productLd : null, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }
@@ -1133,7 +1137,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     ogImage: images[0],
     ogImageAlt: palmsOffImageAlt(product, product.imagePaths[0]),
     ogType: 'product',
-    jsonLdItems: [productLd.offers ? productLd : null, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }

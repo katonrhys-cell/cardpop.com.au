@@ -27,6 +27,9 @@ export const generateMetaDescription = (category, itemCount = 0, priceRange = nu
   return desc;
 };
 
+// Google rejects a Product unless it has offers, review or aggregateRating.
+export const isEligibleProductLd = (ld) => Boolean(ld && (ld.offers || ld.aggregateRating || ld.review));
+
 export const generateStructuredData = (product, categoryPath = null) => {
   if (!product) return null;
 

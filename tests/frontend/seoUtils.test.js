@@ -6,6 +6,7 @@ import {
   generateSitemap,
   mapItemCondition,
   generateProductSchema,
+  isEligibleProductLd,
 } from '@/utils/seoUtils.js';
 
 // ─── generateMetaTitle ────────────────────────────────────────────────────────
@@ -318,5 +319,17 @@ describe('generateSitemap', () => {
   it('closes the urlset element', () => {
     const xml = generateSitemap([], []);
     expect(xml).toContain('</urlset>');
+  });
+});
+
+// ─── isEligibleProductLd ──────────────────────────────────────────────────────
+
+describe('isEligibleProductLd', () => {
+  it('requires offers, review or aggregateRating', () => {
+    expect(isEligibleProductLd({ '@type': 'Product', name: 'Card' })).toBe(false);
+    expect(isEligibleProductLd(null)).toBe(false);
+    expect(isEligibleProductLd({ offers: { '@type': 'Offer' } })).toBe(true);
+    expect(isEligibleProductLd({ aggregateRating: { ratingValue: '5' } })).toBe(true);
+    expect(isEligibleProductLd({ review: [{ '@type': 'Review' }] })).toBe(true);
   });
 });

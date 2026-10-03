@@ -254,6 +254,29 @@ describe('prerender shop products', () => {
     expect(body).toContain('"@type":"Review"');
   });
 
+  it('keeps an unpriced product as a Product when it has published reviews', async () => {
+    // aggregateRating alone satisfies Google's offers/review/aggregateRating rule.
+    state.result = { data: {
+      id: UUID, title: 'Zip Binder', price_aud: 0, stock_quantity: 0, product_type: 'supplies', status: 'active',
+      review_count: 2, average_rating: 5,
+    } };
+    state.listResult = { data: [
+      { rating: 5, title: 'Great', body: 'Holds heaps', reviewer_name: 'Sam', created_at: '2026-10-01T00:00:00Z' },
+    ] };
+    const { body } = await run('/product/shop/' + UUID + '/zip-binder');
+    expect(body).toContain('"@type":"Product"');
+    expect(body).toContain('"@type":"AggregateRating"');
+    expect(body).not.toContain('"@type":"Offer"');
+  });
+
+  it('emits no Product for an unpriced product without reviews', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Zip Binder', price_aud: 0, stock_quantity: 0, product_type: 'supplies', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/zip-binder');
+    expect(body).not.toContain('"@type":"Product"');
+  });
+
   it('emits no rating markup for a product without reviews', async () => {
     state.result = { data: {
       id: UUID, title: 'Zip Binder', price_aud: 30, stock_quantity: 5, product_type: 'supplies', status: 'active',

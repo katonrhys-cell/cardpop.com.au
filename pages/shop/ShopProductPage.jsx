@@ -32,6 +32,7 @@ import {
 } from '@/data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
+import { isEligibleProductLd } from '@/utils/seoUtils.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -208,7 +209,7 @@ const ShopProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={palmsOffImageAlt(product, product.imagePaths[0])}
-        structuredData={[productLd.offers ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">
