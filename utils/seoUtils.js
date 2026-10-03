@@ -163,13 +163,14 @@ export const mapItemCondition = (c) => {
   return 'https://schema.org/UsedCondition';
 };
 
-// Build a schema.org Product (with a nested Offer when a price is known).
+// Build a schema.org Product with a nested Offer. Returns null when there is
+// no price: Google rejects a Product with no offers/review/aggregateRating.
 export const generateProductSchema = ({
   name, image, description, url, price, currency = 'AUD',
   condition, availability = 'InStock', sellerName, brand, category,
   cardNumber, setName, sku, identifier,
 } = {}) => {
-  if (!name) return null;
+  if (!name || !(price > 0)) return null;
 
   const images = (Array.isArray(image) ? image : [image]).filter(Boolean);
 

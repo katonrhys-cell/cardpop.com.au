@@ -26,17 +26,13 @@ const ShopBindersHubPage = () => {
     '@type': 'ItemList',
     name: 'Palms Off Gaming binders',
     numberOfItems: BINDER_PRODUCTS.length,
+    // Summary-page list (URLs only): the hub has no live prices, and a Product
+    // without offers is rejected by Google. Each product page carries its own.
     itemListElement: BINDER_PRODUCTS.map((product, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: {
-        '@type': 'Product',
-        name: product.title,
-        sku: product.sku,
-        brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
-        image: binderImages(product)[0],
-        url: `${SITE_ORIGIN}/shop/binders/${product.slug}`,
-      },
+      name: product.title,
+      url: `${SITE_ORIGIN}/shop/binders/${product.slug}`,
     })),
   };
 

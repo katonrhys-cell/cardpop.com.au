@@ -170,7 +170,7 @@ const ShopBinderProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={binderImageAlt(product, product.imageFiles[0])}
-        structuredData={[productLd, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[productLd.offers ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">

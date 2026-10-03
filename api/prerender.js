@@ -362,10 +362,12 @@ async function renderDealer(supabase, param) {
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
   }).join('\n');
 
-  // Product + Offer JSON-LD for each listing.
+  // Product + Offer JSON-LD for each listing. Google rejects a Product with no
+  // offers/review/aggregateRating, so an unpriced listing is a plain URL item.
   const productLd = (listings || []).map((l, i) => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
     const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
+    if (!(l.price_aud > 0)) return { '@type': 'ListItem', position: i + 1, name: cardName, url };
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
     const img = publicImageUrl(imgPath);
     const product = {
@@ -373,17 +375,15 @@ async function renderDealer(supabase, param) {
       name: cardName,
       url,
       ...(img ? { image: img } : {}),
-      ...(l.price_aud > 0
-        ? { offers: {
-            '@type': 'Offer',
-            price: Number(l.price_aud).toFixed(2),
-            priceCurrency: 'AUD',
-            availability: 'https://schema.org/InStock',
-            ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
-            url,
-            seller: { '@type': 'Store', name },
-          } }
-        : {}),
+      offers: {
+        '@type': 'Offer',
+        price: Number(l.price_aud).toFixed(2),
+        priceCurrency: 'AUD',
+        availability: 'https://schema.org/InStock',
+        ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
+        url,
+        seller: { '@type': 'Store', name },
+      },
     };
     return { '@type': 'ListItem', position: i + 1, item: product };
   });
@@ -596,7 +596,19 @@ async function renderListing(supabase, id, slugParam) {
           url: canonical,
           seller: { '@type': 'Organization', name: sellerName },
         } }
-      : {}),
+      // Expression of Interest: no fixed price, but the seller's offer range is
+      // real — an AggregateOffer from the minimum (max is optional).
+      : listing.price_min_aud > 0
+        ? { offers: {
+            '@type': 'AggregateOffer',
+            lowPrice: Number(listing.price_min_aud).toFixed(2),
+            ...(listing.price_max_aud > 0 ? { highPrice: Number(listing.price_max_aud).toFixed(2) } : {}),
+            priceCurrency: 'AUD',
+            offerCount: 1,
+            availability: soldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+            url: canonical,
+          } }
+        : {}),
   };
 
   const breadcrumb = {
@@ -630,7 +642,9 @@ async function renderListing(supabase, id, slugParam) {
   </ul>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [product, breadcrumb], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image,
+    // Google rejects a Product with no offers/review/aggregateRating.
+    jsonLdItems: [product.offers ? product : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // `canonicalPath` is set when rendering at the canonical /shop/<category>/<slug>
@@ -748,7 +762,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   // The first paragraph of a shop description is written to stand alone as the
   // meta description; the rest is page body only.
   const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
-  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
+  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd.offers ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -768,17 +782,13 @@ function renderBindersHub() {
     '@type': 'ItemList',
     name: 'Palms Off Gaming binders',
     numberOfItems: BINDER_PRODUCTS.length,
+    // Summary-page list (URLs only): the hub has no live prices, and a Product
+    // without offers is rejected by Google. Each product page carries its own.
     itemListElement: BINDER_PRODUCTS.map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: {
-        '@type': 'Product',
-        name: p.title,
-        sku: p.sku,
-        brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
-        image: binderImages(p)[0],
-        url: `${BASE_URL}/shop/binders/${p.slug}`,
-      },
+      name: p.title,
+      url: `${BASE_URL}/shop/binders/${p.slug}`,
     })),
   };
 
@@ -967,7 +977,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     ogImage: images[0],
     ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
     ogType: 'product',
-    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [productLd.offers ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }
@@ -1083,7 +1093,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     ogImage: images[0],
     ogImageAlt: palmsOffImageAlt(product, product.imagePaths[0]),
     ogType: 'product',
-    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [productLd.offers ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }

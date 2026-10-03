@@ -201,7 +201,7 @@ const ShopProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={palmsOffImageAlt(product, product.imagePaths[0])}
-        structuredData={[productLd, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[productLd.offers ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">
