@@ -270,33 +270,38 @@ const ShopCategoryPage = () => {
         structuredData={[breadcrumbSchema, collectionSchema].filter(Boolean)}
       />
 
-      {/* Hero — mirrors the main /shop page hero for a consistent, professional look */}
-      <section className="bg-card border-b border-border py-16 md:py-20">
-        <div className="container-default text-center">
-          <div className="flex justify-center mb-6">
-            <Breadcrumb items={breadcrumbs} />
-          </div>
+      {/* Header — left-aligned and compact, mirroring the main /shop (Card Supplies) page */}
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-6 md:pt-8 w-full">
+        <Breadcrumb items={breadcrumbs} />
 
+        <div className="flex items-center gap-3 mb-1.5">
           <span
-            className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${heroGradient} shadow-lg mx-auto mb-6`}
+            className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br ${heroGradient} shadow-sm shrink-0`}
           >
-            <HeroIcon className="w-8 h-8 text-white drop-shadow-sm" />
+            <HeroIcon className="w-5 h-5 text-white drop-shadow-sm" aria-hidden="true" />
           </span>
-
-          {heroGroup && (
-            <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">
-              {heroGroup}
-            </p>
-          )}
-          <h1 className="text-4xl md:text-5xl font-bold font-heading mb-4">{heroTitle}</h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{heroDesc}</p>
+          <div className="min-w-0">
+            {heroGroup && (
+              <p className="text-xs font-bold uppercase tracking-widest text-primary leading-none mb-1">
+                {heroGroup}
+              </p>
+            )}
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight leading-tight">{heroTitle}</h1>
+          </div>
         </div>
+        <p className="text-muted-foreground">{heroDesc}</p>
       </section>
 
       {/* Products */}
-      <section className="container-default py-12 w-full flex-1">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
-          <div className="relative w-full sm:max-w-md">
+      <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-8 pb-12 w-full flex-1">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+          <h2 className="text-xl font-bold sm:mr-auto">
+            All Products
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
+              {totalItems} {totalItems === 1 ? 'product' : 'products'}
+            </span>
+          </h2>
+          <div className="relative w-full sm:w-72 lg:w-80">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               name="shop-category-search"
@@ -304,26 +309,21 @@ const ShopCategoryPage = () => {
               placeholder={`Search ${heroTitle.toLowerCase()}...`}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-9 h-11 rounded-xl bg-card border-border"
+              className="pl-9 h-10 rounded-xl bg-card border-border"
             />
           </div>
-          <div className="flex items-center gap-3 w-full sm:w-auto">
-            <p className="hidden sm:block text-sm text-muted-foreground whitespace-nowrap">
-              {totalItems} {totalItems === 1 ? 'product' : 'products'}
-            </p>
-            <Select value={sort} onValueChange={setSort}>
-              <SelectTrigger aria-label="Sort products" className="w-full sm:w-[200px] h-11 rounded-xl bg-card border-border">
-                <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest Arrivals</SelectItem>
-                <SelectItem value="oldest">Oldest First</SelectItem>
-                <SelectItem value="price_asc">Price: Low to High</SelectItem>
-                <SelectItem value="price_desc">Price: High to Low</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <Select value={sort} onValueChange={setSort}>
+            <SelectTrigger aria-label="Sort products" className="w-full sm:w-[190px] h-10 rounded-xl bg-card border-border">
+              <SlidersHorizontal className="w-4 h-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">Newest Arrivals</SelectItem>
+              <SelectItem value="oldest">Oldest First</SelectItem>
+              <SelectItem value="price_asc">Price: Low to High</SelectItem>
+              <SelectItem value="price_desc">Price: High to Low</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         <ShopFilterPanel
