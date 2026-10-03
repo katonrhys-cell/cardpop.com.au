@@ -137,11 +137,15 @@ describe('prerender blog articles', () => {
 describe('prerender marketplace listings', () => {
   it('renders an active listing with Product + Offer JSON-LD', async () => {
     state.result = { data: {
-      id: UUID, slug: 'charizard-base-set', title: 'Charizard Base Set',
-      description: 'A holographic Charizard.', price_aud: 1499.95, status: 'active',
-      condition: 'PSA 9', grade: '9', grading_company: 'PSA', accepts_offers: true,
-      images: ['https://cdn.test/charizard.jpg'],
-      vault_item: { card_name: 'Charizard', set_name: 'Base Set', year: 1999 },
+      // Real row shape: the card's details live on the vault item, never on
+      // the listing (which has no title/description/images columns).
+      id: UUID, slug: 'charizard-base-set', price_aud: 1499.95, status: 'active',
+      grading_company: 'PSA', accepts_offers: true,
+      vault_item: {
+        card_name: 'Charizard', set_name: 'Base Set', year: 1999,
+        condition: 'Near Mint', grade: '9', grading_company: 'PSA',
+        vault_images: [{ storage_path: 'https://cdn.test/charizard.jpg' }],
+      },
       seller: { username: 'ash', store_slug: 'ash-cards', display_name: 'Ash Cards' },
     } };
     const { status, body } = await run('/marketplace/' + UUID + '/charizard-base-set');
@@ -151,14 +155,16 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('"price":"1499.95"');
     expect(body).toContain('schema.org/InStock');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/marketplace/' + UUID + '/charizard-base-set" />');
-    expect(body).toContain('Charizard Base Set');
+    expect(body).toContain('<h1>Charizard</h1>');
+    expect(body).toContain('Base Set · 1999');
+    expect(body).toContain('Grade: PSA 9');
   });
 
   it('renders a sold listing as a real page marked SoldOut', async () => {
     // A sold card stays on the site — visible, marked Sold, not purchasable —
     // so its page has genuine content and must not be a 404 (or a soft 404).
     state.result = { data: {
-      id: UUID, slug: 'sold-card', title: 'Sold Card', price_aud: 400, status: 'sold',
+      id: UUID, slug: 'sold-card', price_aud: 400, status: 'sold',
       accepts_offers: true,
       vault_item: { card_name: 'Victor Wembanyama', set_name: 'Topps Chrome', year: 2023 },
       seller: { username: 'kat', display_name: 'Kat' },
@@ -172,6 +178,31 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('no longer available for purchase');
     // A sold listing never advertises that it takes offers.
     expect(body).not.toContain('offers accepted');
+  });
+
+  it('gives an Expression of Interest listing an AggregateOffer from its offer range', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'eoi-card', price_aud: null, price_min_aud: 250, price_max_aud: null,
+      status: 'active', accepts_offers: true,
+      vault_item: { card_name: 'Pikachu Illustrator' },
+      seller: { username: 'ash' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/eoi-card');
+    expect(body).toContain('"@type":"Product"');
+    expect(body).toContain('"@type":"AggregateOffer"');
+    expect(body).toContain('"lowPrice":"250.00"');
+    expect(body).not.toContain('"highPrice"');
+  });
+
+  it('emits no Product for a listing with neither a price nor an offer range', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'trade-card', price_aud: null, status: 'active',
+      vault_item: { card_name: 'Trade Only' }, seller: { username: 'ash' },
+    } };
+    const { status, body } = await run('/marketplace/' + UUID + '/trade-card');
+    expect(status).toBe(200);
+    expect(body).not.toContain('"@type":"Product"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
   });
 
   it('returns a 404 with noindex for an archived listing', async () => {
@@ -750,6 +781,8 @@ describe('prerender Palms Off Gaming binders', () => {
     const { body } = await run(`/shop/binders/${SLUG}`);
     expect(body).not.toContain('noindex');
     expect(body).not.toContain('"@type":"Offer"');
+    // Google rejects a Product with no offers/review/aggregateRating.
+    expect(body).not.toContain('"@type":"Product"');
     expect(body).toContain('https://cardpop.com.au/signup');
     expect(body).toContain('Enquire now');
     expect(body).toContain('Why collectors pick this binder');
@@ -806,13 +839,13 @@ describe('prerender Palms Off Gaming products', () => {
   const CAT = 'top-loaders';
   const SLUG = 'palms-off-gaming-top-loaders-35pt';
 
-  it('renders a product page with Product, Breadcrumb and FAQ JSON-LD', async () => {
+  it('renders an unpriced product page with Breadcrumb and FAQ JSON-LD but no Product', async () => {
     state.result = { data: { price_aud: 0, retail_price_aud: null, stock_quantity: 0, status: 'draft' } };
     const { status, body } = await run(`/shop/${CAT}/${SLUG}`);
     expect(status).toBe(200);
     expect(body).toContain(`<link rel="canonical" href="https://cardpop.com.au/shop/${CAT}/${SLUG}" />`);
-    expect(body).toContain('"@type":"Product"');
-    expect(body).toContain('"name":"Palms Off Gaming"');
+    // Google rejects a Product with no offers/review/aggregateRating.
+    expect(body).not.toContain('"@type":"Product"');
     expect(body).toContain('"@type":"BreadcrumbList"');
     expect(body).toContain('"@type":"FAQPage"');
     expect(body).toContain('Enquire now');
@@ -830,6 +863,8 @@ describe('prerender Palms Off Gaming products', () => {
   it('emits an Offer once the product is priced and active', async () => {
     state.result = { data: { price_aud: 12.5, retail_price_aud: null, stock_quantity: 6, status: 'active' } };
     const { body } = await run(`/shop/${CAT}/${SLUG}`);
+    expect(body).toContain('"@type":"Product"');
+    expect(body).toContain('"name":"Palms Off Gaming"');
     expect(body).toContain('"price":"12.50"');
     expect(body).toContain('https://schema.org/InStock');
   });
@@ -915,7 +950,8 @@ describe('Palms Off Gaming per-product copy', () => {
 
   it('puts the product description in the meta tag and JSON-LD', async () => {
     const product = PALMS_OFF_PRODUCTS.find((p) => p.sku === 'MAG-180PT');
-    state.result = { data: null };
+    // Priced, so the Product JSON-LD (which carries the description) is emitted.
+    state.result = { data: { price_aud: 9.95, retail_price_aud: null, stock_quantity: 4, status: 'active' } };
     const { body } = await run(`/shop/${product.categorySlug}/${product.slug}`);
     expect(body).toContain(`<meta name="description" content="${product.metaDescription}"`);
     expect(body).toContain(`"description":"${product.metaDescription}"`);

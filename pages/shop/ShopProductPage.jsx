@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, Navigate, useLocation } from 'react-router-dom';
+import { useParams, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
@@ -10,6 +10,9 @@ import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
+import SizePicker from '@/components/shop/SizePicker.jsx';
+import useSizeStock from '@/hooks/useSizeStock.js';
+import { sizeGroupFor, sizeProductPath } from '@/utils/shopSizes.js';
 import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
@@ -25,7 +28,7 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import {
   resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
-  palmsOffProductsInCategory,
+  palmsOffProductsInCategory, PALMS_OFF_PRODUCTS,
 } from '@/data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
@@ -56,6 +59,11 @@ const ShopProductPage = () => {
   const { row, family, selectedId, setSelectedId, loading } = useShopLine({
     slug: product?.slug, sku: product?.sku, enabled: validPair,
   });
+  // Point-size lines (Top Loaders 35pt…180pt) are separate products; the picker
+  // links them. Choosing a size opens its own page without jumping to the top.
+  const navigate = useNavigate();
+  const sizeOptions = product ? sizeGroupFor(product, PALMS_OFF_PRODUCTS) : [];
+  const sizeStock = useSizeStock(sizeOptions);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
@@ -200,7 +208,7 @@ const ShopProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={palmsOffImageAlt(product, product.imagePaths[0])}
-        structuredData={[productLd, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[productLd.offers ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">
@@ -264,6 +272,16 @@ const ShopProductPage = () => {
             <p className="mt-5 text-base leading-relaxed text-muted-foreground">
               {intro}
             </p>
+
+            <SizePicker
+              options={sizeOptions}
+              value={product.slug}
+              stock={sizeStock}
+              onChange={(o) => navigate(sizeProductPath(o), { replace: true, preventScrollReset: true })}
+              className="mt-6"
+            />
+
+            <p className="mt-3 text-xs text-muted-foreground">SKU: {row?.sku || product.sku}</p>
 
             {family.length > 1 && (
 

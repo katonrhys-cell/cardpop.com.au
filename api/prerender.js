@@ -363,10 +363,12 @@ async function renderDealer(supabase, param) {
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
   }).join('\n');
 
-  // Product + Offer JSON-LD for each listing.
+  // Product + Offer JSON-LD for each listing. Google rejects a Product with no
+  // offers/review/aggregateRating, so an unpriced listing is a plain URL item.
   const productLd = (listings || []).map((l, i) => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
     const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
+    if (!(l.price_aud > 0)) return { '@type': 'ListItem', position: i + 1, name: cardName, url };
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
     const img = publicImageUrl(imgPath);
     const product = {
@@ -374,17 +376,15 @@ async function renderDealer(supabase, param) {
       name: cardName,
       url,
       ...(img ? { image: img } : {}),
-      ...(l.price_aud > 0
-        ? { offers: {
-            '@type': 'Offer',
-            price: Number(l.price_aud).toFixed(2),
-            priceCurrency: 'AUD',
-            availability: 'https://schema.org/InStock',
-            ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
-            url,
-            seller: { '@type': 'Store', name },
-          } }
-        : {}),
+      offers: {
+        '@type': 'Offer',
+        price: Number(l.price_aud).toFixed(2),
+        priceCurrency: 'AUD',
+        availability: 'https://schema.org/InStock',
+        ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
+        url,
+        seller: { '@type': 'Store', name },
+      },
     };
     return { '@type': 'ListItem', position: i + 1, item: product };
   });
@@ -537,18 +537,22 @@ async function renderListing(supabase, id, slugParam) {
     });
   }
 
-  const { data: listing } = await supabase
+  // The card's name, condition, grade and photos live on the vault item — a
+  // listing row carries only the sale terms. Selecting a column the table lacks
+  // fails the whole query, which used to 404 every listing for crawlers.
+  const { data: listing, error: listingErr } = await supabase
     .from('listings')
-    .select('id, slug, title, description, price, price_aud, price_min_aud, price_max_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
+  if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
 
   // Derive a descriptive slug from the card name (the ID is the stable key; the
   // slug is decorative but should carry the keyword). Falls back to the DB slug,
   // then the URL param, then a generic word — mirrors the shop-product handler
   // and the client canonical so all three agree.
   const card = listing?.vault_item || {};
-  const cardName = listing?.title || card.card_name || 'Trading Card';
+  const cardName = card.card_name || 'Trading Card';
   const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugify(cardName) || slugParam || 'listing'}`;
 
   // A sold listing stays on the site — the card, its photos and its price are
@@ -564,17 +568,16 @@ async function renderListing(supabase, id, slugParam) {
       bodyHtml: '<main><h1>Listing Unavailable</h1><p>This listing is sold or no longer active.</p></main>',
     });
   }
-  const imgPath = listing.images?.[0] || card.vault_images?.[0]?.storage_path || card.card_image;
+  const imgPath = card.vault_images?.[0]?.storage_path || card.card_image;
   const image = publicImageUrl(imgPath);
-  const price = listing.price_aud ?? listing.price;
-  const condition = listing.condition || card.condition;
-  const grade = listing.grade || card.grade;
+  const price = listing.price_aud;
+  const condition = card.condition;
+  const grade = card.grade;
   const gradingCompany = listing.grading_company || card.grading_company;
   const sellerName = listing.seller?.business_name || listing.seller?.display_name || listing.seller?.username || 'CardPop Seller';
   const title = `${cardName}${soldOut ? ' (Sold)' : ''} | CardPop Marketplace`;
   const setLine = [card.set_name, card.year].filter(Boolean).join(' · ');
-  const description = listing.description
-    || `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} ${soldOut ? 'sold on' : 'for sale on'} CardPop, Australia's trading card marketplace.`;
+  const description = `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} ${soldOut ? 'sold on' : 'for sale on'} CardPop, Australia's trading card marketplace.`;
 
   const product = {
     '@context': 'https://schema.org',
@@ -594,7 +597,19 @@ async function renderListing(supabase, id, slugParam) {
           url: canonical,
           seller: { '@type': 'Organization', name: sellerName },
         } }
-      : {}),
+      // Expression of Interest: no fixed price, but the seller's offer range is
+      // real — an AggregateOffer from the minimum (max is optional).
+      : listing.price_min_aud > 0
+        ? { offers: {
+            '@type': 'AggregateOffer',
+            lowPrice: Number(listing.price_min_aud).toFixed(2),
+            ...(listing.price_max_aud > 0 ? { highPrice: Number(listing.price_max_aud).toFixed(2) } : {}),
+            priceCurrency: 'AUD',
+            offerCount: 1,
+            availability: soldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+            url: canonical,
+          } }
+        : {}),
   };
 
   const breadcrumb = {
@@ -626,10 +641,11 @@ async function renderListing(supabase, id, slugParam) {
     ${grade ? `<li>Grade: ${esc(`${gradingCompany || ''} ${grade}`.trim())}</li>` : ''}
     <li>Seller: ${sellerHref ? `<a href="${sellerHref}">${esc(sellerName)}</a>` : esc(sellerName)}</li>
   </ul>
-  ${listing.description ? `<p>${esc(listing.description)}</p>` : ''}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [product, breadcrumb], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image,
+    // Google rejects a Product with no offers/review/aggregateRating.
+    jsonLdItems: [product.offers ? product : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // `canonicalPath` is set when rendering at the canonical /shop/<category>/<slug>
@@ -748,7 +764,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   // The first paragraph of a shop description is written to stand alone as the
   // meta description; the rest is page body only.
   const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
-  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
+  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd.offers ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -768,17 +784,13 @@ function renderBindersHub() {
     '@type': 'ItemList',
     name: 'Palms Off Gaming binders',
     numberOfItems: BINDER_PRODUCTS.length,
+    // Summary-page list (URLs only): the hub has no live prices, and a Product
+    // without offers is rejected by Google. Each product page carries its own.
     itemListElement: BINDER_PRODUCTS.map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: {
-        '@type': 'Product',
-        name: p.title,
-        sku: p.sku,
-        brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
-        image: binderImages(p)[0],
-        url: `${BASE_URL}/shop/binders/${p.slug}`,
-      },
+      name: p.title,
+      url: `${BASE_URL}/shop/binders/${p.slug}`,
     })),
   };
 
@@ -1004,7 +1016,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     ogImage: images[0],
     ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
     ogType: 'product',
-    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [productLd.offers ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }
@@ -1121,7 +1133,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     ogImage: images[0],
     ogImageAlt: palmsOffImageAlt(product, product.imagePaths[0]),
     ogType: 'product',
-    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [productLd.offers ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }
@@ -1168,7 +1180,7 @@ async function renderLanding(supabase, path) {
   } else {
     const { data } = await supabase
       .from('listings')
-      .select('id, slug, title, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
+      .select('id, slug, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
       .eq('status', 'active')
       .neq('listing_type', 'vault')
       .order('created_at', { ascending: false })
@@ -1177,7 +1189,7 @@ async function renderLanding(supabase, path) {
       const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
       const image = publicImageUrl(imgPath);
       return {
-        name: l.title || l.vault_item?.card_name || 'Trading Card',
+        name: l.vault_item?.card_name || 'Trading Card',
         url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
         price: l.price_aud,
         image,
@@ -2981,9 +2993,9 @@ async function renderCollection(supabase, rawSlug) {
   const categoryValues = [cfg.name, ...(cfg.aliases || [])];
   const { data } = await supabase
     .from('listings')
-    .select('id, slug, title, price_aud, category, vault_item:vault_items(card_name)')
+    .select('id, slug, price_aud, vault_item:vault_items!inner(card_name, collection)')
     .eq('status', 'active')
-    .in('category', categoryValues)
+    .in('vault_item.collection', categoryValues)
     .order('created_at', { ascending: false })
     .limit(50);
   const listings = data || [];
@@ -3016,14 +3028,14 @@ async function renderCollection(supabase, rawSlug) {
       itemListElement: listings.map((l, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        name: l.title || l.vault_item?.card_name || 'Trading Card',
+        name: l.vault_item?.card_name || 'Trading Card',
         url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
       })),
     });
   }
 
   const itemsHtml = listings.map((l) => {
-    const name = l.title || l.vault_item?.card_name || 'Trading Card';
+    const name = l.vault_item?.card_name || 'Trading Card';
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>`
       + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');
@@ -3260,7 +3272,7 @@ async function renderSeller(supabase, param) {
 
   const { data: listingData } = await supabase
     .from('listings')
-    .select('id, slug, title, price_aud, vault_item:vault_items(card_name)')
+    .select('id, slug, price_aud, vault_item:vault_items(card_name)')
     .eq('seller_id', profile.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -3290,7 +3302,7 @@ async function renderSeller(supabase, param) {
   };
 
   const itemsHtml = listings.map((l) => {
-    const cardName = l.title || l.vault_item?.card_name || 'Trading Card';
+    const cardName = l.vault_item?.card_name || 'Trading Card';
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(cardName)}</a>`
       + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');

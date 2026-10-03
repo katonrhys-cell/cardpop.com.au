@@ -952,10 +952,10 @@ async function handleSingleItemOrder(session, stripe) {
   if (!cardName && listingId) {
     const { data: listing } = await supabase
       .from('listings')
-      .select('title, vault_item:vault_items!vault_item_id(card_name)')
+      .select('vault_item:vault_items!vault_item_id(card_name)')
       .eq('id', listingId)
       .maybeSingle();
-    cardName = listing?.vault_item?.card_name || listing?.title || 'Trading Card';
+    cardName = listing?.vault_item?.card_name || 'Trading Card';
   }
 
   const { data: newOrder } = await supabase
