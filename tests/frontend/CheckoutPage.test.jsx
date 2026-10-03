@@ -15,7 +15,7 @@ const h = vi.hoisted(() => ({
   // renders; the marketplace identity gate is exercised in its own test.
   auth: { currentUser: { email: 'user@x.com' }, isIdentityVerified: true, profileLoading: false },
 }));
-vi.mock('@/hooks/useCart.jsx', () => ({ useCart: () => ({ cartItems: h.cartItems }) }));
+vi.mock('@/hooks/useCart.jsx', () => ({ useCart: () => ({ cartItems: h.cartItems, removeFromCart: vi.fn(), setIsCartOpen: vi.fn() }) }));
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => h.auth }));
 
 vi.mock('@/lib/supabaseClient.js', () => ({
@@ -98,6 +98,7 @@ function renderCheckout() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.sessionStorage.clear();
   h.cartItems = [cartItem('l1', 100)];
   h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: true, profileLoading: false };
   setFetch();
@@ -158,14 +159,41 @@ describe('CheckoutPage — guards & validation', () => {
 // ─── marketplace identity gate ───────────────────────────────────────────────
 
 describe('CheckoutPage — marketplace identity gate', () => {
-  it('gates a marketplace cart when the buyer is not identity-verified', async () => {
-    h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: false, profileLoading: false };
+  it('asks a signed-out buyer for an account on any marketplace card, with a return path', async () => {
+    h.auth = { currentUser: null, isIdentityVerified: false, profileLoading: false };
     renderCheckout();
-    await waitFor(() =>
-      expect(screen.getByText(/verify your identity to buy on the marketplace/i)).toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.getByText(/sign in to buy marketplace cards/i)).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: /create a free account/i })).toHaveAttribute('href', '/signup?next=%2Fcheckout');
     // The order summary / payment flow is not rendered while blocked.
     expect(screen.queryByText('fill-shipping')).not.toBeInTheDocument();
+  });
+
+  it('lets an unverified member buy a marketplace card under the ID threshold', async () => {
+    h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: false, profileLoading: false };
+    h.cartItems = [cartItem('l1', 499)];
+    renderCheckout();
+    await screen.findByText('fill-shipping');
+    expect(screen.queryByText(/one quick id check/i)).not.toBeInTheDocument();
+  });
+
+  it('asks an unverified member for the ID check once the marketplace items reach the threshold', async () => {
+    h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: false, profileLoading: false };
+    h.cartItems = [cartItem('l1', 300), cartItem('l2', 200)];
+    renderCheckout();
+    await waitFor(() => expect(screen.getByText(/one quick id check before this purchase/i)).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: /verify with stripe/i })).toHaveAttribute('href', '/verify-identity?next=%2Fcheckout');
+    expect(screen.queryByText('fill-shipping')).not.toBeInTheDocument();
+  });
+
+  it('lets a mixed cart pay for its shop items while the cards wait', async () => {
+    h.auth = { currentUser: null, isIdentityVerified: false, profileLoading: false };
+    h.cartItems = [cartItem('l1', 100), { product: { id: 'p1', type: 'shop', title: 'Booster', price: 10 }, quantity: 1, variant: null }];
+    renderCheckout();
+    await userEvent.click(await screen.findByRole('button', { name: /check out the shop item now/i }));
+    await screen.findByText('fill-shipping');
+    expect(screen.getByText(/paying for your shop items only/i)).toBeInTheDocument();
+    const priced = mockFetch.mock.calls.filter(([url]) => url === '/stripe/calculate-cart').at(-1);
+    expect(JSON.parse(priced[1].body).items).toEqual([{ type: 'shop', id: 'p1', quantity: 1 }]);
   });
 
   it('does NOT gate a shop-only cart for an unverified buyer', async () => {
@@ -173,7 +201,7 @@ describe('CheckoutPage — marketplace identity gate', () => {
     h.cartItems = [{ product: { id: 'p1', type: 'shop', title: 'Booster', price: 10 }, quantity: 1, variant: null }];
     renderCheckout();
     await screen.findByText('fill-shipping');
-    expect(screen.queryByText(/verify your identity to buy on the marketplace/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/sign in to buy marketplace cards/i)).not.toBeInTheDocument();
   });
 });
 

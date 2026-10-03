@@ -258,7 +258,10 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] /calculate-cart error: ${err.message}`);
-    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
+    res.status(code).json({
+      error: code === 500 ? 'Something went wrong. Please try again.' : err.message,
+      ...(code !== 500 && err.listingId ? { listingId: err.listingId } : {}),
+    });
   }
 });
 
@@ -623,7 +626,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     if (promoRedemptionHeld) await releasePromoRedemption(promoRedemptionHeld);
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
-    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
+    res.status(code).json({
+      error: code === 500 ? 'Something went wrong. Please try again.' : err.message,
+      ...(code !== 500 && err.listingId ? { listingId: err.listingId } : {}),
+    });
   }
 });
 
@@ -702,8 +708,28 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
     // reviews to them. Empty for marketplace cards (no GTIN) or any failure.
     const gtins = session.payment_status === 'paid' ? await gtinsForSession(supabase, sessionId) : [];
 
+    // The order's own status, so the success page can tell "paid and being
+    // fulfilled" from "paid but refused and refunded" (an overseas card, a
+    // double sale, an amount mismatch). Stripe's payment_status is 'paid' in
+    // both cases. Best-effort: a read failure just leaves it null.
+    let orderStatus = null;
+    let orderId = null;
+    try {
+      const { data: orderRow } = await supabase
+        .from('orders')
+        .select('id, status')
+        .eq('stripe_session_id', sessionId)
+        .maybeSingle();
+      orderStatus = orderRow?.status ?? null;
+      orderId = orderRow?.id ?? null;
+    } catch (orderErr) {
+      logger.warn(`[STRIPE] order status read failed for ${sessionId}: ${orderErr.message}`);
+    }
+
     res.json({
       id:            session.id,
+      orderId,
+      orderStatus,
       status:        session.payment_status,
       amountTotal:   session.amount_total,
       customerEmail: session.customer_details?.email,

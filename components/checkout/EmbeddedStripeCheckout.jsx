@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { stripePromise, hasStripeKey } from '@/lib/stripeClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import StripeElementsPayment from '@/components/checkout/StripeElementsPayment.jsx';
+import { useCart } from '@/hooks/useCart.jsx';
 
 /*
  * Inline Stripe payment. Renders Stripe's Embedded Checkout (card / PayPal /
@@ -30,7 +31,11 @@ const UI_MODE = import.meta.env.VITE_CHECKOUT_UI === 'embedded' ? 'embedded' : '
 const EmbeddedStripeCheckout = ({ requestBody }) => {
   const [clientSecret, setClientSecret] = useState(null);
   const [error, setError] = useState(null);
+  // A listing that sold while the buyer was typing — the server names it so
+  // the fix is one tap (remove it) rather than a "Try again" that can't work.
+  const [unavailableListingId, setUnavailableListingId] = useState(null);
   const [attempt, setAttempt] = useState(0); // bumping this re-runs the fetch
+  const { cartItems, removeFromCart, setIsCartOpen } = useCart();
 
   const loadSecret = useCallback(async (signal) => {
     setError(null);
@@ -49,6 +54,7 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
       const data = await res.json().catch(() => ({}));
       if (signal?.aborted) return;
       if (!res.ok || !data.clientSecret) {
+        setUnavailableListingId(data.listingId || null);
         throw new Error(data.error || `Could not start the payment (HTTP ${res.status}).`);
       }
       setClientSecret(data.clientSecret);
@@ -80,6 +86,9 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
   }
 
   if (error) {
+    const unavailableLine = unavailableListingId
+      ? cartItems.find((item) => item.product?.id === unavailableListingId)
+      : null;
     return (
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm">
         <div className="flex items-start gap-3 text-destructive">
@@ -89,9 +98,25 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
             <p className="mt-1 text-foreground/80">{error}</p>
           </div>
         </div>
-        <Button variant="outline" size="sm" className="mt-4" onClick={() => setAttempt((n) => n + 1)}>
-          <RefreshCw className="mr-2 h-4 w-4" /> Try again
-        </Button>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {unavailableLine ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                removeFromCart(unavailableLine.variant?.id || unavailableLine.product.id);
+                setUnavailableListingId(null);
+                setAttempt((n) => n + 1);
+              }}
+            >
+              Remove “{unavailableLine.product?.title || unavailableLine.product?.name || 'that item'}” and continue
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={() => setAttempt((n) => n + 1)}>
+              <RefreshCw className="mr-2 h-4 w-4" /> Try again
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setIsCartOpen(true)}>Edit cart</Button>
+        </div>
       </div>
     );
   }

@@ -65,6 +65,10 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     q.contains = () => q;
     // Partner promo codes are matched case-insensitively (partners.code).
     q.ilike = () => q;
+    // Identity gate: prices the marketplace lines to compare against the
+    // ID-check threshold. listing-1 (single-item tests) sits under it; l1 (cart
+    // tests) above, so the unverified-buyer 403 still fires there.
+    q.in = () => Promise.resolve({ data: [{ id: 'listing-1', price_aud: 99.99 }, { id: 'l1', price_aud: 900 }], error: null });
     q.single = () => Promise.resolve({ data: null, error: null });
     // The identity gate's profiles lookup uses its own mock so it doesn't
     // consume the generic listing/offer mock the handlers rely on.
@@ -155,6 +159,7 @@ describe('POST /create-checkout', () => {
   const pricingSettings = () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null })          // email_verification_required
+      .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null })              // listing lookup
       .mockResolvedValueOnce({ data: { value: true }, error: null })           // commissions_enabled
       .mockResolvedValueOnce({ data: { value: true }, error: null })           // commission_on_fixed
@@ -247,6 +252,7 @@ describe('POST /create-checkout', () => {
   it("charges the seller's counter amount, not the buyer's original offer, when checking out on a countered offer", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
         data: {
@@ -275,6 +281,7 @@ describe('POST /create-checkout', () => {
   it('rejects an accepted offer whose seller is not the listing seller', async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
         data: {
@@ -298,6 +305,7 @@ describe('POST /create-checkout', () => {
   it("charges the counter amount when the buyer accepted the counter first (status 'accepted', counter set)", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
         data: {
@@ -323,6 +331,7 @@ describe('POST /create-checkout', () => {
   it("rejects checkout on a 'pending' offer the seller never consented to", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
         data: {
@@ -862,6 +871,8 @@ describe('POST /create-cart-checkout', () => {
 
   it('returns 403 when buying your own listing', async () => {
     emailVerifyOff();
+    // Identity gate: a marketplace line in the cart reads the ID threshold.
+    mockMaybeSingle.mockResolvedValueOnce({ data: { value: 500 }, error: null });
     gstSettings();
     mockMaybeSingle.mockResolvedValueOnce({
       data: { id: 'l1', price_aud: 50, seller_id: 'user-123', status: 'active', vault_item: { card_name: 'X' }, seller: { seller_tier: 'none' } },

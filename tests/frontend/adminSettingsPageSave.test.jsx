@@ -92,6 +92,7 @@ describe('AdminSettingsPage save', () => {
       'listing_approval_required', 'max_images_per_listing', 'free_shipping_threshold_aud',
       'default_shipping_rate_aud', 'require_mfa_admins', 'email_verification_required',
       'enable_marketplace', 'enable_trading', 'enable_blog', 'banned_words',
+      'marketplace_identity_threshold_aud',
     ];
     const user = userEvent.setup();
     render(<AdminSettingsPage />);
