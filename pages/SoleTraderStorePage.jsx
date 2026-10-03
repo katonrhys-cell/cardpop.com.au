@@ -177,7 +177,8 @@ const SoleTraderStorePage = () => {
     return publicImageUrl(path);
   };
 
-  // Product + Offer JSON-LD for each item shown in the store.
+  // Product + Offer JSON-LD for each priced item shown in the store — Google
+  // rejects a Product with no offers/review/aggregateRating.
   const productListLd = listings.map((item) => {
     const isMkt = item._type === 'marketplace';
     const name = (isMkt ? item.vault_item?.card_name : item.card_name) || 'Trading Card';
@@ -186,27 +187,26 @@ const SoleTraderStorePage = () => {
     const url = isMkt
       ? `${SITE}/marketplace/${item.id}/${item.slug || 'listing'}`
       : `${SITE}/product/vault/${item.id}`;
+    if (!(price > 0)) return null;
     const image = resolveListingImage(item);
     return {
       '@type': 'Product',
       name,
       url,
       ...(image ? { image } : {}),
-      ...(price > 0
-        ? { offers: {
-            '@type': 'Offer',
-            price: Number(price).toFixed(2),
-            priceCurrency: 'AUD',
-            availability: (isMkt ? item.status === 'sold' : isSoldVaultItem(item))
-              ? 'https://schema.org/SoldOut'
-              : 'https://schema.org/InStock',
-            ...(condition ? { itemCondition: condition } : {}),
-            url,
-            seller: { '@type': 'Store', name: displayName },
-          } }
-        : {}),
+      offers: {
+        '@type': 'Offer',
+        price: Number(price).toFixed(2),
+        priceCurrency: 'AUD',
+        availability: (isMkt ? item.status === 'sold' : isSoldVaultItem(item))
+          ? 'https://schema.org/SoldOut'
+          : 'https://schema.org/InStock',
+        ...(condition ? { itemCondition: condition } : {}),
+        url,
+        seller: { '@type': 'Store', name: displayName },
+      },
     };
-  });
+  }).filter(Boolean);
 
   const structuredData = [
     {

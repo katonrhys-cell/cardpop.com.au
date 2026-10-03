@@ -235,10 +235,21 @@ const ShopCategoryPage = () => {
       numberOfItems: totalItems,
       itemListElement: products.map((p, i) => {
         const price = Number(p.price_aud ?? 0);
+        const url = `${SITE_ORIGIN}${shopProductPath(p)}`;
+        // Unpriced (e.g. coming soon): a Product without a real offer is
+        // rejected by Google, so list the URL only.
+        if (!(price > 0)) {
+          return {
+            '@type': 'ListItem',
+            position: (page - 1) * PER_PAGE + i + 1,
+            name: p.title || p.name || 'Trading Card Supply',
+            url,
+          };
+        }
         const productSchema = {
           '@type': 'Product',
           name: p.title || p.name || 'Trading Card Supply',
-          url: `${SITE_ORIGIN}${shopProductPath(p)}`,
+          url,
           ...(absoluteImage(p) ? { image: absoluteImage(p) } : {}),
           offers: {
             '@type': 'Offer',
@@ -249,7 +260,7 @@ const ShopCategoryPage = () => {
               : (p.stock_quantity == null || p.stock_quantity > 0)
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/OutOfStock',
-            url: `${SITE_ORIGIN}${shopProductPath(p)}`,
+            url,
           },
         };
         return {
