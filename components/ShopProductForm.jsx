@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, X, ImagePlus, Plus, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, X, ImagePlus, Plus, Trash2, ExternalLink, RefreshCw, GripVertical } from 'lucide-react';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
@@ -226,6 +227,25 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const removeImage = (index) => {
     setImages(prev => prev.filter((_, i) => i !== index));
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Drag a photo onto another to move it there; the first photo is the cover.
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+  const moveImage = (from, to) => {
+    if (from == null || to == null || from === to) return;
+    const reorder = (arr) => {
+      const next = [...arr];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    };
+    setImages(reorder);
+    setPreviewUrls(reorder);
+  };
+  const previewSrc = (url) => {
+    if (!url || url.startsWith('blob:') || url.startsWith('/') || url.startsWith('data:')) return url;
+    return publicImageUrl(url) || url;
   };
 
   const uploadNewImages = async () => {
@@ -478,10 +498,24 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="space-y-4 bg-muted/20 p-6 rounded-2xl border border-border">
         <Label className="text-base font-bold text-foreground">Product Images</Label>
+        {previewUrls.length > 1 && <p className="text-xs text-muted-foreground -mt-2">Drag photos to reorder — the first one is the cover image.</p>}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {previewUrls.map((url, index) => (
-            <div key={index} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-border bg-background shadow-sm group">
-              <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+            <div
+              key={`${url}-${index}`}
+              draggable
+              onDragStart={(e) => { setDragIndex(index); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(index)); }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIndex !== index) setOverIndex(index); }}
+              onDrop={(e) => { e.preventDefault(); moveImage(dragIndex, index); setDragIndex(null); setOverIndex(null); }}
+              onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+              className={`relative aspect-[3/4] rounded-xl overflow-hidden border bg-background shadow-sm group cursor-grab active:cursor-grabbing transition-all ${
+                overIndex === index && dragIndex !== null && dragIndex !== index ? 'border-primary ring-2 ring-primary' : 'border-border'
+              } ${dragIndex === index ? 'opacity-40' : ''}`}
+            >
+              <img src={previewSrc(url)} alt={`Preview ${index}`} draggable={false} className="w-full h-full object-cover" />
+              <span className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-[10px] font-bold px-1.5 py-1 rounded-lg">
+                <GripVertical size={12} />{index === 0 ? 'Cover' : index + 1}
+              </span>
               <button
                 type="button"
                 onClick={() => removeImage(index)}
@@ -490,6 +524,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               >
                 <X size={16} />
               </button>
+              <div className="absolute bottom-2 left-2 right-2 flex justify-between sm:hidden">
+                <button type="button" disabled={index === 0} onClick={() => moveImage(index, index - 1)} aria-label="Move earlier" className="bg-black/60 text-white px-2 py-0.5 rounded-lg text-xs disabled:opacity-30">←</button>
+                <button type="button" disabled={index === previewUrls.length - 1} onClick={() => moveImage(index, index + 1)} aria-label="Move later" className="bg-black/60 text-white px-2 py-0.5 rounded-lg text-xs disabled:opacity-30">→</button>
+              </div>
             </div>
           ))}
 
