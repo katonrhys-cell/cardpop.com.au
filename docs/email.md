@@ -36,6 +36,11 @@ The transactional emails and where they fire:
 | Offer response — accepted (pay by …), countered, declined, counter accepted/declined, withdrawn | The other party (both, for an accepted counter) | `src/routes/offers.js` → `PATCH /offers/:id` |
 | Order shipped (tracking) | Buyer | `src/routes/admin.js` `POST /admin/orders/:id/ship` (see below) |
 | Sold-out shop enquiry | Admin (`noreply@cardpop.com.au`) | `src/routes/shop-enquiry.js` — the **Enquire** button on a shop product with `stock_quantity = 0`; reply-to is the shopper. Override the inbox with `SHOP_ENQUIRY_EMAIL` |
+| Abandoned checkout (one reminder, cart-restore link) | Signed-in buyer, or a guest who ticked the newsletter box at checkout | `src/services/retentionSweepService.js` (daily retention sweep) — see `docs/retention.md` |
+| Watchlist price drop / watched card sold | Buyer | retention sweep; off switch in Account → Notification settings |
+| Saved-search matches (daily digest) | Buyer | retention sweep |
+| Back in stock | Whoever clicked **Notify me** on a sold-out shop product (`shop_restock_requests`) | retention sweep |
+| Welcome code expires in 7 days | New user with an unused code | retention sweep |
 
 Email HTML is built by the templates in `src/emails/templates.js`.
 

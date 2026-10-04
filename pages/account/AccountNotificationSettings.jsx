@@ -89,11 +89,19 @@ const CATEGORIES = [
     ],
   },
   {
-    label: 'Watchlist',
+    label: 'Watchlist & searches',
     types: [
-      { key: 'watchlist_price_drop',  label: 'Price drop on watched listing' },
+      { key: 'watchlist_price_drop',  label: 'Price drop on a watched card' },
+      { key: 'watchlist_sold',        label: 'A watched card sold' },
+      { key: 'saved_search_match',    label: 'New cards match a saved search (daily digest)' },
       { key: 'watchlist_bid',         label: 'New bid on watched auction' },
       { key: 'watchlist_ending_soon', label: 'Watched auction ending soon' },
+    ],
+  },
+  {
+    label: 'Shopping',
+    types: [
+      { key: 'abandoned_checkout',    label: 'A reminder if you leave a checkout unfinished' },
     ],
   },
   {

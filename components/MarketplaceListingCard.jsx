@@ -37,10 +37,12 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
-      toast.error('Sign in to save listings to your watchlist');
+      toast('Sign in to save cards to your watchlist', {
+        action: { label: 'Sign in', onClick: () => { window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`); } },
+      });
       return;
     }
-    const { success, watchlisted } = await toggle(listing.id);
+    const { success, watchlisted } = await toggle(listing.id, { priceAud: listing.price_aud });
     if (!success) {
       toast.error('Could not update your watchlist. Please try again.');
       return;

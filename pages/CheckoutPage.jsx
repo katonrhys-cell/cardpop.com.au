@@ -69,10 +69,10 @@ const Section = ({ step, icon: Icon, title, subtitle, children }) => (
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { cardId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const source = searchParams.get('source');
 
-  const { cartItems, setIsCartOpen, removeFromCart } = useCart();
+  const { cartItems, setIsCartOpen, removeFromCart, addToCart } = useCart();
   const { currentUser, isIdentityVerified, profileLoading } = useAuth();
   const { settings } = usePlatformSettings();
   const [initializing, setInitializing] = useState(true);
@@ -112,6 +112,47 @@ const CheckoutPage = () => {
   const [paymentBody, setPaymentBody] = useState(null);
   const readyToPay = paymentBody !== null;
   const paymentRef = useRef(null);
+
+  // ?restore=<orderId>&t=<token> from the abandoned-checkout email: pull the
+  // saved lines back into the cart on whatever device the email was opened on,
+  // then drop the params so a refresh doesn't add them twice.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    const restoreId = searchParams.get('restore');
+    const token = searchParams.get('t');
+    if (!restoreId || !token || restoredRef.current) return;
+    restoredRef.current = true;
+    let cancelled = false;
+    apiServerClient.fetch(`/orders/${encodeURIComponent(restoreId)}/abandoned-cart?t=${encodeURIComponent(token)}`)
+      .then(async (res) => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
+      .then(async ({ ok, body }) => {
+        if (cancelled) return;
+        if (!ok) { toast.error(body.error || 'That cart link has expired.'); return; }
+        let added = 0;
+        for (const line of body.items || []) {
+          const already = cartItems.some((i) => (i.variant?.variant_id || i.product?.id) === (line.variantId || line.id));
+          if (already) continue;
+          try {
+            await addToCart(
+              { id: line.id, type: line.type, source: line.type === 'shop' ? 'shop' : 'marketplace', title: line.title, price: line.unitPriceAud },
+              { id: line.variantId ? `${line.id}:${line.variantId}` : line.id, price_in_cents: Math.round(line.unitPriceAud * 100), manage_inventory: false, ...(line.variantId ? { variant_id: line.variantId } : {}) },
+              line.quantity,
+            );
+            added += 1;
+          } catch { /* a line that can't be re-added is skipped */ }
+        }
+        if (added > 0) toast.success(`Welcome back — ${added} item${added !== 1 ? 's' : ''} restored to your cart.`);
+      })
+      .catch(() => { if (!cancelled) toast.error('Could not restore your cart.'); })
+      .finally(() => {
+        if (cancelled) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete('restore'); next.delete('t');
+        setSearchParams(next, { replace: true });
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per restore link
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

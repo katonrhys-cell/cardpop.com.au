@@ -744,3 +744,112 @@ ${marketplace
     'You are receiving this because you placed an order on CardPop.',
   );
 }
+
+// ─── Retention emails (src/services/retentionSweepService.js) ─────────────────
+
+const linkStyle = 'color:#E63946;text-decoration:none;';
+
+/** The one reminder after an unfinished checkout, with a cart-restore link. */
+export function abandonedCheckoutEmail({ name, items = [], restoreUrl }) {
+  const rows = items.slice(0, 6).map((i) => [
+    `<a href="${esc(i.url)}" style="${linkStyle}">${esc(i.title)}</a>${i.quantity > 1 ? ` × ${Number(i.quantity)}` : ''}`,
+    money(i.price * (i.quantity || 1)),
+  ]);
+  const body = `<p>You left ${items.length === 1 ? 'something' : 'a few things'} in your cart. Cards on CardPop are one-of-a-kind, so once another collector buys one it’s gone.</p>
+${summaryTable(rows)}
+<p>Your cart is saved — pick up where you left off with the button below. Every fee is shown before you pay, and every order is covered by CardPop Buyer Protection.</p>`;
+  return cpEmail(
+    'Your CardPop cart is waiting.',
+    'Still Thinking It Over?',
+    `Hi ${esc(name || 'there')},`,
+    body,
+    esc(restoreUrl),
+    'Return to Checkout',
+    'You’re receiving this because you started a checkout on CardPop and agreed to hear from us. One reminder only.',
+  );
+}
+
+export function watchlistPriceDropEmail({ name, cardName, setName, from, to, pct, url }) {
+  const body = `<p>A card on your watchlist just dropped in price.</p>
+${summaryTable([
+  ['Card', `<a href="${esc(url)}" style="${linkStyle}">${esc(cardName)}</a>${setName ? ` <span style="color:#6b7280;">· ${esc(setName)}</span>` : ''}`],
+  ['Was', money(from)],
+  ['Now', `<strong>${money(to)}</strong> (${Number(pct)}% off)`, true],
+])}
+<p>Marketplace cards are one of a kind — if you want it at this price, now’s the moment.</p>`;
+  return cpEmail(
+    `${esc(cardName)} is now ${money(to)} — ${Number(pct)}% below when you saved it.`,
+    'Price Drop on Your Watchlist',
+    `Hi ${esc(name || 'there')},`,
+    body,
+    esc(url),
+    'View the Card',
+    'Watchlist alerts can be switched off in Account → Notification settings.',
+  );
+}
+
+export function watchlistSoldEmail({ name, cardName, setName, searchUrl }) {
+  const body = `<p><strong>${esc(cardName)}</strong>${setName ? ` (${esc(setName)})` : ''} from your watchlist has sold to another collector.</p>
+<p>Similar cards are listed every day — here’s a live search for it, and you can save the search to be emailed the moment a new one appears.</p>`;
+  return cpEmail(
+    `${esc(cardName)} on your watchlist has sold.`,
+    'One Got Away',
+    `Hi ${esc(name || 'there')},`,
+    body,
+    esc(searchUrl),
+    'Find Another',
+    'Watchlist alerts can be switched off in Account → Notification settings.',
+  );
+}
+
+export function savedSearchMatchesEmail({ name, searchName, searchUrl, matches = [] }) {
+  const rows = matches.slice(0, 5).map((m) => [
+    `<a href="${esc(m.url)}" style="${linkStyle}">${esc(m.title)}</a>${m.set ? ` <span style="color:#6b7280;">· ${esc(m.set)}</span>` : ''}`,
+    money(m.price),
+  ]);
+  const body = `<p>${matches.length === 1 ? 'A new card matches' : `${matches.length} new cards match`} your saved search <strong>${esc(searchName)}</strong>:</p>
+${summaryTable(rows)}
+<p>Saved-search alerts go out once a day with whatever’s new since the last one.</p>`;
+  return cpEmail(
+    `New on CardPop for “${esc(searchName)}”.`,
+    'New Cards Match Your Search',
+    `Hi ${esc(name || 'there')},`,
+    body,
+    esc(searchUrl),
+    'See All Matches',
+    'Manage saved searches in Account → Watchlist.',
+  );
+}
+
+export function backInStockEmail({ productTitle, priceAud, url }) {
+  const body = `<p>Good news — <strong>${esc(productTitle)}</strong> is back in stock at ${money(priceAud)}.</p>
+<p>Stock on popular lines doesn’t last; grab it while it’s here. Shop orders ship tracked, with 14-day returns.</p>`;
+  return cpEmail(
+    `${esc(productTitle)} is back in stock.`,
+    'It’s Back in Stock',
+    'Hi there,',
+    body,
+    esc(url),
+    'Buy It Now',
+    'You asked us to email you when this product came back. This is that one email.',
+  );
+}
+
+export function welcomeOfferReminderEmail({ name, code, discountPct, expiresAt }) {
+  const expiryStr = new Date(expiresAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const body = `<p>Your welcome code is still unused and expires on <strong>${esc(expiryStr)}</strong>.</p>
+<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
+<p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
+<p style="margin:0;font-size:26px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
+</div>
+<p>It takes <strong>${Number(discountPct)}% off the cards</strong> in your first order — it’s applied automatically at checkout when you’re signed in.</p>`;
+  return cpEmail(
+    `Your ${Number(discountPct)}% welcome code expires ${esc(expiryStr)}.`,
+    'Your Welcome Code Expires Soon',
+    `Hi ${esc(name || 'there')},`,
+    body,
+    'https://cardpop.com.au/marketplace',
+    'Find Your First Card',
+    'This one-time offer was generated for your CardPop account and can’t be transferred.',
+  );
+}

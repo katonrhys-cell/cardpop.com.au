@@ -7,6 +7,8 @@ import { shipOrderSchema, shipOrderBodySchema } from '../schemas/adminSchemas.js
 import { markOrderShipped, markOrderDelivered, sellerOwnsOrder, isMultiSellerOrder } from '../services/shipmentService.js';
 import { runDeliverySweep } from '../services/deliverySweepService.js';
 import logger from '../utils/logger.js';
+import { supabase } from '../utils/supabaseClient.js';
+import { verifyRestoreToken } from '../utils/restoreToken.js';
 
 const router = Router();
 
@@ -30,6 +32,37 @@ router.get('/delivery-sweep', async (req, res) => {
   } catch (err) {
     logger.error(`[DELIVERY] sweep run failed: ${err.message}`);
     res.status(500).json({ error: 'Delivery sweep failed' });
+  }
+});
+
+// ─── GET /orders/:id/abandoned-cart?t=… — restore an abandoned cart ──────────
+// Linked from the abandoned-checkout email. Public, but the HMAC token
+// (src/utils/restoreToken.js) must match; it returns the lines only — type,
+// id, title, unit price, quantity, variant — never the address or the email.
+router.get('/:id/abandoned-cart', async (req, res) => {
+  const { id } = req.params;
+  if (!/^[0-9a-f-]{36}$/i.test(id) || !verifyRestoreToken(id, req.query.t)) {
+    return res.status(404).json({ error: 'This cart link is not valid.' });
+  }
+  try {
+    const { data: order, error } = await supabase
+      .from('orders').select('id, status, order_items').eq('id', id).maybeSingle();
+    if (error) throw error;
+    if (!order || !['pending', 'cancelled'].includes(order.status)) {
+      return res.status(410).json({ error: 'This cart has already been checked out.' });
+    }
+    const items = (Array.isArray(order.order_items) ? order.order_items : []).map((l) => ({
+      type: l.type === 'shop' ? 'shop' : 'listing',
+      id: l.id,
+      title: l.title || 'Item',
+      quantity: Math.max(1, Number(l.quantity) || 1),
+      unitPriceAud: Number(l.unit_price_aud ?? (Number(l.line_total_aud) / (Number(l.quantity) || 1))) || 0,
+      ...(l.variant_id ? { variantId: l.variant_id } : {}),
+    })).filter((l) => l.id);
+    res.json({ items });
+  } catch (err) {
+    logger.error(`[ORDERS] abandoned-cart restore failed for ${id}: ${err.message}`);
+    res.status(500).json({ error: 'Could not restore this cart.' });
   }
 });
 

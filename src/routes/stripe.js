@@ -547,6 +547,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // common path byte-identical to before, so it can't break in the window
       // before the buyer_email migration lands.
       ...(userId ? {} : { buyer_email: email }),
+      // Consent to hear from us, recorded with the order so an abandoned-
+      // checkout reminder is only ever sent to someone who ticked the box.
+      marketing_consent: wantsNewsletter,
       seller_id:         null,
       listing_id:        null,
       stripe_session_id: session.id,

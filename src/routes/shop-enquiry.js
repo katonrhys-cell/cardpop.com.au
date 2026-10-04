@@ -93,4 +93,41 @@ router.post('/', async (req, res) => {
   }
 });
 
+/**
+ * POST /shop-enquiry/notify
+ *
+ * "Email me when it's back" on a sold-out shop product — one field, no
+ * message. Stores a restock request that the daily retention sweep emails once
+ * the product is purchasable again (src/services/retentionSweepService.js).
+ * Same abuse controls as the enquiry: honeypot, Turnstile when configured.
+ */
+router.post('/notify', async (req, res) => {
+  const productId = String(req.body?.productId || '').trim();
+  const email = String(req.body?.email || '').trim();
+  const honeypot = String(req.body?.company || '').trim();
+  if (honeypot) return res.status(200).json({ ok: true });
+  if (!isUuid(productId)) return res.status(400).json({ error: 'Unknown product.' });
+  if (!isEmail(email) || email.length > MAX.email) return res.status(400).json({ error: 'Please provide a valid email address.' });
+
+  const captcha = await verifyTurnstileToken(req.body?.turnstileToken, req.ip);
+  if (!captcha.success) return res.status(400).json({ error: 'Captcha verification failed. Please try again.' });
+
+  try {
+    const { data: product, error: lookupError } = await supabase
+      .from('shop_products').select('id, status').eq('id', productId).maybeSingle();
+    if (lookupError) throw lookupError;
+    if (!product || !PUBLIC_SHOP_STATUSES.includes(product.status)) return res.status(404).json({ error: 'Unknown product.' });
+
+    const { error: insErr } = await supabase
+      .from('shop_restock_requests')
+      .insert({ product_id: productId, email: email.toLowerCase(), user_id: req.user?.id || null });
+    // 23505 = an open request already exists for this address — that's a success.
+    if (insErr && insErr.code !== '23505') throw insErr;
+    res.json({ ok: true });
+  } catch (err) {
+    logger.error(`[SHOP_ENQUIRY] restock request failed: ${err.message}`);
+    res.status(500).json({ error: 'We could not save your request. Please try again.' });
+  }
+});
+
 export default router;

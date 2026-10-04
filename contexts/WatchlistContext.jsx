@@ -72,7 +72,7 @@ export const WatchlistProvider = ({ children }) => {
    * (A bare boolean was ambiguous: a successful *removal* and a *failure* both
    * looked the same to callers.)
    */
-  const toggle = useCallback(async (listingId) => {
+  const toggle = useCallback(async (listingId, { priceAud } = {}) => {
     if (!currentUser?.id) return { success: false, watchlisted: ids.has(listingId) };
     const uid = currentUser.id;
     const already = ids.has(listingId);
@@ -93,7 +93,13 @@ export const WatchlistProvider = ({ children }) => {
       if (already) {
         ({ error } = await supabase.from('watchlist').delete().eq('user_id', uid).eq('listing_id', listingId));
       } else {
-        ({ error } = await supabase.from('watchlist').insert({ user_id: uid, listing_id: listingId }));
+        // price_at_add_aud lets the daily retention sweep email a genuine price
+        // drop (and only once per new low) — see docs/retention.md.
+        const price = Number(priceAud);
+        ({ error } = await supabase.from('watchlist').insert({
+          user_id: uid, listing_id: listingId,
+          ...(Number.isFinite(price) && price > 0 ? { price_at_add_aud: price } : {}),
+        }));
       }
     } catch (e) {
       error = e;
