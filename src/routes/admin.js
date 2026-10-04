@@ -16,6 +16,7 @@ import logger from '../utils/logger.js';
 import { sendOrderShipped } from '../utils/emailService.js';
 import { normalizeTrackingNumber, carrierLabel } from '../../utils/shipmentTracking.js';
 import { runSupplierPriceWatch } from '../services/supplierPriceWatchService.js';
+import { syncSiteTraffic, Ga4NotConfiguredError } from '../services/siteTrafficService.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
 
 const router = Router();
@@ -1354,6 +1355,25 @@ router.post('/shop-products/:id/supplier-price-check', validateRequestParams(sho
   } catch (err) {
     logger.error(`[ADMIN] Supplier price check failed: ${err.message}`);
     res.status(500).json({ error: 'Supplier price check failed' });
+  }
+});
+
+/**
+ * POST /admin/site-traffic/sync
+ * "Sync now" on the dashboard's Visitors card: the same GA4 pull the nightly
+ * cron does (src/services/siteTrafficService.js), so an admin can refresh the
+ * numbers or confirm the GA4 credentials work without waiting for the schedule.
+ */
+router.post('/site-traffic/sync', async (req, res) => {
+  try {
+    const summary = await syncSiteTraffic();
+    res.json(summary);
+  } catch (err) {
+    if (err instanceof Ga4NotConfiguredError) {
+      return res.status(503).json({ error: err.message });
+    }
+    logger.error(`[ADMIN] Site traffic sync failed: ${err.message}`);
+    res.status(502).json({ error: 'Site traffic sync failed. Check the GA4 service account and property id.' });
   }
 });
 

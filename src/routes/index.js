@@ -40,6 +40,7 @@ import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
 import shopSupplierWatchRouter from './shop-supplier-watch.js';
+import siteTrafficRouter from './site-traffic.js';
 import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
@@ -200,6 +201,10 @@ export default () => {
     // Weekly supplier price watch for shop products (cron, CRON_SECRET)
     router.use('/shop-supplier-watch', apiLimiter);
     router.use('/shop-supplier-watch', shopSupplierWatchRouter);
+
+    // Nightly GA4 visitor-count sync for the home page / admin (cron, CRON_SECRET)
+    router.use('/site-traffic', apiLimiter);
+    router.use('/site-traffic', siteTrafficRouter);
 
     // Local game store directory submissions
     router.use('/stores', apiLimiter);
