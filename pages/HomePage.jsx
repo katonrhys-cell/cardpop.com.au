@@ -15,6 +15,7 @@ import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
+import { publicTrafficStat } from '@/utils/siteTraffic.js';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 
 // NOTE: this page intentionally imports NOTHING from framer-motion. The library
@@ -184,14 +185,15 @@ const HERO_CARDS = [
 ];
 
 // ─── Stat counter item ────────────────────────────────────────────────────────
-const StatItem = ({ value, suffix, label, isDecimal, inView }) => {
+const StatItem = ({ value, suffix, label, sub, isDecimal, inView }) => {
   const count = useCountUp(value, inView, isDecimal);
   return (
     <div className="text-center">
       <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums">
-        {count}{suffix}
+        {isDecimal ? count : count.toLocaleString('en-AU')}{suffix}
       </div>
       <div className="text-sm text-muted-foreground mt-1 font-medium">{label}</div>
+      {sub && <div className="text-xs text-muted-foreground/80 mt-0.5 tabular-nums">{sub}</div>}
     </div>
   );
 };
@@ -205,6 +207,9 @@ const HomePage = () => {
   // Real platform counts — null until loaded; the strip renders nothing rather
   // than invented numbers if the query fails or the counts are still small.
   const [platformStats, setPlatformStats]     = useState(null);
+  // Visitor counts (GA4 → site_traffic_summary, docs/site-traffic.md). Loaded
+  // separately so a missing/stale traffic row never hides the other counts.
+  const [trafficStat, setTrafficStat]         = useState(null);
 
   const DESK_VISIBLE = 8;
   const total = CATEGORIES.length;
@@ -259,6 +264,7 @@ const HomePage = () => {
         { value: platformStats.events,     label: 'Events Listed' },
       ].filter((s) => s.value > 0)
     : [];
+  if (statItems.length && trafficStat) statItems.push(trafficStat);
 
   const [statsRef, statsInView] = useRevealOnce('-80px');
   const [categoriesRef, categoriesInView] = useRevealOnce('0px');
@@ -375,6 +381,18 @@ const HomePage = () => {
         }, 5 * 60 * 1000)
           .then((res) => { if (isMounted && res?.data) setPlatformStats(res.data); })
           .catch(() => { /* strip stays hidden */ });
+
+        // Visitors tile: last 30 days + since launch, from the nightly GA4
+        // sync. publicTrafficStat() returns null (tile hidden) when the row is
+        // missing, stale, or the count is too small to be worth showing.
+        cachedQuery('homepage_traffic', () =>
+          supabase.from('site_traffic_summary')
+            .select('visitors_30d, visitors_all_time, since_date, synced_at')
+            .eq('id', true)
+            .maybeSingle(),
+        5 * 60 * 1000)
+          .then((res) => { if (isMounted && res?.data) setTrafficStat(publicTrafficStat(res.data)); })
+          .catch(() => { /* tile stays hidden */ });
 
         // Supabase resolves with { data, error } instead of throwing — an
         // unlogged error here renders the empty state with no trace, which
@@ -590,7 +608,7 @@ const HomePage = () => {
       {statItems.length >= 2 && (
         <section ref={statsRef} className="py-8 md:py-12 border-y border-border bg-card">
           <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-            <div className={`grid grid-cols-2 gap-6 md:gap-4 ${statItems.length >= 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
+            <div className={`grid grid-cols-2 gap-6 md:gap-4 ${statItems.length >= 5 ? 'md:grid-cols-3 lg:grid-cols-5' : statItems.length === 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
               {statItems.map((stat) => (
                 <StatItem key={stat.label} {...stat} inView={statsInView} />
               ))}
