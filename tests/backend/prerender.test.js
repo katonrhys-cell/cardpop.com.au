@@ -547,9 +547,10 @@ describe('prerender static content pages', () => {
     const { status, body } = await run('/returns');
     expect(status).toBe(200);
     expect(body).toContain('<h1>Returns &amp; Refunds</h1>');
-    expect(body).toContain('Platform fee retention on marketplace refunds');
+    expect(body).toContain('What you get back');
+    expect(body).toContain('refunded in full');
     expect(body).toContain('CardPop Shop returns &amp; exchanges (new products)');
-    expect(body).toContain('Return window: 5 days');
+    expect(body).toContain('Return window: 14 days');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/returns" />');
     expect(body).not.toContain('noindex');
   });

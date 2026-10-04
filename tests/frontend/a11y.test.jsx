@@ -100,12 +100,12 @@ describe('Accessibility — components', () => {
   });
 
   it('BuyerProtection (full) has no axe violations', async () => {
-    const { container } = render(main(<BuyerProtection />));
+    const { container } = render(router(main(<BuyerProtection />)));
     expect(await axe(container)).toHaveNoViolations();
   });
 
   it('BuyerProtection (compact) has no axe violations', async () => {
-    const { container } = render(main(<BuyerProtection compact />));
+    const { container } = render(router(main(<BuyerProtection compact />)));
     expect(await axe(container)).toHaveNoViolations();
   });
 

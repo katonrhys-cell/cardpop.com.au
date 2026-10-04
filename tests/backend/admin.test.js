@@ -15,9 +15,12 @@ vi.mock('../../src/utils/stripeClient.js', () => ({ default: { transfers: { crea
 vi.mock('../../src/services/payoutService.js', () => ({ payoutSeller: mockPayoutSeller }));
 // Keep the refund arithmetic real; only the platform_settings lookup is stubbed
 // so it doesn't consume a queued supabase builder.
+// Admin-configured retention (50% of the platform fee + the processing fee)
+// so these pin the arithmetic; the policy default is a full refund
+// (tests/backend/services/refundAmounts.test.js).
 vi.mock('../../src/services/refundAmounts.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  getRefundRetentionPct: vi.fn(async () => 50),
+  getRefundPolicyOptions: vi.fn(async () => ({ retentionPct: 50, retainProcessingFee: true })),
 }));
 vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: mockSendOrderShipped }));
 vi.mock('../../src/utils/logger.js', () => ({

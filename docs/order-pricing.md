@@ -102,25 +102,34 @@ tax. It is also kept out of `platform_fee_aud` (which means commission + GST,
 the figure admin revenue reporting and refund retention are computed from) and
 lives in its own `orders.processing_fee_aud` column.
 
-### Refunds retain it in full
+### Refunds return it (full refunds by default)
 
-Stripe does not return its processing fee when a payment is refunded. If
-CardPop refunded the buyer's reimbursement of it, every refund would cost the
-platform that fee on top of the goods coming back. `processRefund()`
-(`src/services/refundService.js`) therefore retains **all** of
-`processing_fee_aud` plus the usual `refund_fee_retention_pct` share of
-commission + GST. Orders placed before the column existed carry 0 and behave
-exactly as they did.
+Stripe does not return its processing fee when a payment is refunded, so every
+refund costs the platform that fee. The Buyer Protection policy
+(`utils/buyerProtectionPolicy.js`, decided 2026-10-03) still refunds it: an
+approved claim is a **full refund** — item, postage, service fee and
+processing fee — because change of mind is never an eligible reason on a
+marketplace card, so there is no no-fault case left to keep a fee on. The
+seller's payout is reversed (`reverseSellerPayout`); the Stripe fee is CardPop's
+cost of the claim.
 
-**Except CardPop Shop orders.** The shop return policy registered in Google
-Merchant Center promises no restocking fee (`utils/shopReturnPolicy.js`), so an
-order whose `order_items` lines are all `type: 'shop'` is refunded its whole
-`total_aud` — CardPop absorbs Stripe's fee. A mixed cart keeps the commission
-share and only the marketplace portion of the processing fee (pro-rated by the
-listing lines + their postage + commission over the pre-fee total), so its shop
-goods still come back in full. The arithmetic is `computeRefundAmounts()` in
-`utils/refundAmounts.js`, shared by the request quote (`routes/refunds.js`),
-admin approval (`routes/admin.js`), `processRefund()` and Account → Orders.
+`computeRefundAmounts()` in `utils/refundAmounts.js` (shared by the request
+quote in `routes/refunds.js`, admin approval in `routes/admin.js`,
+`processRefund()` and Account → Orders) keeps the retention machinery behind two
+platform settings for the day the policy needs tightening:
+`refund_fee_retention_pct` (share of `platform_fee_aud` kept, default **0**) and
+`refund_retain_processing_fee` (default **false**). CardPop Shop orders are
+always refunded in full whatever those say — the shop return policy registered
+in Google Merchant Center promises no restocking fee
+(`utils/shopReturnPolicy.js`) — and a mixed cart applies any retention to the
+marketplace share only.
+
+The **claim window** is enforced by the same module on both ends:
+`refundWindow(order)` drives the Request Refund button and is checked again in
+`POST /refunds/request` (409 `REFUND_WINDOW_NOT_OPEN` / `REFUND_WINDOW_CLOSED`).
+Marketplace: 7 days from delivery (`delivered_at`, else `shipped_at` + 10 days),
+a not-received claim after 7 days unposted, and a hard cap of 45 days from
+purchase. Shop: 14 days from delivery.
 
 ## Australia only
 

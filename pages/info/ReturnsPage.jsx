@@ -3,34 +3,39 @@ import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 import { SHOP_RETURN_POLICY } from '@/utils/shopReturnPolicy.js';
+import { MARKETPLACE_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
 
+// Every number and rule on this page comes from utils/buyerProtectionPolicy.js
+// and utils/shopReturnPolicy.js — the same modules the refund code, the
+// Account → Orders window, the checkout strip and api/prerender.js read. Change
+// the policy there, never here.
 const { windowDays, refundProcessingDays } = SHOP_RETURN_POLICY;
+const MP = MARKETPLACE_PROTECTION;
 
 const ReturnsPage = () => {
   return (
     <InfoPageLayout
       title="Returns & Refunds"
-      description="How returns, exchanges and refunds work for CardPop Shop products and marketplace purchases."
+      description="How returns, exchanges and refunds work for CardPop Shop products and cards bought from other collectors on the marketplace."
       breadcrumbs={[{ label: 'Returns & Refunds' }]}
     >
       <SEOHead
         title="Returns & Refund Policy | CardPop"
-        description={`CardPop's returns policy — ${windowDays}-day returns and exchanges on new CardPop Shop products, plus buyer protection and refunds on marketplace purchases.`}
+        description={`CardPop's returns policy — ${windowDays}-day returns and exchanges on new CardPop Shop products, and ${MP.name}: a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery when a marketplace card isn't as described or doesn't arrive.`}
       />
 
       <h2>Overview</h2>
-      <p>
-        CardPop sells two kinds of items, and each has its own returns policy:
-      </p>
+      <p>CardPop sells two kinds of items, and each has its own policy:</p>
       <ul>
         <li>
           <strong>CardPop Shop products</strong> — new products sold by CardPop itself (binders, sleeves,
-          storage and other supplies in the <Link to="/shop">Shop</Link>). These can be returned or exchanged
-          within {windowDays} days, for any reason.
+          storage and other supplies in the <Link to="/shop">Shop</Link>). Return or exchange them within{' '}
+          {windowDays} days of delivery, for any reason.
         </li>
         <li>
-          <strong>Marketplace purchases</strong> — cards bought from other CardPop sellers. These are covered
-          by buyer protection (see <a href="#marketplace">Marketplace purchases</a> below).
+          <strong>Marketplace purchases</strong> — cards bought from other CardPop collectors. A marketplace
+          sale is <strong>binding</strong>: if the card is as advertised, the sale stands. If it isn&apos;t, or it
+          never arrives, <strong>{MP.name}</strong> refunds you in full (see <a href="#marketplace">below</a>).
         </li>
       </ul>
       <p>
@@ -66,7 +71,6 @@ const ReturnsPage = () => {
           extra business days to show it on your statement.
         </li>
       </ul>
-
       <h3>How to return or exchange a Shop product</h3>
       <ol>
         <li>
@@ -83,67 +87,44 @@ const ReturnsPage = () => {
         </li>
       </ol>
 
-      <h2 id="marketplace">Marketplace Purchases</h2>
-      <p>
-        CardPop offers buyer protection on all marketplace purchases. If something goes wrong, you can
-        request a refund within <strong>30 days of purchase</strong> through your account. We&apos;ll review
-        every request within 2 business days and, where approved, issue the refund directly to your
-        original payment method. Because marketplace cards are sold by individual sellers, the
-        change-of-mind returns offered on CardPop Shop products don&apos;t apply to marketplace purchases.
-      </p>
+      <h2 id="marketplace">Marketplace Purchases — {MP.name}</h2>
+      <p>{PROTECTION_COPY.marketplaceSummary}</p>
+      <p>{PROTECTION_COPY.notShippedSummary}</p>
 
-      <h3>Platform Fee Retention on Marketplace Refunds</h3>
+      <h3>What you get back</h3>
       <p>
-        When a marketplace refund is issued, <strong>50% of the platform fee is non-refundable.</strong> This covers
-        Stripe payment processing costs that CardPop incurs regardless of outcome and cannot recover.
-        The remaining 50% of the fee, plus the full item price, is returned to you.
+        An approved claim refunds <strong>everything you paid</strong> on the order: the card&apos;s price, the
+        seller&apos;s postage, CardPop&apos;s service fee and the payment-processing fee. Nothing is retained.
       </p>
-      <div className="not-prose bg-muted/40 border border-border rounded-xl p-4 my-4 text-sm space-y-2">
-        <p className="font-semibold text-foreground">Example — $100 sale with a $3 platform fee:</p>
-        <ul className="space-y-1 text-muted-foreground list-none pl-0">
-          <li>✅ Item price refunded: <strong className="text-foreground">$100.00</strong></li>
-          <li>✅ 50% of platform fee refunded: <strong className="text-foreground">$1.50</strong></li>
-          <li>🔒 Platform fee retained: <strong className="text-foreground">$1.50</strong> (non-refundable)</li>
-          <li className="pt-1 border-t border-border font-semibold text-foreground">Total returned to buyer: $101.50 AUD</li>
+      <div className="not-prose my-4 space-y-2 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+        <p className="font-semibold text-foreground">Example — $100 card, $10 postage, $3 service fee, $2.50 processing fee:</p>
+        <ul className="list-none space-y-1 pl-0 text-muted-foreground">
+          <li>✅ Card refunded: <strong className="text-foreground">$100.00</strong></li>
+          <li>✅ Postage refunded: <strong className="text-foreground">$10.00</strong></li>
+          <li>✅ Service and processing fees refunded: <strong className="text-foreground">$5.50</strong></li>
+          <li className="border-t border-border pt-1 font-semibold text-foreground">Total returned to you: $115.50 AUD</li>
         </ul>
       </div>
-      <p>
-        This policy is shown to buyers before they complete every purchase so there are no surprises.
-      </p>
 
-      <h3>Eligible Refund Reasons</h3>
-      <p>A marketplace refund may be approved when:</p>
+      <h3>When a claim is approved</h3>
       <ul>
-        <li>The item was not received within a reasonable timeframe.</li>
-        <li>The item received is significantly not as described (wrong card, wrong condition grade).</li>
-        <li>The item arrived damaged in transit (photo evidence of packaging required).</li>
-        <li>The item is proven counterfeit.</li>
-        <li>The seller cancelled the order after payment.</li>
+        {MP.eligibleReasons.map((r) => <li key={r}>{r}</li>)}
       </ul>
 
-      <h3>Non-Eligible Reasons</h3>
-      <p>Marketplace refunds will not be approved for:</p>
+      <h3>When a claim isn&apos;t</h3>
       <ul>
-        <li>Change of mind or buyer's remorse.</li>
-        <li>Market price fluctuations after the purchase date.</li>
-        <li>Minor subjective condition discrepancies on raw (ungraded) cards.</li>
-        <li>Requests made more than 30 days after the purchase date.</li>
+        {MP.ineligibleReasons.map((r) => <li key={r}>{r}</li>)}
+        <li>Requests made after the window — {MP.claimWindowDaysFromDelivery} days from delivery, and never more than {MP.hardCapDaysFromPurchase} days after purchase.</li>
       </ul>
 
-      <h3>How to Request a Marketplace Refund</h3>
-      <ol>
-        <li>Go to <strong>My Account → Orders</strong>.</li>
-        <li>Find the relevant order and click <strong>Request Refund</strong>.</li>
-        <li>Select the reason and provide any supporting details or photos.</li>
-        <li>CardPop will review within 2 business days and notify you of the outcome by email and in-app notification.</li>
-        <li>If approved, the refund is issued via Stripe and takes <strong>5–10 business days</strong> to appear on your statement.</li>
-      </ol>
+      <h3>How to make a claim</h3>
+      <p>{PROTECTION_COPY.processSummary}</p>
 
-      <h3>Seller Obligations</h3>
+      <h3>Seller obligations</h3>
       <p>
-        Sellers are required to accurately describe item condition and grade. Where a refund is approved
-        due to misrepresentation, the seller's proceeds may be clawed back at CardPop's discretion and
-        repeat violations may result in account suspension.
+        Sellers must describe condition and grade accurately, post within {MP.notShippedClaimAfterDays} days using a
+        tracked service, and carry the risk of a parcel that doesn&apos;t arrive. Where a claim is approved, the
+        seller&apos;s payout for that order is reversed. Repeat misdescription leads to account suspension.
       </p>
 
       <h3>Disputes</h3>

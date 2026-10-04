@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock, Star, Truck } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
 import WriteProductReviewModal from '@/components/shop/WriteProductReviewModal.jsx';
@@ -21,6 +21,7 @@ import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import { orderPreorderLines } from '@/utils/shopStock.js';
 import { computeRefundAmounts } from '@/utils/refundAmounts.js';
+import { refundWindow, daysLeftInWindow, MARKETPLACE_PROTECTION, SHOP_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
 
 // Order states in which the buyer has something real to review — the seller
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
@@ -42,7 +43,6 @@ const REFUND_REASONS = [
   { value: 'other',                  label: 'Other' },
 ];
 
-const REFUND_WINDOW_DAYS = 30;
 
 const STATUS_CONFIG = {
   payment_confirmed: { label: 'Confirmed',   color: 'bg-blue-500/10 text-blue-700 border-blue-200' },
@@ -184,11 +184,14 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewReq
   const refundQuote = computeRefundAmounts(order);
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
-  const daysSince   = differenceInDays(new Date(), new Date(order.created_at));
-  const canRefund   = !order.refund_status
+  // The claim window from utils/buyerProtectionPolicy.js — the same rule the
+  // server enforces on POST /refunds/request.
+  const window     = refundWindow(order);
+  const daysLeft   = daysLeftInWindow(window);
+  const refundable = !order.refund_status
     && !['refunded','cancelled','payment_failed'].includes(order.status)
-    && ['payment_confirmed','shipped','completed'].includes(order.status)
-    && daysSince <= REFUND_WINDOW_DAYS;
+    && ['payment_confirmed','shipped','completed'].includes(order.status);
+  const canRefund   = refundable && window.state === 'open';
   const canReview   = !reviewed
     && !!order.seller_id
     && REVIEWABLE_STATUSES.includes(order.status);
@@ -306,14 +309,22 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewReq
       )}
 
       {/* Refund eligibility note */}
-      {!order.refund_status && canRefund && (
+      {refundable && window.state !== 'closed' && (
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
           <span>
-            {refundQuote.shopOrder
-              ? 'CardPop Shop order — refunded in full if a refund is approved (no restocking fee). '
-              : `$${refundQuote.retainedFee.toFixed(2)} AUD in fees (50% of the platform fee, plus any payment processing fee) will be retained if a refund is approved. `}
-            Refunds available for {REFUND_WINDOW_DAYS - daysSince} more day{REFUND_WINDOW_DAYS - daysSince !== 1 ? 's' : ''}.
+            {window.state === 'open' ? (
+              <>
+                {refundQuote.retainedFee > 0
+                  ? `$${refundQuote.retainedFee.toFixed(2)} AUD in fees will be retained if a refund is approved. `
+                  : refundQuote.shopOrder
+                    ? 'Refunded in full if approved — no restocking fee. '
+                    : 'Refunded in full if approved — card, postage and fees. '}
+                {window.reason} {daysLeft > 0 && `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left.`}
+              </>
+            ) : (
+              window.reason
+            )}
           </span>
         </div>
       )}
@@ -424,13 +435,14 @@ const AccountOrders = () => {
       <div className="bg-blue-500/5 border border-blue-400/20 rounded-2xl p-4 flex gap-3 text-sm">
         <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
         <div className="space-y-1">
-          <p className="font-semibold text-foreground">CardPop Refund Policy</p>
+          <p className="font-semibold text-foreground">{MARKETPLACE_PROTECTION.name}</p>
           <p className="text-muted-foreground">
-            Refunds can be requested within {REFUND_WINDOW_DAYS} days of purchase for items not received,
-            not as described, or damaged. On marketplace purchases, <strong>50% of the platform fee and any payment
-            processing fee are non-refundable</strong> — they're deducted from your refund automatically, and everything
-            else is returned to your original payment method within 5–10 business days.
-            CardPop Shop orders are refunded in full, with no restocking fee.
+            {PROTECTION_COPY.marketplaceOneLine} Report a marketplace order within{' '}
+            <strong>{MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days of delivery</strong> (or after{' '}
+            {MARKETPLACE_PROTECTION.notShippedClaimAfterDays} days if it was never posted) and, once approved, the
+            whole order comes back to your original payment method within {MARKETPLACE_PROTECTION.refundArrivalBusinessDays} business
+            days. {PROTECTION_COPY.marketplaceNoChangeOfMind} CardPop Shop products can be returned within{' '}
+            {SHOP_PROTECTION.windowDays} days of delivery for any reason.
           </p>
           <Link to="/returns" className="text-primary font-semibold text-xs hover:underline">View full returns policy →</Link>
         </div>
