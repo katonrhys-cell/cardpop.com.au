@@ -30,6 +30,7 @@ import { getReferralCode } from '@/lib/referral.js';
 import { AMAZON_LOCATION_ENABLED } from '@/lib/amazonLocation.js';
 import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
 import { fetchSavedAddresses, addressRowToShipping, formatAddressLabel } from '@/lib/savedAddresses.js';
+import { trackBeginCheckout, trackAddPaymentInfo } from '@/lib/analytics.js';
 
 // Small numbered section wrapper so the single page reads as an ordered flow
 // without a click-through wizard.
@@ -377,6 +378,7 @@ const CheckoutPage = () => {
     if (flatItems.length === 0) { toast.error('Your cart is empty!'); return; }
     if (!validateShipping()) return;
     if (!validateBilling()) return;
+    trackAddPaymentInfo(checkoutItems);
     // Freeze exactly what the buyer reviewed; later renders can't change it.
     setPaymentBody(checkoutRequestBody);
     // Scroll the newly-revealed payment form into view (guarded — happy-dom in
@@ -392,6 +394,15 @@ const CheckoutPage = () => {
   // serverItems is a fresh array each render; track it by its serialised key so
   // the memo (and the Stripe session it seeds) only changes when the order does.
   const serverItemsKey = JSON.stringify(serverItems);
+  // GA4 begin_checkout: once per distinct cart on this page (not on every
+  // re-render, and not again when the shopper edits their address).
+  const beginCheckoutKeyRef = useRef('');
+  useEffect(() => {
+    if (!serverItems.length || beginCheckoutKeyRef.current === serverItemsKey) return;
+    beginCheckoutKeyRef.current = serverItemsKey;
+    trackBeginCheckout(checkoutItems);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the serialised cart
+  }, [serverItemsKey]);
   // Only forward business details when a valid ABN was supplied — this is what
   // switches the server onto the tax-invoice path.
   const billingAbn = billingData.isBusiness && isValidAbn(billingData.abn) ? normalizeAbn(billingData.abn) : '';

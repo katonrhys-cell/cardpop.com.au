@@ -28,6 +28,7 @@ import {
 } from '@/data/shopBinderProducts.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
+import { trackViewItem } from '@/lib/analytics.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -47,6 +48,11 @@ const ShopBinderProductPage = () => {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
+  useEffect(() => {
+    if (!row?.id) return;
+    trackViewItem({ id: row.id, name: row.name || product?.name, price: row.price_aud, sku: row.sku, category: row.category, type: 'shop' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product row
+  }, [row?.id]);
   // Colours of one line share their reviews (family_sku = the line SKU).
   const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
   const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);

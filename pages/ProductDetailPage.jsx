@@ -45,6 +45,7 @@ import ProductReviews from '@/components/shop/ProductReviews.jsx';
 import { isGtin, productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
 import { describeOfferWindow } from '@/utils/offerWindowDates.js';
+import { trackViewItem } from '@/lib/analytics.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -96,6 +97,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       type: source,
       url: window.location.pathname,
     });
+    trackViewItem({ ...product, type: source === 'shop' ? 'shop' : 'listing' });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per loaded product
   }, [product?.id]);
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;

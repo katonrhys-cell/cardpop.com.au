@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import { trackAddToCart } from '@/lib/analytics.js';
 
 const CartContext = createContext(null);
 
@@ -124,6 +125,7 @@ export const CartProvider = ({ children }) => {
 
       cartItemsRef.current = nextItems;
       setCartItems(nextItems);
+      trackAddToCart(product, variant, isListing ? 1 : quantity);
       resolve();
     });
   }, []);

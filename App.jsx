@@ -38,6 +38,7 @@ import LaunchHero from '@/components/LaunchHero.jsx';
 import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
+import CookieConsentBanner from '@/components/CookieConsentBanner.jsx';
 import ReferralCapture from '@/components/ReferralCapture.jsx';
 import FeatureRoute from '@/components/FeatureRoute.jsx';
 import MaintenanceGate from '@/components/MaintenanceGate.jsx';
@@ -281,6 +282,7 @@ const App = () => {
                 <AdsenseRouteLoader />
                 <GoogleReviewsBadgeLoader />
                 <ReferralCapture />
+                <CookieConsentBanner />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
                     <title>CardPop | Australia's Trading Card Marketplace</title>
