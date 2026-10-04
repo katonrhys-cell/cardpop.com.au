@@ -304,15 +304,15 @@ export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, 
   const body = `<p>Congratulations — your listing sold on CardPop! Here's a breakdown of your sale:</p>
 ${summaryTable(rows)}
 ${Number(gstAud) > 0 ? '<p style="font-size:13px;color:#6b7280;">Your listing price included GST. CardPop withholds the GST on your sale and postage and remits it to the ATO on your behalf.</p>' : ''}
-<p>Head to your order details to arrange delivery with the buyer and finalise the sale.</p>`;
+<p><strong>Next step:</strong> post the card within 7 days using a tracked service, then open <a href="https://cardpop.com.au/account/sales" style="color:#E63946;text-decoration:none;">Account → Sales</a> to see the buyer's delivery address and mark it as shipped with the tracking number — the buyer is emailed the tracking link and your Buyer Protection cover begins.</p>`;
 
   return cpEmail(
     'You made a sale on CardPop — great work!',
     'You Made a Sale!',
     `Well done, ${esc(sellerName)}!`,
     body,
-    `https://cardpop.com.au/orders/${orderId}`,
-    'View Order',
+    'https://cardpop.com.au/account/sales',
+    'Ship This Order',
     'This receipt was sent to confirm your sale on CardPop. Keep it for your records.',
   );
 }
@@ -707,6 +707,40 @@ ${summaryTable(rows)}
     body,
     url ? esc(url) : 'https://cardpop.com.au/account/orders',
     url ? 'Track Your Parcel' : 'View Your Orders',
+    'You are receiving this because you placed an order on CardPop.',
+  );
+}
+
+// ─── Order delivered (buyer) ──────────────────────────────────────────────────
+
+/**
+ * The parcel arrived (a carrier scan, the buyer's own confirmation, or the
+ * 10-day auto rule). Starts the Buyer Protection clock in writing and asks
+ * for the review that sellers earn.
+ */
+export function orderDeliveredEmail({ buyerName, orderRef, items = [], source = 'carrier', sellerName = null, marketplace = true, claimDays = 7 }) {
+  const rows = [['Order', esc(orderRef)]];
+  if (items.length) rows.push(['Items', items.map(esc).join(', ')]);
+  if (sellerName) rows.push(['Seller', esc(sellerName)]);
+  const how = source === 'carrier'
+    ? 'The carrier has recorded your parcel as delivered.'
+    : source === 'buyer'
+      ? 'Thanks for confirming your parcel arrived.'
+      : 'Your parcel was posted over a week ago, so we’ve recorded it as delivered.';
+  const body = `<p>${how}</p>
+${summaryTable(rows)}
+${marketplace
+    ? `<p><strong>Check the card today.</strong> If it isn’t as described, arrived damaged or hasn’t actually turned up, report it from <a href="https://cardpop.com.au/account/orders" style="color:#E63946;text-decoration:none;">Account → Orders</a> within <strong>${Number(claimDays)} days</strong> — CardPop Buyer Protection refunds you in full, fees included.</p>
+<p>All good? A quick rating helps ${sellerName ? esc(sellerName) : 'your seller'} and tells other collectors who to trust.</p>`
+    : `<p>We hope you love it. If anything isn’t right you have 14 days from delivery to return it for any reason, and a product review from your order page helps other collectors choose.</p>`}`;
+
+  return cpEmail(
+    marketplace ? `Your CardPop order ${esc(orderRef)} was delivered — check it within ${Number(claimDays)} days.` : `Your CardPop order ${esc(orderRef)} was delivered.`,
+    'Your Order Was Delivered',
+    `Hi ${esc(buyerName || 'there')},`,
+    body,
+    'https://cardpop.com.au/account/orders',
+    marketplace ? 'Rate Your Seller' : 'Review Your Order',
     'You are receiving this because you placed an order on CardPop.',
   );
 }

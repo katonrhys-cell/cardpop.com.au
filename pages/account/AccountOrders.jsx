@@ -180,7 +180,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewRequest, reviewed, productReviews }) => {
+const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewRequest, onReceived, reviewed, productReviews }) => {
   const refundQuote = computeRefundAmounts(order);
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
@@ -329,6 +329,26 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewReq
         </div>
       )}
 
+      {order.delivered_at && (
+        <p className="flex items-center gap-2 text-xs text-emerald-700">
+          <CheckCircle2 className="w-4 h-4" /> Delivered {format(new Date(order.delivered_at), 'dd MMM yyyy')}
+          {order.delivery_source === 'auto' && <span className="text-muted-foreground">(assumed — posted over {MARKETPLACE_PROTECTION.autoDeliveredDaysAfterShipped} days ago)</span>}
+        </p>
+      )}
+
+      {/* The buyer says it arrived: starts the 7-day Buyer Protection window
+          and completes the order (POST /orders/:id/received). */}
+      {order.status === 'shipped' && !order.delivered_at && onReceived && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onReceived(order)}
+          className="w-full rounded-xl font-bold gap-2 text-xs h-9"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" /> I've received it
+        </Button>
+      )}
+
       {/* Actions */}
       {(canRefund || canReview) && (
         <div className="flex gap-2">
@@ -375,6 +395,19 @@ const AccountOrders = () => {
   const [productReviewTarget, setProductReviewTarget] = useState(null);
   // `${order_id}:${product_id}` → review status, for this buyer's product reviews.
   const [productReviews, setProductReviews] = useState(() => new Map());
+
+  const handleReceived = useCallback(async (order) => {
+    try {
+      const res = await apiServerClient.fetch(`/orders/${order.id}/received`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not confirm delivery');
+      toast.success(`Thanks — delivery recorded. Not as described? You have ${MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days to report it.`);
+      fetchOrders();
+    } catch (err) {
+      toast.error(err.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchOrders is stable per user
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -483,6 +516,7 @@ const AccountOrders = () => {
               order={order}
               onRefundRequest={setRefundTarget}
               onReviewRequest={setReviewTarget}
+              onReceived={handleReceived}
               reviewed={reviewedOrderIds.has(order.id)}
               productReviews={productReviews}
               onProductReviewRequest={setProductReviewTarget}

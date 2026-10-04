@@ -40,6 +40,7 @@ import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
 import shopSupplierWatchRouter from './shop-supplier-watch.js';
+import ordersRouter from './orders.js';
 import siteTrafficRouter from './site-traffic.js';
 import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
@@ -202,6 +203,10 @@ export default () => {
     router.use('/shop-supplier-watch', apiLimiter);
     router.use('/shop-supplier-watch', shopSupplierWatchRouter);
 
+    // Order delivery lifecycle: seller "mark shipped", buyer "received", and
+    // the daily delivery sweep (cron, CRON_SECRET) — see docs/order-delivery.md
+    router.use('/orders', apiLimiter);
+    router.use('/orders', ordersRouter);
     // Nightly GA4 visitor-count sync for the home page / admin (cron, CRON_SECRET)
     router.use('/site-traffic', apiLimiter);
     router.use('/site-traffic', siteTrafficRouter);

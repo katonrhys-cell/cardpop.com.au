@@ -8,13 +8,12 @@ import { payoutAccountName } from '../utils/sellerAccountShape.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAal2 } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams, validateRequestQuery } from '../middleware/validateRequest.js';
+import { markOrderShipped } from '../services/shipmentService.js';
 import { setUserRoleSchema, setUserRoleBodySchema, reviewVerificationSchema, reviewVerificationBodySchema, processRefundSchema, processRefundBodySchema, getDisputesSchema, getOffersSchema, resolveDisputeSchema, resolveDisputeBodySchema, setUserStatusSchema, setUserStatusBodySchema, identityReviewSchema, identityReviewBodySchema, createBusinessProfileBodySchema, businessProfileIdSchema, updateBusinessProfileBodySchema, createCardArtBodySchema, cardArtIdSchema, shipOrderSchema, shipOrderBodySchema, shopProductIdSchema, eventRsvpsSchema, setEventOrganiserBodySchema, eventOrganiserSchema } from '../schemas/adminSchemas.js';
 import { cardArtLookupKey } from '../utils/cardImageResolver.js';
 import { assertNotLiteralPrivateAddress, ssrfSafeDispatcher } from '../utils/safeFetch.js';
 import { fetch } from 'undici';
 import logger from '../utils/logger.js';
-import { sendOrderShipped } from '../utils/emailService.js';
-import { normalizeTrackingNumber, carrierLabel } from '../../utils/shipmentTracking.js';
 import { runSupplierPriceWatch } from '../services/supplierPriceWatchService.js';
 import { syncSiteTraffic, Ga4NotConfiguredError } from '../services/siteTrafficService.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
@@ -433,85 +432,19 @@ router.patch('/refunds/:id', validateRequestParams(processRefundSchema), validat
 });
 
 // ─── Mark an order shipped (+ email the buyer their tracking) ─────────────────
-// Replaces the old client-side status flip, which sent the customer nothing.
-// Re-posting on an already-shipped order updates the tracking reference (and
-// re-sends the email when notify is on) without resetting shipped_at.
-const SHIPPABLE_STATUSES = new Set(['payment_confirmed', 'shipped']);
-
+// Shared with the seller's own endpoint (POST /orders/:id/ship) through
+// services/shipmentService.js — one implementation of the status flip, the
+// tracking email and the bell. Re-posting on an already-shipped order updates
+// the tracking reference (and re-sends the email when notify is on) without
+// resetting shipped_at.
 router.post('/orders/:id/ship', validateRequestParams(shipOrderSchema), validateRequestBody(shipOrderBodySchema), async (req, res) => {
   const { id } = req.params;
   const { carrier, notify } = req.body;
-  const trackingNumber = normalizeTrackingNumber(req.body.tracking_number);
 
   try {
-    const { data: order, error: readErr } = await supabase
-      .from('orders')
-      .select('id, status, buyer_id, buyer_email, shipping_name, order_items, shipped_at, listing:listings!listing_id(title, vault_item:vault_items(card_name))')
-      .eq('id', id)
-      .maybeSingle();
-    if (readErr) throw readErr;
-    if (!order) return res.status(404).json({ error: 'Order not found' });
-    if (!SHIPPABLE_STATUSES.has(order.status)) {
-      return res.status(409).json({ error: `An order that is ${String(order.status).replace(/_/g, ' ')} can't be marked shipped` });
-    }
-
-    const now = new Date().toISOString();
-    const { data: updated, error: updErr } = await supabase
-      .from('orders')
-      .update({
-        status: 'shipped',
-        tracking_carrier: carrier,
-        tracking_number: trackingNumber,
-        shipped_at: order.shipped_at || now,
-      })
-      .eq('id', id)
-      .select('id, status, tracking_carrier, tracking_number, shipped_at, shipping_notified_at')
-      .single();
-    if (updErr) throw updErr;
-
-    const orderRef = id.slice(0, 8).toUpperCase();
-    const lines = Array.isArray(order.order_items) ? order.order_items : [];
-    const items = lines.length
-      ? lines.map(l => l?.title).filter(Boolean)
-      : [order.listing?.vault_item?.card_name || order.listing?.title].filter(Boolean);
-
-    let emailed = false;
-    let emailError = null;
-    if (notify) {
-      // A guest's email is on the order; a registered buyer's lives in
-      // profiles.email (service-role only).
-      let buyerEmail = order.buyer_email || null;
-      let buyerName = order.shipping_name || null;
-      if (order.buyer_id && (!buyerEmail || !buyerName)) {
-        const { data: profile } = await supabase
-          .from('profiles').select('email, display_name').eq('id', order.buyer_id).maybeSingle();
-        buyerEmail = buyerEmail || profile?.email || null;
-        buyerName = buyerName || profile?.display_name || null;
-      }
-
-      if (!buyerEmail) {
-        emailError = 'No email address on file for this buyer';
-      } else {
-        // Shop products can be reviewed once shipped — say so in the email.
-        const invitesReview = lines.some((l) => l?.type === 'shop');
-        emailed = await sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber, invitesReview });
-        if (emailed) {
-          updated.shipping_notified_at = now;
-          await supabase.from('orders').update({ shipping_notified_at: now }).eq('id', id)
-            .then(() => {}, () => {});
-        } else {
-          emailError = 'The shipping email could not be sent';
-        }
-      }
-
-      if (order.buyer_id) {
-        await supabase.from('notifications').insert({
-          user_id: order.buyer_id, type: 'order_update', title: 'Your order has shipped 📦',
-          body: `${carrierLabel(carrier)} tracking: ${trackingNumber}`,
-          link: '/account/orders', related_id: id,
-        }).then(() => {}, () => {});
-      }
-    }
+    const { order: updated, emailed, emailError, trackingNumber } = await markOrderShipped({
+      orderId: id, carrier, trackingNumber: req.body.tracking_number, notify,
+    });
 
     await supabase.from('audit_logs').insert({
       user_id: req.user.id,
@@ -523,8 +456,9 @@ router.post('/orders/:id/ship', validateRequestParams(shipOrderSchema), validate
     logger.info(`[ADMIN] ${req.user.id} marked order ${id} shipped (${carrier} ${trackingNumber}, emailed=${emailed})`);
     res.json({ success: true, order: updated, emailed, emailError });
   } catch (err) {
-    logger.error(`[ADMIN] Failed to mark order shipped: ${err.message}`);
-    res.status(500).json({ error: 'Failed to mark order shipped' });
+    const code = err.statusCode || 500;
+    if (code === 500) logger.error(`[ADMIN] Failed to mark order shipped: ${err.message}`);
+    res.status(code).json({ error: code === 500 ? 'Failed to mark order shipped' : err.message });
   }
 });
 

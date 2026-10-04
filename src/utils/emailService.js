@@ -20,6 +20,7 @@ import {
   offerUpdateEmail,
   shopEnquiryEmail,
   orderShippedEmail,
+  orderDeliveredEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -277,5 +278,19 @@ export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail
     to,
     subject: `Identity verification needs review: ${userName || 'A user'}`,
     html: identityReviewNeededEmail({ userId, userName, userEmail }),
+  });
+}
+
+/**
+ * Tells the buyer their parcel arrived, starts the Buyer Protection clock in
+ * writing and asks for a seller rating.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOrderDelivered({ buyerEmail, buyerName, orderRef, items, source, sellerName, marketplace = true, claimDays }) {
+  return send({
+    to: buyerEmail,
+    subject: `Your CardPop order ${orderRef} was delivered`,
+    html: orderDeliveredEmail({ buyerName, orderRef, items, source, sellerName, marketplace, claimDays }),
   });
 }
