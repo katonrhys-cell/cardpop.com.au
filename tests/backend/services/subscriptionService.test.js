@@ -15,7 +15,11 @@ import {
   getSubscriptionStatus,
   tierFromStripeSubscription,
   tierFromPaypalPlanId,
+  applyStripeSubscription,
+  applyPaypalSubscription,
+  COMPLIMENTARY_STATUS,
 } from '../../../src/services/subscriptionService.js';
+import { markTrialRedeemed } from '../../../src/services/welcomeOfferService.js';
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -136,5 +140,78 @@ describe('getSubscriptionStatus', () => {
   it('returns null when no profile row exists', async () => {
     mockSupabase.from.mockReturnValueOnce(builder({ data: null, error: null }));
     await expect(getSubscriptionStatus('missing')).resolves.toBeNull();
+  });
+});
+
+// A complimentary (grandfathered) membership is granted service-side with no
+// provider subscription behind it — the owner/admin accounts hold Ultimate this
+// way. A provider event about such an account must never downgrade it.
+describe('complimentary memberships are never overwritten by provider events', () => {
+  function updateBuilder(result) {
+    const b = {
+      update: vi.fn(() => b),
+      eq: vi.fn(() => b),
+      neq: vi.fn(() => b),
+      select: vi.fn(() => Promise.resolve(result)),
+    };
+    return b;
+  }
+
+  it('exports the grandfathered status as the complimentary marker', () => {
+    expect(COMPLIMENTARY_STATUS).toBe('grandfathered');
+  });
+
+  it('Stripe: filters the write to non-grandfathered rows and stops when nothing matched', async () => {
+    const b = updateBuilder({ data: [], error: null });
+    mockSupabase.from.mockReturnValueOnce(b);
+
+    await applyStripeSubscription({
+      id: 'sub_1', customer: 'cus_1', status: 'canceled',
+      metadata: { userId: 'owner' }, items: { data: [] },
+    });
+
+    expect(b.update).toHaveBeenCalledWith(expect.objectContaining({
+      subscription_status: 'canceled', subscription_tier: 'free',
+    }));
+    expect(b.eq).toHaveBeenCalledWith('id', 'owner');
+    expect(b.neq).toHaveBeenCalledWith('subscription_status', 'grandfathered');
+    expect(markTrialRedeemed).not.toHaveBeenCalled();
+  });
+
+  it('Stripe: a real subscriber (row matched) is still applied in full', async () => {
+    const b = updateBuilder({ data: [{ id: 'buyer' }], error: null });
+    mockSupabase.from.mockReturnValueOnce(b);
+
+    await applyStripeSubscription({
+      id: 'sub_2', customer: 'cus_2', status: 'active',
+      metadata: { userId: 'buyer', tier: 'elite' }, items: { data: [] },
+    });
+
+    expect(b.update).toHaveBeenCalledWith(expect.objectContaining({
+      subscription_status: 'active', subscription_tier: 'elite', stripe_subscription_id: 'sub_2',
+    }));
+    expect(markTrialRedeemed).toHaveBeenCalledWith('buyer');
+  });
+
+  it('PayPal: filters the write to non-grandfathered rows and stops when nothing matched', async () => {
+    const b = updateBuilder({ data: [], error: null });
+    mockSupabase.from.mockReturnValueOnce(b);
+
+    await applyPaypalSubscription({ userId: 'owner', paypalSubscriptionId: 'I-1', status: 'none' });
+
+    expect(b.neq).toHaveBeenCalledWith('subscription_status', 'grandfathered');
+    expect(markTrialRedeemed).not.toHaveBeenCalled();
+  });
+
+  it('PayPal: a real subscriber (row matched) is still applied in full', async () => {
+    const b = updateBuilder({ data: [{ id: 'buyer' }], error: null });
+    mockSupabase.from.mockReturnValueOnce(b);
+
+    await applyPaypalSubscription({ userId: 'buyer', paypalSubscriptionId: 'I-2', status: 'active' });
+
+    expect(b.update).toHaveBeenCalledWith(expect.objectContaining({
+      subscription_status: 'active', subscription_tier: 'pro', paypal_subscription_id: 'I-2',
+    }));
+    expect(markTrialRedeemed).toHaveBeenCalledWith('buyer');
   });
 });
