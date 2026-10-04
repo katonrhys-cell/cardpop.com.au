@@ -12,6 +12,9 @@ Three independent, complementary systems run in production:
 
 Sentry (errors + performance traces) also runs but isn't visitor analytics.
 
+GA4's visitor counts are also pulled **into the app** nightly (home page
+"Visitors" tile, Admin → Dashboard → Visitors card) — see `docs/site-traffic.md`.
+
 ### How GA4 tracking works in this SPA
 
 - `lib/analytics.js` installs the `dataLayer`/`gtag()` **command queue at boot**
