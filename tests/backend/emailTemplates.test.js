@@ -16,6 +16,10 @@ import {
   savedSearchMatchesEmail,
   backInStockEmail,
   welcomeOfferReminderEmail,
+  orderDeliveredEmail,
+  welcomeOfferEmail,
+  refundProcessedEmail,
+  refundIssuedEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -323,5 +327,54 @@ describe('retention emails (hero badge + stat tiles)', () => {
     expect(html).toContain('POP-ABC');
     expect(html).toContain('10%');
     expect(html).toContain('Days left');
+  });
+});
+
+describe('transactional emails — hero badge + stat tiles', () => {
+  it('order confirmed: total, item count and Buyer Protection tiles above the receipt', () => {
+    const html = orderConfirmedEmail({
+      buyerName: 'Ash', orderId: 'abcd1234-0000', total: 188.35,
+      invoice: { orderDate: '2026-10-04T00:00:00Z', items: [{ name: 'Charizard', quantity: 1, total: 150 }, { name: 'Binder', quantity: 2, total: 50 }], subtotal: 200, total: 188.35 },
+    });
+    expect(html).toContain('Purchase confirmed');
+    expect(html).toContain('#ABCD1234');
+    expect(html).toContain('$188.35');
+    expect(html).toContain('>3<'); // 1 + 2 items
+    expect(html).toContain('Buyer Protection');
+    expect(html).toContain('Charizard');
+  });
+  it('item sold: sale price, net proceeds and the 7-day posting tile', () => {
+    const html = itemSoldEmail({ sellerName: 'Misty', cardName: 'Charizard', itemPrice: 150, commissionAud: 7.5, gstAud: 13.64, sellerProceeds: 138.81, orderId: 'x' });
+    expect(html).toContain('You made a sale!');
+    expect(html).toContain('$150.00');
+    expect(html).toContain('$138.81');
+    expect(html).toContain('Days to post it');
+    expect(html).toContain('https://cardpop.com.au/account/sales');
+  });
+  it('shipped and delivered keep their tracking link, items and protection window', () => {
+    const shipped = orderShippedEmail({ buyerName: 'Ash', orderRef: 'ABCD1234', items: ['Charizard', XSS], carrier: 'auspost', trackingNumber: '33AB1234567' });
+    expect(shipped).toContain('Your order has shipped');
+    expect(shipped).toContain('Australia Post');
+    expect(shipped).toContain('https://auspost.com.au/mypost/track/details/33AB1234567');
+    expect(shipped).not.toContain(XSS);
+    const delivered = orderDeliveredEmail({ buyerName: 'Ash', orderRef: 'ABCD1234', items: ['Charizard'], sellerName: XSS, claimDays: 7 });
+    expect(delivered).toContain('Your order was delivered');
+    expect(delivered).toContain('Days to report a problem');
+    expect(delivered).toContain('Rate Your Seller');
+    expect(delivered).not.toContain(XSS);
+    const shop = orderDeliveredEmail({ buyerName: 'Ash', orderRef: 'ABCD1234', marketplace: false });
+    expect(shop).toContain('Days to return, any reason');
+    expect(shop).toContain('Review Your Order');
+  });
+  it('welcome offer and refunds show their headline figures', () => {
+    const welcome = welcomeOfferEmail({ name: XSS, code: 'POP-ABC123', trialDays: 30, discountPct: 10, expiresAt: '2026-11-03T00:00:00Z' });
+    expect(welcome).not.toContain(XSS);
+    expect(welcome).toContain('POP-ABC123');
+    expect(welcome).toContain('Days of selling, free');
+    expect(welcome).toContain('3 November 2026');
+    expect(refundProcessedEmail({ buyerName: 'Ash', refundAmount: 188.35, orderId: 'x' })).toContain('$188.35');
+    const issued = refundIssuedEmail({ sellerName: 'Misty', refundAmount: 100, retainedFee: 0, orderId: 'x' });
+    expect(issued).toContain('Refunded to buyer');
+    expect(issued).toContain('$0.00');
   });
 });
