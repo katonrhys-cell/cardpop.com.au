@@ -743,10 +743,10 @@ const GENERATED_PRODUCTS = [
     ],
   },
   {
-    slug: "palms-off-gaming-playmat",
+    slug: "palms-off-gaming-core-playmat",
     sku: "PM-ST",
-    title: "Palms Off Gaming Playmat",
-    shortTitle: "Playmat",
+    title: "Palms Off Gaming Core Playmat",
+    shortTitle: "Core Playmat",
     categorySlug: "playmats",
     categoryName: "Playmats",
     colours: ["Black", "Blue", "Jade", "Pink", "Purple", "Red", "Turquoise", "Yellow"],

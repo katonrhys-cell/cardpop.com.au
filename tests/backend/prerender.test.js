@@ -2,12 +2,13 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // The prerender function builds its own Supabase client from @supabase/supabase-js,
 // so we mock that module and feed per-table results through a chainable builder.
-const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, publicUrl: 'https://cdn.test/img.jpg' }));
+const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, listResultByTable: null, publicUrl: 'https://cdn.test/img.jpg' }));
 
 vi.mock('@supabase/supabase-js', () => {
-  const builder = () => {
+  const builder = (table) => {
     // Single-row fetches end in .maybeSingle()/.single() → state.result.
-    // List fetches await the chain itself (thenable) → state.listResult.
+    // List fetches await the chain itself (thenable) → state.listResult, or
+    // state.listResultByTable[table] when a test needs per-table answers.
     const b = {
       select: vi.fn(() => b),
       eq: vi.fn(() => b),
@@ -22,13 +23,13 @@ vi.mock('@supabase/supabase-js', () => {
       limit: vi.fn(() => b),
       maybeSingle: vi.fn(() => Promise.resolve(state.result)),
       single: vi.fn(() => Promise.resolve(state.result)),
-      then: (resolve, reject) => Promise.resolve(state.listResult).then(resolve, reject),
+      then: (resolve, reject) => Promise.resolve(state.listResultByTable?.[table] ?? state.listResult).then(resolve, reject),
     };
     return b;
   };
   return {
     createClient: vi.fn(() => ({
-      from: vi.fn(() => builder()),
+      from: vi.fn((table) => builder(table)),
       storage: { from: vi.fn(() => ({ getPublicUrl: () => ({ data: { publicUrl: state.publicUrl } }) })) },
     })),
   };
@@ -39,8 +40,8 @@ import { BINDER_SLUGS } from '../../data/shopBinderProducts.js';
 import { PALMS_OFF_PRODUCTS } from '../../data/palmsOffCatalogue.js';
 import { PALMS_OFF_CATEGORIES } from '../../data/palmsOffCategories.js';
 
-function run(path) {
-  const req = { query: { path } };
+function run(path, query = {}) {
+  const req = { query: { path, ...query } };
   let body = '';
   const res = {
     statusCode: 0,
@@ -54,7 +55,7 @@ function run(path) {
 
 const UUID = '11111111-2222-3333-4444-555555555555';
 
-beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; });
+beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; });
 
 describe('prerender blog articles', () => {
   it('renders an article with its title, description and featured image', async () => {
@@ -354,14 +355,51 @@ describe('prerender shop products', () => {
   });
 
   it('serves a house binder at /shop/binders/<slug>', async () => {
-    state.listResult = { data: [{ id: UUID, slug: 'binder-12-pocket-premium', category: 'Binders', status: 'active' }] };
+    state.listResult = { data: [{ id: UUID, slug: '12-pocket-premium-binder', category: 'Binders', status: 'active' }] };
     state.result = { data: {
-      id: UUID, title: 'Binder 12 Pocket Premium', slug: 'binder-12-pocket-premium',
+      id: UUID, title: '12-Pocket Premium Binder', slug: '12-pocket-premium-binder',
       category: 'Binders', price_aud: 39.95, stock_quantity: 3, status: 'active',
     } };
-    const { status, body } = await run('/shop/binders/binder-12-pocket-premium');
+    const { status, body } = await run('/shop/binders/12-pocket-premium-binder');
     expect(status).toBe(200);
-    expect(body).toContain('https://cardpop.com.au/shop/binders/binder-12-pocket-premium');
+    expect(body).toContain('https://cardpop.com.au/shop/binders/12-pocket-premium-binder');
+  });
+
+  it('301s a renamed house product from its old slug to its current URL', async () => {
+    state.listResultByTable = {
+      shop_products: { data: [] },
+      shop_product_slug_redirects: { data: [{
+        old_slug: 'binder-12-pocket-premium',
+        product: { id: UUID, slug: '12-pocket-premium-binder', category: 'Binders', colour: null, family_sku: null, status: 'active' },
+      }] },
+    };
+    const { status, headers } = await run('/shop/binders/binder-12-pocket-premium');
+    expect(status).toBe(301);
+    expect(headers.Location).toBe('https://cardpop.com.au/shop/binders/12-pocket-premium-binder');
+  });
+
+  it('301s an old colour-line slug onto the renamed line, keeping the chosen colour', async () => {
+    const sibling = (colour) => ({
+      old_slug: `palms-off-gaming-playmat-${colour.toLowerCase()}`,
+      product: { id: UUID, slug: `palms-off-gaming-core-playmat-${colour.toLowerCase()}`, category: 'Playmats', colour, family_sku: 'PM-ST', status: 'active' },
+    });
+    state.listResultByTable = {
+      shop_products: { data: [] },
+      shop_product_slug_redirects: { data: [sibling('Black'), sibling('Pink')] },
+    };
+    const withColour = await run('/shop/playmats/palms-off-gaming-playmat', { colour: 'pink' });
+    expect(withColour.status).toBe(301);
+    expect(withColour.headers.Location).toBe('https://cardpop.com.au/shop/playmats/palms-off-gaming-core-playmat?colour=pink');
+
+    const bare = await run('/shop/playmats/palms-off-gaming-playmat');
+    expect(bare.status).toBe(301);
+    expect(bare.headers.Location).toBe('https://cardpop.com.au/shop/playmats/palms-off-gaming-core-playmat');
+  });
+
+  it('404s an unknown shop product slug that has no redirect', async () => {
+    state.listResultByTable = { shop_products: { data: [] }, shop_product_slug_redirects: { data: [] } };
+    const { status } = await run('/shop/binders/no-such-binder');
+    expect(status).not.toBe(301);
   });
 });
 
