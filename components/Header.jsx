@@ -291,10 +291,10 @@ const Header = () => {
             {/* Sell CTA — the primary marketplace action (list a card). Routes to
                 the add-card flow; ProtectedRoute prompts login for signed-out
                 users. Shown from sm up; on phones it lives in the mobile menu. */}
-            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex font-bold rounded-xl gap-1.5 shrink-0">
-              <Link to="/vault/add">
+            <Button asChild variant="outline" size="sm" className="inline-flex font-bold rounded-xl gap-1.5 shrink-0 px-2.5 sm:px-3">
+              <Link to="/vault/add" aria-label="Sell a card">
                 <Tag className="h-4 w-4" aria-hidden="true" />
-                Sell
+                <span className="hidden sm:inline">Sell</span>
               </Link>
             </Button>
 

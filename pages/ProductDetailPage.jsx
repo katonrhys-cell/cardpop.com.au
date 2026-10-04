@@ -48,6 +48,9 @@ import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 import { trackViewItem } from '@/lib/analytics.js';
 import { identityRequiredForAmount } from '@/utils/marketplaceIdentity.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
+import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
+import MoreFromSeller from '@/components/MoreFromSeller.jsx';
+import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -102,6 +105,20 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     trackViewItem({ ...product, type: source === 'shop' ? 'shop' : 'listing' });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per loaded product
   }, [product?.id]);
+  // On a phone the image, title, chips, price and seller card push the buy
+  // buttons below the fold. Once they scroll out of view, a slim fixed bar
+  // repeats the price and the primary action.
+  const ctaRef = useRef(null);
+  const [ctaOffscreen, setCtaOffscreen] = useState(false);
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([entry]) => setCtaOffscreen(!entry.isIntersecting && entry.boundingClientRect.top < 0), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-observe when the CTA block (re)mounts
+  }, [product?.id, product?.status]);
+
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
   const vaultIsAdmin = source === 'vault' ? isAdmin : false;
 
@@ -440,6 +457,18 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     handleAddToCart()?.then((added) => { if (added) navigate('/checkout'); });
   };
 
+  // Offers need an account (the DB binds buyer_id). Ask up front and come
+  // straight back, instead of letting the buyer type an amount and lose it
+  // to a redirect on Send.
+  const handleOpenOffer = () => {
+    if (!currentUser) {
+      toast('Sign in to make an offer — you\'ll come straight back to this card.');
+      navigate('/login', { state: { from: { pathname: window.location.pathname } } });
+      return;
+    }
+    setOfferOpen(true);
+  };
+
   // Opens the propose-trade modal: pick one of your own listings to offer,
   // with the value difference settled as a cash top-up. Only rendered when the
   // enable_trading platform flag is on.
@@ -547,7 +576,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
         <SEOHead
           title={`${product.name} | CardPop`}
           description={product.description?.split(/\n\s*\n/)[0] || `${product.name} — available on CardPop Australia's trading card marketplace.`}
-          ogImage={product.images?.[0] || undefined}
+          ogImage={publicImageUrl(product.images?.[0]) || undefined}
           canonicalUrl={source === 'marketplace'
             // Marketplace listings canonicalise to /marketplace/:id/:slug — the
             // URL form the sitemap and bot prerenderer advertise.
@@ -778,23 +807,31 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                       <User className="w-6 h-6" />
                     )}
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Owner / Seller</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">{isShop ? 'Sold by' : 'Seller'}</p>
                     <p className="font-bold text-base text-foreground flex items-center gap-1.5">
                       {seller.business_name}
                       {isVerified(seller.is_verified) && <ShieldCheck className="w-4 h-4" style={{ color: `hsl(var(--verified-badge))` }} />}
                     </p>
+                    {/* Who am I buying from? Rating and ID status, right here —
+                        previously the seller block showed a name and nothing else. */}
+                    {!isShop && seller.id && seller.type !== 'official' && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <SellerRatingDisplay sellerId={seller.id} compact />
+                        {isVerified(seller.is_verified) && <span>ID verified</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* A seller with a storefront links to the full store (which
                     lists this card among the rest of their stock); everyone
                     else links to their public profile. */}
                 {seller.storePath ? (
-                  <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
+                  <Button asChild variant="outline" size="sm" className="rounded-full shrink-0">
                     <Link to={seller.storePath}>View Store</Link>
                   </Button>
                 ) : !isShop && seller.id ? (
-                  <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
+                  <Button asChild variant="outline" size="sm" className="rounded-full shrink-0">
                     <Link to={`/seller/${seller.id}`}>View Profile</Link>
                   </Button>
                 ) : null}
@@ -899,7 +936,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-3 mb-8">
+              <div ref={ctaRef} className="flex flex-col gap-3 mb-8">
                 {product.listing_type === 'For Sale' || product.listing_type === 'For Sale & Trade' ? (
                   // A vault item is only purchasable through its marketplace
                   // listing (checkout prices from the listings row). Reaching
@@ -927,7 +964,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                     size="lg"
                     variant={isEOI ? 'default' : 'outline'}
                     className="w-full h-14 rounded-xl font-bold text-lg shadow-md"
-                    onClick={() => setOfferOpen(true)}
+                    onClick={handleOpenOffer}
                   >
                     {isEOI ? <HandCoins className="w-5 h-5 mr-2" /> : <Tag className="w-5 h-5 mr-2" />}
                     Make an Offer
@@ -1034,7 +1071,45 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
         {isShop && (
           <ProductReviews title={product.name} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
         )}
+
+        {/* Cross-sell: the seller's other live cards, then the visitor's own trail. */}
+        {source === 'marketplace' && seller?.id && seller.type !== 'official' && (
+          <MoreFromSeller
+            sellerId={seller.id}
+            excludeListingId={product.id}
+            sellerName={seller.business_name}
+            storePath={seller.storePath}
+            className="mt-14"
+          />
+        )}
+        <RecentlyViewed className="mt-14" />
       </div>
+
+      {/* Sticky buy bar — phones only, once the in-page buttons have scrolled away. */}
+      {ctaOffscreen && !isSold && source !== 'vault' && product.listing_type !== 'Private' && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 shadow-[0_-8px_30px_-12px_rgba(0,0,0,0.25)] backdrop-blur lg:hidden" data-testid="sticky-buy-bar">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-muted-foreground">{product.name}</p>
+              <p className="text-lg font-extrabold tabular-nums text-foreground">
+                {isEOI ? formatOfferRange(product) : `$${(product.price || 0).toFixed(2)}`}
+                {!isShop && !isEOI && Number(product.shipping_cost_aud) > 0 && (
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">+ ${Number(product.shipping_cost_aud).toFixed(2)} post</span>
+                )}
+              </p>
+            </div>
+            {isShop ? (
+              <Button className="h-12 rounded-xl px-5 font-bold" onClick={handleAddToCart} disabled={product.stockQuantity === 0 && !isPreorder(product)}>
+                {isPreorder(product) ? 'Pre-order' : 'Add to cart'}
+              </Button>
+            ) : product.listing_type === 'For Sale' || product.listing_type === 'For Sale & Trade' ? (
+              <Button className="h-12 rounded-xl px-5 font-bold" onClick={handleBuyNow}>Buy Now</Button>
+            ) : canOffer ? (
+              <Button className="h-12 rounded-xl px-5 font-bold" onClick={handleOpenOffer}>Make an Offer</Button>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
