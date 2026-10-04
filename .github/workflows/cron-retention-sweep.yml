@@ -1,0 +1,30 @@
+name: Cron · Retention sweep
+
+# The one email a day that brings shoppers back: abandoned-checkout reminders
+# (consented buyers only), watchlist price-drop / sold alerts, saved-search
+# digests, back-in-stock emails, welcome codes for accounts the signup page
+# couldn't issue (social sign-ups), and welcome-code expiry reminders. Each
+# message is sent once (stamped in the DB), so a retry can't repeat one.
+# Runbook: docs/retention.md.
+
+on:
+  schedule:
+    # 21:47 UTC = 07:47 AEST — morning inboxes, after the overnight jobs.
+    - cron: '47 21 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cron-retention-sweep
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    uses: ./.github/workflows/cron-job.yml
+    with:
+      endpoint: /api/retention/sweep
+      max_seconds: 50
+      attempts: 2
+    secrets: inherit

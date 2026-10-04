@@ -56,7 +56,7 @@ describe('loadAdsenseScript', () => {
 describe('isAdEligiblePath', () => {
   it('allows ads on public content pages', async () => {
     const { isAdEligiblePath } = await freshLoader();
-    for (const path of ['/', '/blog/how-to-grade', '/events/sydney-show', '/shop', '/prices/pokemon', '/vaulted']) {
+    for (const path of ['/blog/how-to-grade', '/events/sydney-show', '/grading/scales', '/analytics/buying-guides/x', '/community/forum', '/vaulted']) {
       expect(isAdEligiblePath(path), path).toBe(true);
     }
   });
@@ -64,6 +64,13 @@ describe('isAdEligiblePath', () => {
   it('keeps ads off screens without publisher content', async () => {
     const { isAdEligiblePath } = await freshLoader();
     for (const path of ['/login', '/signup/', '/account/orders', '/admin', '/checkout', '/checkout-success', '/vault/add', '/search', '/launch', '/messaging', '/card-shops/add']) {
+      expect(isAdEligiblePath(path), path).toBe(false);
+    }
+  });
+
+  it('keeps ads off every buying surface so Auto ads never sit beside Add to Cart', async () => {
+    const { isAdEligiblePath } = await freshLoader();
+    for (const path of ['/', '/shop', '/shop/sleeves/palms-off-sleeves', '/marketplace', '/marketplace/123/charizard', '/product/shop/abc', '/prices/pokemon', '/collections/pokemon', '/seller/u1', '/dealer/u1']) {
       expect(isAdEligiblePath(path), path).toBe(false);
     }
   });

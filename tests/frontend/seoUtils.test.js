@@ -6,6 +6,7 @@ import {
   generateSitemap,
   mapItemCondition,
   generateProductSchema,
+  isEligibleProductLd,
 } from '@/utils/seoUtils.js';
 
 // ─── generateMetaTitle ────────────────────────────────────────────────────────
@@ -256,9 +257,9 @@ describe('generateProductSchema', () => {
     expect(data.offers.seller.name).toBe('Ash Cards');
   });
 
-  it('omits the Offer entirely when there is no price', () => {
-    const data = generateProductSchema({ name: 'Mystery Card' });
-    expect(data.offers).toBeUndefined();
+  it('returns null when there is no price (a Product needs offers for Google)', () => {
+    expect(generateProductSchema({ name: 'Mystery Card' })).toBeNull();
+    expect(generateProductSchema({ name: 'Mystery Card', price: 0 })).toBeNull();
   });
 
   it('honours an OutOfStock availability', () => {
@@ -267,7 +268,7 @@ describe('generateProductSchema', () => {
   });
 
   it('accepts an array of images and drops falsy entries', () => {
-    const data = generateProductSchema({ name: 'Card', image: ['https://a.jpg', null, undefined] });
+    const data = generateProductSchema({ name: 'Card', price: 5, image: ['https://a.jpg', null, undefined] });
     expect(data.image).toEqual(['https://a.jpg']);
   });
 });
@@ -318,5 +319,17 @@ describe('generateSitemap', () => {
   it('closes the urlset element', () => {
     const xml = generateSitemap([], []);
     expect(xml).toContain('</urlset>');
+  });
+});
+
+// ─── isEligibleProductLd ──────────────────────────────────────────────────────
+
+describe('isEligibleProductLd', () => {
+  it('requires offers, review or aggregateRating', () => {
+    expect(isEligibleProductLd({ '@type': 'Product', name: 'Card' })).toBe(false);
+    expect(isEligibleProductLd(null)).toBe(false);
+    expect(isEligibleProductLd({ offers: { '@type': 'Offer' } })).toBe(true);
+    expect(isEligibleProductLd({ aggregateRating: { ratingValue: '5' } })).toBe(true);
+    expect(isEligibleProductLd({ review: [{ '@type': 'Review' }] })).toBe(true);
   });
 });

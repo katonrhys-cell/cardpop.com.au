@@ -134,7 +134,7 @@ async function main() {
     verification_status: 'approved',
     identity_name_mismatch: false,
     has_saved_card: true,
-    subscription_tier: 'premium',
+    subscription_tier: 'ultimate',
     subscription_status: 'grandfathered',
     is_public: true,
     is_active: true,
@@ -164,7 +164,7 @@ async function main() {
   } else {
     const { error } = await supabase.from('profiles').update(fields).eq('id', user.id);
     if (error) throw error;
-    console.log('  profile: admin + verified + Premium + dealer store applied');
+    console.log('  profile: admin + verified + Ultimate + dealer store applied');
   }
 
   if (issuedPassword && !process.env.STORE_ACCOUNT_PASSWORD) {

@@ -22,7 +22,8 @@ import SoldBadge from '@/components/SoldBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
-import { CARD_VARIANTS, getCardVariants } from '@/lib/cardVariants.js';
+import { CARD_VARIANTS, getCardVariants, FOIL_VARIANT } from '@/lib/cardVariants.js';
+import { genericVariantChips, getAutographLabel } from '@/lib/cardAttributeLabels.js';
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -48,6 +49,46 @@ const CardSkeleton = () => (
   </div>
 );
 
+// ─── Shared card details (rail + holy grail cards) ───────────────────────────
+// Eyebrow line: the set the card belongs to (what the card is), falling back to
+// the collection. Marketplace-sourced rows carry `category` instead.
+const cardDetails = (item) => ({
+  eyebrow: item.set_name || item.category || item.collectionType || item.collection || '—',
+  detailBits: [item.year, item.card_number ? `#${item.card_number}` : null].filter(Boolean),
+});
+
+const HOLO_RE = /holo|foil/i;
+const chipBase = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none';
+
+// Finish chips — a selected Foil / Holo must be visible on the tile. `variant`
+// is a comma-separated string on vault rows.
+const CardDetailChips = ({ item }) => {
+  const variantList = item.variant
+    ? String(item.variant).split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+  const finishChips = genericVariantChips(variantList)
+    .filter(v => v !== FOIL_VARIANT)
+    .slice(0, 2);
+  const isFoil = !!item.is_foil || variantList.some(v => HOLO_RE.test(v));
+  const hasAuto = !!getAutographLabel(item);
+  if (!isFoil && finishChips.length === 0 && !hasAuto && !item.is_rookie) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {isFoil && (
+        <span className={`${chipBase} gap-0.5 border border-yellow-400/50 bg-yellow-400/10 text-yellow-800 dark:text-yellow-300`}>
+          <Sparkles className="w-2.5 h-2.5" /> {finishChips.find(v => HOLO_RE.test(v)) ?? 'Holo'}
+        </span>
+      )}
+      {finishChips.filter(v => !HOLO_RE.test(v)).map(v => (
+        <span key={v} className={`${chipBase} border border-primary/30 bg-primary/5 text-primary`}>{v}</span>
+      ))}
+      {hasAuto && <span className={`${chipBase} border border-border bg-muted/50 text-foreground`}>Auto</span>}
+      {item.is_rookie && <span className={`${chipBase} bg-amber-100 text-amber-900`}>RC</span>}
+    </div>
+  );
+};
+
 // ─── Mini listing card for horizontal scroll sections ────────────────────────
 const MiniListingCard = ({ listing, accentHex, badge }) => {
   // Vault-sourced rails carry the card's listing in `listings`; marketplace
@@ -69,6 +110,8 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
         : `/product/${source}/${listing.id}/${slugify(title)}`);
   const grade = listing.grade;
   const gradingCompany = listing.grading_company;
+
+  const { eyebrow, detailBits } = cardDetails(listing);
 
   return (
     <Link
@@ -105,11 +148,15 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
       </div>
       <div className="p-3 flex flex-col gap-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground line-clamp-1">
-          {listing.category || listing.collectionType || '—'}
+          {eyebrow}
         </p>
         <p className="text-sm font-bold leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
           {title}
         </p>
+        {detailBits.length > 0 && (
+          <p className="text-[11px] text-muted-foreground line-clamp-1">{detailBits.join(' · ')}</p>
+        )}
+        <CardDetailChips item={listing} />
         <p
           className={`text-base font-extrabold tabular-nums mt-auto ${isSold ? 'line-through opacity-60' : ''}`}
           style={{ color: isSold ? undefined : accentHex }}
@@ -129,6 +176,7 @@ const HolyGrailCard = ({ card, accentHex }) => {
     : null;
   const price = card.estimated_value_aud ?? 0;
   const title = card.card_name ?? 'Featured Card';
+  const { eyebrow, detailBits } = cardDetails(card);
   const sellerName = card.owner?.display_name || card.owner?.username || 'Seller';
   const sellerId = card.owner_id;
   const avatarSrc = card.owner?.avatar_url || null;
@@ -178,11 +226,18 @@ const HolyGrailCard = ({ card, accentHex }) => {
       </Link>
 
       <div className="p-4 flex flex-col gap-2">
-        <Link to={detailPath}>
+        <Link to={detailPath} className="flex flex-col gap-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground line-clamp-1">
+            {eyebrow}
+          </p>
           <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
             {title}
           </h3>
+          {detailBits.length > 0 && (
+            <p className="text-xs text-muted-foreground line-clamp-1">{detailBits.join(' · ')}</p>
+          )}
         </Link>
+        <CardDetailChips item={card} />
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
           <span
             className={`text-xl font-extrabold tabular-nums ${isSold ? 'line-through opacity-60' : ''}`}
@@ -523,7 +578,7 @@ const CollectionPage = () => {
 
       let q = supabase.from('listings')
         .select(
-          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
+          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug)`,
           { count: 'estimated' }
         )
         // Sold listings stay in the grid, badged "Sold" (not purchasable).

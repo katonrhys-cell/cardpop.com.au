@@ -11,6 +11,9 @@ Vercel Cron. `vercel.json` has no `crons` block.
 | Event scan | `/cron/event-scan` | `7 17 * * 0` | 03:07 AEST Monday | `cron-event-scan.yml` |
 | Event website re-scan | `/cron/event-scan?mode=watches` | `43 16 * * *` | 02:43 AEST daily | `cron-event-watch.yml` |
 | Supplier price watch | `/api/shop-supplier-watch/run` | `17 20 * * *` | 06:17 AEST daily (each product weekly) | `cron-supplier-price-watch.yml` |
+| Delivery sweep | `/api/orders/delivery-sweep` | `37 20 * * *` | 06:37 AEST daily | `cron-delivery-sweep.yml` |
+| Retention sweep | `/api/retention/sweep` | `47 21 * * *` | 07:47 AEST daily | `cron-retention-sweep.yml` |
+| Site traffic sync (GA4 visitors) | `/api/site-traffic/sync` | `23 19 * * *` | 05:23 AEST daily | `cron-site-traffic.yml` |
 
 Each caller workflow is a dozen lines that delegate to the reusable runner
 `.github/workflows/cron-job.yml`, which makes one authenticated `GET` and fails
@@ -93,7 +96,10 @@ Current cost, approximately:
 | Price refresh | ~30 | ~30 |
 | Blog generation | ~30 | ~30 |
 | Event scan | ~4 | ~4 |
-| **Total** | | **~425** |
+| Delivery sweep | ~30 | ~30 |
+| Retention sweep | ~30 | ~30 |
+| Site traffic sync | ~30 | ~30 |
+| **Total** | | **~455** |
 
 That leaves roughly 1,575 minutes for CI (`ci.yml`, `main-ci.yml`, `e2e.yml`,
 `lighthouse.yml`, `snyk-security.yml`, …), which is the far larger consumer.

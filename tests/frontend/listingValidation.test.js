@@ -86,11 +86,26 @@ describe('field rules', () => {
   it('requires a sensible offer range for Expression of Interest', () => {
     const eoi = { listingType: 'Expression of Interest' };
     expect(validateListingField('offerMin', { ...eoi, offerMin: '' })).toMatch(/minimum/);
-    expect(validateListingField('offerMax', { ...eoi, offerMin: '10', offerMax: '' })).toMatch(/maximum/);
+    // The top of the range is optional — "offers from $10".
+    expect(validateListingField('offerMax', { ...eoi, offerMin: '10', offerMax: '' })).toBeNull();
+    expect(validateListingField('offerMax', { ...eoi, offerMin: '10', offerMax: '-3' })).toMatch(/maximum/);
     expect(validateListingField('offerMax', { ...eoi, offerMin: '10', offerMax: '5' })).toMatch(/at least the minimum/);
     expect(validateListingField('offerMin', { ...eoi, offerMin: '10' })).toBeNull();
     expect(validateListingField('offerMax', { ...eoi, offerMin: '10', offerMax: '20' })).toBeNull();
     expect(validateListingField('offerMin', { listingType: 'private', offerMin: '' })).toBeNull();
+  });
+
+  it('validates the optional Expression of Interest offer window', () => {
+    const eoi = { listingType: 'Expression of Interest' };
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const inDays = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return iso(d); };
+    expect(validateListingField('offerCloseDate', { ...eoi })).toBeNull();
+    expect(validateListingField('offerOpenDate', { ...eoi, offerOpenDate: inDays(-5) })).toBeNull();
+    expect(validateListingField('offerCloseDate', { ...eoi, offerOpenDate: inDays(1), offerCloseDate: inDays(7) })).toBeNull();
+    expect(validateListingField('offerCloseDate', { ...eoi, offerCloseDate: inDays(0) })).toBeNull();
+    expect(validateListingField('offerCloseDate', { ...eoi, offerCloseDate: inDays(-1) })).toMatch(/past/);
+    expect(validateListingField('offerCloseDate', { ...eoi, offerOpenDate: inDays(7), offerCloseDate: inDays(2) })).toMatch(/after the opening/);
+    expect(validateListingField('offerCloseDate', { listingType: 'For Sale', offerCloseDate: inDays(-1) })).toBeNull();
   });
 
   it('enforces the trade value floor on edit only', () => {

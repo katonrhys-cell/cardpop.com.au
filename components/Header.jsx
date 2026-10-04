@@ -127,12 +127,28 @@ const Header = () => {
     return () => clearTimeout(timer);
   }, [location.pathname, mobileMenuOpen]);
 
+  // Header "scrolled" state with hysteresis: it turns on once the page is
+  // clearly scrolled (> 24px) and only turns off again when the page is back
+  // at the very top. A single threshold flickered on iOS Safari — rubber-band
+  // overscroll and the collapsing toolbar make scrollY jitter around any fixed
+  // pixel value, which toggled the header's classes several times per gesture.
+  // Updates are also coalesced to one per animation frame.
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const y = window.scrollY;
+      setIsScrolled((prev) => (prev ? y > 0 : y > 24));
     };
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -209,9 +225,13 @@ const Header = () => {
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+      // backdrop-blur stays on in both states so the compositing layer it
+      // creates is never torn down mid-scroll (that tear-down is what iOS
+      // Safari renders as a flicker on a sticky header), and only colour,
+      // shadow and border are transitioned — never backdrop-filter itself.
+      className={`sticky top-0 z-50 w-full backdrop-blur-md transform-gpu transition-[background-color,box-shadow,border-color] duration-300 ${
         isScrolled
-          ? 'bg-background/90 backdrop-blur-md shadow-sm border-b border-border'
+          ? 'bg-background/90 shadow-sm border-b border-border'
           : 'bg-background border-b border-border/50'
       }`}
     >
@@ -291,10 +311,10 @@ const Header = () => {
             {/* Sell CTA — the primary marketplace action (list a card). Routes to
                 the add-card flow; ProtectedRoute prompts login for signed-out
                 users. Shown from sm up; on phones it lives in the mobile menu. */}
-            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex font-bold rounded-xl gap-1.5 shrink-0">
-              <Link to="/vault/add">
+            <Button asChild variant="outline" size="sm" className="inline-flex font-bold rounded-xl gap-1.5 shrink-0 px-2.5 sm:px-3">
+              <Link to="/vault/add" aria-label="Sell a card">
                 <Tag className="h-4 w-4" aria-hidden="true" />
-                Sell
+                <span className="hidden sm:inline">Sell</span>
               </Link>
             </Button>
 

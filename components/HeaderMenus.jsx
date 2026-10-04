@@ -30,10 +30,14 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 export const NAV_LINKS = [
   // `icon` (where present) matches the lucide icon in that page's own hero/heading,
   // so the mobile menu's flat links carry the same visual cue as the page they open.
-  // Five top-level sections. Blog and Events fold into the Community dropdown —
-  // seven-plus entries buried the three jobs visitors actually come for
-  // (buy, sell, check prices) among content links.
-  { label: 'Shop', href: '/shop', icon: ShoppingBag },
+  // Six top-level sections, named for what a shopper is looking for: Buy Cards
+  // (the marketplace mega-dropdown, rendered first), Supplies (CardPop's own
+  // shop — it was labelled "Shop", which sent card buyers to sleeves and
+  // binders), Sell, Prices, Community, Grading. Blog and Events fold into the
+  // Community dropdown so the three jobs visitors come for — buy, sell, check
+  // prices — aren't buried among content links.
+  { label: 'Supplies', href: '/shop', icon: ShoppingBag },
+  { label: 'Sell', href: '/vault/add', icon: Tag },
   { label: 'Prices', href: '/analytics', icon: LineChart },
   { label: 'Community', href: '/community' },
   { label: 'Grading', href: '/grading' },
@@ -137,16 +141,17 @@ const MobileBrowseSection = ({ onNavigate }) => {
   return (
     <div className="mb-4">
       <p className="px-1 text-[11px] font-extrabold uppercase tracking-widest text-muted-foreground mb-2">
-        Marketplace
+        Buy Cards
       </p>
 
       <SheetClose asChild>
         <Link
           to="/marketplace"
           onClick={onNavigate}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-semibold text-muted-foreground"
+          className="flex items-center justify-between gap-2 px-4 py-3 mb-1 rounded-xl bg-primary/10 hover:bg-primary/15 transition-colors text-sm font-bold text-foreground"
         >
-          View All Listings
+          <span className="flex items-center gap-2"><Store className="w-4 h-4 text-primary" aria-hidden="true" />Browse all cards</span>
+          <ArrowRight className="w-4 h-4 text-primary" aria-hidden="true" />
         </Link>
       </SheetClose>
 
@@ -283,7 +288,7 @@ const BrowseDropdown = ({ onNavigate }) => {
             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
       >
-        Marketplace
+        Buy Cards
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -299,7 +304,7 @@ const BrowseDropdown = ({ onNavigate }) => {
             onClick={() => { setOpen(false); onNavigate?.(); }}
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
-            <span className="text-sm font-bold text-foreground">View All Listings</span>
+            <span className="text-sm font-bold text-foreground">Browse all cards</span>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
           </Link>
 
@@ -398,7 +403,7 @@ const ShopDropdown = ({ onNavigate }) => {
             : 'text-muted-foreground hover:text-foreground hover:bg-muted'
         }`}
       >
-        Shop
+        Supplies
         <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
       </button>
 
@@ -410,8 +415,8 @@ const ShopDropdown = ({ onNavigate }) => {
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
             <div className="min-w-0">
-              <span className="text-sm font-bold text-foreground">Explore All Supplies</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Protect, store and display your collection</p>
+              <span className="text-sm font-bold text-foreground">Shop all supplies</span>
+              <p className="text-xs text-muted-foreground mt-0.5">Sleeves, binders, storage and display — sold by CardPop</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
@@ -795,7 +800,7 @@ const MobileShopSection = ({ onNavigate }) => {
       >
         <span className="text-sm font-bold text-foreground flex items-center gap-2">
           <ShoppingBag className="w-4 h-4 text-primary" />
-          Shop
+          Supplies
         </span>
         <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -1152,11 +1157,12 @@ export const DesktopNavMenus = ({ onNavigate }) => {
     <>
       {settings.enable_marketplace !== false && <BrowseDropdown onNavigate={onNavigate} />}
       {NAV_LINKS.map((link) => {
-        if (link.label === 'Shop') return <ShopDropdown key="shop" onNavigate={onNavigate} />;
+        if (link.label === 'Supplies') return <ShopDropdown key="shop" onNavigate={onNavigate} />;
         if (link.label === 'Prices') return <AnalyticsDropdown key="prices" onNavigate={onNavigate} />;
         if (link.label === 'Community') return <CommunityDropdown key="community" onNavigate={onNavigate} />;
         if (link.label === 'Grading') return <GradingDropdown key="grading" onNavigate={onNavigate} />;
         const isActive = isNavLinkActive(link, location.pathname);
+        const isSell = link.label === 'Sell';
         return (
           <Link
             key={link.label}
@@ -1164,7 +1170,9 @@ export const DesktopNavMenus = ({ onNavigate }) => {
             className={`px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap ${
               isActive
                 ? 'bg-primary text-primary-foreground shadow-sm'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                : isSell
+                  ? 'text-primary font-bold hover:bg-primary/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
             }`}
           >
             {link.label}
@@ -1224,7 +1232,7 @@ export const MobileNavMenus = ({
           {settings.enable_marketplace !== false && <MobileBrowseSection key={openKey} onNavigate={onNavigate} />}
 
           {NAV_LINKS.map((link) => {
-            if (link.label === 'Shop') return <MobileShopSection key={`shop-${openKey}`} onNavigate={onNavigate} />;
+            if (link.label === 'Supplies') return <MobileShopSection key={`shop-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Prices') return <MobileAnalyticsSection key={`prices-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Community') return <MobileCommunitySection key={`community-${openKey}`} onNavigate={onNavigate} />;
             if (link.label === 'Grading') return <MobileGradingSection key={`grading-${openKey}`} onNavigate={onNavigate} />;

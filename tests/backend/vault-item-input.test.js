@@ -190,6 +190,27 @@ describe('validateVaultItemRow', () => {
     expect(errors).toHaveProperty('offerMax');
   });
 
+  it('allows an Expression of Interest with a minimum and no maximum', () => {
+    const { row } = build({ listing_type: 'Expression of Interest' });
+    const errors = validateVaultItemRow(row, { pricing: { offerMin: 100, offerMax: null }, isEdit: false });
+    expect(errors).not.toHaveProperty('offerMin');
+    expect(errors).not.toHaveProperty('offerMax');
+  });
+
+  it('rejects an Expression of Interest offer window that closes before it opens', () => {
+    const { row } = build({ listing_type: 'Expression of Interest' });
+    const errors = validateVaultItemRow(row, {
+      pricing: { offerMin: 100, offersOpenAt: '2026-11-10T00:00:00Z', offersCloseAt: '2026-11-05T00:00:00Z' },
+      isEdit: false,
+    });
+    expect(errors).toHaveProperty('offerCloseDate');
+    const ok = validateVaultItemRow(row, {
+      pricing: { offerMin: 100, offersOpenAt: '2026-11-01T00:00:00Z', offersCloseAt: '2026-11-15T00:00:00Z' },
+      isEdit: false,
+    });
+    expect(ok).not.toHaveProperty('offerCloseDate');
+  });
+
   it('blocks setting the estimated value below the locked base value on edit', () => {
     const { row } = buildVaultItemRow(
       { ...baseItem, estimated_value_aud: 10 },
@@ -200,5 +221,29 @@ describe('validateVaultItemRow', () => {
       existing: { card_image: `${USER}/x.jpg`, category_id: 'c', franchise_id: 'f', locked_base_value_aud: 50 },
     });
     expect(errors).toHaveProperty('estimatedValue');
+  });
+});
+
+describe('card_video', () => {
+  it('accepts a video path inside the caller\'s own folder', () => {
+    const { row, pathErrors } = build({ card_video: `${USER}/1784500000001-video.mp4` });
+    expect(row.card_video).toBe(`${USER}/1784500000001-video.mp4`);
+    expect(pathErrors).toEqual([]);
+  });
+
+  it('rejects a video path in someone else\'s folder', () => {
+    const { row, pathErrors } = build({ card_video: 'other-user/1-video.mp4' });
+    expect(pathErrors.length).toBe(1);
+    expect(row).not.toHaveProperty('card_video');
+  });
+
+  it('rejects a non-video extension', () => {
+    const { pathErrors } = build({ card_video: `${USER}/payload.html` });
+    expect(pathErrors.length).toBe(1);
+  });
+
+  it('leaves the stored video alone when omitted and clears it on explicit null', () => {
+    expect(build({}, { isEdit: true }).row).not.toHaveProperty('card_video');
+    expect(build({ card_video: null }, { isEdit: true }).row.card_video).toBeNull();
   });
 });

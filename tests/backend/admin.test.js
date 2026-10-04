@@ -15,9 +15,12 @@ vi.mock('../../src/utils/stripeClient.js', () => ({ default: { transfers: { crea
 vi.mock('../../src/services/payoutService.js', () => ({ payoutSeller: mockPayoutSeller }));
 // Keep the refund arithmetic real; only the platform_settings lookup is stubbed
 // so it doesn't consume a queued supabase builder.
+// Admin-configured retention (50% of the platform fee + the processing fee)
+// so these pin the arithmetic; the policy default is a full refund
+// (tests/backend/services/refundAmounts.test.js).
 vi.mock('../../src/services/refundAmounts.js', async (importOriginal) => ({
   ...(await importOriginal()),
-  getRefundRetentionPct: vi.fn(async () => 50),
+  getRefundPolicyOptions: vi.fn(async () => ({ retentionPct: 50, retainProcessingFee: true })),
 }));
 vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: mockSendOrderShipped }));
 vi.mock('../../src/utils/logger.js', () => ({
@@ -484,6 +487,23 @@ describe('POST /orders/:id/ship', () => {
     }));
     expect(notifyUpdate.update).toHaveBeenCalledWith({ shipping_notified_at: expect.any(String) });
     expect(notification.insert).toHaveBeenCalledWith(expect.objectContaining({ user_id: 'buyer-1', related_id: ORDER_ID }));
+  });
+
+  it('invites a review only when the order has shop products', async () => {
+    const send = async (order_items) => {
+      mockSendOrderShipped.mockClear();
+      queueFrom(
+        makeBuilder({ data: { ...paidOrder, order_items }, error: null }),
+        makeBuilder({ data: { id: ORDER_ID, status: 'shipped' }, error: null }),
+        makeBuilder({ data: { email: 'sam@example.com', display_name: 'Sam' }, error: null }),
+        makeBuilder(), makeBuilder(), makeBuilder(),
+      );
+      mockSendOrderShipped.mockResolvedValue(true);
+      await request(app).post(`/admin/orders/${ORDER_ID}/ship`).send({ carrier: 'auspost', tracking_number: '33AB1234567' });
+      return mockSendOrderShipped.mock.calls[0][0];
+    };
+    expect((await send([{ type: 'shop', id: 'p1', title: 'Binder' }])).invitesReview).toBe(true);
+    expect((await send([{ type: 'listing', id: 'l1', title: 'Card' }])).invitesReview).toBe(false);
   });
 
   it('uses the guest email on the order and skips the email when notify is false', async () => {

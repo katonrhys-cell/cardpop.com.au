@@ -40,7 +40,17 @@ import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFa
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
-import { listingTakesOffers } from '@/utils/offerEligibility.js';
+import useShopReviews from '@/hooks/useShopReviews.js';
+import ProductReviews from '@/components/shop/ProductReviews.jsx';
+import { isGtin, productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
+import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
+import { describeOfferWindow } from '@/utils/offerWindowDates.js';
+import { trackViewItem } from '@/lib/analytics.js';
+import { identityRequiredForAmount } from '@/utils/marketplaceIdentity.js';
+import BuyerProtection from '@/components/BuyerProtection.jsx';
+import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
+import MoreFromSeller from '@/components/MoreFromSeller.jsx';
+import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -56,8 +66,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   const source = sourceProp || sourceParam;
   const id = idProp || idParam;
   const navigate = useNavigate();
-  const { addToCart, setIsCartOpen } = useCart();
-  const { currentUser, isAdmin, loading: authLoading } = useAuth();
+  const { addToCart, setIsCartOpen, cartItems } = useCart();
+  const { currentUser, isAdmin, isIdentityVerified, loading: authLoading } = useAuth();
   const { settings } = usePlatformSettings();
   const { findCategory: findShopCategory } = useShopCategoryGroups();
   
@@ -92,8 +102,23 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       type: source,
       url: window.location.pathname,
     });
+    trackViewItem({ ...product, type: source === 'shop' ? 'shop' : 'listing' });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per loaded product
   }, [product?.id]);
+  // On a phone the image, title, chips, price and seller card push the buy
+  // buttons below the fold. Once they scroll out of view, a slim fixed bar
+  // repeats the price and the primary action.
+  const ctaRef = useRef(null);
+  const [ctaOffscreen, setCtaOffscreen] = useState(false);
+  useEffect(() => {
+    const el = ctaRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver(([entry]) => setCtaOffscreen(!entry.isIntersecting && entry.boundingClientRect.top < 0), { threshold: 0 });
+    io.observe(el);
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-observe when the CTA block (re)mounts
+  }, [product?.id, product?.status]);
+
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
   const vaultIsAdmin = source === 'vault' ? isAdmin : false;
 
@@ -320,6 +345,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Shop colour family: the other colours of this product line, each its own
   // product. Picking one navigates to that colour's page.
   const familySku = source === 'shop' ? product?.family_sku : null;
+  // Reviews are shared across a product's colours (family_sku), else per product.
+  const reviewPool = source === 'shop' && product ? reviewPoolKey({ familySku: product.family_sku, productId: product.id }) : null;
+  const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
   useEffect(() => {
     let cancelled = false;
     if (!familySku) { setFamily([]); return undefined; }
@@ -360,6 +388,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     return () => { supabase.removeChannel(channel); };
   }, [id, source, product?.vault_item?.id]);
 
+  // Shared by "Buy Now" (adds, then straight to checkout) and "Add to cart"
+  // (adds, toast with a View Cart action). Resolves to true once the line is in
+  // the cart so Buy Now knows it's safe to navigate.
   const handleAddToCart = () => {
     if (!product) return;
     if (source !== 'shop' && product.status === 'sold') {
@@ -404,7 +435,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
         };
     // Unlimited pre-orders: the cart must not cap them by stock.
     if (unlimited) cartVariant.manage_inventory = false;
-    addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
+    return addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
       .then(() => {
         toast.success(cartProduct.preorder ? 'Pre-order added to cart' : 'Added to cart', {
           action: {
@@ -412,8 +443,30 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             onClick: () => setIsCartOpen(true)
           }
         });
+        return true;
       })
-      .catch(e => toast.error(e.message));
+      .catch(e => { toast.error(e.message); return false; });
+  };
+
+  // "Buy Now" means buy now: the card goes in the cart and the buyer lands on
+  // checkout in one tap. (It used to add to the cart and stop, which read as a
+  // broken button.) A listing already in the cart just goes to checkout.
+  const handleBuyNow = () => {
+    const alreadyInCart = cartItems.some((item) => (item.variant?.id || item.product?.id) === product.id);
+    if (alreadyInCart) { navigate('/checkout'); return; }
+    handleAddToCart()?.then((added) => { if (added) navigate('/checkout'); });
+  };
+
+  // Offers need an account (the DB binds buyer_id). Ask up front and come
+  // straight back, instead of letting the buyer type an amount and lose it
+  // to a redirect on Send.
+  const handleOpenOffer = () => {
+    if (!currentUser) {
+      toast('Sign in to make an offer — you\'ll come straight back to this card.');
+      navigate('/login', { state: { from: { pathname: window.location.pathname } } });
+      return;
+    }
+    setOfferOpen(true);
   };
 
   // Opens the propose-trade modal: pick one of your own listings to offer,
@@ -480,7 +533,15 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // Buy-now listings take offers alongside Buy Now unless the seller turned
   // Accept Offers off; EOI always does; trade-only and auctions never.
   const canOffer = !isShop && !isSold && source === 'marketplace'
-    && listingTakesOffers({ listing_type: product.db_listing_type, accepts_offers: product.accepts_offers });
+    && listingTakesOffers({
+      listing_type: product.db_listing_type,
+      accepts_offers: product.accepts_offers,
+      offers_open_at: product.offers_open_at,
+      offers_close_at: product.offers_close_at,
+    });
+  // EOI offer window — optional dates the seller takes offers between.
+  const eoiWindow = isEOI ? offerWindowState(product) : 'open';
+  const eoiWindowNote = isEOI && !isSold ? describeOfferWindow(product, eoiWindow) : null;
   
   const statusBadge = isShop 
     ? (comingSoon
@@ -515,7 +576,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
         <SEOHead
           title={`${product.name} | CardPop`}
           description={product.description?.split(/\n\s*\n/)[0] || `${product.name} — available on CardPop Australia's trading card marketplace.`}
-          ogImage={product.images?.[0] || undefined}
+          ogImage={publicImageUrl(product.images?.[0]) || undefined}
           canonicalUrl={source === 'marketplace'
             // Marketplace listings canonicalise to /marketplace/:id/:slug — the
             // URL form the sitemap and bot prerenderer advertise.
@@ -523,6 +584,16 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             : source === 'shop'
               ? (canonicalPath || shopProductBasePath(product) || legacyShopProductPath(product))
               : `/product/${source}/${id}/${slugify(product.name || 'product')}`}
+          structuredData={isShop && Number(reviewStats?.review_count) > 0 ? {
+            '@context': 'https://schema.org',
+            '@type': 'Product',
+            name: product.name,
+            image: product.images,
+            sku: product.sku || product.id,
+            ...(isGtin(product.barcode) ? { gtin: String(product.barcode) } : {}),
+            description: product.description?.split(/\n\s*\n/)[0] || product.name,
+            ...productReviewsLd(reviewStats, shopReviews),
+          } : undefined}
         />
 
         {/* Breadcrumb gives a reliable upward path for visitors who land here
@@ -557,6 +628,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 record itself. Shop products have none and stay Classic. */}
             <ProductImageCarousel
               images={product.images}
+              video={product.vault_item?.card_video || product.card_video || null}
               record={product}
               displayStyle={product.vault_item?.display_style || product.display_style}
             />
@@ -643,18 +715,25 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Seller Is Looking For</p>
                   <div className="flex items-end gap-3">
                     <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
-                      {product.price_min_aud != null && product.price_max_aud != null
-                        ? `$${Number(product.price_min_aud).toFixed(2)} – $${Number(product.price_max_aud).toFixed(2)}`
-                        : 'Open to offers'}
+                      {formatOfferRange(product.price_min_aud, product.price_max_aud) ?? 'Open to offers'}
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1.5">
-                    This card is listed as an expression of interest — make an offer in (or near) this range.
+                    {product.price_min_aud != null && product.price_max_aud == null
+                      ? 'This card is listed as an expression of interest — make an offer from this amount up.'
+                      : 'This card is listed as an expression of interest — make an offer in (or near) this range.'}
                   </p>
+                  {eoiWindowNote && (
+                    <p className={`text-sm font-semibold mt-1.5 flex items-center gap-1.5 ${eoiWindow === 'open' ? 'text-foreground' : 'text-muted-foreground'}`}>
+                      <CalendarClock className="w-4 h-4" /> {eoiWindowNote}
+                    </p>
+                  )}
                 </>
               ) : (
                 <>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                    {source === 'vault' ? 'Estimated value' : 'Price'}
+                  </p>
                   <div className="flex items-end gap-3">
                     <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
                       ${(product.price || 0).toFixed(2)}
@@ -677,6 +756,25 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                     )}
                   </div>
                   <BnplMessage amount={product.price} className="mt-2" />
+                  {/* The marketplace buying rule, stated where the decision is
+                      made rather than sprung at the till: a free account for
+                      any card, plus a one-time ID check once the order reaches
+                      the admin threshold (utils/marketplaceIdentity.js). */}
+                  {source === 'marketplace' && !isSold && (
+                    identityRequiredForAmount(product.price, settings.marketplace_identity_threshold_aud) ? (
+                      currentUser && isIdentityVerified ? null : (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                          Orders of ${Number(settings.marketplace_identity_threshold_aud).toLocaleString('en-AU')}+ need a one-time ID check at checkout (about 2 minutes, via Stripe).
+                        </p>
+                      )
+                    ) : !currentUser ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                        Buying from a collector needs a free CardPop account — you can create it at checkout.
+                      </p>
+                    ) : null
+                  )}
                   {/* Market context beside the price — the number buyers actually
                       decide on. Links down to the full eBay market section. */}
                   {!isShop && (
@@ -709,23 +807,31 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                       <User className="w-6 h-6" />
                     )}
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">Owner / Seller</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">{isShop ? 'Sold by' : 'Seller'}</p>
                     <p className="font-bold text-base text-foreground flex items-center gap-1.5">
                       {seller.business_name}
                       {isVerified(seller.is_verified) && <ShieldCheck className="w-4 h-4" style={{ color: `hsl(var(--verified-badge))` }} />}
                     </p>
+                    {/* Who am I buying from? Rating and ID status, right here —
+                        previously the seller block showed a name and nothing else. */}
+                    {!isShop && seller.id && seller.type !== 'official' && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <SellerRatingDisplay sellerId={seller.id} compact />
+                        {isVerified(seller.is_verified) && <span>ID verified</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* A seller with a storefront links to the full store (which
                     lists this card among the rest of their stock); everyone
                     else links to their public profile. */}
                 {seller.storePath ? (
-                  <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
+                  <Button asChild variant="outline" size="sm" className="rounded-full shrink-0">
                     <Link to={seller.storePath}>View Store</Link>
                   </Button>
                 ) : !isShop && seller.id ? (
-                  <Button asChild variant="outline" size="sm" className="rounded-full hidden sm:flex">
+                  <Button asChild variant="outline" size="sm" className="rounded-full shrink-0">
                     <Link to={`/seller/${seller.id}`}>View Profile</Link>
                   </Button>
                 ) : null}
@@ -812,9 +918,11 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {preorder ? 'Pre-order Now' : 'Add to Cart'}
                 </Button>
-                {!preorder && product.stockQuantity !== null && (
-                  <p className="text-sm text-center font-medium text-muted-foreground">
-                    {product.stockQuantity} available in stock
+                {/* Scarcity only when it's real: "500 available" removes urgency,
+                    "Only 3 left" creates it. Nothing is said above 5. */}
+                {!preorder && product.stockQuantity !== null && product.stockQuantity > 0 && product.stockQuantity <= 5 && (
+                  <p className="text-sm text-center font-semibold text-brand-red">
+                    Only {product.stockQuantity} left in stock
                   </p>
                 )}
               </div>
@@ -828,7 +936,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col gap-3 mb-8">
+              <div ref={ctaRef} className="flex flex-col gap-3 mb-8">
                 {product.listing_type === 'For Sale' || product.listing_type === 'For Sale & Trade' ? (
                   // A vault item is only purchasable through its marketplace
                   // listing (checkout prices from the listings row). Reaching
@@ -840,9 +948,14 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                       <PackageX className="w-5 h-5 mr-2" /> Not currently available
                     </Button>
                   ) : (
-                    <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleAddToCart}>
-                      Buy Now
-                    </Button>
+                    <>
+                      <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleBuyNow}>
+                        Buy Now
+                      </Button>
+                      <Button size="lg" variant="outline" className="w-full h-12 rounded-xl font-semibold" onClick={handleAddToCart}>
+                        <ShoppingCart className="w-4 h-4 mr-2" aria-hidden="true" /> Add to cart
+                      </Button>
+                    </>
                   )
                 ) : null}
 
@@ -851,11 +964,21 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                     size="lg"
                     variant={isEOI ? 'default' : 'outline'}
                     className="w-full h-14 rounded-xl font-bold text-lg shadow-md"
-                    onClick={() => setOfferOpen(true)}
+                    onClick={handleOpenOffer}
                   >
                     {isEOI ? <HandCoins className="w-5 h-5 mr-2" /> : <Tag className="w-5 h-5 mr-2" />}
                     Make an Offer
                   </Button>
+                )}
+
+                {isEOI && !isSold && eoiWindow !== 'open' && (
+                  <div className="text-center p-4 rounded-xl bg-muted/50 border border-border">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {eoiWindow === 'upcoming'
+                        ? `${eoiWindowNote} — check back then to make an offer.`
+                        : 'Offers on this card have closed.'}
+                    </p>
+                  </div>
                 )}
 
                 {settings.enable_trading !== false &&
@@ -880,6 +1003,11 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <Button size="lg" variant="secondary" className="w-full h-14 rounded-xl font-bold text-lg" disabled>
                     <Lock className="w-5 h-5 mr-2" /> Private Item
                   </Button>
+                )}
+
+                {/* The promise, at the point of decision (utils/buyerProtectionPolicy.js). */}
+                {!isSold && source !== 'vault' && (
+                  <BuyerProtection compact kind={isShop ? 'shop' : 'marketplace'} className="pt-1" />
                 )}
               </div>
             )}
@@ -939,7 +1067,49 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             </div>
           )}
         </div>
+
+        {isShop && (
+          <ProductReviews title={product.name} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
+        )}
+
+        {/* Cross-sell: the seller's other live cards, then the visitor's own trail. */}
+        {source === 'marketplace' && seller?.id && seller.type !== 'official' && (
+          <MoreFromSeller
+            sellerId={seller.id}
+            excludeListingId={product.id}
+            sellerName={seller.business_name}
+            storePath={seller.storePath}
+            className="mt-14"
+          />
+        )}
+        <RecentlyViewed className="mt-14" />
       </div>
+
+      {/* Sticky buy bar — phones only, once the in-page buttons have scrolled away. */}
+      {ctaOffscreen && !isSold && source !== 'vault' && product.listing_type !== 'Private' && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 shadow-[0_-8px_30px_-12px_rgba(0,0,0,0.25)] backdrop-blur lg:hidden" data-testid="sticky-buy-bar">
+          <div className="mx-auto flex max-w-lg items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium text-muted-foreground">{product.name}</p>
+              <p className="text-lg font-extrabold tabular-nums text-foreground">
+                {isEOI ? formatOfferRange(product) : `$${(product.price || 0).toFixed(2)}`}
+                {!isShop && !isEOI && Number(product.shipping_cost_aud) > 0 && (
+                  <span className="ml-1 text-xs font-medium text-muted-foreground">+ ${Number(product.shipping_cost_aud).toFixed(2)} post</span>
+                )}
+              </p>
+            </div>
+            {isShop ? (
+              <Button className="h-12 rounded-xl px-5 font-bold" onClick={handleAddToCart} disabled={product.stockQuantity === 0 && !isPreorder(product)}>
+                {isPreorder(product) ? 'Pre-order' : 'Add to cart'}
+              </Button>
+            ) : product.listing_type === 'For Sale' || product.listing_type === 'For Sale & Trade' ? (
+              <Button className="h-12 rounded-xl px-5 font-bold" onClick={handleBuyNow}>Buy Now</Button>
+            ) : canOffer ? (
+              <Button className="h-12 rounded-xl px-5 font-bold" onClick={handleOpenOffer}>Make an Offer</Button>
+            ) : null}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

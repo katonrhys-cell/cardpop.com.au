@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import DisplayStyleDialog from '@/components/vault/DisplayStyleDialog.jsx';
 import { getDisplayStyleLabel } from '@/components/vault/DisplayStylePicker.jsx';
+import { formatOfferRange } from '@/utils/offerEligibility.js';
 
 const STATUS_CONFIG = {
   'For Sale':        { label: 'For Sale',        className: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400', icon: ShoppingCart },
@@ -312,9 +313,7 @@ const AccountListings = () => {
                       <TableCell className="tabular-nums font-medium">
                         {listing.price_aud != null
                           ? `$${Number(listing.price_aud).toFixed(2)}`
-                          : (listing.price_min_aud != null && listing.price_max_aud != null)
-                            ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
-                            : '—'}
+                          : formatOfferRange(listing.price_min_aud, listing.price_max_aud) ?? '—'}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm tabular-nums">
                         {listing.created_at ? new Date(listing.created_at).toLocaleDateString() : '—'}

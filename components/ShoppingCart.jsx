@@ -15,6 +15,13 @@ import { publicImageUrl } from '@/utils/imageUrl.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
+import apiServerClient from '@/lib/apiServerClient.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
+import { marketplaceGate, hasMarketplaceLine } from '@/utils/marketplaceIdentity.js';
+import { ShieldCheck, Truck } from 'lucide-react';
+
+const aud = (n) => `$${Number(n || 0).toFixed(2)}`;
 
 // Storage path or absolute URL → CDN-aware public URL.
 const resolveImg = (path) => publicImageUrl(path);
@@ -49,6 +56,64 @@ const ShoppingCart = () => {
       }, () => {});
     return () => { cancelled = true; };
   }, [isCartOpen, listingIdsKey]);
+
+  // The real total, not the subtotal. The drawer used to print the item
+  // subtotal in bold as "Total", so the service fee, payment processing and
+  // shipping first appeared on the payment page. Ask the same server endpoint
+  // checkout uses (debounced, whenever the drawer is open and the lines change)
+  // and show an itemised estimate; on any failure fall back to an honest
+  // "fees & shipping at checkout" rather than a wrong number.
+  const { currentUser, isIdentityVerified } = useAuth();
+  const { settings } = usePlatformSettings();
+  const [estimate, setEstimate] = useState(null);
+  const [estimating, setEstimating] = useState(false);
+  const linesKey = cartItems
+    .map((item) => `${item.product?.type || 'listing'}:${item.product?.id}:${item.variant?.variant_id || ''}:${item.quantity}`)
+    .join('|');
+  useEffect(() => {
+    if (!isCartOpen || !linesKey) { setEstimate(null); return; }
+    let cancelled = false;
+    setEstimating(true);
+    const timer = setTimeout(() => {
+      const items = cartItems
+        .map((i) => ({ type: i.product?.type || 'listing', id: i.product?.id, quantity: i.quantity ?? 1, ...(i.variant?.variant_id ? { variantId: i.variant.variant_id } : {}) }))
+        .filter((i) => i.id);
+      apiServerClient.fetch('/stripe/calculate-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => { if (!cancelled) setEstimate(data && typeof data.totalAud === 'number' ? data : null); })
+        .catch(() => { if (!cancelled) setEstimate(null); })
+        .finally(() => { if (!cancelled) setEstimating(false); });
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the serialised lines
+  }, [isCartOpen, linesKey]);
+
+  // Free-shipping progress on CardPop Shop items ($15 flat under the
+  // threshold, free from it — the rule lives in platform settings and is
+  // priced server-side). Marketplace postage is per seller and not part of it.
+  const shopSubtotalAud = cartItems.reduce((sum, item) => {
+    if ((item.product?.type || 'listing') !== 'shop') return sum;
+    const cents = item.variant?.sale_price_in_cents || item.variant?.price_in_cents || (item.product.price ? item.product.price * 100 : 0);
+    return sum + (cents * item.quantity) / 100;
+  }, 0);
+  const freeShipAt = Number(settings.free_shipping_threshold_aud) || 0;
+  const shipRate = Number(settings.default_shipping_rate_aud) || 0;
+  const showShipBar = shopSubtotalAud > 0 && freeShipAt > 0 && shipRate > 0;
+  const shipRemaining = Math.max(0, freeShipAt - shopSubtotalAud);
+
+  // Say now what checkout will ask for — a free account for any marketplace
+  // card, plus the one-time ID check once the cards reach the threshold.
+  const gateLevel = marketplaceGate({
+    lines: cartItems,
+    thresholdAud: settings.marketplace_identity_threshold_aud,
+    isAuthenticated: !!currentUser,
+    isIdentityVerified,
+  });
+  const marketplaceInCart = hasMarketplaceLine(cartItems);
 
   const handleCheckout = () => {
     if (cartItems.length === 0) return;
@@ -232,23 +297,72 @@ const ShoppingCart = () => {
             </ScrollArea>
 
             <div className="p-6 bg-card border-t border-border shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.05)]">
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between text-muted-foreground">
+              {showShipBar && (
+                <div className="mb-4" data-testid="free-shipping-bar">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Truck className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                    {shipRemaining > 0
+                      ? <>Add <span className="font-bold text-foreground">{aud(shipRemaining)}</span> more of shop items for free shipping (otherwise {aud(shipRate)} flat)</>
+                      : <span className="font-bold text-foreground">You've unlocked free shipping on shop items</span>}
+                  </p>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (shopSubtotalAud / freeShipAt) * 100)}%` }} />
+                  </div>
+                </div>
+              )}
+              <div className="space-y-2 mb-5">
+                <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Subtotal</span>
                   <span className="tabular-nums">{getCartTotal()}</span>
                 </div>
-                <div className="flex justify-between text-muted-foreground text-sm">
-                  <span>Shipping</span>
-                  <span>Calculated at checkout</span>
-                </div>
-                <p className="text-xs text-muted-foreground">Prices include GST.</p>
+                {estimate ? (
+                  <>
+                    {estimate.commissionAud > 0 && (
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Service fee</span>
+                        <span className="tabular-nums">{aud(estimate.commissionAud)}</span>
+                      </div>
+                    )}
+                    {estimate.processingAud > 0 && (
+                      <div className="flex justify-between text-sm text-muted-foreground">
+                        <span>Payment processing</span>
+                        <span className="tabular-nums">{aud(estimate.processingAud)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Shipping</span>
+                      <span className="tabular-nums">{estimate.shippingAud > 0 ? aud(estimate.shippingAud) : 'Free'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Fees &amp; shipping</span>
+                    <span>{estimating ? 'Calculating…' : 'Shown at checkout'}</span>
+                  </div>
+                )}
                 <Separator className="my-2" />
                 <div className="flex justify-between items-end">
-                  <span className="font-bold text-lg text-foreground">Total</span>
-                  <span className="font-bold text-2xl text-foreground tabular-nums">{getCartTotal()}</span>
+                  <span className="font-bold text-lg text-foreground">{estimate ? 'Total' : 'Subtotal'}</span>
+                  <span className="font-bold text-2xl text-foreground tabular-nums" data-testid="cart-total">
+                    {estimate ? aud(estimate.totalAud) : getCartTotal()}
+                  </span>
                 </div>
-                <BnplMessage amount={numericTotalAud} align="center" />
+                <p className="text-xs text-muted-foreground">
+                  {estimate ? <>Includes GST of {aud(estimate.includedGstAud)}. Promo codes apply at checkout.</> : 'Prices include GST.'}
+                </p>
+                <BnplMessage amount={estimate ? estimate.totalAud : numericTotalAud} align="center" />
               </div>
+
+              {marketplaceInCart && gateLevel !== 'open' && (
+                <p className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground" data-testid="marketplace-gate-note">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                  <span>
+                    {gateLevel === 'account'
+                      ? <>Marketplace cards need a free CardPop account — you can sign in or create one at checkout, and your cart is kept.</>
+                      : <>Marketplace orders of ${Number(settings.marketplace_identity_threshold_aud).toLocaleString('en-AU')}+ need a one-time ID check (about 2 minutes, via Stripe). You'll be asked at checkout.</>}
+                  </span>
+                </p>
+              )}
 
               <Button
                 className="w-full h-14 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"

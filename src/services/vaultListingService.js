@@ -20,6 +20,12 @@ import { PUBLIC_LISTING_TYPES } from '../utils/vaultItemInput.js';
 import logger from '../utils/logger.js';
 
 const SALE_TYPES = ['For Sale', 'For Sale & Trade'];
+
+const validTimestamp = (v) => {
+  if (!v) return null;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
 const TRADE_TYPES = ['For Trade', 'For Sale & Trade'];
 
 export const syncMarketplaceListing = async (userClient, { cardId, userId, listingType, pricing = {} }) => {
@@ -72,6 +78,12 @@ export const syncMarketplaceListing = async (userClient, { cardId, userId, listi
       price_min_aud: isEOI ? (Number(pricing.offerMin) || null) : null,
       price_max_aud: isEOI ? (Number(pricing.offerMax) || null) : null,
       ...(isEOI ? { accepts_offers: true } : {}),
+      // Optional EOI offer window (ISO timestamps; null = open now / no
+      // closing date). Only written for EOI — nothing else reads it.
+      ...(isEOI ? {
+        offers_open_at: validTimestamp(pricing.offersOpenAt),
+        offers_close_at: validTimestamp(pricing.offersCloseAt),
+      } : {}),
       listed_at: new Date().toISOString(),
     };
 

@@ -68,6 +68,14 @@ describe('useWatchlist', () => {
     expect(mockInsert).toHaveBeenCalledWith({ user_id: 'u1', listing_id: 'l9' });
   });
 
+  it('records the price the buyer saw so the retention sweep can email a real drop', async () => {
+    h.fetchData = [];
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => { await result.current.toggle('l9', { priceAud: '149.50' }); });
+    expect(mockInsert).toHaveBeenCalledWith({ user_id: 'u1', listing_id: 'l9', price_at_add_aud: 149.5 });
+  });
+
   it('removes a listing via delete when toggled off', async () => {
     h.fetchData = [{ listing_id: 'l1' }];
     const { result } = renderHook(() => useWatchlist(), { wrapper });

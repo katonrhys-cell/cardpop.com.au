@@ -14,7 +14,7 @@ const eventFromListing = (listing, kind) => {
     key: `${kind}-${listing.id}`,
     kind, // 'listed' | 'sold'
     listingId: listing.id,
-    name: listing.vault_item?.card_name || listing.title || 'A card',
+    name: listing.vault_item?.card_name || 'A card',
     price: Number(listing.price_aud || 0),
     image: publicImageUrl(
       listing.vault_item?.card_image
@@ -43,7 +43,7 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
 
     const seed = async () => {
       try {
-        const base = 'id, title, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))';
+        const base = 'id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))';
         const [listed, sold] = await Promise.all([
           supabase.from('listings').select(base)
             .eq('status', 'active').order('created_at', { ascending: false }).limit(10),
@@ -68,7 +68,7 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
       try {
         const { data } = await supabase
           .from('listings')
-          .select('id, title, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))')
+          .select('id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))')
           .eq('id', row.id)
           .maybeSingle();
         if (cancelled || !data) return;

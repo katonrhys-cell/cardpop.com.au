@@ -226,10 +226,10 @@ const BuildingYourBusinessPage = () => {
               {Array(4).fill(0).map((_, i) => (
                 <div key={i} className="rounded-2xl border border-border bg-card p-6 space-y-4">
                   <div className="flex items-center gap-4">
-                    <Skeleton className="h-16 w-44 rounded-2xl" />
-                    <div className="space-y-2 flex-1">
-                      <Skeleton className="h-5 w-32" />
-                      <Skeleton className="h-4 w-48" />
+                    <Skeleton className="h-16 w-44 shrink-0 rounded-2xl" />
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <Skeleton className="h-5 w-full max-w-32" />
+                      <Skeleton className="h-4 w-full max-w-48" />
                     </div>
                   </div>
                   <Skeleton className="h-16 w-full" />

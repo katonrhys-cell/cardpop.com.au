@@ -5,7 +5,7 @@ import { sendRefundProcessed, sendRefundIssued } from '../utils/emailService.js'
 import { reverseSellerPayout } from './payoutService.js';
 import { creditWallet } from './walletService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
-import { computeRefundAmounts, DEFAULT_REFUND_FEE_RETENTION_PCT } from './refundAmounts.js';
+import { computeRefundAmounts, DEFAULT_REFUND_FEE_RETENTION_PCT, getRefundRetainProcessingFee } from './refundAmounts.js';
 import { isAdminUser } from '../middleware/auth.js';
 
 export async function processRefund(req, res) {
@@ -50,13 +50,14 @@ export async function processRefund(req, res) {
     // webhook), NOT the buyer-created refunds row, so the fee retention can't be
     // bypassed by zeroing commission_aud/gst_aud or inflating total_paid_aud.
     const retentionPct = Number(await getPlatformSetting('refund_fee_retention_pct', DEFAULT_REFUND_FEE_RETENTION_PCT));
+    const retainProcessingFee = await getRefundRetainProcessingFee();
     const orderTotal = Number(refund.order?.total_aud);
     if (!Number.isFinite(orderTotal) || orderTotal <= 0) {
       return res.status(400).json({ error: 'Order total is missing or invalid' });
     }
     // Same arithmetic the buyer was quoted at request time and the admin saw
     // at approval — see refundAmounts.js for what is retained and why.
-    const { retainedFee, refundAmount } = computeRefundAmounts(refund.order, retentionPct);
+    const { retainedFee, refundAmount } = computeRefundAmounts(refund.order, retentionPct, { retainProcessingFee });
 
     if (refundAmount <= 0) return res.status(400).json({ error: 'Calculated refund amount is zero or negative' });
     if (refundAmount > orderTotal) return res.status(400).json({ error: 'Refund exceeds order total' });

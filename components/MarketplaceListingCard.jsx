@@ -1,5 +1,7 @@
 
 import React, { useState, lazy, Suspense } from 'react';
+import { offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
+import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 import { Link } from 'react-router-dom';
 import { Heart, ZoomIn } from 'lucide-react';
 // Lazy: the zoom modal drags framer-motion with it — load it only on demand.
@@ -22,6 +24,8 @@ import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
+import CardPopLogo from '@/components/CardPopLogo.jsx';
+import { sellerFromProfile } from '@/lib/sellerIdentity.js';
 
 const MarketplaceListingCard = ({ listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -33,10 +37,12 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
-      toast.error('Sign in to save listings to your watchlist');
+      toast('Sign in to save cards to your watchlist', {
+        action: { label: 'Sign in', onClick: () => { window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname)}`); } },
+      });
       return;
     }
-    const { success, watchlisted } = await toggle(listing.id);
+    const { success, watchlisted } = await toggle(listing.id, { priceAud: listing.price_aud });
     if (!success) {
       toast.error('Could not update your watchlist. Please try again.');
       return;
@@ -70,6 +76,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
 
   const sellerObj = listing.seller;
   const sellerId = listing.seller_id || sellerObj?.id;
+  const sellerInfo = sellerFromProfile(sellerObj, sellerId);
   const titleSlug = slugify(vaultItem?.card_name || listing.title || 'card');
   const detailPath = `/marketplace/${listing.id}/${titleSlug}`;
   const isSold = listing.status === 'sold';
@@ -216,22 +223,34 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
           <div className="flex items-center justify-between">
             {listing.listing_type === 'expression_of_interest' ? (
               <span className={`font-extrabold tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'} ${listing.price_min_aud != null && listing.price_max_aud != null ? 'text-base' : 'text-xl'}`}>
-                {listing.price_min_aud != null && listing.price_max_aud != null
-                  ? `$${Number(listing.price_min_aud).toFixed(2)} – $${Number(listing.price_max_aud).toFixed(2)}`
-                  : 'Open to offers'}
+                {formatOfferRange(listing.price_min_aud, listing.price_max_aud) ?? 'Open to offers'}
                 {/* sky-700 (not 600): at 10px bold on the white card face, axe holds this
     to the normal-text 4.5:1 contrast bar, which sky-600 misses (4.09:1). */}
-<span className="block text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">Seeking offers</span>
+<span className="block text-[10px] font-bold uppercase tracking-wider text-sky-700 dark:text-sky-400">
+                  {(() => {
+                    const state = offerWindowState(listing);
+                    if (state === 'upcoming') return describeOfferWindow(listing, state);
+                    if (state === 'closed') return 'Offers closed';
+                    return 'Seeking offers';
+                  })()}
+                </span>
               </span>
             ) : (
               <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
                 ${Number(listing.price_aud || 0).toFixed(2)}
-                {/* Seller-set postage — free stays quiet, a cost is disclosed on
-                    the card so checkout's shipping line is never a surprise. */}
-                {!isSold && Number(listing.shipping_cost_aud) > 0 && (
-                  <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                    + ${Number(listing.shipping_cost_aud).toFixed(2)} shipping
-                  </span>
+                {/* Seller-set postage. A cost is disclosed so checkout's shipping
+                    line is never a surprise; free postage is one of the strongest
+                    reasons to pick a card, so it's said rather than left blank. */}
+                {!isSold && (
+                  Number(listing.shipping_cost_aud) > 0 ? (
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                      + ${Number(listing.shipping_cost_aud).toFixed(2)} shipping
+                    </span>
+                  ) : (
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                      Free shipping
+                    </span>
+                  )
                 )}
               </span>
             )}
@@ -246,8 +265,10 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                {sellerObj?.avatar_url ? (
-                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
+                {sellerInfo.type === 'official' ? (
+                  <CardPopLogo variant="icon" iconClassName="w-4 h-5" />
+                ) : sellerInfo.logoUrl ? (
+                  <img src={toCdnUrl(sellerInfo.logoUrl)} alt={sellerInfo.business_name} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
                 )}
@@ -255,9 +276,9 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
-                    {sellerObj?.display_name || sellerObj?.username || 'Community Seller'}
+                    {sellerObj ? sellerInfo.business_name : 'Community Seller'}
                   </span>
-                  {isVerified(sellerObj?.is_verified) && <VerifiedBadge size="sm" />}
+                  {isVerified(sellerInfo.is_verified) && <VerifiedBadge size="sm" />}
                   {sellerObj?.seller_tier && sellerObj.seller_tier !== 'none' && (
                     <SellerTierBadge tier={sellerObj.seller_tier} size="xs" />
                   )}

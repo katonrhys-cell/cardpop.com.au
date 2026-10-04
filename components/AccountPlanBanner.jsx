@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { BadgeCheck, ShieldCheck, CreditCard, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { supabase } from '@/lib/supabaseClient.js';
+import { PLANS, planFromTier } from '@/config/plans.js';
 
 /**
  * Compact plan-and-next-steps banner for the account dashboard.
@@ -14,7 +16,21 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
  *   • offers the Pro upgrade
  */
 const AccountPlanBanner = () => {
-  const { isPro, isIdentityVerified, hasSavedCard, trialActive, trialDaysLeft } = useAuth();
+  const { currentUser, isPro, isIdentityVerified, hasSavedCard, trialActive, trialDaysLeft, subscriptionTier } = useAuth();
+  const planName = PLANS[planFromTier(subscriptionTier)]?.name || (isPro ? 'Pro' : 'Hobby');
+
+  // Paid tiers buy listing allowances, a store page and display styles —
+  // seller features. The upgrade nudge only makes sense for someone who has
+  // listed (or is set up to sell); a buyer saw "Upgrade to Pro" on every visit
+  // for a plan that did nothing for them.
+  const [isSeller, setIsSeller] = React.useState(isIdentityVerified && hasSavedCard);
+  React.useEffect(() => {
+    if (!currentUser?.id || isSeller) return undefined;
+    let cancelled = false;
+    supabase.from('listings').select('id', { count: 'exact', head: true }).eq('seller_id', currentUser.id)
+      .then(({ count }) => { if (!cancelled && (count || 0) > 0) setIsSeller(true); }, () => {});
+    return () => { cancelled = true; };
+  }, [currentUser?.id, isSeller]);
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -26,21 +42,23 @@ const AccountPlanBanner = () => {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your plan</p>
             <p className="font-heading text-lg font-bold text-foreground">
-              {isPro ? 'CardPop Pro' : 'Hobby (free)'}
+              {isPro ? `CardPop ${planName}` : 'Hobby (free)'}
               {trialActive && trialDaysLeft != null && (
                 <span className="ml-2 text-sm font-semibold text-brand-red">· {trialDaysLeft} trial {trialDaysLeft === 1 ? 'day' : 'days'} left</span>
               )}
             </p>
           </div>
         </div>
-        {!isPro && (
+        {!isPro && isSeller && (
           <Button asChild className="bg-brand-red font-bold hover:bg-brand-red/90">
             <Link to="/account/membership">Upgrade to Pro <ArrowRight className="ml-1.5 h-4 w-4" /></Link>
           </Button>
         )}
       </div>
 
-      {/* Next-step nudges — both are required to unlock selling & trading */}
+      {/* Next-step nudges — the two steps that unlock selling. Buyers who have
+          never listed see neither; their account works as is. */}
+      {(isSeller || !isIdentityVerified) && (
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {!isIdentityVerified && (
           <Link
@@ -49,7 +67,7 @@ const AccountPlanBanner = () => {
           >
             <ShieldCheck className="h-5 w-5 shrink-0 text-brand-red" />
             <span className="text-foreground">
-              <span className="font-bold">Verify your ID</span> to buy, sell &amp; trade on the marketplace — free, takes a minute.
+              <span className="font-bold">Verify your ID</span> to sell on the marketplace (and for larger purchases) — free, takes about two minutes.
             </span>
           </Link>
         )}
@@ -71,6 +89,7 @@ const AccountPlanBanner = () => {
           </span>
         </Link>
       </div>
+      )}
     </div>
   );
 };

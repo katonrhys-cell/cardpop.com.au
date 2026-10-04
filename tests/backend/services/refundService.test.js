@@ -22,6 +22,12 @@ vi.mock('../../../src/services/payoutService.js', () => ({ reverseSellerPayout: 
 vi.mock('../../../src/services/walletService.js', () => ({ creditWallet: mockCreditWallet }));
 vi.mock('../../../src/services/stripeWebhookService.js', () => ({ getPlatformSetting: mockGetPlatformSetting }));
 vi.mock('../../../src/middleware/auth.js', () => ({ isAdminUser: mockIsAdminUser }));
+// These pin the retention arithmetic with both admin knobs on (50% of the
+// platform fee + the processing fee); the policy default retains nothing.
+vi.mock('../../../src/services/refundAmounts.js', async (importOriginal) => ({
+  ...(await importOriginal()),
+  getRefundRetainProcessingFee: vi.fn(async () => true),
+}));
 
 import { processRefund } from '../../../src/services/refundService.js';
 

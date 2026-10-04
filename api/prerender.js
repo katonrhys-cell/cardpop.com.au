@@ -11,11 +11,14 @@ import {
   resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
 } from '../data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
-import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
+import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug, shopSlugRedirectTarget } from '../utils/shopProductUrl.js';
 import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js';
 import { shopCategoryLeaves } from '../utils/shopCategoryPages.js';
 import { colourListText } from '../utils/colourSwatch.js';
 import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopReturnPolicy.js';
+import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerProtectionPolicy.js';
+import { CARRIERS } from '../utils/shipmentTracking.js';
+import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -362,10 +365,12 @@ async function renderDealer(supabase, param) {
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
   }).join('\n');
 
-  // Product + Offer JSON-LD for each listing.
+  // Product + Offer JSON-LD for each listing. Google rejects a Product with no
+  // offers/review/aggregateRating, so an unpriced listing is a plain URL item.
   const productLd = (listings || []).map((l, i) => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
     const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
+    if (!(l.price_aud > 0)) return { '@type': 'ListItem', position: i + 1, name: cardName, url };
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
     const img = publicImageUrl(imgPath);
     const product = {
@@ -373,17 +378,15 @@ async function renderDealer(supabase, param) {
       name: cardName,
       url,
       ...(img ? { image: img } : {}),
-      ...(l.price_aud > 0
-        ? { offers: {
-            '@type': 'Offer',
-            price: Number(l.price_aud).toFixed(2),
-            priceCurrency: 'AUD',
-            availability: 'https://schema.org/InStock',
-            ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
-            url,
-            seller: { '@type': 'Store', name },
-          } }
-        : {}),
+      offers: {
+        '@type': 'Offer',
+        price: Number(l.price_aud).toFixed(2),
+        priceCurrency: 'AUD',
+        availability: 'https://schema.org/InStock',
+        ...(schemaItemCondition(l.vault_item?.condition) ? { itemCondition: schemaItemCondition(l.vault_item?.condition) } : {}),
+        url,
+        seller: { '@type': 'Store', name },
+      },
     };
     return { '@type': 'ListItem', position: i + 1, item: product };
   });
@@ -536,18 +539,22 @@ async function renderListing(supabase, id, slugParam) {
     });
   }
 
-  const { data: listing } = await supabase
+  // The card's name, condition, grade and photos live on the vault item — a
+  // listing row carries only the sale terms. Selecting a column the table lacks
+  // fails the whole query, which used to 404 every listing for crawlers.
+  const { data: listing, error: listingErr } = await supabase
     .from('listings')
-    .select('id, slug, title, description, price, price_aud, price_min_aud, price_max_aud, category, condition, grade, grading_company, status, images, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
+  if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
 
   // Derive a descriptive slug from the card name (the ID is the stable key; the
   // slug is decorative but should carry the keyword). Falls back to the DB slug,
   // then the URL param, then a generic word — mirrors the shop-product handler
   // and the client canonical so all three agree.
   const card = listing?.vault_item || {};
-  const cardName = listing?.title || card.card_name || 'Trading Card';
+  const cardName = card.card_name || 'Trading Card';
   const canonical = `${BASE_URL}/marketplace/${id}/${listing?.slug || slugify(cardName) || slugParam || 'listing'}`;
 
   // A sold listing stays on the site — the card, its photos and its price are
@@ -563,17 +570,16 @@ async function renderListing(supabase, id, slugParam) {
       bodyHtml: '<main><h1>Listing Unavailable</h1><p>This listing is sold or no longer active.</p></main>',
     });
   }
-  const imgPath = listing.images?.[0] || card.vault_images?.[0]?.storage_path || card.card_image;
+  const imgPath = card.vault_images?.[0]?.storage_path || card.card_image;
   const image = publicImageUrl(imgPath);
-  const price = listing.price_aud ?? listing.price;
-  const condition = listing.condition || card.condition;
-  const grade = listing.grade || card.grade;
+  const price = listing.price_aud;
+  const condition = card.condition;
+  const grade = card.grade;
   const gradingCompany = listing.grading_company || card.grading_company;
   const sellerName = listing.seller?.business_name || listing.seller?.display_name || listing.seller?.username || 'CardPop Seller';
   const title = `${cardName}${soldOut ? ' (Sold)' : ''} | CardPop Marketplace`;
   const setLine = [card.set_name, card.year].filter(Boolean).join(' · ');
-  const description = listing.description
-    || `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} ${soldOut ? 'sold on' : 'for sale on'} CardPop, Australia's trading card marketplace.`;
+  const description = `${cardName}${setLine ? ` (${setLine})` : ''}${grade ? ` — ${gradingCompany || ''} ${grade}`.trimEnd() : ''} ${soldOut ? 'sold on' : 'for sale on'} CardPop, Australia's trading card marketplace.`;
 
   const product = {
     '@context': 'https://schema.org',
@@ -593,7 +599,19 @@ async function renderListing(supabase, id, slugParam) {
           url: canonical,
           seller: { '@type': 'Organization', name: sellerName },
         } }
-      : {}),
+      // Expression of Interest: no fixed price, but the seller's offer range is
+      // real — an AggregateOffer from the minimum (max is optional).
+      : listing.price_min_aud > 0
+        ? { offers: {
+            '@type': 'AggregateOffer',
+            lowPrice: Number(listing.price_min_aud).toFixed(2),
+            ...(listing.price_max_aud > 0 ? { highPrice: Number(listing.price_max_aud).toFixed(2) } : {}),
+            priceCurrency: 'AUD',
+            offerCount: 1,
+            availability: soldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+            url: canonical,
+          } }
+        : {}),
   };
 
   const breadcrumb = {
@@ -616,17 +634,20 @@ async function renderListing(supabase, id, slugParam) {
     ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong>${soldOut ? '' : (listing.accepts_offers ? ' (offers accepted)' : '')}</p>`
     : (listing.price_min_aud != null && listing.price_max_aud != null
       ? `<p><strong>Seeking offers: A$${esc(Number(listing.price_min_aud).toFixed(2))} – A$${esc(Number(listing.price_max_aud).toFixed(2))}</strong></p>`
-      : '')}
+      : listing.price_min_aud != null
+        ? `<p><strong>Seeking offers from A$${esc(Number(listing.price_min_aud).toFixed(2))}</strong></p>`
+        : '')}
   ${setLine ? `<p>${esc(setLine)}</p>` : ''}
   <ul>
     ${condition ? `<li>Condition: ${esc(condition)}</li>` : ''}
     ${grade ? `<li>Grade: ${esc(`${gradingCompany || ''} ${grade}`.trim())}</li>` : ''}
     <li>Seller: ${sellerHref ? `<a href="${sellerHref}">${esc(sellerName)}</a>` : esc(sellerName)}</li>
   </ul>
-  ${listing.description ? `<p>${esc(listing.description)}</p>` : ''}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, jsonLdItems: [product, breadcrumb], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image,
+    // Google rejects a Product with no offers/review/aggregateRating.
+    jsonLdItems: [isEligibleProductLd(product) ? product : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // `canonicalPath` is set when rendering at the canonical /shop/<category>/<slug>
@@ -649,11 +670,31 @@ async function renderShopProductBySlug(supabase, categorySlug, productSlug, colo
       .not('family_sku', 'is', null));
     rows = (rows || []).filter((r) => shopLineSlug(r) === productSlug);
   }
+  if (!rows?.length) {
+    // A slug the product used to have (renamed in Admin → Products, or the
+    // SEO clean-up migration) keeps working: 301 to its current URL.
+    const target = await shopSlugRedirect(supabase, productSlug, colour);
+    return target ? { status: 301, location: `${BASE_URL}${target}` } : null;
+  }
   const row = (colour && rows.find((r) => r.colour && r.slug.endsWith(`-${colour}`))) || rows?.[0];
   if (!row) return null;
   const base = shopProductBasePath(row);
   if (base && shopCategorySlug(row) !== categorySlug) return { status: 301, location: `${BASE_URL}${base}` };
   return renderShopProduct(supabase, row.id, null, { canonicalPath: base });
+}
+
+/**
+ * Current path for a former slug (shop_product_slug_redirects), or null. The
+ * LIKE picks up an old colour sibling's slug for an old *line* slug too;
+ * shopSlugRedirectTarget() does the exact line matching.
+ */
+async function shopSlugRedirect(supabase, productSlug, colour) {
+  const { data } = await supabase
+    .from('shop_product_slug_redirects')
+    .select('old_slug, product:shop_products(id, slug, category, colour, family_sku, status)')
+    .like('old_slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}%`);
+  const live = (data || []).filter((r) => r.product && PUBLIC_SHOP_STATUSES.includes(r.product.status));
+  return shopSlugRedirectTarget(live, productSlug, colour);
 }
 
 async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}) {
@@ -708,6 +749,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     description: toText(description, 1000),
     ...(product.category ? { category: product.category } : {}),
     brand: { '@type': 'Brand', name: 'CardPop' },
+    ...(await loadShopReviewLd(supabase, { familySku: product.family_sku, productId: product.family_sku ? null : product.id })),
     ...(price > 0
       ? { offers: {
           '@type': 'Offer',
@@ -744,7 +786,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   // The first paragraph of a shop description is written to stand alone as the
   // meta description; the rest is page body only.
   const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
-  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [productLd, breadcrumb], bodyHtml });
+  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -764,17 +806,13 @@ function renderBindersHub() {
     '@type': 'ItemList',
     name: 'Palms Off Gaming binders',
     numberOfItems: BINDER_PRODUCTS.length,
+    // Summary-page list (URLs only): the hub has no live prices, and a Product
+    // without offers is rejected by Google. Each product page carries its own.
     itemListElement: BINDER_PRODUCTS.map((p, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: {
-        '@type': 'Product',
-        name: p.title,
-        sku: p.sku,
-        brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
-        image: binderImages(p)[0],
-        url: `${BASE_URL}/shop/binders/${p.slug}`,
-      },
+      name: p.title,
+      url: `${BASE_URL}/shop/binders/${p.slug}`,
     })),
   };
 
@@ -805,6 +843,46 @@ function renderBindersHub() {
     jsonLdItems: [itemList, breadcrumb],
     bodyHtml,
   });
+}
+
+// Google rejects a Product unless it has offers, review or aggregateRating, so
+// a Product node without one of them is dropped rather than emitted.
+function isEligibleProductLd(ld) { return Boolean(ld && (ld.offers || ld.aggregateRating || ld.review)); }
+
+// ── Product reviews (shop_product_reviews) ──────────────────────────────────
+//
+// Published, verified-purchase reviews of a shop product — shared across a
+// colour line (pool = family_sku, else the product id; utils/productReviews.js).
+// Returns the schema.org aggregateRating/review properties for the Product, or
+// {} when there are none or the table isn't there yet: rating markup must only
+// ever describe reviews the page actually shows (components/shop/ProductReviews.jsx).
+async function loadShopReviewLd(supabaseClient, { familySku, productId, slug }) {
+  try {
+    const poolFor = async () => {
+      const pools = [];
+      if (familySku) pools.push(reviewPoolKey({ familySku }));
+      if (productId) pools.push(reviewPoolKey({ productId }));
+      else if (slug) {
+        // A catalogue line with no colour family pools by its own product id.
+        const { data: row } = await supabaseClient.from('shop_products').select('id').eq('slug', slug).maybeSingle();
+        if (row?.id) pools.push(reviewPoolKey({ productId: row.id }));
+      }
+      return pools.filter(Boolean);
+    };
+    for (const pool of await poolFor()) {
+      const [stats, list] = await Promise.all([
+        supabaseClient.from('shop_product_review_stats').select('review_count, average_rating').eq('pool_key', pool).maybeSingle(),
+        supabaseClient.from('shop_product_reviews')
+          .select('rating, title, body, reviewer_name, created_at')
+          .eq('pool_key', pool).eq('status', 'published')
+          .order('created_at', { ascending: false }).limit(10),
+      ]);
+      if (stats.error || !stats.data) continue;
+      const ld = productReviewsLd(stats.data, list.error ? [] : (list.data || []));
+      if (ld.aggregateRating) return ld;
+    }
+  } catch { /* reviews are non-critical */ }
+  return {};
 }
 
 // ── Commercial data for a catalogue line page ───────────────────────────────
@@ -894,6 +972,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: 'Binders',
     url: canonical,
+    ...(await loadShopReviewLd(supabaseClient, { familySku: product.sku, slug: product.slug })),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -963,7 +1042,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     ogImage: images[0],
     ogImageAlt: binderImageAlt(product, product.imageFiles[0]),
     ogType: 'product',
-    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }
@@ -1013,6 +1092,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: category.name,
     url: canonical,
+    ...(await loadShopReviewLd(supabaseClient, { familySku: product.sku, slug: product.slug })),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -1079,7 +1159,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     ogImage: images[0],
     ogImageAlt: palmsOffImageAlt(product, product.imagePaths[0]),
     ogType: 'product',
-    jsonLdItems: [productLd, breadcrumb, faqLd].filter(Boolean),
+    jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb, faqLd].filter(Boolean),
     bodyHtml,
   });
 }
@@ -1126,7 +1206,7 @@ async function renderLanding(supabase, path) {
   } else {
     const { data } = await supabase
       .from('listings')
-      .select('id, slug, title, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
+      .select('id, slug, price_aud, vault_item:vault_items(card_name, card_image, vault_images(storage_path))')
       .eq('status', 'active')
       .neq('listing_type', 'vault')
       .order('created_at', { ascending: false })
@@ -1135,7 +1215,7 @@ async function renderLanding(supabase, path) {
       const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
       const image = publicImageUrl(imgPath);
       return {
-        name: l.title || l.vault_item?.card_name || 'Trading Card',
+        name: l.vault_item?.card_name || 'Trading Card',
         url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
         price: l.price_aud,
         image,
@@ -1757,44 +1837,48 @@ const STATIC_CONTENT = {
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }],
     h1: 'Frequently Asked Questions',
     intro: 'Find answers to common questions about buying, selling, and vaulting on CardPop™.',
+    // Keep in step with pages/info/FAQPage.jsx — no cloaking.
     faqs: [
-      { q: 'How does the CardPop™ Vault work?', a: 'The Vault is our secure storage facility. When you buy a card, you can choose to send it to your Vault instead of your home. This lets you instantly relist the card for sale without paying shipping fees, or hold it securely as an investment.' },
-      { q: 'What are the selling fees on CardPop™?', a: 'We charge a flat 8% commission on all successful sales. There are no listing fees. If you sell an item directly from your Vault, the commission is reduced to 6%.' },
-      { q: 'How do I get paid when I sell an item on CardPop™?', a: 'Funds from successful sales are added to your CardPop™ Wallet balance. You can use this balance to purchase other items on the platform, or withdraw it to your nominated bank account at any time.' },
-      { q: 'Are trades protected on CardPop™?', a: 'Yes. When you agree to a trade, both parties send their items to our authentication center. We verify the condition and authenticity of all items before forwarding them to their final destinations.' },
+      { q: 'Do I need an account to buy?', a: 'Not for CardPop Shop products — supplies, binders and sealed stock check out as a guest. Cards bought from other collectors on the marketplace need a free account (it’s how the seller reaches you and how your Buyer Protection is tied to the order); you can create it at checkout and come straight back. Larger marketplace orders also ask for a one-time ID check through Stripe.' },
+      { q: 'What does shipping cost and how long does it take?', a: 'CardPop Shop orders ship tracked within Australia: a flat rate under the free-shipping threshold and free above it, dispatched within 2 business days. Marketplace cards ship at the postage the seller sets, shown on the listing and in your cart before you pay; sellers are expected to post within a week. See the Shipping page for the current rates.' },
+      { q: 'What if a card arrives and it isn’t what was described?', a: PROTECTION_COPY.marketplaceSummary },
+      { q: 'Can I return a card because I changed my mind?', a: `Not a marketplace card — a sale between collectors is binding once the card is as advertised. New CardPop Shop products can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days of delivery for any reason, unused and in their packaging.` },
+      { q: 'What happens if the seller never posts my card?', a: PROTECTION_COPY.notShippedSummary },
+      { q: 'How does the CardPop™ Vault work?', a: 'The Vault is your digital collection on CardPop™. Add a card by photographing it — our card identification fills in the details for you — then track its estimated value, show it off on your public profile, and list it for sale in a couple of clicks. Your cards stay with you; the Vault keeps the record, the photos and the market data in one place.' },
+      { q: 'What are the selling fees on CardPop™?', a: 'There are no listing fees — you only pay a commission when an item actually sells. The exact commission for your sale is shown in the price breakdown before you confirm, and again on the order once it completes, so there are never surprise deductions.' },
+      { q: 'How do I get paid when I sell an item on CardPop™?', a: 'Sales are paid out to your Stripe-connected bank account once the order completes. Until you connect a payout account, proceeds are held in your CardPop™ Wallet and released when you do.' },
+      { q: 'Can I trade cards with other collectors on CardPop™?', a: 'Not yet. Card-for-card trading is on the roadmap and is switched off until it’s ready — listings are for sale only. When it launches, trades will run through CardPop™ so your transaction history and Buyer Protection apply.' },
     ],
   },
 
   '/safe-buying': {
     title: "Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™",
-    description: 'Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and a 14-day Buyer Protection Guarantee.',
+    description: `Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described or doesn't arrive.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Safe Buying', path: '/safe-buying' }],
     h1: 'Why CardPop Is Safe: Buyer Protection & Secure Payments',
     intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
+    // Keep in step with pages/info/SafeBuyingPage.jsx — no cloaking.
     sections: [
       { h2: 'Every payment is secure', paras: [
-        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Afterpay, Apple Pay, Google Pay or Stripe Link, all in Australian dollars.',
+        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay, all in Australian dollars.',
       ] },
-      { h2: 'Buyer protection on every order', paras: [
-        'Every purchase is backed by our 14-day Buyer Protection Guarantee. If your item doesn’t arrive within the expected timeframe, or is significantly not as described, you can request a full refund through our resolution process. You’re never left out of pocket for an order that goes wrong.',
-      ] },
+      { h2: 'Buyer protection on every order', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
       { h2: 'You only trade with verified people', paras: [
         'What makes CardPop safer than open marketplaces and social-media groups is that real, verified people stand behind every account. Sellers confirm their identity with a government-issued ID and a matching selfie through Stripe Identity before they can sell. Verified accounts carry a Verified badge, so you always know who you’re buying from — and fraudsters and throwaway accounts have nowhere to hide.',
       ] },
-      { h2: 'Authentication for high-value cards', paras: [
-        'For high-value cards and trades, we offer middleman authentication: items ship to our facility where experts verify authenticity and condition before forwarding to the buyer. Both sides transact with total confidence.',
-      ] },
       { h2: 'How to buy safely on CardPop', items: [
-        { text: 'Buy from verified sellers — look for the Verified badge on seller profiles.' },
+        { text: 'Buy from verified sellers — look for the Verified badge and the seller’s rating on the listing.' },
+        { text: 'Read the photos and condition carefully — a marketplace sale is binding when the card matches its listing, so check the grade, the set and the card number before you pay.' },
         { text: 'Pay through CardPop’s Stripe checkout — never send money off-platform, so your Buyer Protection always applies.' },
-        { text: 'Use authentication for big-ticket cards — add middleman authentication for peace of mind on high-value purchases.' },
+        { text: `Check the card the day it arrives — you have ${MP.claimWindowDaysFromDelivery} days from delivery to report a problem, with photos.` },
         { text: 'Keep communication on-platform — it keeps a record and keeps you protected.' },
       ] },
     ],
     faqs: [
-      { q: 'Is CardPop a safe place to buy trading cards?', a: 'Yes. Every order is paid through Stripe’s PCI-DSS Level 1 checkout, backed by a 14-day Buyer Protection Guarantee, and sellers are identity-verified through Stripe Identity — so you buy Pokémon, Magic and sports cards from real, verified Australian sellers with a full refund if anything goes wrong.' },
-      { q: 'Where is the safest place to buy Pokémon cards in Australia?', a: 'CardPop is built specifically for safe trading-card transactions in Australia: secure Stripe payments in AUD, ID-verified sellers, buyer protection on every order, and optional middleman authentication for high-value cards — protections general marketplaces and social-media groups don’t offer.' },
-      { q: 'What if my card never arrives or isn’t as described?', a: 'You’re covered by our 14-day Buyer Protection Guarantee. Open a case through our resolution process and, if the item didn’t arrive or was significantly not as described, you’ll receive a full refund.' },
+      { q: 'Is CardPop a safe place to buy trading cards?', a: `Yes. Every order is paid through Stripe’s PCI-DSS Level 1 checkout, backed by ${MP.name}, and sellers are identity-verified through Stripe Identity — so you buy Pokémon, Magic and sports cards from real, verified Australian sellers with a full refund if the card isn’t as described or doesn’t arrive.` },
+      { q: 'Where is the safest place to buy Pokémon cards in Australia?', a: 'CardPop is built specifically for safe trading-card transactions in Australia: secure Stripe payments in AUD, ID-verified sellers, buyer protection on every order and a binding-sale rule that keeps bad-faith buyers and sellers out — protections general marketplaces and social-media groups don’t offer.' },
+      { q: 'What if my card never arrives or isn’t as described?', a: `You’re covered by ${MP.name}. Report it within ${MP.claimWindowDaysFromDelivery} days of delivery — or after ${MP.notShippedClaimAfterDays} days if it was never posted — and, once approved, you’re refunded in full: the card, postage and every fee.` },
+      { q: 'Can I change my mind after buying a card?', a: `A marketplace sale is binding when the card is as advertised, so there are no change-of-mind returns on cards bought from other collectors. New CardPop Shop products can be returned within ${SHOP_RETURN_POLICY.windowDays} days for any reason.` },
       { q: 'How do I know the seller is genuine?', a: 'Sellers verify their identity with a government ID and a matching selfie through Stripe Identity before they can sell. Verified accounts carry a Verified badge, so you’re never trading with an anonymous or throwaway account.' },
       { q: 'Are my payment details secure?', a: 'Yes. Payments are processed entirely on Stripe’s encrypted, PCI-DSS-compliant checkout. Your card details are never stored on or transmitted through CardPop’s servers.' },
     ],
@@ -1844,12 +1928,13 @@ const STATIC_CONTENT = {
 
   '/returns': {
     title: 'Returns & Refund Policy | CardPop',
-    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, plus buyer protection and refunds on marketplace purchases.`,
+    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, and ${MP.name}: a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery when a marketplace card isn't as described or doesn't arrive.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Returns & Refunds', path: '/returns' }],
     h1: 'Returns & Refunds',
-    intro: 'How returns, exchanges and refunds work for CardPop Shop products and marketplace purchases.',
+    intro: 'How returns, exchanges and refunds work for CardPop Shop products and cards bought from other collectors on the marketplace.',
+    // Keep in step with pages/info/ReturnsPage.jsx — no cloaking.
     sections: [
-      { h2: 'Overview', paras: [`CardPop sells two kinds of items, each with its own returns policy: new CardPop Shop products sold by CardPop itself, which can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days for any reason, and marketplace purchases from other CardPop sellers, which are covered by buyer protection. Returns are available within Australia. Nothing in this policy limits your rights under the Australian Consumer Law.`] },
+      { h2: 'Overview', paras: [`CardPop sells two kinds of items, each with its own policy: new CardPop Shop products sold by CardPop itself, which can be returned or exchanged within ${SHOP_RETURN_POLICY.windowDays} days of delivery for any reason, and marketplace purchases from other CardPop collectors, where a sale is binding if the card is as advertised and ${MP.name} refunds you in full if it isn’t or never arrives. Returns are available within Australia. Nothing in this policy limits your rights under the Australian Consumer Law.`] },
       { h2: 'CardPop Shop returns & exchanges (new products)', items: [
         { text: `Return window: ${SHOP_RETURN_POLICY.windowDays} days from the day your order is delivered.` },
         { text: 'Defective and non-defective items: we accept returns of faulty items and change-of-mind returns. For a change-of-mind return the item must be new and unused, in its original condition and packaging.' },
@@ -1859,59 +1944,69 @@ const STATIC_CONTENT = {
         { text: `Refund processing time: once your return arrives and has been checked, your refund is processed within ${SHOP_RETURN_POLICY.refundProcessingDays} days to your original payment method.` },
       ] },
       { h2: 'How to return or exchange a Shop product', paras: [`Within ${SHOP_RETURN_POLICY.windowDays} days of delivery, email support@cardpop.com.au with your order number, the item(s) you are returning and whether you would like a refund or an exchange. We reply with the return address and instructions; post the item back well packed with your order number included. Once it arrives we process your refund within ${SHOP_RETURN_POLICY.refundProcessingDays} days, or send out your exchange.`] },
-      { h2: 'Marketplace purchases', paras: ['Buyer protection applies to all marketplace purchases. Request a refund within 30 days of purchase through your account. Requests are reviewed within 2 business days; if approved, the refund is issued to your original payment method. Because marketplace cards are sold by individual sellers, the change-of-mind returns offered on CardPop Shop products don’t apply to marketplace purchases.'] },
-      { h2: 'Platform fee retention on marketplace refunds', paras: ['When a marketplace refund is issued, 50% of the platform fee is non-refundable (it covers Stripe processing costs CardPop can’t recover). The other 50% of the fee plus the full item price is returned. Example — on a $100 sale with a $3 platform fee: $100.00 item price refunded, $1.50 (50% of the fee) refunded, $1.50 retained, for $101.50 AUD returned. This policy is shown before every purchase.'] },
-      { h2: 'Eligible marketplace refund reasons', items: [
-        { text: 'Item not received within a reasonable timeframe.' },
-        { text: 'Item significantly not as described (wrong card or wrong condition grade).' },
-        { text: 'Item arrived damaged in transit (photo evidence of packaging required).' },
-        { text: 'Item proven counterfeit.' },
-        { text: 'Seller cancelled the order after payment.' },
-      ] },
-      { h2: 'Non-eligible marketplace refund reasons', items: [
-        { text: 'Change of mind or buyer’s remorse.' },
-        { text: 'Market price fluctuations after purchase.' },
-        { text: 'Minor subjective condition discrepancies on raw (ungraded) cards.' },
-        { text: 'Requests made more than 30 days after purchase.' },
-      ] },
-      { h2: 'How to request a marketplace refund', paras: ['Go to My Account → Orders, find the order and click Request Refund, select the reason and provide details or photos. CardPop reviews within 2 business days and notifies you by email and in-app. If approved, the refund is issued via Stripe and takes 5–10 business days to appear.'] },
-      { h2: 'Seller obligations', paras: ['Sellers must accurately describe item condition and grade. If a refund is approved due to misrepresentation, the seller’s proceeds may be clawed back at CardPop’s discretion; repeat violations may result in account suspension.'] },
+      { h2: `Marketplace purchases — ${MP.name}`, paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
+      { h2: 'What you get back', paras: ['An approved claim refunds everything you paid on the order: the card’s price, the seller’s postage, CardPop’s service fee and the payment-processing fee. Nothing is retained. Example — a $100 card with $10 postage, a $3 service fee and a $2.50 processing fee returns $115.50 AUD.'] },
+      { h2: 'When a claim is approved', items: MP.eligibleReasons.map((text) => ({ text })) },
+      { h2: 'When a claim isn’t', items: [...MP.ineligibleReasons.map((text) => ({ text })), { text: `Requests made after the window — ${MP.claimWindowDaysFromDelivery} days from delivery, and never more than ${MP.hardCapDaysFromPurchase} days after purchase.` }] },
+      { h2: 'How to make a claim', paras: [PROTECTION_COPY.processSummary] },
+      { h2: 'Seller obligations', paras: [`Sellers must describe condition and grade accurately, post within ${MP.notShippedClaimAfterDays} days using a tracked service, and carry the risk of a parcel that doesn’t arrive. Where a claim is approved, the seller’s payout for that order is reversed. Repeat misdescription leads to account suspension.`] },
       { h2: 'Disputes', paras: ['If buyer and seller can’t resolve an issue directly, contact CardPop support with the order number and evidence. The team mediates and makes a binding decision within 5 business days.'] },
     ],
   },
 
   '/shipping': {
     title: 'Shipping Information | CardPop',
-    description: "Learn about CardPop's shipping policies, rates and delivery times for Australian orders.",
+    description: `CardPop ships within Australia. Shop orders: $15 flat, free from $100, tracked. Marketplace cards ship at the seller's listed postage, posted within ${MP.notShippedClaimAfterDays} days.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Shipping', path: '/shipping' }],
     h1: 'Shipping Information',
-    intro: 'Everything you need to know about how we deliver your cards safely.',
+    intro: 'How CardPop Shop orders and marketplace cards get to you, what it costs, and how long it takes.',
+    // Keep in step with pages/info/ShippingPage.jsx (which reads the live
+    // shipping settings; the defaults are quoted here) — no cloaking.
     sections: [
-      { h2: 'Domestic shipping (Australia)', items: [
-        { text: 'Standard Tracked: $8.95 (3–5 business days).' },
-        { text: 'Express Tracked: $12.95 (1–2 business days).' },
-        { text: 'Signature Required: additional $2.95 (recommended for high-value items).' },
+      { h2: 'CardPop Shop orders', items: [
+        { text: 'Orders under $100: $15 flat-rate tracked shipping, charged once per order.' },
+        { text: 'Orders of $100 or more: free tracked shipping.' },
+        { text: 'Dispatch: within 2 business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout).' },
+        { text: 'Delivery: typically 3–7 business days with Australia Post, depending on where you are.' },
+      ], paras: ['The $100 threshold is based on the CardPop Shop items in your cart. All prices include GST.'] },
+      { h2: 'Marketplace cards (bought from other collectors)', items: [
+        { text: 'Postage: set by each seller and shown on the listing and in your cart before you pay; many sellers offer free postage.' },
+        { text: `Dispatch: sellers are expected to post within ${MP.notShippedClaimAfterDays} days of your order, using a tracked service, and to mark the order as posted with the tracking number — you get an email with the tracking link.` },
+        { text: `If it isn’t posted in time: after ${MP.notShippedClaimAfterDays} days with no tracking you can report the order as not received from My Account → Orders and be refunded in full.` },
+        { text: 'If it goes missing: a tracked parcel that never arrives is the seller’s loss, not yours — see Buyer Protection on the Returns page.' },
       ] },
-      { h2: 'International shipping', paras: ['We currently ship to New Zealand, the USA, Canada and the UK. International rates are calculated at checkout based on weight and destination.'] },
-      { h2: 'Packaging standards', paras: ['Single cards are shipped in a penny sleeve, top loader and team bag, secured between rigid cardboard to prevent bending. Graded cards are shipped in protective sleeves with bubble wrap.'] },
-      { h2: 'Vault transfers', paras: ['Items purchased and sent directly to your CardPop Vault incur zero shipping fees. You only pay shipping when you request a physical withdrawal from your vault.'] },
+      { h2: 'Carriers and tracking', paras: [`Tracking links on CardPop support ${Object.values(CARRIERS).filter((c) => c.trackUrl).map((c) => c.label).join(', ')}. Every shipped order shows its carrier and tracking number in My Account → Orders, and the shipped email carries the same link.`] },
+      { h2: 'Where we ship', paras: ['We currently ship to Australian addresses only, and accept payment from Australian-issued cards and PayPal.'] },
+      { h2: 'Packaging standards', paras: ['Single cards are shipped in a penny sleeve and top loader (or team bag), secured between rigid cardboard to prevent bending in transit. Graded cards are shipped in protective sleeves with bubble wrap. Sealed product is boxed, not bagged. Sellers are held to the same standard — a card that arrives damaged because it was poorly packed is covered by Buyer Protection.'] },
     ],
+    links: [{ text: 'Returns & Refunds', href: '/returns' }],
   },
 
   '/trust-safety': {
     title: 'Trust & Safety | CardPop™',
-    description: "CardPop™'s trust and safety policies — how we protect buyers and sellers in the Australian trading card community.",
+    description: `How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Trust & Safety', path: '/trust-safety' }],
     h1: 'Trust & Safety',
-    intro: 'How we protect every buyer and seller in our community.',
+    intro: 'Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe.',
+    // Keep in step with pages/info/TrustSafetyPage.jsx — no cloaking.
     sections: [
-      { h2: 'Buyer protection', paras: ['Payments are processed securely through Stripe, and every order is backed by a 14-day Buyer Protection Guarantee. If an item doesn’t arrive in the expected timeframe or is significantly not as described, you can request a full refund through the resolution process.'] },
-      { h2: 'Seller protection', paras: ['Sellers are protected against fraudulent chargebacks and false claims, provided they ship to the verified address with tracking and signature confirmation.'] },
-      { h2: 'Authentication services', paras: ['For high-value items and trades we offer middleman authentication — items are shipped to CardPop’s facility where experts verify authenticity and condition before forwarding to the buyer.'] },
+      { h2: 'Secure payments', paras: ['Every purchase on CardPop is processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.'] },
+      { h2: 'Buyer protection', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
+      { h2: 'Seller protection', paras: ['Sellers are protected against fraudulent chargebacks and false claims. Ship to the buyer’s checkout address with tracking (signature on delivery for high-value cards), mark the order posted with the tracking number, and you’re covered — a would-be scammer can’t claim “item not received” against a tracked, delivered parcel. A sale is binding, so a buyer can’t return a card that matches its listing because they changed their mind.'] },
+      { h2: 'Verified identity', paras: ['Real people stand behind every account. Before anyone can sell, they verify their identity through Stripe Identity: a photograph of a government-issued ID and a matching selfie. Buyers need a free account for any marketplace card and complete the same one-time check for larger orders. Stripe performs the check and confirms the match — CardPop never stores your document images.'] },
       { h2: 'Community guidelines', paras: ['We have a zero-tolerance policy for fraud, harassment and market manipulation. Violators are permanently banned from the platform.'] },
+    ],
+    faqs: [
+      { q: 'Is my card information safe on CardPop?', a: 'Yes. Payments are processed by Stripe, a PCI-DSS Level 1 certified provider. Card details are entered inside Stripe’s encrypted checkout and are never stored on or transmitted through CardPop’s servers.' },
+      { q: 'What payment methods can I use?', a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.' },
+      { q: 'What happens if my card never arrives or is not as described?', a: `You’re covered by ${MP.name}. Report it from My Account → Orders within ${MP.claimWindowDaysFromDelivery} days of delivery (or after ${MP.notShippedClaimAfterDays} days if the seller never posts it). If the card is significantly not as described, damaged, counterfeit or missing, you’re refunded in full — the card, postage and every fee — to your original payment method.` },
+      { q: 'Can I return a marketplace card if I change my mind?', a: 'No. A marketplace sale is binding once the card is as advertised — you’re buying from another collector, not a shop. Change-of-mind returns apply to new CardPop Shop products only.' },
+      { q: 'When do I have to verify my ID?', a: 'To sell, always. To buy a marketplace card, you need a free account; a one-time Stripe Identity check (government ID plus a matching selfie) is asked for on larger marketplace orders. Stripe performs the check and CardPop never stores your document images.' },
+      { q: 'How are sellers protected?', a: 'As long as you ship to the buyer’s checkout address with tracking (and signature on delivery for high-value cards) and mark the order posted, you’re protected against fraudulent chargebacks and false “item not received” claims.' },
     ],
     links: [
       { text: 'How to buy safely on CardPop', href: '/safe-buying' },
+      { text: 'Returns & Refunds', href: '/returns' },
       { text: 'Browse the Marketplace', href: '/marketplace' },
     ],
   },
@@ -2939,9 +3034,9 @@ async function renderCollection(supabase, rawSlug) {
   const categoryValues = [cfg.name, ...(cfg.aliases || [])];
   const { data } = await supabase
     .from('listings')
-    .select('id, slug, title, price_aud, category, vault_item:vault_items(card_name)')
+    .select('id, slug, price_aud, vault_item:vault_items!inner(card_name, collection)')
     .eq('status', 'active')
-    .in('category', categoryValues)
+    .in('vault_item.collection', categoryValues)
     .order('created_at', { ascending: false })
     .limit(50);
   const listings = data || [];
@@ -2974,14 +3069,14 @@ async function renderCollection(supabase, rawSlug) {
       itemListElement: listings.map((l, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        name: l.title || l.vault_item?.card_name || 'Trading Card',
+        name: l.vault_item?.card_name || 'Trading Card',
         url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
       })),
     });
   }
 
   const itemsHtml = listings.map((l) => {
-    const name = l.title || l.vault_item?.card_name || 'Trading Card';
+    const name = l.vault_item?.card_name || 'Trading Card';
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>`
       + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');
@@ -3218,7 +3313,7 @@ async function renderSeller(supabase, param) {
 
   const { data: listingData } = await supabase
     .from('listings')
-    .select('id, slug, title, price_aud, vault_item:vault_items(card_name)')
+    .select('id, slug, price_aud, vault_item:vault_items(card_name)')
     .eq('seller_id', profile.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -3248,7 +3343,7 @@ async function renderSeller(supabase, param) {
   };
 
   const itemsHtml = listings.map((l) => {
-    const cardName = l.title || l.vault_item?.card_name || 'Trading Card';
+    const cardName = l.vault_item?.card_name || 'Trading Card';
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(cardName)}</a>`
       + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');

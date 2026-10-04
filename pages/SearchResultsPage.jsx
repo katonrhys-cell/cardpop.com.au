@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, ImageOff } from 'lucide-react';
@@ -58,7 +59,7 @@ async function searchListings(tokens) {
   const { data, error } = await applyTokens(
     supabase
       .from('listings')
-      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
       // Sold cards stay in the results, badged "Sold" by MarketplaceListingCard
       // — a card that sold is still the card someone searched for. Only
       // 'archived' is genuinely off the site.
@@ -323,6 +324,29 @@ const SearchResultsPage = () => {
               Did you mean “{didYouMean}”?
             </button>
           )}
+          {/* Never a dead end: the two buying surfaces, plus the searches that
+              usually land. */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <Button asChild className="rounded-xl font-bold">
+              <Link to={query ? `/marketplace?q=${encodeURIComponent(query)}` : '/marketplace'}>Browse all cards</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl font-bold">
+              <Link to="/shop">Shop supplies</Link>
+            </Button>
+          </div>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <span className="w-full text-xs font-semibold uppercase tracking-wider text-muted-foreground">Popular right now</span>
+            {['Charizard', 'Pikachu', 'Umbreon', 'Black Lotus', 'Luka Dončić', 'Prizm'].map((term) => (
+              <button
+                key={term}
+                type="button"
+                onClick={() => setSearchParams({ q: term })}
+                className="rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium hover:border-primary/50 hover:text-primary"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <>

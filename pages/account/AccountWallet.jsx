@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Wallet, ExternalLink, CheckCircle2, Clock, AlertCircle,
   ArrowDownLeft, Loader2, RefreshCw, TrendingUp, Banknote,
@@ -292,8 +293,11 @@ const AccountWallet = () => {
 
       {/* Sales & payout history */}
       <Card className="shadow-sm border-border overflow-hidden">
-        <CardHeader className="border-b border-border bg-muted/20 px-6 py-5">
+        <CardHeader className="border-b border-border bg-muted/20 px-6 py-5 flex flex-row items-center justify-between gap-3">
           <CardTitle className="font-serif text-xl">Sale Payouts</CardTitle>
+          <Button asChild variant="outline" size="sm" className="rounded-xl font-bold">
+            <Link to="/account/sales">Post &amp; track sales</Link>
+          </Button>
         </CardHeader>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

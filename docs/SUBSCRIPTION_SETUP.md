@@ -31,6 +31,37 @@ CardPop has five account plans, defined in `config/plans.js`:
 > id (PayPal) — see `tierFromStripeSubscription` / `tierFromPaypalPlanId` in
 > `src/services/subscriptionService.js`.
 
+## Complimentary (free) memberships
+
+A tier can be granted with no Stripe/PayPal subscription behind it by setting
+`profiles.subscription_status = 'grandfathered'` alongside the tier. That status
+is in `ENTITLED_STATUSES`, so the app treats the account as a paying member of
+that tier, and **no provider webhook ever emits it**, so nothing external flips
+it back. Both `subscription_tier` and `subscription_status` are locked against
+self-writes, so the grant has to be made service-side — by migration, which is
+the repeatable, production-applied way (never the SQL editor; see CLAUDE.md).
+
+Current grants (all **Ultimate**, the top tier, at no cost):
+
+| Account | Migration |
+|---|---|
+| `katonrhys@gmail.com` (owner) | `20260802062300_grant_owner_ultimate_membership.sql`, re-asserted by `20261004064733_…` |
+| `rfkates09@hotmail.com` (owner) | `20261004064733_grant_admin_accounts_ultimate_membership.sql` |
+| `admin@cardpop.com.au` (platform store + admin login) | `20260806064711_…` (Premium) raised to Ultimate by `20261004064733_…` |
+
+To comp another account, add a new migration in the same shape (keyed on
+`lower(auth.users.email)`, idempotent). `applyStripeSubscription` /
+`applyPaypalSubscription` (`src/services/subscriptionService.js`) skip any
+profile whose status is `grandfathered` (`COMPLIMENTARY_STATUS`), so a provider
+event about a comped account — a stray cancel, a PayPal `create` — can never
+downgrade it. To *revoke* a comp, a migration sets the status back to `'none'`
+and the tier to `'free'`.
+
+Note that being an admin (`profiles.is_admin`) does **not** by itself confer a
+tier — admin access and membership are separate grants. The only admin
+exemptions in the tier system are the monthly listing quota trigger and the
+Whatnot-shows insert policy.
+
 ## Where to change the offer
 
 `config/subscription.js` is the single source of truth for prices/trial,

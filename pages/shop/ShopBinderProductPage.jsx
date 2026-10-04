@@ -14,6 +14,9 @@ import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, vari
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
+import useShopReviews from '@/hooks/useShopReviews.js';
+import ProductReviews from '@/components/shop/ProductReviews.jsx';
+import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { Badge } from '@/components/ui/badge';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
@@ -24,6 +27,9 @@ import {
   resolveBinderProduct, binderImages, binderImageAlt, binderSpecs, BINDER_PRODUCTS,
 } from '@/data/shopBinderProducts.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
+import { isEligibleProductLd } from '@/utils/seoUtils.js';
+import { trackViewItem } from '@/lib/analytics.js';
+import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -43,6 +49,14 @@ const ShopBinderProductPage = () => {
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
+  useEffect(() => {
+    if (!row?.id) return;
+    trackViewItem({ id: row.id, name: row.name || product?.name, price: row.price_aud, sku: row.sku, category: row.category, type: 'shop' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product row
+  }, [row?.id]);
+  // Colours of one line share their reviews (family_sku = the line SKU).
+  const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
+  const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
 
   // Not a catalogue binder (e.g. a CardPop house binder): same URL shape,
   // generic product page.
@@ -65,7 +79,9 @@ const ShopBinderProductPage = () => {
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
   // Pre-orders are unlimited: available whatever stock_quantity says.
   const unlimited = isPreorder(row);
-  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0);
+  // stock_quantity null = untracked stock (the generic product page treats it
+  // the same way) — it must read as available, not sold out.
+  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity == null || Number(row.stock_quantity) > 0));
   const anyVariantInStock = unlimited || (variants.length > 0 ? variants.some(variantInStock) : inStock);
   // The CTA flips itself. While a product has no price (or is still `draft`) it
   // is enquiry-only: the button sends people to sign up, and the page is
@@ -111,7 +127,7 @@ const ShopBinderProductPage = () => {
       toast.success(preorder ? 'Pre-order added to cart' : 'Added to cart', {
         action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
       });
-    });
+    }).catch((e) => toast.error(e.message || 'Could not add that to your cart.'));
   };
 
   // ── Structured data ───────────────────────────────────────────────────────
@@ -125,6 +141,7 @@ const ShopBinderProductPage = () => {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: 'Binders',
     url: canonical,
+    ...productReviewsLd(reviewStats, shopReviews),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -170,7 +187,7 @@ const ShopBinderProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={binderImageAlt(product, product.imageFiles[0])}
-        structuredData={[productLd, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">
@@ -281,9 +298,13 @@ const ShopBinderProductPage = () => {
                   />
                 </>
               ) : isPurchasable && anyVariantInStock ? (
-                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
-                  <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
-                </Button>
+                <>
+                  <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
+                    <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
+                  </Button>
+                  {/* The returns promise at the point of decision (utils/shopReturnPolicy.js). */}
+                  <BuyerProtection compact kind="shop" className="mt-3" />
+                </>
               ) : isPurchasable ? (
                 // Sold out: 0 stock on an otherwise live product. Offer an
                 // enquiry that emails admin instead of a dead button.
@@ -377,6 +398,8 @@ const ShopBinderProductPage = () => {
             </div>
           </section>
         )}
+
+        <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
         {/* ── Specifications ──────────────────────────────────────────────── */}
         <section className="mt-14 max-w-3xl">

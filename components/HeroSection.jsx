@@ -1,6 +1,6 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Eager, framer-motion-FREE hero. This is the homepage's LCP content (the <h1>).
@@ -11,12 +11,50 @@ import { Button } from '@/components/ui/button';
 //   3. the top of the real HomePage once its chunk arrives.
 // Because it avoids framer-motion, it renders on React's first commit and stays
 // out of the lazy homepage/animation chunks. If you change the copy or markup
-// here, mirror it in tools/home-shell.html.
+// here, mirror it in tools/home-shell.html and pages/HomePage.jsx.
+//
+// The hero speaks to BUYERS first: a marketplace needs demand to show its
+// sellers, and most visitors arrive wanting a card. Search is the primary
+// action, "Shop cards" the filled button, "Sell for free" the secondary.
 const TRUST = [
-  { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />, label: 'Buyer Protected' },
-  { icon: <Zap className="w-3.5 h-3.5" aria-hidden="true" />, label: 'AUD Pricing' },
-  { icon: <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />, label: 'Live Market Data' },
+  { icon: <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />, label: 'Buyer Protection on every order' },
+  { icon: <Zap className="w-3.5 h-3.5" aria-hidden="true" />, label: 'AUD prices, Australian sellers' },
+  { icon: <TrendingUp className="w-3.5 h-3.5" aria-hidden="true" />, label: 'Live market data' },
 ];
+
+export const HERO_SEARCH_PLACEHOLDER = 'Search Charizard, Black Lotus, Luka Dončić rookie…';
+
+// Plain form (no SearchBar dependency) so the eager hero stays tiny; the
+// results page handles suggestions, spelling and empty states.
+export const HeroSearchForm = ({ className = '' }) => {
+  const navigate = useNavigate();
+  return (
+    <form
+      role="search"
+      className={`flex w-full max-w-xl items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] p-1.5 backdrop-blur-sm focus-within:border-white/40 ${className}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const q = new FormData(e.currentTarget).get('q');
+        const query = typeof q === 'string' ? q.trim() : '';
+        if (query) navigate(`/search?q=${encodeURIComponent(query)}`);
+        else navigate('/marketplace');
+      }}
+    >
+      <Search className="ml-3 h-5 w-5 shrink-0 text-zinc-400" aria-hidden="true" />
+      <input
+        type="search"
+        name="q"
+        aria-label="Search cards"
+        placeholder={HERO_SEARCH_PLACEHOLDER}
+        autoComplete="off"
+        className="h-11 min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-zinc-500 focus:outline-none"
+      />
+      <Button type="submit" className="h-11 shrink-0 rounded-xl px-5 font-bold" style={{ background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)', color: '#fff', border: 'none' }}>
+        Search
+      </Button>
+    </form>
+  );
+};
 
 const HeroSection = () => {
   return (
@@ -75,25 +113,29 @@ const HeroSection = () => {
             }}
           >
             <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" />
-            CardPop™ Live
+            CardPop™
             <span className="text-white/30 font-normal">·</span>
-            <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
+            <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
-            Sell Your Trading Cards to{' '}
+            Buy and Sell Trading Cards{' '}
             <br className="hidden sm:block" />
             <span
               className="text-transparent bg-clip-text"
               style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
             >
-              Buyers Across Australia
+              with Collectors Across Australia
             </span>
           </h1>
 
-          <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
-            CardPop is Australia's marketplace for Pokémon, MTG, sports cards and more. List your collection in minutes, reach thousands of verified collectors, and get paid securely in AUD — with buyer protection on every order.
+          <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
+            Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.
           </p>
+
+          <div className="mb-6 flex justify-center lg:justify-start">
+            <HeroSearchForm />
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
             <Button
@@ -107,8 +149,8 @@ const HeroSection = () => {
                 border: 'none',
               }}
             >
-              <Link to="/signup">
-                Start Selling — It's Free <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
+              <Link to="/marketplace">
+                Shop Cards <ArrowRight className="ml-2 w-5 h-5" aria-hidden="true" />
               </Link>
             </Button>
             <Button
@@ -122,8 +164,8 @@ const HeroSection = () => {
                 color: '#e4e4e7',
               }}
             >
-              <Link to="/marketplace">
-                Browse the Marketplace
+              <Link to="/signup?next=%2Fvault%2Fadd">
+                Sell for Free
               </Link>
             </Button>
           </div>

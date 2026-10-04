@@ -9,6 +9,7 @@ import { installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.
 import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
 import { GA_MEASUREMENT_ID, installGtag } from '@/lib/analytics.js';
+import { initMetaPixel } from '@/lib/metaPixel.js';
 import { scheduleAdsenseLoad } from '@/lib/adsense.js';
 import '@/index.css';
 import '@/global.css';
@@ -224,6 +225,9 @@ if (typeof window !== 'undefined') {
   // AnalyticsPageViews queue up and replay in order once gtag.js loads below.
   if (import.meta.env.PROD && analyticsEnabled) {
     try { installGtag(); } catch { /* analytics is non-critical */ }
+    // Meta Pixel: dormant until VITE_META_PIXEL_ID is set and the visitor
+    // accepts marketing cookies (lib/consent.js); installs itself on consent.
+    try { initMetaPixel(); } catch { /* pixel is non-critical */ }
   }
 
   // Register service worker after page load for offline support

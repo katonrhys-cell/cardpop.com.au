@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = {
   max_images_per_listing: '10',
   free_shipping_threshold_aud: '100',
   default_shipping_rate_aud: '15',
+  marketplace_identity_threshold_aud: '500',
   require_mfa_admins: false,
   email_verification_required: true,
   enable_marketplace: true,
@@ -243,6 +244,22 @@ const AdminSettingsPage = () => {
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Applied to CardPop Shop items at checkout — a flat rate charged once per order, waived when the shop-item subtotal reaches the threshold. A rate of 0 disables shipping charges; a threshold of 0 means no free-shipping tier. Marketplace listings are unaffected: each seller sets their own shipping price per listing, charged to the buyer and paid out to the seller in full.
+                </p>
+              </div>
+              <div className="space-y-2 max-w-md">
+                <div className="space-y-2">
+                  <Label>Marketplace ID-check threshold (AUD)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={settings.marketplace_identity_threshold_aud}
+                    onChange={e => set('marketplace_identity_threshold_aud', e.target.value)}
+                    className="bg-background"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Buying marketplace cards always needs a signed-in account. Once the marketplace items in an order reach this value the buyer must also have passed the Stripe Identity (ID + selfie) check. Set 0 to require ID on every marketplace order. Shop items are never affected.
                 </p>
               </div>
             </CardContent>

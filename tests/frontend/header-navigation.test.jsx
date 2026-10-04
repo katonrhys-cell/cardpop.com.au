@@ -102,7 +102,7 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    // First selection: open hamburger, then navigate to /shop. Shop is an
+    // First selection: open hamburger, then navigate to /shop. Supplies is an
     // expandable section (not a flat link), so open it and tap "Shop All
     // Supplies". Scope to the Sheet dialog — the desktop Row-2 nav renders the
     // same labels, so unscoped queries would match two elements. The Sheet body
@@ -110,7 +110,7 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     const dialog = await screen.findByRole('dialog');
     expect(dialog).toBeInTheDocument();
-    await user.click(await within(dialog).findByRole('button', { name: 'Shop' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Supplies' }));
     await user.click(await within(dialog).findByRole('link', { name: 'Shop All Supplies' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/shop'));
 
@@ -118,10 +118,10 @@ describe('Header mobile hamburger menu — consecutive navigations', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(document.body.style.pointerEvents).not.toBe('none');
 
-    // Second selection: open hamburger again, tap "View All Listings" under Marketplace
+    // Second selection: open hamburger again, tap "Browse all cards" under Buy Cards
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     const dialog2 = await screen.findByRole('dialog');
-    await user.click(await within(dialog2).findByRole('link', { name: 'View All Listings' }));
+    await user.click(await within(dialog2).findByRole('link', { name: /browse all cards/i }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
 
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
@@ -158,12 +158,12 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     renderHeader();
 
     // The Row-2 nav is lazy; wait for the trigger before interacting.
-    await user.hover(await screen.findByRole('button', { name: /marketplace/i }));
+    await user.hover(await screen.findByRole('button', { name: /buy cards/i }));
     await user.click(await screen.findByRole('link', { name: 'Pokémon' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/pokemon'));
 
     await user.unhover(screen.getByTestId('current-path'));
-    await user.hover(await screen.findByRole('button', { name: /marketplace/i }));
+    await user.hover(await screen.findByRole('button', { name: /buy cards/i }));
     await user.click(await screen.findByRole('link', { name: 'NBA' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/collections/nba'));
   });
@@ -177,9 +177,9 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/community/forum'));
 
     // Marketplace is now a mega-dropdown (formerly "Browse Collections");
-    // its "View All Listings" row is the direct link to /marketplace.
-    await user.hover(await screen.findByRole('button', { name: /marketplace/i }));
-    await user.click(await screen.findByRole('link', { name: 'View All Listings' }));
+    // its "Browse all cards" row is the direct link to /marketplace.
+    await user.hover(await screen.findByRole('button', { name: /buy cards/i }));
+    await user.click(await screen.findByRole('link', { name: /browse all cards/i }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
   });
 
@@ -189,7 +189,7 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
 
     // user.click moves the mouse onto the trigger first, so the hover handler
     // opens the menu and the click must not immediately close it again.
-    await user.click(await screen.findByRole('button', { name: /marketplace/i }));
+    await user.click(await screen.findByRole('button', { name: /buy cards/i }));
     expect(await screen.findByRole('link', { name: 'Pokémon' })).toBeInTheDocument();
   });
 
@@ -197,7 +197,7 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     const user = userEvent.setup();
     renderHeader();
 
-    await user.pointer({ keys: '[TouchA]', target: await screen.findByRole('button', { name: /marketplace/i }) });
+    await user.pointer({ keys: '[TouchA]', target: await screen.findByRole('button', { name: /buy cards/i }) });
     const pokemonLink = await screen.findByRole('link', { name: 'Pokémon' });
     await user.pointer({ keys: '[TouchA]', target: pokemonLink });
     await user.click(pokemonLink);
@@ -215,7 +215,7 @@ describe('Header body pointer-events failsafe', () => {
     await user.click(screen.getByRole('button', { name: /open menu/i }));
     const dialog = await screen.findByRole('dialog');
     // Shop is an expandable section: open it, then tap "Shop All Supplies".
-    await user.click(await within(dialog).findByRole('button', { name: 'Shop' }));
+    await user.click(await within(dialog).findByRole('button', { name: 'Supplies' }));
     await user.click(await within(dialog).findByRole('link', { name: 'Shop All Supplies' }));
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/shop'));
 

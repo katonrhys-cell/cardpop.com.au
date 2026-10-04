@@ -144,8 +144,8 @@ export const PALMS_OFF_CATEGORIES = {
 
   'playmats': {
     name: 'Playmats',
-    heading: 'Palms Off Gaming Playmats',
-    blurb: 'Rubber-backed playmats in eight colours.',
+    heading: 'Palms Off Gaming Core Playmats',
+    blurb: 'Rubber-backed Core Playmats in eight colours.',
     intro:
       'A playmat does two jobs: it gives sleeves a surface they can be picked up from without scraping a table, and it keeps a game area defined. The rubber backing stops the mat sliding mid-game, and the cloth top is what lets you get a fingernail under a card without dragging it across bare wood.',
     choosing: 'These differ only by colour. Eight are available.',

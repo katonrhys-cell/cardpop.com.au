@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, Navigate, useLocation } from 'react-router-dom';
+import { useParams, Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { MessageSquare, ShoppingCart, PackageX, Check, ChevronRight, Clock } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
@@ -10,10 +10,16 @@ import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
+import SizePicker from '@/components/shop/SizePicker.jsx';
+import useSizeStock from '@/hooks/useSizeStock.js';
+import { sizeGroupFor, sizeProductPath } from '@/utils/shopSizes.js';
 import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
+import useShopReviews from '@/hooks/useShopReviews.js';
+import ProductReviews from '@/components/shop/ProductReviews.jsx';
+import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { Badge } from '@/components/ui/badge';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
@@ -22,10 +28,13 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
 import {
   resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
-  palmsOffProductsInCategory,
+  palmsOffProductsInCategory, PALMS_OFF_PRODUCTS,
 } from '@/data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
+import { isEligibleProductLd } from '@/utils/seoUtils.js';
+import { trackViewItem } from '@/lib/analytics.js';
+import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -53,9 +62,22 @@ const ShopProductPage = () => {
   const { row, family, selectedId, setSelectedId, loading } = useShopLine({
     slug: product?.slug, sku: product?.sku, enabled: validPair,
   });
+  // Point-size lines (Top Loaders 35pt…180pt) are separate products; the picker
+  // links them. Choosing a size opens its own page without jumping to the top.
+  const navigate = useNavigate();
+  const sizeOptions = product ? sizeGroupFor(product, PALMS_OFF_PRODUCTS) : [];
+  const sizeStock = useSizeStock(sizeOptions);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);
+  useEffect(() => {
+    if (!row?.id) return;
+    trackViewItem({ id: row.id, name: row.name || product?.name, price: row.price_aud, sku: row.sku, category: row.category, type: 'shop' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per product row
+  }, [row?.id]);
+  // Colours of one line share their reviews (family_sku = the line SKU).
+  const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
+  const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
 
   // Not a catalogue product: any other shop product (e.g. CardPop house
   // products) is served at the same /shop/<category>/<slug> shape.
@@ -85,7 +107,9 @@ const ShopProductPage = () => {
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
   // Pre-orders are unlimited: available whatever stock_quantity says.
   const unlimited = isPreorder(row);
-  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0);
+  // stock_quantity null = untracked stock (the generic product page treats it
+  // the same way) — it must read as available, not sold out.
+  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity == null || Number(row.stock_quantity) > 0));
   const anyVariantInStock = unlimited || (variants.length > 0 ? variants.some(variantInStock) : inStock);
   // Same self-flipping CTA as the binder pages: enquiry-only until priced and
   // active, then Add to cart with an Offer. Stock arriving is an admin edit.
@@ -129,7 +153,7 @@ const ShopProductPage = () => {
       toast.success(preorder ? 'Pre-order added to cart' : 'Added to cart', {
         action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
       });
-    });
+    }).catch((e) => toast.error(e.message || 'Could not add that to your cart.'));
   };
 
   // Product copy wins where it exists; the product type's shared copy is the
@@ -150,6 +174,7 @@ const ShopProductPage = () => {
     brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
     category: category.name,
     url: canonical,
+    ...productReviewsLd(reviewStats, shopReviews),
     ...(isPurchasable ? {
       offers: {
         '@type': 'Offer',
@@ -193,7 +218,7 @@ const ShopProductPage = () => {
         canonicalUrl={canonical}
         ogImage={images[0]}
         ogImageAlt={palmsOffImageAlt(product, product.imagePaths[0])}
-        structuredData={[productLd, breadcrumbLd, faqLd].filter(Boolean)}
+        structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
       <div className="container mx-auto px-4 py-6 md:py-10">
@@ -258,6 +283,16 @@ const ShopProductPage = () => {
               {intro}
             </p>
 
+            <SizePicker
+              options={sizeOptions}
+              value={product.slug}
+              stock={sizeStock}
+              onChange={(o) => navigate(sizeProductPath(o), { replace: true, preventScrollReset: true })}
+              className="mt-6"
+            />
+
+            <p className="mt-3 text-xs text-muted-foreground">SKU: {row?.sku || product.sku}</p>
+
             {family.length > 1 && (
 
               <VariantPicker
@@ -304,9 +339,13 @@ const ShopProductPage = () => {
                   />
                 </>
               ) : isPurchasable && anyVariantInStock ? (
-                <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
-                  <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
-                </Button>
+                <>
+                  <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
+                    <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
+                  </Button>
+                  {/* The returns promise at the point of decision (utils/shopReturnPolicy.js). */}
+                  <BuyerProtection compact kind="shop" className="mt-3" />
+                </>
               ) : isPurchasable ? (
                 // Sold out: 0 stock on an otherwise live product. Offer an
                 // enquiry that emails admin instead of a dead button.
@@ -405,6 +444,8 @@ const ShopProductPage = () => {
             </div>
           </section>
         )}
+
+        <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
         <section className="mt-14 max-w-3xl">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>

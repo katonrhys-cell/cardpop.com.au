@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import { PAID_ORDER_STATUSES, SETTLED_REFUND_STATUSES, summariseRevenue, formatAud } from '@/utils/revenue.js';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
+import SiteTrafficCard from '@/components/admin/SiteTrafficCard.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // `to` turns the whole card into a link through to the detail view behind the
@@ -254,6 +255,11 @@ const AdminDashboard = () => {
             )}
           </CardContent>
         </Card>
+        {/* Visitors from Google Analytics (docs/site-traffic.md) — spans the
+            row so the 30-day sparkline has room. */}
+        <div className="md:col-span-2 lg:col-span-4">
+          <SiteTrafficCard />
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -279,6 +285,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
+          <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
         </div>
       </div>
 

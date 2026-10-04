@@ -951,8 +951,8 @@ export const PALMS_OFF_PRODUCT_COPY = {
     ],
   },
   "PM-ST": {
-    metaDescription: "Palms Off Gaming playmat with a rubber backing that stays put on the table. A plain colour surface for play, trading and photos, in eight colours.",
-    intro: "A playmat is the one accessory that touches every card in a game. This Palms Off Gaming mat gives sleeved cards a surface they can be picked up from without scraping across a bare table, and the rubber backing grips so the mat does not slide mid-game. It comes in eight plain colours, from Black and Jade to Pink and Yellow, so there is one for every deck box.",
+    metaDescription: "Palms Off Gaming Core Playmat with a rubber backing that stays put on the table. A plain colour surface for play, trading and photos, in eight colours.",
+    intro: "A playmat is the one accessory that touches every card in a game. The Palms Off Gaming Core Playmat gives sleeved cards a surface they can be picked up from without scraping across a bare table, and the rubber backing grips so the mat does not slide mid-game. It comes in eight plain colours, from Black and Jade to Pink and Yellow, so there is one for every deck box.",
     details: [
       "Plain colour mats have a practical side beyond looks. With no printed art, cards stand out clearly against the surface, which makes the board state easier to read across the table in Pokémon, Magic, One Piece or Lorcana. It also means nothing distracts from the cards when the mat is used as a photography background.",
       "That background use is worth thinking about if you sell cards. A flat, single-colour surface removes clutter and gives consistent listing photos. Darker colours such as Black or Purple make holo and foil cards pop, while lighter ones like Yellow or Turquoise suit darker card borders. Some sellers keep two colours for that reason, and swap between them depending on the card being shot.",

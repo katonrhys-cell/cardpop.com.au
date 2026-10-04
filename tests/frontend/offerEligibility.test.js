@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listingTakesOffers, offerDisplayStatus, OFFER_WINDOW_HOURS } from '@/utils/offerEligibility.js';
+import { listingTakesOffers, offerDisplayStatus, offerWindowState, formatOfferRange, OFFER_WINDOW_HOURS } from '@/utils/offerEligibility.js';
 
 // The same rule gates the "Make an Offer" button (ProductDetailPage), POST
 // /offers, and — mirrored in SQL — the offers insert trigger.
@@ -28,6 +28,35 @@ describe('listingTakesOffers', () => {
 
   it('binds offers for 48 hours', () => {
     expect(OFFER_WINDOW_HOURS).toBe(48);
+  });
+});
+
+describe('expression of interest offer window', () => {
+  const now = new Date('2026-10-03T00:00:00Z');
+  const past = '2026-10-01T00:00:00Z';
+  const future = '2026-10-05T00:00:00Z';
+  const eoi = (extra) => ({ listing_type: 'expression_of_interest', status: 'active', ...extra });
+
+  it.each([
+    ['no dates at all', {}, 'open'],
+    ['opened in the past, no close', { offers_open_at: past }, 'open'],
+    ['closes in the future, no open', { offers_close_at: future }, 'open'],
+    ['inside both ends', { offers_open_at: past, offers_close_at: future }, 'open'],
+    ['not open yet', { offers_open_at: future }, 'upcoming'],
+    ['already closed', { offers_close_at: past }, 'closed'],
+  ])('%s → %s', (_label, dates, expected) => {
+    expect(offerWindowState(eoi(dates), now)).toBe(expected);
+    expect(listingTakesOffers(eoi(dates), now)).toBe(expected === 'open');
+  });
+});
+
+describe('formatOfferRange', () => {
+  it('formats a full range, an open-ended minimum, and a bare maximum', () => {
+    expect(formatOfferRange(80, 120)).toBe('$80.00 – $120.00');
+    expect(formatOfferRange(80, null)).toBe('From $80.00');
+    expect(formatOfferRange('80', '')).toBe('From $80.00');
+    expect(formatOfferRange(null, 120)).toBe('Up to $120.00');
+    expect(formatOfferRange(null, null)).toBeNull();
   });
 });
 
