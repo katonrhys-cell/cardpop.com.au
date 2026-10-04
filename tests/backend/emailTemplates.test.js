@@ -11,6 +11,11 @@ import {
   offerUpdateEmail,
   shopEnquiryEmail,
   orderShippedEmail,
+  abandonedCheckoutEmail,
+  watchlistPriceDropEmail,
+  savedSearchMatchesEmail,
+  backInStockEmail,
+  welcomeOfferReminderEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -286,5 +291,37 @@ describe('offerUpdateEmail (responses)', () => {
 
   it('throws on an unknown kind rather than sending a blank email', () => {
     expect(() => offerUpdateEmail({ ...base, kind: 'nope', audience: 'buyer' })).toThrow(/Unknown offer email kind/);
+  });
+});
+
+describe('retention emails (hero badge + stat tiles)', () => {
+  it('escape user-controlled strings and carry the restore / product links', () => {
+    const html = abandonedCheckoutEmail({ name: XSS, items: [{ title: XSS, quantity: 2, price: 25, url: 'https://cardpop.com.au/shop/x' }], restoreUrl: 'https://cardpop.com.au/checkout?restore=1&t=abc' });
+    expect(html).not.toContain(XSS);
+    expect(html).toContain(esc(XSS));
+    expect(html).toContain('Return to Checkout');
+    expect(html).toContain('restore=1&amp;t=abc'); // & is escaped inside the href
+    expect(html).toContain('$50.00'); // 2 × $25 line, and the cart-total tile
+    expect(html).toContain('Items saved');
+  });
+  it('price drop shows the percentage, the new price and the old price struck through', () => {
+    const html = watchlistPriceDropEmail({ name: 'Ash', cardName: XSS, setName: 'Base Set', from: 150, to: 120, pct: 20, url: 'https://cardpop.com.au/marketplace/1' });
+    expect(html).not.toContain(XSS);
+    expect(html).toContain('20%');
+    expect(html).toContain('$120.00');
+    expect(html).toMatch(/<s[^>]*>\$150\.00<\/s>/);
+  });
+  it('saved-search digest lists matches and the lowest price', () => {
+    const html = savedSearchMatchesEmail({ name: 'Ash', searchName: XSS, searchUrl: 'https://cardpop.com.au/marketplace?q=x', matches: [{ title: 'A', set: 'S', price: 40, url: 'u' }, { title: 'B', set: 'S', price: 15, url: 'u' }] });
+    expect(html).not.toContain(XSS);
+    expect(html).toContain('2 new cards match');
+    expect(html).toContain('$15.00');
+  });
+  it('back in stock and welcome reminder render the headline tiles', () => {
+    expect(backInStockEmail({ productTitle: XSS, priceAud: 29.95, url: 'https://cardpop.com.au/shop/a/b' })).toContain('$29.95');
+    const html = welcomeOfferReminderEmail({ name: 'Ash', code: 'POP-ABC', discountPct: 10, expiresAt: new Date(Date.now() + 5 * 86400000).toISOString() });
+    expect(html).toContain('POP-ABC');
+    expect(html).toContain('10%');
+    expect(html).toContain('Days left');
   });
 });

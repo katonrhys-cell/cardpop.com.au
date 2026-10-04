@@ -744,3 +744,194 @@ ${marketplace
     'You are receiving this because you placed an order on CardPop.',
   );
 }
+
+// ─── Retention emails (src/services/retentionSweepService.js) ─────────────────
+//
+// Styled like a Google Search Console digest: a centred headline, one big
+// circular icon badge, a row of stat tiles (coloured circle · big number ·
+// small caption), then the button. Built from tables, border-radius and
+// unicode glyphs only — Gmail strips <svg> and ignores most CSS, so there are
+// no images to block and nothing to break. Colours are the brand palette
+// (red / charcoal / greys) plus one green for "good news" tiles — no blue.
+
+const linkStyle = 'color:#E63946;text-decoration:none;';
+const TILE = { red: '#E63946', green: '#16A34A', charcoal: '#1C1C1E', grey: '#6B7280' };
+
+/** The big centred icon badge under the headline (a glyph in a coloured ring). */
+function heroBadge(glyph, colour = TILE.red) {
+  return `<table cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 20px;"><tr>
+<td align="center" valign="middle" style="width:96px;height:96px;border-radius:48px;background:${colour}20;">
+<table cellpadding="0" cellspacing="0" border="0"><tr>
+<td align="center" valign="middle" style="width:64px;height:64px;border-radius:32px;background:${colour};color:#FFFFFF;font-size:30px;font-weight:900;line-height:64px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${glyph}</td>
+</tr></table></td></tr></table>`;
+}
+
+/** Centred headline + optional sub-line (the product / card / search name). */
+function heroHeading(title, subtitle) {
+  return `<h1 style="margin:0 0 6px;font-size:28px;line-height:1.25;font-weight:400;color:#1C1C1E;text-align:center;letter-spacing:-0.3px;">${title}</h1>
+${subtitle ? `<p style="margin:0 0 28px;font-size:16px;color:#4B5563;text-align:center;">${subtitle}</p>` : '<div style="height:20px;"></div>'}`;
+}
+
+/** One stat tile: coloured circle with a glyph, a big figure, a small caption. */
+function statTile({ glyph, colour = TILE.red, value, caption }) {
+  return `<td align="center" valign="top" style="padding:8px 6px;">
+<table cellpadding="0" cellspacing="0" border="0" align="center"><tr>
+<td align="center" valign="middle" style="width:56px;height:56px;border-radius:28px;background:${colour};color:#FFFFFF;font-size:24px;font-weight:900;line-height:56px;">${glyph}</td>
+</tr></table>
+<p style="margin:12px 0 2px;font-size:30px;font-weight:400;color:#1C1C1E;line-height:1.1;letter-spacing:-0.5px;">${value}</p>
+<p style="margin:0;font-size:13px;color:#6B7280;line-height:1.4;">${caption}</p>
+</td>`;
+}
+
+/** A row of 1–3 tiles, in a bordered card like the Search Console summary. */
+function statRow(tiles) {
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:12px;margin:0 0 28px;">
+<tr><td style="padding:20px 10px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${tiles.map(statTile).join('')}</tr></table></td></tr>
+</table>`;
+}
+
+/** A list of items (cart lines, matches) in the same bordered-card style. */
+function itemCard(rows) {
+  const html = rows.map(([left, right]) =>
+    `<tr><td style="padding:10px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${left}</td><td align="right" style="padding:10px 0;font-size:14px;font-weight:700;color:#1C1C1E;border-bottom:1px solid #F3F4F6;white-space:nowrap;">${right}</td></tr>`).join('');
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:12px;margin:0 0 24px;"><tr><td style="padding:8px 20px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">${html}</table></td></tr></table>`;
+}
+
+const centred = (text) => `<p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#374151;text-align:center;">${text}</p>`;
+const plural = (n, one, many) => (n === 1 ? one : many);
+
+/** The one reminder after an unfinished checkout, with a cart-restore link. */
+export function abandonedCheckoutEmail({ name, items = [], restoreUrl }) {
+  const count = items.reduce((n, i) => n + (Number(i.quantity) || 1), 0);
+  const total = items.reduce((n, i) => n + Number(i.price || 0) * (Number(i.quantity) || 1), 0);
+  const rows = items.slice(0, 6).map((i) => [
+    `<a href="${esc(i.url)}" style="${linkStyle}">${esc(i.title)}</a>${i.quantity > 1 ? ` × ${Number(i.quantity)}` : ''}`,
+    money(i.price * (i.quantity || 1)),
+  ]);
+  const body = `${heroBadge('🛒')}
+${heroHeading('Your cart is waiting', `Hi ${esc(name || 'there')} — you left ${plural(count, 'something', 'a few things')} behind.`)}
+${statRow([
+  { glyph: '#', colour: TILE.red, value: String(count), caption: plural(count, 'Item saved', 'Items saved') },
+  { glyph: '$', colour: TILE.charcoal, value: money(total), caption: 'Cart total' },
+  { glyph: '✓', colour: TILE.green, value: 'Full', caption: 'Buyer Protection' },
+])}
+${itemCard(rows)}
+${centred('Cards on CardPop are one of a kind — once another collector buys one it’s gone. Every fee is shown before you pay.')}`;
+  return cpEmail(
+    'Your CardPop cart is waiting.',
+    '',
+    '',
+    body,
+    esc(restoreUrl),
+    'Return to Checkout',
+    'You’re receiving this because you started a checkout on CardPop and agreed to hear from us. One reminder only.',
+  );
+}
+
+export function watchlistPriceDropEmail({ name, cardName, setName, from, to, pct, url }) {
+  const body = `${heroBadge('↓', TILE.green)}
+${heroHeading('Price drop on your watchlist', `<a href="${esc(url)}" style="${linkStyle}font-weight:700;">${esc(cardName)}</a>${setName ? ` · ${esc(setName)}` : ''}`)}
+${statRow([
+  { glyph: '↓', colour: TILE.green, value: `${Number(pct)}%`, caption: 'Price drop' },
+  { glyph: '$', colour: TILE.red, value: money(to), caption: 'Now' },
+  { glyph: '$', colour: TILE.grey, value: `<s style="color:#9CA3AF;">${money(from)}</s>`, caption: 'When you saved it' },
+])}
+${centred(`Hi ${esc(name || 'there')} — marketplace cards are one of a kind. If you want it at this price, now’s the moment.`)}`;
+  return cpEmail(
+    `${esc(cardName)} is now ${money(to)} — ${Number(pct)}% below when you saved it.`,
+    '',
+    '',
+    body,
+    esc(url),
+    'View the Card',
+    'Watchlist alerts can be switched off in Account → Notification settings.',
+  );
+}
+
+export function watchlistSoldEmail({ name, cardName, setName, searchUrl }) {
+  const body = `${heroBadge('✕', TILE.charcoal)}
+${heroHeading('One got away', `<strong>${esc(cardName)}</strong>${setName ? ` · ${esc(setName)}` : ''} has sold to another collector.`)}
+${centred(`Hi ${esc(name || 'there')} — similar cards are listed every day. Here’s a live search for it, and you can save the search to be emailed the moment a new one appears.`)}`;
+  return cpEmail(
+    `${esc(cardName)} on your watchlist has sold.`,
+    '',
+    '',
+    body,
+    esc(searchUrl),
+    'Find Another',
+    'Watchlist alerts can be switched off in Account → Notification settings.',
+  );
+}
+
+export function savedSearchMatchesEmail({ name, searchName, searchUrl, matches = [] }) {
+  const n = matches.length;
+  const prices = matches.map((m) => Number(m.price) || 0).filter((p) => p > 0);
+  const low = prices.length ? Math.min(...prices) : 0;
+  const rows = matches.slice(0, 5).map((m) => [
+    `<a href="${esc(m.url)}" style="${linkStyle}">${esc(m.title)}</a>${m.set ? ` <span style="color:#6b7280;">· ${esc(m.set)}</span>` : ''}`,
+    money(m.price),
+  ]);
+  const body = `${heroBadge('★')}
+${heroHeading(`${n} new ${plural(n, 'card matches', 'cards match')} your search`, `“${esc(searchName)}”`)}
+${statRow([
+  { glyph: '+', colour: TILE.red, value: String(n), caption: plural(n, 'New listing', 'New listings') },
+  { glyph: '$', colour: TILE.green, value: money(low), caption: 'From' },
+])}
+${itemCard(rows)}
+${centred(`Hi ${esc(name || 'there')} — saved-search alerts go out once a day with whatever’s new since the last one.`)}`;
+  return cpEmail(
+    `New on CardPop for “${esc(searchName)}”.`,
+    '',
+    '',
+    body,
+    esc(searchUrl),
+    'See All Matches',
+    'Manage saved searches in Account → Watchlist.',
+  );
+}
+
+export function backInStockEmail({ productTitle, priceAud, url }) {
+  const body = `${heroBadge('✓', TILE.green)}
+${heroHeading('It’s back in stock', `<a href="${esc(url)}" style="${linkStyle}font-weight:700;">${esc(productTitle)}</a>`)}
+${statRow([
+  { glyph: '$', colour: TILE.red, value: money(priceAud), caption: 'Price' },
+  { glyph: '✓', colour: TILE.green, value: '14 days', caption: 'Returns' },
+  { glyph: '→', colour: TILE.charcoal, value: 'Tracked', caption: 'Shipping' },
+])}
+${centred('You asked us to let you know — stock on popular lines doesn’t last, so grab it while it’s here.')}`;
+  return cpEmail(
+    `${esc(productTitle)} is back in stock.`,
+    '',
+    'Hi there,',
+    body,
+    esc(url),
+    'Buy It Now',
+    'You asked us to email you when this product came back. This is that one email.',
+  );
+}
+
+export function welcomeOfferReminderEmail({ name, code, discountPct, expiresAt }) {
+  const expiry = new Date(expiresAt);
+  const expiryStr = expiry.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const daysLeft = Math.max(1, Math.ceil((expiry.getTime() - Date.now()) / 86400000));
+  const body = `${heroBadge('%')}
+${heroHeading('Your welcome code expires soon', `Hi ${esc(name || 'there')} — it’s still unused.`)}
+${statRow([
+  { glyph: '%', colour: TILE.red, value: `${Number(discountPct)}%`, caption: 'Off the cards in your first order' },
+  { glyph: '⏱', colour: TILE.charcoal, value: String(daysLeft), caption: `${plural(daysLeft, 'Day', 'Days')} left · ${esc(expiryStr)}` },
+])}
+<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px;">
+<p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
+<p style="margin:0;font-size:26px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
+</div>
+${centred('It’s applied automatically at checkout when you’re signed in.')}`;
+  return cpEmail(
+    `Your ${Number(discountPct)}% welcome code expires ${esc(expiryStr)}.`,
+    '',
+    '',
+    body,
+    'https://cardpop.com.au/marketplace',
+    'Find Your First Card',
+    'This one-time offer was generated for your CardPop account and can’t be transferred.',
+  );
+}

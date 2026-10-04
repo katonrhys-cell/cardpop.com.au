@@ -18,7 +18,12 @@ vi.mock('../../src/services/shipmentService.js', async (importOriginal) => ({
 }));
 const sweep = vi.hoisted(() => ({ run: vi.fn(async () => ({ scanned: 0 })) }));
 vi.mock('../../src/services/deliverySweepService.js', () => ({ runDeliverySweep: sweep.run }));
-vi.mock('../../src/utils/supabaseClient.js', () => ({ supabase: { from: vi.fn() }, default: { from: vi.fn() } }));
+const db = vi.hoisted(() => ({ maybeSingle: vi.fn() }));
+vi.mock('../../src/utils/supabaseClient.js', () => {
+  const chain = { select: () => chain, eq: () => chain, maybeSingle: db.maybeSingle };
+  return { supabase: { from: () => chain }, default: { from: () => chain } };
+});
+vi.mock('../../src/utils/restoreToken.js', () => ({ verifyRestoreToken: (id, t) => t === `ok-${id}` }));
 vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: vi.fn(), sendOrderDelivered: vi.fn() }));
 
 import ordersRouter from '../../src/routes/orders.js';
@@ -103,5 +108,29 @@ describe('GET /orders/delivery-sweep (cron)', () => {
     const res = await request(app).get('/orders/delivery-sweep').set('Authorization', 'Bearer s3cret');
     expect(res.status).toBe(200);
     expect(sweep.run).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GET /orders/:id/abandoned-cart (public, token-protected)', () => {
+  it('404s without a valid token — an order id alone reveals nothing', async () => {
+    expect((await request(app).get(`/orders/${ORDER}/abandoned-cart`)).status).toBe(404);
+    expect((await request(app).get(`/orders/${ORDER}/abandoned-cart?t=wrong`)).status).toBe(404);
+    expect(db.maybeSingle).not.toHaveBeenCalled();
+  });
+  it('returns only the lines for a still-unpaid order', async () => {
+    db.maybeSingle.mockResolvedValueOnce({ data: { id: ORDER, status: 'cancelled', order_items: [
+      { type: 'listing', id: 'l1', title: 'Charizard', quantity: 1, unit_price_aud: 120, seller_id: 's1', shipping_name: 'secret' },
+      { type: 'shop', id: 'p1', title: 'Binder', quantity: 2, unit_price_aud: 25, variant_id: 'v1' },
+    ] }, error: null });
+    const res = await request(app).get(`/orders/${ORDER}/abandoned-cart?t=ok-${ORDER}`);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ items: [
+      { type: 'listing', id: 'l1', title: 'Charizard', quantity: 1, unitPriceAud: 120 },
+      { type: 'shop', id: 'p1', title: 'Binder', quantity: 2, unitPriceAud: 25, variantId: 'v1' },
+    ] });
+  });
+  it('410s once the order has been paid', async () => {
+    db.maybeSingle.mockResolvedValueOnce({ data: { id: ORDER, status: 'paid', order_items: [] }, error: null });
+    expect((await request(app).get(`/orders/${ORDER}/abandoned-cart?t=ok-${ORDER}`)).status).toBe(410);
   });
 });

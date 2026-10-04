@@ -91,6 +91,10 @@ describe('ProductCard sold-out state', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /enquire/i }));
     const dialog = await screen.findByRole('dialog');
+    // Sold out opens on the one-field "email me when it's back"; the full
+    // enquiry form is one click away.
+    expect(dialog).toHaveTextContent(/email me when it.s back/i);
+    fireEvent.click(screen.getByRole('button', { name: /send an enquiry/i }));
     expect(dialog).toHaveTextContent(/enquire about this item/i);
 
     // Pre-filled from the signed-in account.
@@ -116,11 +120,28 @@ describe('ProductCard sold-out state', () => {
     expect(await screen.findByText(/enquiry sent/i)).toBeInTheDocument();
   });
 
+  it('"Notify me" posts just the email to /shop-enquiry/notify and confirms', async () => {
+    mockFetch.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+    renderCard({ ...base, stock_quantity: 0 });
+    fireEvent.click(screen.getByRole('button', { name: /enquire/i }));
+    await screen.findByRole('dialog');
+    expect(screen.queryByLabelText(/^name$/i)).toBeNull();
+    expect(screen.getByLabelText(/^email$/i)).toHaveValue('ash@example.com');
+    fireEvent.click(screen.getByRole('button', { name: /notify me/i }));
+
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    const [url, opts] = mockFetch.mock.calls[0];
+    expect(url).toBe('/shop-enquiry/notify');
+    expect(JSON.parse(opts.body)).toMatchObject({ productId: base.id, email: 'ash@example.com', company: '' });
+    expect(await screen.findByText(/you.re on the list/i)).toBeInTheDocument();
+  });
+
   it('surfaces a server error with a mailto fallback to admin', async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 502, json: async () => ({ error: 'Provider down' }) });
     renderCard({ ...base, stock_quantity: 0 });
     fireEvent.click(screen.getByRole('button', { name: /enquire/i }));
     await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: /send an enquiry/i }));
     fireEvent.click(screen.getByRole('button', { name: /send enquiry/i }));
 
     const alert = await screen.findByRole('alert');
