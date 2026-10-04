@@ -78,7 +78,9 @@ const ShopBinderProductPage = () => {
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
   // Pre-orders are unlimited: available whatever stock_quantity says.
   const unlimited = isPreorder(row);
-  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0);
+  // stock_quantity null = untracked stock (the generic product page treats it
+  // the same way) — it must read as available, not sold out.
+  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity == null || Number(row.stock_quantity) > 0));
   const anyVariantInStock = unlimited || (variants.length > 0 ? variants.some(variantInStock) : inStock);
   // The CTA flips itself. While a product has no price (or is still `draft`) it
   // is enquiry-only: the button sends people to sign up, and the page is
@@ -124,7 +126,7 @@ const ShopBinderProductPage = () => {
       toast.success(preorder ? 'Pre-order added to cart' : 'Added to cart', {
         action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
       });
-    });
+    }).catch((e) => toast.error(e.message || 'Could not add that to your cart.'));
   };
 
   // ── Structured data ───────────────────────────────────────────────────────

@@ -184,7 +184,7 @@ export async function createSingleItemCheckout(req, res) {
       lineItems.push({
         price_data: {
           currency: 'aud',
-          product_data: { name: `Platform Fee (${breakdown.commissionPct}%)` },
+          product_data: { name: `Service fee (${breakdown.commissionPct}%)` },
           unit_amount: Math.round(breakdown.commissionAud * 100),
         },
         quantity: 1,

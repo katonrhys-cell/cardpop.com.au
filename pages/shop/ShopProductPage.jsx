@@ -106,7 +106,9 @@ const ShopProductPage = () => {
   const chosenVariant = variants.find((v) => v.id === selectedVariantId) || null;
   // Pre-orders are unlimited: available whatever stock_quantity says.
   const unlimited = isPreorder(row);
-  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity ?? 0) > 0);
+  // stock_quantity null = untracked stock (the generic product page treats it
+  // the same way) — it must read as available, not sold out.
+  const inStock = unlimited || (variants.length > 0 ? !!chosenVariant && variantInStock(chosenVariant) : (row?.stock_quantity == null || Number(row.stock_quantity) > 0));
   const anyVariantInStock = unlimited || (variants.length > 0 ? variants.some(variantInStock) : inStock);
   // Same self-flipping CTA as the binder pages: enquiry-only until priced and
   // active, then Add to cart with an Offer. Stock arriving is an admin edit.
@@ -150,7 +152,7 @@ const ShopProductPage = () => {
       toast.success(preorder ? 'Pre-order added to cart' : 'Added to cart', {
         action: { label: 'View cart', onClick: () => setIsCartOpen(true) },
       });
-    });
+    }).catch((e) => toast.error(e.message || 'Could not add that to your cart.'));
   };
 
   // Product copy wins where it exists; the product type's shared copy is the

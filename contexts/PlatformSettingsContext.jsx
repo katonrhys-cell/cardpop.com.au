@@ -18,6 +18,9 @@ const DEFAULTS = {
   enable_blog: true,
   max_images_per_listing: 10,
   listing_approval_required: false,
+  marketplace_identity_threshold_aud: 500,
+  free_shipping_threshold_aud: 100,
+  default_shipping_rate_aud: 15,
 };
 
 const PlatformSettingsContext = createContext({ settings: DEFAULTS, loading: true });

@@ -22,6 +22,14 @@ const PUBLIC_SETTINGS = {
   enable_blog: true,
   max_images_per_listing: 10,
   listing_approval_required: false,
+  // Marketplace buying rule, so the product page / cart drawer can say up
+  // front when an ID check applies (utils/marketplaceIdentity.js). 0 = every
+  // marketplace order.
+  marketplace_identity_threshold_aud: 500,
+  // Shop shipping rule, so "free shipping over $X" can be promised before the
+  // checkout page (the server still prices it — src/services/cartService.js).
+  free_shipping_threshold_aud: 100,
+  default_shipping_rate_aud: 15,
 };
 
 // platform_settings.value is jsonb: booleans store as real JSON booleans, but

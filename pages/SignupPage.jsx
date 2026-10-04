@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { safeInternalPath } from '@/lib/safeInternalPath.js';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import OAuthButtons from '@/components/OAuthButtons.jsx';
@@ -60,6 +61,11 @@ const SignupPage = () => {
 
   const { signup } = useAuth();
   const navigate = useNavigate();
+  // Where to land once the account exists — e.g. /checkout when the buyer was
+  // sent here by the marketplace gate. Travels inside the confirmation link
+  // (/welcome?next=…) so even the email round-trip ends back at the cart.
+  const [searchParams] = useSearchParams();
+  const nextPath = safeInternalPath(searchParams.get('next'));
 
   useEffect(() => {
     const p = formData.password;
@@ -99,7 +105,7 @@ const SignupPage = () => {
 
       // Turnstile token (when enabled) is verified server-side by Supabase Auth.
       const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
-      const result = await signup(formData.email, formData.password, fullName, captchaToken);
+      const result = await signup(formData.email, formData.password, fullName, captchaToken, { next: nextPath });
       const user = result?.user;
       const session = result?.session;
 
@@ -145,7 +151,7 @@ const SignupPage = () => {
       // Otherwise they must verify their email first; ID verification and the
       // card are collected on their first sign-in.
       if (session?.access_token) {
-        navigate('/verify-identity?welcome=1');
+        navigate(nextPath || '/verify-identity?welcome=1');
       } else {
         setSuccess(true);
       }
@@ -184,8 +190,9 @@ const SignupPage = () => {
             <h2 className="font-serif text-2xl font-bold mb-4">Check Your Email</h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
               We've sent a verification link to <span className="text-foreground font-bold">{formData.email}</span>.
-              Clicking it confirms your email and walks you through the next steps — verifying your ID and
-              adding a card — so you're ready to buy, sell and trade.
+              {nextPath === '/checkout'
+                ? ' Click it and you\'ll land straight back at your checkout, with your cart and details kept.'
+                : ' Clicking it confirms your email and walks you through the next steps — verifying your ID and adding a card — so you\'re ready to buy, sell and trade.'}
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Your account is <span className="text-foreground font-bold">free, forever</span> — buy straight away.

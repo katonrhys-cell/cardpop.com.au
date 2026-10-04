@@ -203,8 +203,12 @@ export const AuthProvider = ({ children }) => {
     };
   }, [session?.access_token, session?.user?.id]);
 
-  const signup = async (email, password, fullName, captchaToken) => {
+  const signup = async (email, password, fullName, captchaToken, { next } = {}) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
+    // Optional app-internal path appended to the confirmation link, so a buyer
+    // who signed up from checkout returns there after confirming (WelcomePage
+    // honours ?next=; anything that isn't a plain internal path is dropped).
+    const nextParam = typeof next === 'string' && /^\/(?!\/)/.test(next) ? `?next=${encodeURIComponent(next)}` : '';
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -218,7 +222,7 @@ export const AuthProvider = ({ children }) => {
         // (ID verification → add a card → wallet). This URL must be added to
         // Supabase → Authentication → URL Configuration → Redirect URLs, else
         // Supabase falls back to the Site URL and the chain isn't entered.
-        emailRedirectTo: `${window.location.origin}/welcome`,
+        emailRedirectTo: `${window.location.origin}/welcome${nextParam}`,
       },
     });
     if (error) throw error;

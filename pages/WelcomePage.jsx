@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { safeInternalPath } from '@/lib/safeInternalPath.js';
 import { Helmet } from 'react-helmet-async';
 import { Loader2, MailWarning, Compass, Tag, ShieldCheck, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -29,14 +30,19 @@ const WelcomePage = () => {
   const { settings } = usePlatformSettings();
   const [timedOut, setTimedOut] = useState(false);
   const redirected = useRef(false);
+  // Signup carried a destination (the checkout the buyer came from): go
+  // straight there instead of asking what they'd like to do.
+  const [searchParams] = useSearchParams();
+  const nextPath = safeInternalPath(searchParams.get('next'));
 
   // An already ID-verified user re-confirming an email doesn't need the intent
-  // fork — send them to their dashboard.
+  // fork — send them to their dashboard. A `next` destination wins for anyone.
   useEffect(() => {
-    if (redirected.current || !isAuthenticated || !isIdentityVerified) return;
+    if (redirected.current || !isAuthenticated) return;
+    if (!nextPath && !isIdentityVerified) return;
     redirected.current = true;
-    navigate('/account', { replace: true });
-  }, [isAuthenticated, isIdentityVerified, navigate]);
+    navigate(nextPath || '/account', { replace: true });
+  }, [isAuthenticated, isIdentityVerified, nextPath, navigate]);
 
   const browsePath = settings.enable_marketplace === false ? '/shop' : '/marketplace';
 

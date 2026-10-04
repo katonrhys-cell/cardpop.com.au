@@ -16,6 +16,7 @@ import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { renderSurveyOptIn } from '@/lib/googleCustomerReviews.js';
 import { trackPurchase } from '@/lib/analytics.js';
+import { CHECKOUT_FORM_STORAGE_KEY } from '@/pages/CheckoutPage.jsx';
 
 // Post-purchase account creation for guests. The order is already placed and
 // paid — this just lets the shopper turn their guest checkout into a real
@@ -148,8 +149,16 @@ const CheckoutSuccessPage = () => {
         if (cancelled) return;
         setSessionData(data);
         const paid = data.status === 'paid' || data.status === 'no_payment_required';
+        // Stripe says paid, but the webhook refused to fulfil (an overseas
+        // card, a listing that had already sold, an amount mismatch) and is
+        // refunding — the buyer must not read "Thank you for your order".
+        if (paid && data.orderStatus === 'payment_failed') {
+          setStatus('refused');
+          return;
+        }
         setStatus(paid ? 'paid' : 'unpaid');
         if (paid) {
+          try { window.sessionStorage.removeItem(CHECKOUT_FORM_STORAGE_KEY); } catch { /* ignore */ }
           // GA4 / Google Ads / Meta purchase — deduped per session id inside
           // trackPurchase, so a reload of this page can't double-count a sale.
           trackPurchase({
@@ -199,12 +208,16 @@ const CheckoutSuccessPage = () => {
       ? 'Payment not completed'
       : status === 'missing'
         ? 'No order to show'
-        : "We couldn't confirm your payment";
+        : status === 'refused'
+          ? "We couldn't accept this order"
+          : "We couldn't confirm your payment";
     const message = status === 'unpaid'
       ? 'Your payment was not completed, so your order has not been placed. Your cart has been kept so you can try again.'
       : status === 'missing'
         ? 'There is no checkout session associated with this page.'
-        : 'We were unable to verify your payment. If you were charged, please contact support before retrying so you are not charged twice.';
+        : status === 'refused'
+          ? 'Your payment went through, but we were unable to fulfil the order — most often because the card was issued outside Australia, or the item had just sold to someone else. A full refund is already on its way to the same card (5–10 business days to appear) and we\'ve emailed you the details. Nothing further is needed.'
+          : 'We were unable to verify your payment. If you were charged, please contact support before retrying so you are not charged twice.';
 
     return (
       <div className="min-h-[80vh] bg-muted/20 py-16 flex items-center justify-center">

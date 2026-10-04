@@ -46,6 +46,7 @@ import { isGtin, productReviewsLd, reviewPoolKey } from '@/utils/productReviews.
 import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
 import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 import { trackViewItem } from '@/lib/analytics.js';
+import { identityRequiredForAmount } from '@/utils/marketplaceIdentity.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -61,8 +62,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   const source = sourceProp || sourceParam;
   const id = idProp || idParam;
   const navigate = useNavigate();
-  const { addToCart, setIsCartOpen } = useCart();
-  const { currentUser, isAdmin, loading: authLoading } = useAuth();
+  const { addToCart, setIsCartOpen, cartItems } = useCart();
+  const { currentUser, isAdmin, isIdentityVerified, loading: authLoading } = useAuth();
   const { settings } = usePlatformSettings();
   const { findCategory: findShopCategory } = useShopCategoryGroups();
   
@@ -369,6 +370,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     return () => { supabase.removeChannel(channel); };
   }, [id, source, product?.vault_item?.id]);
 
+  // Shared by "Buy Now" (adds, then straight to checkout) and "Add to cart"
+  // (adds, toast with a View Cart action). Resolves to true once the line is in
+  // the cart so Buy Now knows it's safe to navigate.
   const handleAddToCart = () => {
     if (!product) return;
     if (source !== 'shop' && product.status === 'sold') {
@@ -413,7 +417,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
         };
     // Unlimited pre-orders: the cart must not cap them by stock.
     if (unlimited) cartVariant.manage_inventory = false;
-    addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
+    return addToCart(cartProduct, cartVariant, 1, cartVariant.inventory_quantity ?? 999)
       .then(() => {
         toast.success(cartProduct.preorder ? 'Pre-order added to cart' : 'Added to cart', {
           action: {
@@ -421,8 +425,18 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             onClick: () => setIsCartOpen(true)
           }
         });
+        return true;
       })
-      .catch(e => toast.error(e.message));
+      .catch(e => { toast.error(e.message); return false; });
+  };
+
+  // "Buy Now" means buy now: the card goes in the cart and the buyer lands on
+  // checkout in one tap. (It used to add to the cart and stop, which read as a
+  // broken button.) A listing already in the cart just goes to checkout.
+  const handleBuyNow = () => {
+    const alreadyInCart = cartItems.some((item) => (item.variant?.id || item.product?.id) === product.id);
+    if (alreadyInCart) { navigate('/checkout'); return; }
+    handleAddToCart()?.then((added) => { if (added) navigate('/checkout'); });
   };
 
   // Opens the propose-trade modal: pick one of your own listings to offer,
@@ -687,7 +701,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 </>
               ) : (
                 <>
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Estimated Value / Price</p>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                    {source === 'vault' ? 'Estimated value' : 'Price'}
+                  </p>
                   <div className="flex items-end gap-3">
                     <span className="text-4xl font-extrabold tabular-nums tracking-tight text-foreground">
                       ${(product.price || 0).toFixed(2)}
@@ -710,6 +726,25 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                     )}
                   </div>
                   <BnplMessage amount={product.price} className="mt-2" />
+                  {/* The marketplace buying rule, stated where the decision is
+                      made rather than sprung at the till: a free account for
+                      any card, plus a one-time ID check once the order reaches
+                      the admin threshold (utils/marketplaceIdentity.js). */}
+                  {source === 'marketplace' && !isSold && (
+                    identityRequiredForAmount(product.price, settings.marketplace_identity_threshold_aud) ? (
+                      currentUser && isIdentityVerified ? null : (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                          Orders of ${Number(settings.marketplace_identity_threshold_aud).toLocaleString('en-AU')}+ need a one-time ID check at checkout (about 2 minutes, via Stripe).
+                        </p>
+                      )
+                    ) : !currentUser ? (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        <ShieldCheck className="mr-1 inline h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                        Buying from a collector needs a free CardPop account — you can create it at checkout.
+                      </p>
+                    ) : null
+                  )}
                   {/* Market context beside the price — the number buyers actually
                       decide on. Links down to the full eBay market section. */}
                   {!isShop && (
@@ -845,9 +880,11 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {preorder ? 'Pre-order Now' : 'Add to Cart'}
                 </Button>
-                {!preorder && product.stockQuantity !== null && (
-                  <p className="text-sm text-center font-medium text-muted-foreground">
-                    {product.stockQuantity} available in stock
+                {/* Scarcity only when it's real: "500 available" removes urgency,
+                    "Only 3 left" creates it. Nothing is said above 5. */}
+                {!preorder && product.stockQuantity !== null && product.stockQuantity > 0 && product.stockQuantity <= 5 && (
+                  <p className="text-sm text-center font-semibold text-brand-red">
+                    Only {product.stockQuantity} left in stock
                   </p>
                 )}
               </div>
@@ -873,9 +910,14 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                       <PackageX className="w-5 h-5 mr-2" /> Not currently available
                     </Button>
                   ) : (
-                    <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleAddToCart}>
-                      Buy Now
-                    </Button>
+                    <>
+                      <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleBuyNow}>
+                        Buy Now
+                      </Button>
+                      <Button size="lg" variant="outline" className="w-full h-12 rounded-xl font-semibold" onClick={handleAddToCart}>
+                        <ShoppingCart className="w-4 h-4 mr-2" aria-hidden="true" /> Add to cart
+                      </Button>
+                    </>
                   )
                 ) : null}
 
