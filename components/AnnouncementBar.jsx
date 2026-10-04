@@ -33,11 +33,13 @@ const AnnouncementBar = () => {
   return (
     <div className="relative z-40 bg-brand-charcoal text-white" data-testid="announcement-bar">
       <div className="mx-auto flex max-w-[90rem] items-center justify-center gap-2 px-10 py-2 text-center text-xs font-semibold sm:text-sm">
-        <Sparkles className="hidden h-4 w-4 shrink-0 text-brand-red sm:block" aria-hidden="true" />
+        <Sparkles className="hidden h-4 w-4 shrink-0 text-red-400 sm:block" aria-hidden="true" />
         <p>
-          <span className="text-brand-red">{WELCOME_DISCOUNT_PCT}% off your first order</span> when you join free
+          {/* red-400 (#f87171), not brand-red: #CE1126 on charcoal is 2.6:1 and
+              fails WCAG AA (4.5:1) — the e2e a11y audit catches it. */}
+          <span className="text-red-400">{WELCOME_DISCOUNT_PCT}% off your first order</span> when you join free
           {' · '}
-          <Link to="/signup" className="underline underline-offset-2 hover:text-brand-red">Create your account</Link>
+          <Link to="/signup" className="underline underline-offset-2 hover:text-red-400">Create your account</Link>
         </p>
         <button
           type="button"
