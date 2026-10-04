@@ -41,6 +41,7 @@ import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
 import shopSupplierWatchRouter from './shop-supplier-watch.js';
 import ordersRouter from './orders.js';
+import siteTrafficRouter from './site-traffic.js';
 import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
@@ -206,6 +207,9 @@ export default () => {
     // the daily delivery sweep (cron, CRON_SECRET) — see docs/order-delivery.md
     router.use('/orders', apiLimiter);
     router.use('/orders', ordersRouter);
+    // Nightly GA4 visitor-count sync for the home page / admin (cron, CRON_SECRET)
+    router.use('/site-traffic', apiLimiter);
+    router.use('/site-traffic', siteTrafficRouter);
 
     // Local game store directory submissions
     router.use('/stores', apiLimiter);
