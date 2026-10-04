@@ -131,6 +131,7 @@ const AccountReviews = lazy(() => import('@/pages/account/AccountReviews.jsx'));
 const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx'));
 const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
+const AccountSales = lazy(() => import('@/pages/account/AccountSales.jsx'));
 const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
 const AccountShows = lazy(() => import('@/pages/account/AccountShows.jsx'));
 const AccountSoleTrader = lazy(() => import('@/pages/account/AccountSoleTrader.jsx'));
@@ -393,6 +394,7 @@ const App = () => {
                         <Route path="/account/verification" element={<Navigate to="/verify-identity" replace />} />
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
+                        <Route path="/account/sales" element={<ProtectedRoute><AccountSales /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
                         <Route path="/account/shows" element={<ProtectedRoute><AccountShows /></ProtectedRoute>} />
                         <Route path="/account/sole-trader" element={<ProtectedRoute><AccountSoleTrader /></ProtectedRoute>} />

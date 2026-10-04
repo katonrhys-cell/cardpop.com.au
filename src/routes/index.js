@@ -40,6 +40,7 @@ import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
 import shopSupplierWatchRouter from './shop-supplier-watch.js';
+import ordersRouter from './orders.js';
 import storesRouter from './stores.js';
 import catalogRouter from './catalog.js';
 import psaRouter from './psa.js';
@@ -200,6 +201,11 @@ export default () => {
     // Weekly supplier price watch for shop products (cron, CRON_SECRET)
     router.use('/shop-supplier-watch', apiLimiter);
     router.use('/shop-supplier-watch', shopSupplierWatchRouter);
+
+    // Order delivery lifecycle: seller "mark shipped", buyer "received", and
+    // the daily delivery sweep (cron, CRON_SECRET) — see docs/order-delivery.md
+    router.use('/orders', apiLimiter);
+    router.use('/orders', ordersRouter);
 
     // Local game store directory submissions
     router.use('/stores', apiLimiter);
