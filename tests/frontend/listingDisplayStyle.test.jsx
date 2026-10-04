@@ -84,7 +84,7 @@ describe('ProductImageCarousel × display style', () => {
   it('leaves the hero untouched for classic / shop products', () => {
     const { container } = render(<ProductImageCarousel images={images} />);
     expect(container.querySelector('.cardshowcase')).toBeNull();
-    expect(screen.getByAltText('Product view 1')).toBeInTheDocument();
+    expect(screen.getByAltText('Card – front')).toBeInTheDocument();
   });
 
   it('renders an unknown stored style as classic rather than breaking', () => {
@@ -117,12 +117,12 @@ describe('ProductImageCarousel × display style', () => {
         <ProductImageCarousel images={multi} displayStyle="holographic" />,
       );
 
-      await user.click(screen.getByAltText('Thumbnail 2').closest('button'));
+      await user.click(screen.getByAltText('Card – back thumbnail').closest('button'));
       expect(container.querySelector('.cardshowcase')).toBeNull();
-      expect(screen.getByAltText('Product view 2')).toBeInTheDocument();
+      expect(screen.getByAltText('Card – back')).toBeInTheDocument();
 
       // …and comes back when the buyer returns to the first photo.
-      await user.click(screen.getByAltText('Thumbnail 1').closest('button'));
+      await user.click(screen.getByAltText('Card – front thumbnail').closest('button'));
       expect(container.querySelector('.cardshowcase--holographic')).toBeTruthy();
     });
   });

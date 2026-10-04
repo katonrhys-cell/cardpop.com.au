@@ -39,6 +39,7 @@ import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
 import CookieConsentBanner from '@/components/CookieConsentBanner.jsx';
+import AnnouncementBar from '@/components/AnnouncementBar.jsx';
 import ReferralCapture from '@/components/ReferralCapture.jsx';
 import FeatureRoute from '@/components/FeatureRoute.jsx';
 import MaintenanceGate from '@/components/MaintenanceGate.jsx';
@@ -289,6 +290,7 @@ const App = () => {
                     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
                   </Helmet>
                   
+                  <AnnouncementBar />
                   <Header />
                   
                   <main className="flex-grow flex flex-col">

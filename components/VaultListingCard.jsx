@@ -166,6 +166,11 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
             <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
+              {/* Without a live listing the figure is the owner's estimate, not
+                  an asking price — label it so a vault card can't read as buyable. */}
+              {liveListing?.price_aud == null && !isSold && (
+                <span className="mr-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground align-middle">Est. value</span>
+              )}
               ${Number(liveListing?.price_aud ?? vaultItem.estimated_value_aud ?? 0).toFixed(2)}
             </span>
             {isSold && (

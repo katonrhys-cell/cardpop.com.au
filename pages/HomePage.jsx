@@ -17,6 +17,9 @@ import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
 import { publicTrafficStat } from '@/utils/siteTraffic.js';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
+import { HeroSearchForm } from '@/components/HeroSection.jsx';
+import { MARKETPLACE_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
+import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 
 // NOTE: this page intentionally imports NOTHING from framer-motion. The library
 // costs ~110 kB of JS and ~1.5 s of main-thread execution on a mid-range phone
@@ -100,8 +103,8 @@ const TRUST_SIGNALS = [
   },
   {
     icon: Package,
-    title: 'Buyer Protection',
-    body: 'A full refund within 14 days if your item never arrives or isn\'t as described.',
+    title: MARKETPLACE_PROTECTION.name,
+    body: `${PROTECTION_COPY.marketplaceOneLine} Report it within ${MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days of delivery.`,
   },
 ];
 
@@ -109,19 +112,19 @@ const CATEGORIES = HOMEPAGE_CATEGORIES;
 
 const HOW_IT_WORKS = [
   {
-    step: '01', icon: Package,
-    title: 'List Your Cards',
-    desc: 'Add cards to your vault in seconds. Set prices, conditions, and trade preferences with ease.',
+    step: '01', icon: Search,
+    title: 'Find Your Card',
+    desc: 'Search by name, set or number across every Australian seller, filter by grade and condition, and compare against live market prices.',
   },
   {
-    step: '02', icon: Search,
-    title: 'Find or Get Found',
-    desc: 'Smart search connects you with buyers and sellers across Australia in real time.',
+    step: '02', icon: ShieldCheck,
+    title: 'Pay Securely',
+    desc: 'Checkout in AUD through Stripe — card, PayPal, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
   },
   {
-    step: '03', icon: ShieldCheck,
-    title: 'Trade Safely',
-    desc: 'Pay securely through Stripe and shop with our 14-day Buyer Protection — a full refund if your item never arrives or isn\'t as described.',
+    step: '03', icon: Package,
+    title: 'Get It Delivered, Protected',
+    desc: `Sellers post tracked within a week. If a card isn't as described or doesn't arrive, ${MARKETPLACE_PROTECTION.name} refunds you in full.`,
   },
 ];
 
@@ -525,25 +528,29 @@ const HomePage = () => {
               }}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              CardPop™ Live
+              CardPop™
               <span className="text-white/30 font-normal">·</span>
-              <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
+              <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
-              Sell Your Trading Cards to{' '}
+              Buy and Sell Trading Cards{' '}
               <br className="hidden sm:block" />
               <span
                 className="text-transparent bg-clip-text"
                 style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
               >
-                Buyers Across Australia
+                with Collectors Across Australia
               </span>
             </h1>
 
-            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
-              CardPop is Australia's marketplace for Pokémon, MTG, sports cards and more. List your collection in minutes, reach thousands of verified collectors, and get paid securely in AUD — with buyer protection on every order.
+            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
+              Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.
             </p>
+
+            <div className="mb-6 flex justify-center lg:justify-start">
+              <HeroSearchForm />
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
               <Button
@@ -557,8 +564,8 @@ const HomePage = () => {
                   border: 'none',
                 }}
               >
-                <Link to="/signup">
-                  Start Selling — It's Free <ArrowRight className="ml-2 w-5 h-5" />
+                <Link to="/marketplace">
+                  Shop Cards <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
               </Button>
               <Button
@@ -572,8 +579,8 @@ const HomePage = () => {
                   color: '#e4e4e7',
                 }}
               >
-                <Link to="/marketplace">
-                  Browse the Marketplace
+                <Link to="/signup?next=%2Fvault%2Fadd">
+                  Sell for Free
                 </Link>
               </Button>
             </div>
@@ -584,9 +591,9 @@ const HomePage = () => {
               style={{ animationDelay: '0.5s' }}
             >
               {[
-                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protected' },
-                { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD Pricing' },
-                { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live Market Data' },
+                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protection on every order' },
+                { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD prices, Australian sellers' },
+                { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live market data' },
               ].map(({ icon, label }) => (
                 <span
                   key={label}
@@ -601,6 +608,77 @@ const HomePage = () => {
         </div>
 
       </section>
+
+      {/* ── Featured cards ────────────────────────────────────────────────── */}
+      <section className="py-12 md:py-24 bg-muted/30 border-t border-border">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
+          <div className="flex items-end justify-between mb-6 md:mb-12">
+            <div>
+              <h2 className="text-3xl font-bold font-serif mb-1 md:mb-2">Just Listed</h2>
+              <p className="text-muted-foreground">Fresh cards from Australian collectors — buy now or make an offer.</p>
+            </div>
+            <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
+              <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
+            </Button>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="space-y-4">
+                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : featuredCards.length > 0 ? (
+            <div
+              ref={cardsRef}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+            >
+              {featuredCards.map((card, i) => (
+                <div
+                  key={card.id}
+                  className={cardsInView ? 'anim-reveal-up' : 'opacity-0'}
+                  style={cardsInView ? { animationDelay: `${i * 0.1}s` } : undefined}
+                >
+                  {/* Isolate each card: a single malformed record throwing
+                      during render must not blank the whole grid (and, via the
+                      route-level boundary, the whole homepage). */}
+                  <ErrorBoundary fallback={null}>
+                    <VaultListingCard vaultItem={card} />
+                  </ErrorBoundary>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-background rounded-3xl border border-border">
+              <p className="text-muted-foreground font-medium">New cards land here as collectors list them.</p>
+              <Button asChild variant="outline" className="mt-4 rounded-xl font-bold">
+                <Link to="/marketplace">Browse the marketplace</Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="mt-6 text-center sm:hidden">
+            <Button asChild variant="outline" className="w-full rounded-xl font-bold">
+              <Link to="/marketplace">Browse all cards</Link>
+            </Button>
+          </div>
+
+          {/* Ways to pay — shown where the buying starts, not only at the till. */}
+          <ul className="mt-8 flex flex-wrap items-center justify-center gap-3" aria-label="Accepted payment methods">
+            {PAYMENT_MARKS.map(({ label, Mark }) => (
+              <li key={label} className="flex h-8 w-12 items-center justify-center rounded-md border border-border bg-white px-1.5" title={label}>
+                <Mark />
+                <span className="sr-only">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
 
       {/* ── Stats strip — real counts only ───────────────────────────────────
           Renders nothing until the counts load, and skips any metric that is
@@ -747,7 +825,7 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-2xl font-bold mb-3 text-secondary-foreground">Bank-Grade Security</h3>
                 <p className="text-secondary-foreground/80 leading-relaxed">
-                  Payments are processed securely through Stripe, and every order is covered by our 14-day Buyer Protection Guarantee — a full refund if an item doesn't arrive or isn't as described.
+                  Payments are processed securely through Stripe, and every order is covered by {MARKETPLACE_PROTECTION.name} — a full refund, fees included, if a card doesn't arrive or isn't as described.
                 </p>
               </div>
               <div className="absolute right-0 bottom-0 w-2/3 h-2/3 bg-gradient-to-tl from-primary/10 to-transparent rounded-tl-full transition-transform duration-500 group-hover:scale-110" />
@@ -782,13 +860,18 @@ const HomePage = () => {
             {/* CTA feature */}
             <div className="md:col-span-2 bg-primary text-primary-foreground rounded-3xl p-6 md:p-12 flex flex-col sm:flex-row items-center justify-between gap-6 md:gap-8 relative overflow-hidden">
               <div className="relative z-10 max-w-md">
-                <h3 className="text-2xl md:text-3xl font-bold mb-3 md:mb-4">Ready to start trading?</h3>
+                <h3 className="text-2xl md:text-3xl font-bold mb-3 md:mb-4">Ready to find your next card?</h3>
                 <p className="text-primary-foreground/90 mb-6 md:mb-8">
-                  Join our community of verified collectors and start building your dream vault today.
+                  Browse what Australian collectors are selling right now — and when you're ready, list your own for free.
                 </p>
-                <Button asChild variant="secondary" size="lg" className="rounded-xl font-bold text-primary hover:bg-background">
-                  <Link to="/signup">Get Started Now</Link>
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button asChild variant="secondary" size="lg" className="rounded-xl font-bold text-primary hover:bg-background">
+                    <Link to="/marketplace">Shop cards</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg" className="rounded-xl font-bold border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">
+                    <Link to="/signup?next=%2Fvault%2Fadd">Sell for free</Link>
+                  </Button>
+                </div>
               </div>
               <div className="relative z-10 w-24 h-24 sm:w-48 sm:h-48 bg-primary-foreground/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
                 <Users className="w-12 h-12 sm:w-24 sm:h-24 text-primary-foreground/80" />
@@ -802,9 +885,9 @@ const HomePage = () => {
       <section className="py-12 md:py-24 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">How CardPop Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">How Buying Works</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Three simple steps to start trading with confidence across Australia.
+              Three steps from search to a card in your hands — protected the whole way.
             </p>
           </div>
 
@@ -833,64 +916,7 @@ const HomePage = () => {
 
           <div className="mt-8 md:mt-14 text-center">
             <Button asChild size="lg" className="h-14 px-10 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
-              <Link to="/signup">Start for Free <ArrowRight className="ml-2 w-5 h-5" /></Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Featured cards ────────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-muted/30 border-t border-border">
-        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="flex items-end justify-between mb-6 md:mb-12">
-            <div>
-              <h2 className="text-3xl font-bold font-serif mb-1 md:mb-2">Featured Cards</h2>
-              <p className="text-muted-foreground">Handpicked listings from Australian collectors.</p>
-            </div>
-            <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
-              <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="space-y-4">
-                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                  <Skeleton className="h-5 w-2/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              ))}
-            </div>
-          ) : featuredCards.length > 0 ? (
-            <div
-              ref={cardsRef}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-            >
-              {featuredCards.map((card, i) => (
-                <div
-                  key={card.id}
-                  className={cardsInView ? 'anim-reveal-up' : 'opacity-0'}
-                  style={cardsInView ? { animationDelay: `${i * 0.1}s` } : undefined}
-                >
-                  {/* Isolate each card: a single malformed record throwing
-                      during render must not blank the whole grid (and, via the
-                      route-level boundary, the whole homepage). */}
-                  <ErrorBoundary fallback={null}>
-                    <VaultListingCard vaultItem={card} />
-                  </ErrorBoundary>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-background rounded-3xl border border-border">
-              <p className="text-muted-foreground font-medium">No recent cards available at the moment.</p>
-            </div>
-          )}
-
-          <div className="mt-6 text-center sm:hidden">
-            <Button asChild variant="outline" className="w-full rounded-xl font-bold">
-              <Link to="/marketplace">View All Listings</Link>
+              <Link to="/marketplace">Start browsing <ArrowRight className="ml-2 w-5 h-5" /></Link>
             </Button>
           </div>
         </div>
@@ -929,7 +955,10 @@ const HomePage = () => {
             </div>
           ) : (
             <div className="text-center py-12 bg-muted rounded-3xl border border-border shadow-sm">
-              <p className="text-muted-foreground font-medium">Seller profiles are currently being updated.</p>
+              <p className="text-muted-foreground font-medium">Featured sellers appear here as they're verified.</p>
+              <Button asChild variant="outline" className="mt-4 rounded-xl font-bold">
+                <Link to="/signup?next=%2Fvault%2Fadd">Become a CardPop seller</Link>
+              </Button>
             </div>
           )}
         </div>

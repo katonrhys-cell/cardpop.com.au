@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, ImageOff } from 'lucide-react';
@@ -323,6 +324,29 @@ const SearchResultsPage = () => {
               Did you mean “{didYouMean}”?
             </button>
           )}
+          {/* Never a dead end: the two buying surfaces, plus the searches that
+              usually land. */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <Button asChild className="rounded-xl font-bold">
+              <Link to={query ? `/marketplace?q=${encodeURIComponent(query)}` : '/marketplace'}>Browse all cards</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl font-bold">
+              <Link to="/shop">Shop supplies</Link>
+            </Button>
+          </div>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <span className="w-full text-xs font-semibold uppercase tracking-wider text-muted-foreground">Popular right now</span>
+            {['Charizard', 'Pikachu', 'Umbreon', 'Black Lotus', 'Luka Dončić', 'Prizm'].map((term) => (
+              <button
+                key={term}
+                type="button"
+                onClick={() => setSearchParams({ q: term })}
+                className="rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium hover:border-primary/50 hover:text-primary"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <>

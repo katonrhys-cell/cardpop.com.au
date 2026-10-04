@@ -258,6 +258,31 @@ const CheckoutPage = () => {
   // it's stale or invalid.
   const [promoInput, setPromoInput] = useState(() => getReferralCode());
   const [promoCode, setPromoCode] = useState(() => getReferralCode());
+  // The welcome code (10% off a first order) used to live only in an email the
+  // buyer had to find and paste. For a signed-in buyer with no code in hand it
+  // is fetched and applied automatically; if the server says it's already been
+  // used (or expired), it is dropped quietly rather than toasting an error at
+  // a returning customer.
+  const autoAppliedCodeRef = useRef('');
+  useEffect(() => {
+    if (!currentUser || promoCode || promoInput) return;
+    let cancelled = false;
+    apiServerClient.fetch('/welcome-offer/mine')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const offer = data?.offer;
+        if (cancelled || !offer?.code) return;
+        const expiresAt = offer.expires_at || offer.expiresAt;
+        if (expiresAt && new Date(expiresAt).getTime() < Date.now()) return;
+        if (offer.discount_redeemed_at || offer.discountRedeemedAt) return;
+        autoAppliedCodeRef.current = offer.code;
+        setPromoInput(offer.code);
+        setPromoCode(offer.code);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per signed-in checkout
+  }, [currentUser?.id]);
 
   // Wallet balance (Stripe Customer Balance — CardPop holds no ledger of its
   // own). Mutually exclusive with a promo code; toggling one clears the other.
@@ -343,7 +368,13 @@ const CheckoutPage = () => {
         setPricing(data);
         setPricingState('ready');
         if (data?.promoError) {
-          toast.error(data.promoError);
+          if (autoAppliedCodeRef.current && autoAppliedCodeRef.current === promoCode) {
+            // Auto-applied welcome code that no longer applies — drop it silently.
+            autoAppliedCodeRef.current = '';
+            setPromoInput('');
+          } else {
+            toast.error(data.promoError);
+          }
           setPromoCode('');
         } else if (promoCode && !useWallet && data?.discountAud > 0) {
           toast.success(`Code applied — $${Number(data.discountAud).toFixed(2)} off.`);

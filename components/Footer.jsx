@@ -5,6 +5,7 @@ import CardPopLogo from '@/components/CardPopLogo.jsx';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { resetConsent } from '@/lib/consent.js';
+import { WELCOME_DISCOUNT_PCT } from '@/config/welcomeOffer.js';
 
 const DiscordIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -45,7 +46,11 @@ const Footer = () => {
 
             {/* Newsletter signup */}
             <div className="mb-6">
-              <p className="text-sm font-bold uppercase tracking-wider mb-3">Stay in the Loop</p>
+              <p className="text-sm font-bold uppercase tracking-wider mb-1">Stay in the Loop</p>
+              <p className="text-xs text-muted-foreground mb-3">
+                New listings, price movers and drops. New here?{' '}
+                <Link to="/signup" className="font-semibold text-primary hover:underline">Join free for {WELCOME_DISCOUNT_PCT}% off your first order</Link>.
+              </p>
               <NewsletterSignup />
             </div>
 
