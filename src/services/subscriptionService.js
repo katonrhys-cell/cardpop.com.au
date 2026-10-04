@@ -10,6 +10,17 @@ import { ENV, PAID_TIER_ORDER } from '../../config/subscription.js';
 const isEntitledStatus = (status) => ['trialing', 'active'].includes(status);
 
 /**
+ * The status of a COMPLIMENTARY membership: a tier granted service-side (by
+ * migration — the owner/admin accounts hold Ultimate this way) with no
+ * Stripe/PayPal subscription behind it. No provider ever emits it, so a
+ * provider event about such an account is never the source of truth for its
+ * tier: applying one would silently downgrade a free grant to whatever the
+ * event says (a `customer.subscription.deleted` → Hobby, a PayPal create →
+ * 'none'). Both apply* helpers therefore leave a grandfathered profile alone.
+ */
+export const COMPLIMENTARY_STATUS = 'grandfathered';
+
+/**
  * Which paid tier a Stripe subscription buys. The tier is stamped into the
  * subscription metadata at checkout; for subscriptions created before the
  * multi-tier ladder (or with missing metadata) fall back to matching the
@@ -141,7 +152,11 @@ export async function applyStripeSubscription(subscription) {
   // lockstep with what the member actually pays for.
   const tier = isEntitledStatus(status) ? tierFromStripeSubscription(subscription) : 'free';
 
-  const { error } = await supabase
+  // The status filter makes the write a no-op on a complimentary
+  // (grandfathered) membership — see COMPLIMENTARY_STATUS. Done in the same
+  // statement rather than a read-then-write so a concurrent event can't slip
+  // between the check and the update.
+  const { data: updated, error } = await supabase
     .from('profiles')
     .update({
       subscription_status:    status,
@@ -151,10 +166,16 @@ export async function applyStripeSubscription(subscription) {
       stripe_subscription_id: subscription.id,
       trial_ends_at:          trialEndsAt,
     })
-    .eq('id', userId);
+    .eq('id', userId)
+    .neq('subscription_status', COMPLIMENTARY_STATUS)
+    .select('id');
 
   if (error) {
     logger.error(`[SUB] Failed to apply Stripe subscription for ${userId}: ${error.message}`);
+    return;
+  }
+  if (!updated?.length) {
+    logger.info(`[SUB] ${userId} holds a complimentary membership — ignored Stripe ${subscription.id} (${status})`);
     return;
   }
   // A started trial/subscription consumes the welcome code's trial half so
@@ -197,7 +218,8 @@ export async function applyPaypalSubscription({ userId, paypalSubscriptionId, st
     return;
   }
 
-  const { error } = await supabase
+  // No-op on a complimentary (grandfathered) membership — see COMPLIMENTARY_STATUS.
+  const { data: updated, error } = await supabase
     .from('profiles')
     .update({
       subscription_status:    status,
@@ -206,10 +228,16 @@ export async function applyPaypalSubscription({ userId, paypalSubscriptionId, st
       paypal_subscription_id: paypalSubscriptionId,
       trial_ends_at:          trialEndsAt,
     })
-    .eq('id', userId);
+    .eq('id', userId)
+    .neq('subscription_status', COMPLIMENTARY_STATUS)
+    .select('id');
 
   if (error) {
     logger.error(`[SUB] Failed to apply PayPal subscription for ${userId}: ${error.message}`);
+    return;
+  }
+  if (!updated?.length) {
+    logger.info(`[SUB] ${userId} holds a complimentary membership — ignored PayPal ${paypalSubscriptionId} (${status})`);
     return;
   }
   if (['trialing', 'active'].includes(status)) await markTrialRedeemed(userId);
