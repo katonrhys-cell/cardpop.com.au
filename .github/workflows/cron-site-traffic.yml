@@ -1,0 +1,35 @@
+name: Cron · Site traffic sync
+
+# Pulls visitor counts (users, sessions, page views) from Google Analytics 4
+# into site_traffic_daily / site_traffic_summary so the home page stats strip
+# and Admin → Dashboard can show "visitors in the last 30 days" and "since
+# launch" without calling Google from the browser. Read-only against GA4;
+# re-pulls the full daily history each night because GA4 finalises a day up
+# to ~48h late. Answers 503 (a red run) until GA4_PROPERTY_ID and
+# GA4_SERVICE_ACCOUNT_JSON are set in Vercel. Runbook: docs/site-traffic.md.
+
+on:
+  schedule:
+    # 19:23 UTC = 05:23 AEST, after GA4 has closed out the previous AEST day.
+    # Off the top of the hour and clear of the 19:30 price refresh.
+    - cron: '23 19 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cron-site-traffic
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    uses: ./.github/workflows/cron-job.yml
+    with:
+      endpoint: /api/site-traffic/sync
+      # Two GA4 reports plus a few hundred-row upsert: seconds, not minutes.
+      # api/index.js is capped at maxDuration 40.
+      max_seconds: 50
+      # Idempotent (upserts), so a retry is safe and free.
+      attempts: 2
+    secrets: inherit
