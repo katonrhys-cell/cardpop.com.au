@@ -75,4 +75,36 @@ export function shopProductPath(row) {
   return colour ? `${base}?colour=${colour}` : base;
 }
 
+/**
+ * Where an old slug should 301 to, or null if it isn't one.
+ *
+ * `redirects` are `shop_product_slug_redirects` rows joined to their product
+ * (`{ old_slug, product: { slug, category, colour, family_sku } }`), already
+ * filtered to public products. `productSlug` is the second URL segment, which
+ * for a colour family is the *line* slug — so an old sibling slug
+ * ("palms-off-gaming-playmat-pink") matches the old line slug
+ * ("palms-off-gaming-playmat") once its colour suffix is dropped. A requested
+ * ?colour= is carried across when a sibling of that colour exists; otherwise
+ * the target is the line's bare canonical URL.
+ */
+export function shopSlugRedirectTarget(redirects, productSlug, colour) {
+  const wantedSlug = productSlug ? String(productSlug).trim() : '';
+  if (!wantedSlug) return null;
+  const matches = [];
+  for (const r of redirects || []) {
+    const row = r?.product;
+    const old = String(r?.old_slug || '').trim();
+    if (!row || !old) continue;
+    const colourSlug = shopColourParam(row);
+    const oldLine = colourSlug && old.endsWith(`-${colourSlug}`) ? old.slice(0, -(colourSlug.length + 1)) : old;
+    if (oldLine !== wantedSlug) continue;
+    matches.push({ row, colourSlug });
+  }
+  if (matches.length === 0) return null;
+  const wantedColour = colour ? slugify(colour) : '';
+  const sibling = wantedColour && matches.find((m) => m.colourSlug === wantedColour);
+  if (sibling) return shopProductPath(sibling.row);
+  return shopProductBasePath(matches[0].row) || shopProductPath(matches[0].row);
+}
+
 export default shopProductPath;

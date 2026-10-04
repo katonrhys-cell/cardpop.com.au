@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   shopProductPath, shopProductBasePath, shopLineSlug, shopColourParam, shopCategorySlug, legacyShopProductPath,
+  shopSlugRedirectTarget,
 } from '@/utils/shopProductUrl.js';
 import { SHOP_CATEGORIES } from '@/utils/shopCategories.js';
 import { BINDER_PRODUCTS } from '@/data/shopBinderProducts.js';
@@ -61,5 +62,39 @@ describe('URL scheme matches the shop taxonomy', () => {
       expect(shopProductBasePath({ slug: `${p.slug}-black`, colour: 'Black', family_sku: p.sku, category: 'Binders' }))
         .toBe(`/shop/binders/${p.slug}`);
     }
+  });
+});
+
+describe('shopSlugRedirectTarget', () => {
+  const house = { old_slug: 'binder-9-pocket-zip', product: { id: 'h1', slug: '9-pocket-zip-binder', category: 'Binders', colour: null, family_sku: null } };
+  const mat = (colour) => ({
+    old_slug: `palms-off-gaming-playmat-${colour.toLowerCase()}`,
+    product: { id: colour, slug: `palms-off-gaming-core-playmat-${colour.toLowerCase()}`, category: 'Playmats', colour, family_sku: 'PM-ST' },
+  });
+
+  it('sends an old house slug to the product\'s current URL', () => {
+    expect(shopSlugRedirectTarget([house], 'binder-9-pocket-zip')).toBe('/shop/binders/9-pocket-zip-binder');
+  });
+
+  it('matches an old line slug through its colour siblings and keeps the chosen colour', () => {
+    const rows = [mat('Black'), mat('Pink')];
+    expect(shopSlugRedirectTarget(rows, 'palms-off-gaming-playmat', 'pink'))
+      .toBe('/shop/playmats/palms-off-gaming-core-playmat?colour=pink');
+    expect(shopSlugRedirectTarget(rows, 'palms-off-gaming-playmat'))
+      .toBe('/shop/playmats/palms-off-gaming-core-playmat');
+    // A colour the line never had falls back to the bare line page.
+    expect(shopSlugRedirectTarget(rows, 'palms-off-gaming-playmat', 'green'))
+      .toBe('/shop/playmats/palms-off-gaming-core-playmat');
+  });
+
+  it('ignores redirects whose old slug merely shares a prefix', () => {
+    expect(shopSlugRedirectTarget([house], 'binder-9-pocket')).toBeNull();
+    expect(shopSlugRedirectTarget([mat('Pink')], 'palms-off-gaming-playmat-pin')).toBeNull();
+  });
+
+  it('returns null with nothing to go on', () => {
+    expect(shopSlugRedirectTarget([], 'anything')).toBeNull();
+    expect(shopSlugRedirectTarget(null, '')).toBeNull();
+    expect(shopSlugRedirectTarget([{ old_slug: 'x', product: null }], 'x')).toBeNull();
   });
 });

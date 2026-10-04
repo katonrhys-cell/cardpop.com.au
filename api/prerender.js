@@ -11,7 +11,7 @@ import {
   resolvePalmsOffProduct, palmsOffImages, palmsOffImageAlt, palmsOffSpecs,
 } from '../data/palmsOffCatalogue.js';
 import { resolvePalmsOffCategory } from '../data/palmsOffCategories.js';
-import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug } from '../utils/shopProductUrl.js';
+import { shopProductPath, shopProductBasePath, shopCategorySlug, shopLineSlug, shopSlugRedirectTarget } from '../utils/shopProductUrl.js';
 import { PUBLIC_SHOP_STATUSES, isPurchasableStatus } from '../utils/shopStock.js';
 import { shopCategoryLeaves } from '../utils/shopCategoryPages.js';
 import { colourListText } from '../utils/colourSwatch.js';
@@ -670,11 +670,31 @@ async function renderShopProductBySlug(supabase, categorySlug, productSlug, colo
       .not('family_sku', 'is', null));
     rows = (rows || []).filter((r) => shopLineSlug(r) === productSlug);
   }
+  if (!rows?.length) {
+    // A slug the product used to have (renamed in Admin → Products, or the
+    // SEO clean-up migration) keeps working: 301 to its current URL.
+    const target = await shopSlugRedirect(supabase, productSlug, colour);
+    return target ? { status: 301, location: `${BASE_URL}${target}` } : null;
+  }
   const row = (colour && rows.find((r) => r.colour && r.slug.endsWith(`-${colour}`))) || rows?.[0];
   if (!row) return null;
   const base = shopProductBasePath(row);
   if (base && shopCategorySlug(row) !== categorySlug) return { status: 301, location: `${BASE_URL}${base}` };
   return renderShopProduct(supabase, row.id, null, { canonicalPath: base });
+}
+
+/**
+ * Current path for a former slug (shop_product_slug_redirects), or null. The
+ * LIKE picks up an old colour sibling's slug for an old *line* slug too;
+ * shopSlugRedirectTarget() does the exact line matching.
+ */
+async function shopSlugRedirect(supabase, productSlug, colour) {
+  const { data } = await supabase
+    .from('shop_product_slug_redirects')
+    .select('old_slug, product:shop_products(id, slug, category, colour, family_sku, status)')
+    .like('old_slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}%`);
+  const live = (data || []).filter((r) => r.product && PUBLIC_SHOP_STATUSES.includes(r.product.status));
+  return shopSlugRedirectTarget(live, productSlug, colour);
 }
 
 async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}) {
