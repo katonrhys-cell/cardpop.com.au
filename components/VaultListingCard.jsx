@@ -11,7 +11,8 @@ import { slugify } from '@/lib/slugify.js';
 import { VARIANT_BADGES, ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
 import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
-import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
+import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { isVerified } from '@/utils/verification.js';
@@ -183,13 +184,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
               to={`/seller/${sellerId}`} 
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                {sellerObj?.avatar_url ? (
-                  <img src={toCdnUrl(sellerObj.avatar_url)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
-                ) : (
-                  (sellerObj?.display_name || sellerObj?.name || 'U')[0].toUpperCase()
-                )}
-              </div>
+              <ProfileAvatar profile={sellerObj} fallbackName="U" />
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">

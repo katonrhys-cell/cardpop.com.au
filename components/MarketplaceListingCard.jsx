@@ -9,7 +9,7 @@ const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
-import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
+import { getCardImage, CARD_GRID_SIZES, publicImageUrl } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
@@ -268,7 +268,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
                 {sellerInfo.type === 'official' ? (
                   <CardPopLogo variant="icon" iconClassName="w-4 h-5" />
                 ) : sellerInfo.logoUrl ? (
-                  <img src={toCdnUrl(sellerInfo.logoUrl)} alt={sellerInfo.business_name} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
+                  <img src={publicImageUrl(sellerInfo.logoUrl)} alt={sellerInfo.business_name} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
                 ) : (
                   (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
                 )}

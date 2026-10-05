@@ -9,7 +9,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 // "More from this seller" — the cheapest cross-sell on a marketplace: the
 // buyer already trusts this seller enough to be here, and combining cards
 // saves them postage. Renders nothing when the seller has no other live cards.
-const SELLER_EMBED = 'seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)';
+const SELLER_EMBED = 'seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)';
 
 const MoreFromSeller = ({ sellerId, excludeListingId, sellerName, storePath, limit = 4, className = '' }) => {
   const [listings, setListings] = useState([]);
