@@ -93,12 +93,12 @@ const SoleTraderStorePage = () => {
         const resolvedId = profile.id;
         const [marketplaceRes, vaultRes] = await Promise.all([
           supabase.from('listings')
-            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
+            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
             // Sold cards stay on the storefront, badged "Sold".
             .eq('seller_id', resolvedId).in('status', ['active', 'sold'])
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')
-            .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+            .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_admin, profile_photo_or_character, is_verified, seller_tier, rating, reviews_count)`)
             .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
         ]);

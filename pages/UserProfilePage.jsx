@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Link } from 'react-router-dom';
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 
 const UserProfilePage = () => {
   const { currentUser } = useAuth();
@@ -126,9 +126,12 @@ const UserProfilePage = () => {
           .from('vault-images')
           .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
-        updatePayload.profile_photo_or_character = filePath;
+        // Full public URL, written to both photo columns so the header, cards
+        // and seller pages all show the same picture.
+        const { data: urlData } = supabase.storage.from('vault-images').getPublicUrl(filePath);
+        Object.assign(updatePayload, profilePhotoColumns(urlData.publicUrl));
       } else if (removeAvatar) {
-        updatePayload.profile_photo_or_character = null;
+        Object.assign(updatePayload, profilePhotoColumns(null));
       }
 
       let updatedProfile;
@@ -175,9 +178,7 @@ const UserProfilePage = () => {
 
   // Generate fallback UI if public profile doesn't exist
   const isProfileEmpty = !profile && !isEditing;
-  const currentPhotoUrl = profile?.profile_photo_or_character
-    ? (publicImageUrl(profile.profile_photo_or_character))
-    : null;
+  const currentPhotoUrl = profilePhotoUrl(profile);
 
   return (
     <div className="w-full container-default py-8 md:py-16 font-sans">

@@ -140,7 +140,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
         if (source === 'marketplace') {
           const { data: listing, error: fetchError } = await supabase
             .from('listings')
-            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug)')
+            .select('*, vault_item:vault_items!inner(*, vault_images(*)), seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug)')
             .eq('id', id)
             // Sold listings still render (marked "Sold" + buy disabled); only
             // archived listings are treated as gone.

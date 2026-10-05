@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const VaultDropdown = ({ isMobile = false }) => {
   const { currentUser, logout, isVerified, isAdmin } = useAuth();
@@ -41,7 +41,7 @@ const VaultDropdown = ({ isMobile = false }) => {
               <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
                 {currentUser.avatar_url ? (
                   <img
-                    src={toCdnUrl(currentUser.avatar_url)}
+                    src={publicImageUrl(currentUser.avatar_url)}
                     alt={displayName}
                     className="h-full w-full object-cover"
                   />
@@ -62,7 +62,7 @@ const VaultDropdown = ({ isMobile = false }) => {
           >
             {currentUser.avatar_url ? (
               <img
-                src={toCdnUrl(currentUser.avatar_url)}
+                src={publicImageUrl(currentUser.avatar_url)}
                 alt={displayName}
                 className="h-full w-full rounded-full object-cover"
               />

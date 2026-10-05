@@ -17,6 +17,7 @@ import { VerificationBadge } from '@/components/VerificationBadge.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import { toast } from 'sonner';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 
 const VaultProfilePage = () => {
   const { currentUser, isVerified } = useAuth();
@@ -58,8 +59,8 @@ const VaultProfilePage = () => {
           bio: record.bio || '',
           location: record.location_suburb || '',
         });
-        if (record.avatar_url) {
-          const avatarUrl = publicImageUrl(record.avatar_url);
+        if (profilePhotoUrl(record)) {
+          const avatarUrl = profilePhotoUrl(record);
           setAvatarPreview(avatarUrl);
         }
 
@@ -122,7 +123,8 @@ const VaultProfilePage = () => {
           .from('vault-images')
           .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
-        updatePayload.avatar_url = filePath;
+        const { data: urlData } = supabase.storage.from('vault-images').getPublicUrl(filePath);
+        Object.assign(updatePayload, profilePhotoColumns(urlData.publicUrl));
       }
 
       const { data: updatedRecord, error: updateError } = await supabase
@@ -152,8 +154,8 @@ const VaultProfilePage = () => {
       location: profile?.location_suburb || '',
     });
     setAvatarFile(null);
-    if (profile?.avatar_url) {
-      const avatarUrl = publicImageUrl(profile.avatar_url);
+    if (profilePhotoUrl(profile)) {
+      const avatarUrl = profilePhotoUrl(profile);
       setAvatarPreview(avatarUrl);
     } else {
       setAvatarPreview(null);

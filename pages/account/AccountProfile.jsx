@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Upload, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -109,7 +110,7 @@ const AccountProfile = () => {
         personal_collection: formData.personal_collection,
         location_state: formData.location_state,
         location_suburb: formData.location_suburb,
-        avatar_url,
+        ...profilePhotoColumns(avatar_url),
         social_links: {
           twitter: formData.social_twitter,
           instagram: formData.social_instagram,
@@ -132,7 +133,7 @@ const AccountProfile = () => {
     }
   };
 
-  const currentPhotoUrl = currentUser?.avatar_url ?? null;
+  const currentPhotoUrl = profilePhotoUrl(currentUser);
   const isUserVerified = isVerified(currentUser?.is_verified) || currentUser?.verified;
 
   return (
