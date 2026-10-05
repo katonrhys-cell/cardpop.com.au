@@ -1,5 +1,5 @@
 import { isGtin } from './productReviews.js';
-import { cardMpn } from './productIdentifiers.js';
+import { cardIdentifiersLd, cardMpn, shopProductIdentifiersLd } from './productIdentifiers.js';
 
 export const generateMetaTitle = (category, subcategory = null, productType = null, itemName = null) => {
   const baseName = "CardPop";
@@ -42,7 +42,8 @@ export const generateStructuredData = (product, categoryPath = null) => {
     "name": product.title || product.cardName || product.name,
     "image": product.images ? product.images.map(i => i.url) : [],
     "description": product.description || `Buy ${product.title || product.cardName} securely.`,
-    "sku": product.sku || product.id,
+    // brand / sku / mpn / gtin — utils/productIdentifiers.js.
+    ...shopProductIdentifiersLd({ brand: product.brand, sku: product.sku || product.id, barcode: product.barcode || product.gtin }),
     "offers": {
       "@type": "Offer",
       "url": typeof window !== 'undefined' ? window.location.href : '',
@@ -183,7 +184,7 @@ export const generateProductSchema = ({
   // Google only accepts a real GTIN (8/12/13/14 digits) under `gtin`; a
   // set + card number is the card's manufacturer part number instead.
   const gtin = isGtin(identifier) ? String(identifier).trim() : undefined;
-  const mpn = cardMpn({ setName, cardNumber }) || (identifier && !gtin ? String(identifier) : undefined);
+  const mpn = cardMpn({ setName, cardNumber }) || (identifier && !gtin ? String(identifier).trim() : undefined);
 
   const data = {
     '@context': 'https://schema.org',
@@ -192,7 +193,7 @@ export const generateProductSchema = ({
     ...(images.length ? { image: images } : {}),
     ...(description ? { description } : {}),
     ...(category ? { category } : {}),
-    ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
+    ...cardIdentifiersLd({ brand, setName, cardNumber }),
     ...(gtin ? { gtin } : {}),
     ...(mpn ? { mpn } : {}),
     ...(sku ? { sku } : {}),

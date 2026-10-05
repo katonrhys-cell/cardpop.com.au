@@ -173,6 +173,16 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('"sku":"4/102"');
   });
 
+  it('falls back to the vault item\'s franchise or category row for the brand', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'lebron', price_aud: 250, status: 'active',
+      vault_item: { card_name: 'LeBron James', collection: '', franchise: { name: 'NBA Basketball' }, category: { name: 'Sports' } },
+      seller: { username: 'kat' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/lebron');
+    expect(body).toContain('"brand":{"@type":"Brand","name":"NBA"}');
+  });
+
   it('never invents an identifier for a card with no franchise or number', async () => {
     state.result = { data: {
       id: UUID, slug: 'mystery', price_aud: 20, status: 'active',

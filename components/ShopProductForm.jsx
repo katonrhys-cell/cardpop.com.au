@@ -738,7 +738,13 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 <Label htmlFor="shop-product-brand" className="text-xs">Brand (maker)</Label>
                 <Input id="shop-product-brand" placeholder="e.g. Palms Off Gaming — blank for a CardPop house product" value={formData.brand}
                   onChange={(e) => handleInputChange('brand', e.target.value)} className="bg-background" />
-                <p className="text-[11px] text-muted-foreground">Google needs a brand plus the SKU or barcode on every product page — blank is treated as CardPop.</p>
+                {!formData.brand.trim() && formData.sku.trim() && !/^CP-/i.test(formData.sku.trim()) ? (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    This SKU doesn't look like a CardPop house SKU (CP-…). Without a brand Google will list it as a CardPop product — set the maker's name.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Google needs a brand plus the SKU or barcode on every product page — blank is treated as CardPop.</p>
+                )}
               </div>
             </div>
           </div>

@@ -104,9 +104,21 @@ tracking must be off, or every navigation counts twice:
   they get `brand` (the franchise, normalised: `pokemon` → Pokémon,
   `Basketball (NBA)` → NBA…) and `mpn` = set + card number. A card with no
   known franchise or number gets nothing rather than an invented value.
+  A card saved without a collection falls back to its vault item's franchise /
+  category rows (both FKs into `categories`) in the prerender.
   Google's Rich Results Test on a product URL should show no "Missing field"
   warning for brand/gtin/mpn; the Search Console issue clears after the
   affected URLs are re-crawled (use *Validate fix* on the report).
+  **Keeping it fixed**: `tests/backend/productMarkupIdentifiers.test.js`
+  fails CI when a Product node is written anywhere without spreading one of
+  the helpers into it (a new product surface can't ship identifier-less);
+  `npm run check:merchant-listings` (`scripts/check-merchant-listings.mjs`)
+  fetches a sitemap sample the way Googlebot does and reports every Product
+  with no brand/gtin/mpn or a malformed gtin — it runs weekly from
+  `.github/workflows/merchant-listings-check.yml`, which files one tracking
+  issue on failure, and is the first thing to run after a Search Console
+  email about Merchant listings. Admin → Products warns when a non-`CP-` SKU
+  is saved with the Brand blank.
 - **Prerendering for bots**: `api/prerender.js` serves real per-route HTML
   meta to crawlers (see `docs/` and `tests/backend/prerender.test.js`).
 - **Sitemap**: generated live at `https://cardpop.com.au/sitemap.xml`

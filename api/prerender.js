@@ -19,7 +19,7 @@ import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopRet
 import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerProtectionPolicy.js';
 import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
-import { shopProductIdentifiersLd, cardIdentifiersLd } from '../utils/productIdentifiers.js';
+import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -318,7 +318,7 @@ async function renderDealer(supabase, param) {
 
   const { data: listings } = await supabase
     .from('listings')
-    .select('id, slug, price_aud, vault_item:vault_items(card_name, collection, set_name, card_number, condition, card_image, vault_images(storage_path))')
+    .select('id, slug, price_aud, vault_item:vault_items(card_name, collection, set_name, card_number, condition, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name))')
     .eq('seller_id', dealer.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -380,7 +380,7 @@ async function renderDealer(supabase, param) {
       url,
       ...(img ? { image: img } : {}),
       // Merchant listings want a global identifier: brand + set/card number.
-      ...cardIdentifiersLd({ brand: l.vault_item?.collection, setName: l.vault_item?.set_name, cardNumber: l.vault_item?.card_number }),
+      ...cardIdentifiersLd({ brand: cardBrandName(l.vault_item?.collection, l.vault_item?.franchise?.name, l.vault_item?.category?.name), setName: l.vault_item?.set_name, cardNumber: l.vault_item?.card_number }),
       offers: {
         '@type': 'Offer',
         price: Number(l.price_aud).toFixed(2),
@@ -547,7 +547,7 @@ async function renderListing(supabase, id, slugParam) {
   // fails the whole query, which used to 404 every listing for crawlers.
   const { data: listing, error: listingErr } = await supabase
     .from('listings')
-    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
   if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
@@ -593,8 +593,10 @@ async function renderListing(supabase, id, slugParam) {
     ...(card.set_name ? { category: card.set_name } : {}),
     // Google's Merchant listings report flags a Product with no gtin/mpn/brand;
     // a single card has no GTIN, so brand (the franchise) + mpn (set and
-    // card number) is its identifier pair — utils/productIdentifiers.js.
-    ...cardIdentifiersLd({ brand: card.collection, setName: card.set_name, cardNumber: card.card_number }),
+    // card number) is its identifier pair — utils/productIdentifiers.js. The
+    // free-text collection wins; the vault item's franchise / category rows
+    // (both FKs into `categories`) cover a card saved without one.
+    ...cardIdentifiersLd({ brand: cardBrandName(card.collection, card.franchise?.name, card.category?.name), setName: card.set_name, cardNumber: card.card_number }),
     ...(grade ? { additionalProperty: [{ '@type': 'PropertyValue', name: 'Grade', value: `${gradingCompany || ''} ${grade}`.trim() }] } : {}),
     ...(price > 0
       ? { offers: {
