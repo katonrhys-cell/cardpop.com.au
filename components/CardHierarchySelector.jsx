@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Check, ChevronDown, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import {
-  Select, SelectContent, SelectGroup, SelectItem,
-  SelectLabel, SelectSeparator, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/ui/command';
 import { useCategories } from '@/hooks/useCategories.js';
 
 /**
@@ -52,6 +56,7 @@ const CardHierarchySelector = ({
   const [loadingManufacturers, setLoadingManufacturers] = useState(false);
   const [loadingTeams, setLoadingTeams]           = useState(false);
   const [loadingSets, setLoadingSets]             = useState(false);
+  const [setOpen, setSetOpen]                     = useState(false);
 
   // Load root categories once on mount
   useEffect(() => {
@@ -160,6 +165,12 @@ const CardHierarchySelector = ({
   }, {});
   const seriesGroups = Object.entries(groupedSets).sort(([a], [b]) => a.localeCompare(b));
   const hasSets = sets.length > 0;
+  const selectedSet = sets.find(s => s.id === setId);
+
+  const pickSet = (id) => {
+    handleSetChange(id);
+    setSetOpen(false);
+  };
 
   if (loadingRoots) {
     return (
@@ -271,23 +282,53 @@ const CardHierarchySelector = ({
               <Loader2 className="w-4 h-4 animate-spin" /> Loading sets…
             </div>
           ) : (
-            <Select value={setId || ''} onValueChange={handleSetChange}>
-              <SelectTrigger className="h-11 bg-background">
-                <SelectValue placeholder="Select set…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">— Not specified —</SelectItem>
-                {seriesGroups.map(([series, items], gi) => (
-                  <SelectGroup key={series}>
-                    {gi > 0 && <SelectSeparator />}
-                    <SelectLabel>{series}</SelectLabel>
-                    {items.map(s => (
-                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+            <Popover open={setOpen} onOpenChange={setSetOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={setOpen}
+                  className="h-11 w-full justify-between bg-background px-3 font-normal"
+                >
+                  <span className={`truncate ${selectedSet ? '' : 'text-muted-foreground'}`}>
+                    {selectedSet ? selectedSet.name : 'Select set…'}
+                  </span>
+                  <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+              >
+                <Command>
+                  <CommandInput placeholder="Search sets…" />
+                  <CommandList>
+                    <CommandEmpty>No sets found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem value="__none__" keywords={['not specified', 'none']} onSelect={() => pickSet('__none__')}>
+                        — Not specified —
+                      </CommandItem>
+                    </CommandGroup>
+                    {seriesGroups.map(([series, items]) => (
+                      <CommandGroup key={series} heading={series}>
+                        {items.map(s => (
+                          <CommandItem
+                            key={s.id}
+                            value={s.id}
+                            keywords={[s.name, series]}
+                            onSelect={() => pickSet(s.id)}
+                          >
+                            <span className="flex-1">{s.name}</span>
+                            {s.id === setId && <Check className="h-4 w-4" />}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
                     ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
       )}
