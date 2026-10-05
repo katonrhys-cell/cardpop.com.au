@@ -14,6 +14,7 @@ Vercel Cron. `vercel.json` has no `crons` block.
 | Delivery sweep | `/api/orders/delivery-sweep` | `37 20 * * *` | 06:37 AEST daily | `cron-delivery-sweep.yml` |
 | Retention sweep | `/api/retention/sweep` | `47 21 * * *` | 07:47 AEST daily | `cron-retention-sweep.yml` |
 | Site traffic sync (GA4 visitors) | `/api/site-traffic/sync` | `23 19 * * *` | 05:23 AEST daily | `cron-site-traffic.yml` |
+| Merchant listings check (live Product markup has brand/gtin/mpn) | *(none — fetches public pages, `scripts/check-merchant-listings.mjs`)* | `33 20 * * 1` | 06:33 AEST Tuesday weekly | `merchant-listings-check.yml` (files a tracking issue on failure, like `migration-drift.yml`) |
 
 Each caller workflow is a dozen lines that delegate to the reusable runner
 `.github/workflows/cron-job.yml`, which makes one authenticated `GET` and fails

@@ -161,6 +161,40 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('Grade: PSA 9');
   });
 
+  it('gives the card a brand and MPN so Merchant listings has a global identifier', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'charizard-base-set', price_aud: 1499.95, status: 'active',
+      vault_item: { card_name: 'Charizard', collection: 'pokemon', set_name: 'Base Set', card_number: '4/102', year: 1999 },
+      seller: { username: 'ash' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/charizard-base-set');
+    expect(body).toContain('"brand":{"@type":"Brand","name":"Pokémon"}');
+    expect(body).toContain('"mpn":"Base Set 4/102"');
+    expect(body).toContain('"sku":"4/102"');
+  });
+
+  it('falls back to the vault item\'s franchise or category row for the brand', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'lebron', price_aud: 250, status: 'active',
+      vault_item: { card_name: 'LeBron James', collection: '', franchise: { name: 'NBA Basketball' }, category: { name: 'Sports' } },
+      seller: { username: 'kat' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/lebron');
+    expect(body).toContain('"brand":{"@type":"Brand","name":"NBA"}');
+  });
+
+  it('never invents an identifier for a card with no franchise or number', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'mystery', price_aud: 20, status: 'active',
+      vault_item: { card_name: 'Mystery Card' },
+      seller: { username: 'ash' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/mystery');
+    expect(body).toContain('"@type":"Product"');
+    expect(body).not.toContain('"brand"');
+    expect(body).not.toContain('"mpn"');
+  });
+
   it('renders a sold listing as a real page marked SoldOut', async () => {
     // A sold card stays on the site — visible, marked Sold, not purchasable —
     // so its page has genuine content and must not be a 404 (or a soft 404).
@@ -236,6 +270,29 @@ describe('prerender shop products', () => {
     expect(body).toContain('schema.org/InStock');
     // canonical uses the slugified title, not the URL slug param
     expect(body).toContain('/product/shop/' + UUID + '/pokemon-scarlet-violet-booster-box');
+  });
+
+  it('emits brand, sku, mpn and gtin so Merchant listings has a global identifier', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Zip Binder', sku: 'ZB-04-BLK', brand: 'Palms Off Gaming', barcode: '1209202001436',
+      price_aud: 30, stock_quantity: 5, product_type: 'supplies', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/zip-binder');
+    expect(body).toContain('"brand":{"@type":"Brand","name":"Palms Off Gaming"}');
+    expect(body).toContain('"sku":"ZB-04-BLK"');
+    expect(body).toContain('"mpn":"ZB-04-BLK"');
+    expect(body).toContain('"gtin":"1209202001436"');
+  });
+
+  it('brands a house product CardPop and drops a barcode that is not a GTIN', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Penny Sleeves', sku: 'CP-PENNY-SLEEVES', brand: null, barcode: 'n/a',
+      price_aud: 4, stock_quantity: 5, product_type: 'supplies', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/penny-sleeves');
+    expect(body).toContain('"brand":{"@type":"Brand","name":"CardPop"}');
+    expect(body).toContain('"mpn":"CP-PENNY-SLEEVES"');
+    expect(body).not.toContain('"gtin"');
   });
 
   it('adds aggregateRating and review JSON-LD when the product has published reviews', async () => {
@@ -869,6 +926,19 @@ describe('prerender Palms Off Gaming binders', () => {
     expect(body).toContain('"@type":"Offer"');
     expect(body).toContain('"price":"49.95"');
     expect(body).toContain('https://schema.org/InStock');
+  });
+
+  it('carries the priced colour\'s barcode as the gtin, with the SKU as mpn', async () => {
+    state.result = { data: null };
+    state.listResult = { data: [
+      { price_aud: 54.95, retail_price_aud: null, stock_quantity: 2, status: 'active', barcode: '1209202001450' },
+      { price_aud: 49.95, retail_price_aud: null, stock_quantity: 3, status: 'active', barcode: '1209202001436' },
+    ] };
+    const { body } = await run(`/shop/binders/${SLUG}`);
+    expect(body).toContain('"price":"49.95"');
+    expect(body).toContain('"gtin":"1209202001436"');
+    expect(body).toContain('"brand":{"@type":"Brand","name":"Palms Off Gaming"}');
+    expect(body).toMatch(/"mpn":"[A-Z0-9-]+"/);
   });
 
   it('marks a family of only pre-order siblings as PreOrder', async () => {

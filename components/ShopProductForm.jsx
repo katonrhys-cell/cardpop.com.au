@@ -51,6 +51,9 @@ const CUSTOM_CATEGORY = '__custom__';
 const INITIAL_STATE = {
   title: '',
   sku: '',
+  // Maker of the product (Palms Off Gaming for its lines). Blank = CardPop's
+  // own product; it is the Brand in the page's Product markup for Google.
+  brand: '',
   description: '',
   price_aud: '',
   retail_price_aud: '',
@@ -132,6 +135,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       setFormData({
         title: product.title || '',
         sku: product.sku || '',
+        brand: product.brand || '',
         description: product.description || '',
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
         retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
@@ -325,6 +329,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       const payload = {
         title: formData.title.trim(),
         sku,
+        brand: formData.brand.trim() || null,
         description: formData.description.trim() || null,
         price_aud: price,
         retail_price_aud: rrp,
@@ -728,6 +733,18 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 <Label htmlFor="shop-product-barcode" className="text-xs">Barcode (EAN)</Label>
                 <Input id="shop-product-barcode" inputMode="numeric" placeholder="Printed on the packaging" value={formData.barcode}
                   onChange={(e) => handleInputChange('barcode', e.target.value)} className="bg-background font-mono" />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="shop-product-brand" className="text-xs">Brand (maker)</Label>
+                <Input id="shop-product-brand" placeholder="e.g. Palms Off Gaming — blank for a CardPop house product" value={formData.brand}
+                  onChange={(e) => handleInputChange('brand', e.target.value)} className="bg-background" />
+                {!formData.brand.trim() && formData.sku.trim() && !/^CP-/i.test(formData.sku.trim()) ? (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    This SKU doesn't look like a CardPop house SKU (CP-…). Without a brand Google will list it as a CardPop product — set the maker's name.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Google needs a brand plus the SKU or barcode on every product page — blank is treated as CardPop.</p>
+                )}
               </div>
             </div>
           </div>

@@ -17,6 +17,7 @@ import useShopLine from '@/hooks/useShopLine.js';
 import useShopReviews from '@/hooks/useShopReviews.js';
 import ProductReviews from '@/components/shop/ProductReviews.jsx';
 import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
+import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { Badge } from '@/components/ui/badge';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
@@ -137,8 +138,9 @@ const ShopBinderProductPage = () => {
     name: product.title,
     description: product.metaDescription,
     image: images,
-    sku: product.sku,
-    brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
+    // sku/mpn (the brand's own SKU) + gtin from the shown colour's barcode —
+    // the global identifiers Google's Merchant listings report asks for.
+    ...shopProductIdentifiersLd({ sku: product.sku, barcode: row?.barcode }, { brand: 'Palms Off Gaming' }),
     category: 'Binders',
     url: canonical,
     ...productReviewsLd(reviewStats, shopReviews),

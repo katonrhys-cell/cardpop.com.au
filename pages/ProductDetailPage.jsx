@@ -42,7 +42,8 @@ import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProdu
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import useShopReviews from '@/hooks/useShopReviews.js';
 import ProductReviews from '@/components/shop/ProductReviews.jsx';
-import { isGtin, productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
+import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
+import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { listingTakesOffers, offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
 import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 import { trackViewItem } from '@/lib/analytics.js';
@@ -589,8 +590,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             '@type': 'Product',
             name: product.name,
             image: product.images,
-            sku: product.sku || product.id,
-            ...(isGtin(product.barcode) ? { gtin: String(product.barcode) } : {}),
+            // brand + sku/mpn + gtin: utils/productIdentifiers.js.
+            ...shopProductIdentifiersLd(product),
             description: product.description?.split(/\n\s*\n/)[0] || product.name,
             ...productReviewsLd(reviewStats, shopReviews),
           } : undefined}
