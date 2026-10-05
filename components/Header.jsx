@@ -255,12 +255,17 @@ const Header = () => {
             <CardPopLogo variant="full" iconClassName="w-9 h-[44px]" />
           </Link>
 
-          {/* Search — absolutely centred so it always sits at the true visual midpoint */}
-          <div className="absolute inset-x-0 hidden lg:flex justify-center pointer-events-none">
-            <div className="w-full max-w-xl pointer-events-auto px-4">
-              <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
+          {/* Search — absolutely centred so it always sits at the true visual
+              midpoint. Only mounted on lg+ (it's display:none below that, and
+              the mobile row below renders its own), so phones build one search
+              bar instead of two. */}
+          {isDesktop && (
+            <div className="absolute inset-x-0 hidden lg:flex justify-center pointer-events-none">
+              <div className="w-full max-w-xl pointer-events-auto px-4">
+                <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Spacer pushes all action icons to the right edge */}
           <div className="flex-1" />
@@ -436,9 +441,11 @@ const Header = () => {
             below lg the only way to search was to open the hamburger. Search is
             the primary discovery path for a marketplace, so surface it inline
             here on every screen under lg. */}
-        <div className="lg:hidden py-2.5 border-b border-border/40">
-          <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." className="max-w-full" />
-        </div>
+        {!isDesktop && (
+          <div className="lg:hidden py-2.5 border-b border-border/40">
+            <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." className="max-w-full" />
+          </div>
+        )}
 
         {/* ── Row 2: Nav links (desktop only) ── */}
         {isDesktop && (

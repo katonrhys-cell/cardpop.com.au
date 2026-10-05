@@ -42,3 +42,27 @@ describe('AnnouncementBar', () => {
     expect(screen.queryByTestId('announcement-bar')).not.toBeInTheDocument();
   });
 });
+
+describe('AnnouncementBar while auth is still resolving', () => {
+  // The static homepage shell already shows the bar to anonymous visitors, so
+  // React must render it on its first commit too — otherwise it pops in ~1 s
+  // later and shifts the whole page. A cached Supabase session means the
+  // visitor is (almost certainly) a member, so the bar waits for auth instead.
+  it('renders at once when no session is cached', () => {
+    auth.loading = true;
+    window.localStorage.removeItem('sb-vrfsaazuqjxotnieqlkd-auth-token');
+    renderAt('/');
+    expect(screen.getByTestId('announcement-bar')).toBeInTheDocument();
+  });
+
+  it('waits for auth when a session is cached', () => {
+    auth.loading = true;
+    window.localStorage.setItem('sb-vrfsaazuqjxotnieqlkd-auth-token', '{"access_token":"x"}');
+    try {
+      renderAt('/');
+      expect(screen.queryByTestId('announcement-bar')).not.toBeInTheDocument();
+    } finally {
+      window.localStorage.removeItem('sb-vrfsaazuqjxotnieqlkd-auth-token');
+    }
+  });
+});

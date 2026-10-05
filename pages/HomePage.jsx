@@ -4,10 +4,8 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabaseClient.js';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
-import { VAULT_ITEM_CARD_COLUMNS, VAULT_IMAGE_CARD_COLUMNS, VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
-import { cachedQuery } from '@/lib/queryCache.js';
+import { getFeaturedCards, getFeaturedSellers, getPlatformStats, getTrafficSummary } from '@/lib/homepageData.js';
+import { useMediaQuery } from '@/hooks/useMediaQuery.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
@@ -277,123 +275,35 @@ const HomePage = () => {
 
   // The animated hero showcase is hidden below lg (CSS `hidden lg:block`), so
   // only desktop viewports pay for its chunk (and framer-motion inside it).
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
-    const onChange = (e) => setIsDesktop(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  // The category browser has two layouts — a swipe strip on phones and an
+  // arrow carousel from `sm` up. Both used to be in the DOM with one hidden
+  // by CSS, so every visitor built 64 tiles (each with an SVG icon) for a row
+  // that shows 24 or 8 — a visible slice of the first-render long task on a
+  // mid-range phone. Only the layout for the current viewport is rendered.
+  const isSmUp = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchHomeData = async () => {
       try {
-        // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
+        // The queries themselves live in lib/homepageData.js, where main.jsx
+        // STARTS them before React mounts; these reads join the in-flight
+        // promise (or hit the 5-minute cache) rather than fetching again.
         const [listingsRes, sellersRes] = await Promise.all([
-          cachedQuery('homepage_featured_cards', async () => {
-            // vault_items has more than one FK to profiles, so the embed must use
-            // the explicit constraint-name hint (!vault_items_owner_id_fkey) —
-            // the bare !owner_id hint returns a PostgREST 400.
-            // The listing embed is what lets a featured card that has sold say
-            // so — the vault row keeps its "For Sale" listing_type after a sale.
-            const SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_admin, profile_photo_or_character, is_verified, seller_tier, rating, reviews_count), vault_images(${VAULT_IMAGE_CARD_COLUMNS}), ${VAULT_ITEM_LISTING_EMBED}`;
-            const LIMIT = 4;
-            // Fresh builder per call — a Supabase query builder is single-use.
-            // Backfill uses genuinely-public recent cards.
-            const publicBase = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');
-
-            // Admin-curated picks (Marketplace Management → Featured) come first.
-            // `is_featured` is admin-only, so it means "show this on the home
-            // page" — surface it regardless of the per-card is_public flag. A
-            // card can be live in the marketplace (active listing) yet have
-            // is_public = false, in which case requiring is_public here made
-            // featuring it save successfully but never appear. Still exclude
-            // Private listings. (Anon visibility is granted by the matching
-            // vault_items_public_featured_select RLS policy.)
-            const featuredRes = await supabase.from('vault_items').select(SELECT)
-              .eq('is_featured', true).neq('listing_type', 'Private')
-              .order('created_at', { ascending: false }).limit(LIMIT);
-            if (featuredRes.error) return featuredRes;
-            const featured = featuredRes.data ?? [];
-            if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
-
-            const seen = new Set(featured.map(c => c.id));
-            const merged = [...featured];
-
-            // Membership perk: Premium-and-up sellers' newest public cards
-            // fill the remaining Featured Cards slots ahead of everyone
-            // else's. The !inner join makes the owner-tier filter drop
-            // non-matching rows instead of null-ing the embed. Best-effort —
-            // any error just falls through to the generic backfill.
-            const PREMIUM_SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey!inner(id, display_name, username, avatar_url, is_admin, profile_photo_or_character, is_verified, seller_tier, rating, reviews_count, subscription_tier), vault_images(${VAULT_IMAGE_CARD_COLUMNS}), ${VAULT_ITEM_LISTING_EMBED}`;
-            const premiumRes = await supabase.from('vault_items').select(PREMIUM_SELECT)
-              .eq('is_public', true).neq('listing_type', 'Private')
-              .in('owner.subscription_tier', ['premium', 'elite', 'ultimate'])
-              .order('created_at', { ascending: false }).limit(LIMIT);
-            for (const card of premiumRes.data ?? []) {
-              if (!seen.has(card.id)) { seen.add(card.id); merged.push(card); }
-            }
-            if (merged.length >= LIMIT) return { data: merged.slice(0, LIMIT), error: null };
-
-            // Backfill with the most recent cards so the grid is never emptier
-            // than before curation existed (empty selection = previous behaviour).
-            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + merged.length);
-            if (fillRes.error) return { data: merged, error: null };
-            const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
-            return { data: [...merged, ...backfill].slice(0, LIMIT), error: null };
-          },
-            5 * 60 * 1000
-          ),
-          // Featured Sellers = admin-flagged accounts plus every Ultimate
-          // member (homepage placement is an Ultimate membership perk).
-          cachedQuery('homepage_featured_sellers', () =>
-            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS)
-              .or('is_featured_seller.eq.true,subscription_tier.eq.ultimate')
-              .eq('is_active', true)
-              .order('rating', { ascending: false, nullsFirst: false })
-              .limit(4),
-            5 * 60 * 1000
-          ),
+          getFeaturedCards(),
+          getFeaturedSellers(),
         ]);
 
-        // Real platform counts for the stats strip (cheap head-count queries,
-        // RLS-scoped so anon sees only what's public anyway). Best-effort: a
-        // failure just leaves the strip hidden.
-        cachedQuery('homepage_stats', async () => {
-          const [listings, sellers, vaultCards, events] = await Promise.all([
-            supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-            supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true),
-            supabase.from('vault_items').select('id', { count: 'exact', head: true }),
-            supabase.from('events_public').select('id', { count: 'exact', head: true }),
-          ]);
-          const error = listings.error || sellers.error || vaultCards.error || events.error;
-          if (error) return { data: null, error };
-          return {
-            data: {
-              listings: listings.count || 0,
-              sellers: sellers.count || 0,
-              vaultCards: vaultCards.count || 0,
-              events: events.count || 0,
-            },
-            error: null,
-          };
-        }, 5 * 60 * 1000)
+        // Stats strip — best-effort: a failure just leaves the strip hidden.
+        getPlatformStats()
           .then((res) => { if (isMounted && res?.data) setPlatformStats(res.data); })
           .catch(() => { /* strip stays hidden */ });
 
-        // Visitors tile: last 30 days + since launch, from the nightly GA4
-        // sync. publicTrafficStat() returns null (tile hidden) when the row is
-        // missing, stale, or the count is too small to be worth showing.
-        cachedQuery('homepage_traffic', () =>
-          supabase.from('site_traffic_summary')
-            .select('visitors_30d, visitors_all_time, since_date, synced_at')
-            .eq('id', true)
-            .maybeSingle(),
-        5 * 60 * 1000)
+        // Visitors tile. publicTrafficStat() returns null (tile hidden) when
+        // the row is missing, stale, or the count is too small to show.
+        getTrafficSummary()
           .then((res) => { if (isMounted && res?.data) setTrafficStat(publicTrafficStat(res.data)); })
           .catch(() => { /* tile stays hidden */ });
 
@@ -699,7 +609,7 @@ const HomePage = () => {
       <LiveActivityTicker framed />
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
-      <section className="py-8 md:py-10 bg-background border-b border-border">
+      <section className="cv-auto py-8 md:py-10 bg-background border-b border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {TRUST_SIGNALS.map(({ icon: Icon, title, body }) => (
@@ -727,7 +637,7 @@ const HomePage = () => {
       </section>
 
       {/* ── Category browse ───────────────────────────────────────────────── */}
-      <section className="py-10 md:py-16 bg-background">
+      <section className="cv-auto py-10 md:py-16 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex items-end justify-between mb-6 md:mb-8">
             <div>
@@ -740,6 +650,7 @@ const HomePage = () => {
           </div>
 
           {/* Mobile: touch swipe through all 24 */}
+          {!isSmUp && (
           <div ref={categoriesRef} className="sm:hidden flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scroll-px-4 scrollbar-hide -mx-4 px-4">
             {CATEGORIES.map((cat, i) => (
               <div
@@ -757,8 +668,10 @@ const HomePage = () => {
               </div>
             ))}
           </div>
+          )}
 
           {/* Desktop: single-row arrow carousel */}
+          {isSmUp && (
           <div className="hidden sm:flex items-center gap-3">
             <button
               onClick={goDeskPrev}
@@ -805,11 +718,12 @@ const HomePage = () => {
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
+          )}
         </div>
       </section>
 
       {/* ── Bento features ───────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-card border-y border-border relative">
+      <section className="cv-auto py-12 md:py-24 bg-card border-y border-border relative">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">Built for Serious Collectors</h2>
@@ -882,7 +796,7 @@ const HomePage = () => {
       </section>
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-background">
+      <section className="cv-auto py-12 md:py-24 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">How Buying Works</h2>
@@ -923,7 +837,7 @@ const HomePage = () => {
       </section>
 
       {/* ── Featured sellers ──────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-background border-t border-border">
+      <section className="cv-auto py-12 md:py-24 bg-background border-t border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
             <h2 className="text-3xl font-bold font-serif mb-3 md:mb-4">Trusted Australian Sellers</h2>
@@ -965,7 +879,7 @@ const HomePage = () => {
       </section>
 
       {/* ── Recently viewed (renders nothing until the visitor has viewed cards) ── */}
-      <section className="py-6 md:py-10 bg-background">
+      <section className="cv-auto py-6 md:py-10 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <RecentlyViewed />
         </div>

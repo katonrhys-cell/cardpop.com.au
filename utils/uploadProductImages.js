@@ -74,8 +74,8 @@ const extensionFor = (mime) => (/webp/i.test(mime) ? 'webp' : /png/i.test(mime) 
  * Base storage path (no extension) for a shop product image. The epoch-ms keeps
  * every upload at a fresh, immutable path so the one-year cache header is safe.
  */
-export function shopImageBasePath(now = Date.now()) {
-  return `${SHOP_IMAGE_PREFIX}/${now}-${randomSuffix()}`;
+export function shopImageBasePath(now = Date.now(), prefix = SHOP_IMAGE_PREFIX) {
+  return `${prefix}/${now}-${randomSuffix()}`;
 }
 
 /** Public URL for a path in the shop image bucket. */
@@ -120,9 +120,15 @@ async function uploadWithRetry(path, body, { attempts = UPLOAD_ATTEMPTS } = {}) 
 
 /**
  * Compress, thumbnail and upload one image File.
+ *
+ * `prefix` picks the folder inside the `media` bucket. Shop photos use the
+ * default; the homepage hero showcase (Admin → Hero Showcase) uploads under
+ * `hero-showcase` through the same pipeline so its cards — displayed at 68 px
+ * and 160 px — get the 480 px companion thumbnail instead of being served the
+ * full upload (PageSpeed's biggest "Improve image delivery" line on desktop).
  * @returns {Promise<{url: string, path: string, thumbnail: boolean}>}
  */
-export async function uploadShopImage(file) {
+export async function uploadShopImage(file, { prefix = SHOP_IMAGE_PREFIX } = {}) {
   if (!(typeof File !== 'undefined' && file instanceof File)) {
     throw new Error('Not an image file');
   }
@@ -148,7 +154,7 @@ export async function uploadShopImage(file) {
     );
   }
 
-  const base = shopImageBasePath();
+  const base = shopImageBasePath(Date.now(), prefix);
   const isWebp = /webp/i.test(full.type || '');
 
   // The `.opt.webp` marker promises a companion thumbnail exists, so earn it
