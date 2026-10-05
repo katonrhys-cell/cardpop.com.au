@@ -38,6 +38,7 @@ import { publicImageUrl } from '@/utils/imageUrl.js';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { hasStorefront } from '@/config/plans.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
+import { cardIdentifiersLd } from '@/utils/productIdentifiers.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -194,6 +195,10 @@ const SoleTraderStorePage = () => {
       name,
       url,
       ...(image ? { image } : {}),
+      // brand (franchise) + mpn (set and card number): utils/productIdentifiers.js.
+      ...cardIdentifiersLd(isMkt
+        ? { brand: item.vault_item?.collection, setName: item.vault_item?.set_name, cardNumber: item.vault_item?.card_number }
+        : { brand: item.collection, setName: item.set_name, cardNumber: item.card_number }),
       offers: {
         '@type': 'Offer',
         price: Number(price).toFixed(2),

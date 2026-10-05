@@ -13,6 +13,7 @@ import {
   fetchRelatedCards,
   formatAud,
 } from '@/lib/cardPrices.js';
+import { cardIdentifiersLd } from '@/utils/productIdentifiers.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -157,6 +158,9 @@ const CardPriceDetailPage = () => {
       name: fullName,
       description: card.blurb || description,
       category: `${categoryInfo.label} Trading Cards`,
+      url: `${SITE_ORIGIN}${pageUrl}`,
+      // brand + sku/mpn (set and card number): utils/productIdentifiers.js.
+      ...cardIdentifiersLd({ brand: categoryInfo.label, setName: card.set_name, cardNumber: card.card_number }),
       offers: {
         '@type': 'AggregateOffer',
         priceCurrency: 'AUD',

@@ -20,6 +20,7 @@ import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds }
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
+import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { toast } from 'sonner';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -251,6 +252,8 @@ const ShopCategoryPage = () => {
           name: p.title || p.name || 'Trading Card Supply',
           url,
           ...(absoluteImage(p) ? { image: absoluteImage(p) } : {}),
+          // brand + sku/mpn + gtin: utils/productIdentifiers.js.
+          ...shopProductIdentifiersLd(p),
           offers: {
             '@type': 'Offer',
             priceCurrency: 'AUD',

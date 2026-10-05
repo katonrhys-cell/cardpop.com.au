@@ -18,7 +18,7 @@ export { colourListText, sortColourNames } from '@/utils/colourSwatch.js';
 
 /** Columns a colour picker needs from each sibling. */
 export const FAMILY_SELECT_BASE =
-  'id, sku, title, slug, category, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
+  'id, sku, barcode, title, slug, category, colour, colour_hex, stock_quantity, price_aud, retail_price_aud, status, images, image_url, family_sku';
 
 /** With the pre-order estimate (shop_products.preorder_eta). */
 export const FAMILY_SELECT = `${FAMILY_SELECT_BASE}, preorder_eta`;

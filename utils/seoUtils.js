@@ -1,3 +1,6 @@
+import { isGtin } from './productReviews.js';
+import { cardMpn } from './productIdentifiers.js';
+
 export const generateMetaTitle = (category, subcategory = null, productType = null, itemName = null) => {
   const baseName = "CardPop";
   if (itemName) {
@@ -177,8 +180,10 @@ export const generateProductSchema = ({
 
   const images = (Array.isArray(image) ? image : [image]).filter(Boolean);
 
-  // Build identifier: prefer explicit identifier, fall back to card number or set+card combo
-  const gtin = identifier || (cardNumber && setName ? `${setName}-${cardNumber}` : cardNumber) || undefined;
+  // Google only accepts a real GTIN (8/12/13/14 digits) under `gtin`; a
+  // set + card number is the card's manufacturer part number instead.
+  const gtin = isGtin(identifier) ? String(identifier).trim() : undefined;
+  const mpn = cardMpn({ setName, cardNumber }) || (identifier && !gtin ? String(identifier) : undefined);
 
   const data = {
     '@context': 'https://schema.org',
@@ -189,6 +194,7 @@ export const generateProductSchema = ({
     ...(category ? { category } : {}),
     ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
     ...(gtin ? { gtin } : {}),
+    ...(mpn ? { mpn } : {}),
     ...(sku ? { sku } : {}),
   };
 

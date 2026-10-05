@@ -19,6 +19,7 @@ import { SHOP_RETURN_POLICY, shopMerchantReturnPolicyLd } from '../utils/shopRet
 import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerProtectionPolicy.js';
 import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
+import { shopProductIdentifiersLd, cardIdentifiersLd } from '../utils/productIdentifiers.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -317,7 +318,7 @@ async function renderDealer(supabase, param) {
 
   const { data: listings } = await supabase
     .from('listings')
-    .select('id, slug, price_aud, vault_item:vault_items(card_name, condition, card_image, vault_images(storage_path))')
+    .select('id, slug, price_aud, vault_item:vault_items(card_name, collection, set_name, card_number, condition, card_image, vault_images(storage_path))')
     .eq('seller_id', dealer.id)
     .eq('status', 'active')
     .order('created_at', { ascending: false })
@@ -378,6 +379,8 @@ async function renderDealer(supabase, param) {
       name: cardName,
       url,
       ...(img ? { image: img } : {}),
+      // Merchant listings want a global identifier: brand + set/card number.
+      ...cardIdentifiersLd({ brand: l.vault_item?.collection, setName: l.vault_item?.set_name, cardNumber: l.vault_item?.card_number }),
       offers: {
         '@type': 'Offer',
         price: Number(l.price_aud).toFixed(2),
@@ -544,7 +547,7 @@ async function renderListing(supabase, id, slugParam) {
   // fails the whole query, which used to 404 every listing for crawlers.
   const { data: listing, error: listingErr } = await supabase
     .from('listings')
-    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, set_name, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
   if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
@@ -588,6 +591,10 @@ async function renderListing(supabase, id, slugParam) {
     ...(image ? { image } : {}),
     description,
     ...(card.set_name ? { category: card.set_name } : {}),
+    // Google's Merchant listings report flags a Product with no gtin/mpn/brand;
+    // a single card has no GTIN, so brand (the franchise) + mpn (set and
+    // card number) is its identifier pair — utils/productIdentifiers.js.
+    ...cardIdentifiersLd({ brand: card.collection, setName: card.set_name, cardNumber: card.card_number }),
     ...(grade ? { additionalProperty: [{ '@type': 'PropertyValue', name: 'Grade', value: `${gradingCompany || ''} ${grade}`.trim() }] } : {}),
     ...(price > 0
       ? { offers: {
@@ -709,7 +716,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
 
   const { data: product } = await supabase
     .from('shop_products')
-    .select('id, title, slug, family_sku, colour, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
+    .select('id, title, slug, sku, brand, barcode, family_sku, colour, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
     .eq('id', id)
     .maybeSingle();
 
@@ -748,7 +755,9 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     ...(image ? { image } : {}),
     description: toText(description, 1000),
     ...(product.category ? { category: product.category } : {}),
-    brand: { '@type': 'Brand', name: 'CardPop' },
+    // brand (the row's, else CardPop) + sku/mpn + gtin from the barcode — the
+    // global identifiers Google's Merchant listings report asks for.
+    ...shopProductIdentifiersLd(product),
     ...(await loadShopReviewLd(supabase, { familySku: product.family_sku, productId: product.family_sku ? null : product.id })),
     ...(price > 0
       ? { offers: {
@@ -895,7 +904,7 @@ async function loadShopReviewLd(supabaseClient, { familySku, productId, slug }) 
 //
 // Returns { price, rrp, inStock, preorder, isPurchasable }.
 async function loadShopLineCommerce(supabaseClient, { slug, sku }) {
-  const COLS = 'price_aud, retail_price_aud, stock_quantity, status';
+  const COLS = 'price_aud, retail_price_aud, stock_quantity, status, barcode';
   const positive = (v) => (v != null && Number(v) > 0 ? Number(v) : null);
   let siblings = [];
   if (sku) {
@@ -917,8 +926,14 @@ async function loadShopLineCommerce(supabaseClient, { slug, sku }) {
     const priced = available.length ? available : purchasable;
     const prices = priced.map((s) => positive(s.price_aud)).filter((v) => v != null);
     const rrps = siblings.map((s) => positive(s.retail_price_aud)).filter((v) => v != null);
+    // The Offer is priced from the cheapest sibling that can be bought, so the
+    // GTIN on the page is that sibling's packaging barcode.
+    const cheapest = priced
+      .filter((s) => positive(s.price_aud) != null)
+      .sort((a, b) => positive(a.price_aud) - positive(b.price_aud))[0];
     return {
       price: prices.length ? Math.min(...prices) : null,
+      barcode: cheapest?.barcode || null,
       rrp: rrps.length ? Math.max(...rrps) : null,
       inStock: available.length > 0,
       // PreOrder only when nothing is in stock right now.
@@ -936,6 +951,7 @@ async function loadShopLineCommerce(supabaseClient, { slug, sku }) {
   const price = positive(row?.price_aud);
   return {
     price,
+    barcode: row?.barcode || null,
     rrp: positive(row?.retail_price_aud),
     inStock: row?.status === 'preorder' || (Number(row?.stock_quantity) || 0) > 0,
     preorder: row?.status === 'preorder',
@@ -958,7 +974,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
 
   const canonical = `${BASE_URL}/shop/binders/${product.slug}`;
   const images = binderImages(product);
-  const { price, rrp, inStock, preorder, isPurchasable } = await loadShopLineCommerce(
+  const { price, rrp, inStock, preorder, isPurchasable, barcode } = await loadShopLineCommerce(
     supabaseClient, { slug: product.slug, sku: product.sku },
   );
 
@@ -968,8 +984,8 @@ async function renderBinderProduct(supabaseClient, slugParam) {
     name: product.title,
     description: product.metaDescription,
     image: images,
-    sku: product.sku,
-    brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
+    // sku/mpn (the brand's own SKU) + gtin from the priced colour's barcode.
+    ...shopProductIdentifiersLd({ sku: product.sku, barcode }, { brand: 'Palms Off Gaming' }),
     category: 'Binders',
     url: canonical,
     ...(await loadShopReviewLd(supabaseClient, { familySku: product.sku, slug: product.slug })),
@@ -1072,7 +1088,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
 
   const canonical = `${BASE_URL}/shop/${category.slug}/${product.slug}`;
   const images = palmsOffImages(product);
-  const { price, rrp, inStock, preorder, isPurchasable } = await loadShopLineCommerce(
+  const { price, rrp, inStock, preorder, isPurchasable, barcode } = await loadShopLineCommerce(
     supabaseClient, { slug: product.slug, sku: product.sku },
   );
   // Product copy wins where it exists; the product type's shared copy is the
@@ -1088,8 +1104,8 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
     name: product.title,
     description,
     image: images,
-    sku: product.sku,
-    brand: { '@type': 'Brand', name: 'Palms Off Gaming' },
+    // sku/mpn (the brand's own SKU) + gtin from the priced colour's barcode.
+    ...shopProductIdentifiersLd({ sku: product.sku, barcode }, { brand: 'Palms Off Gaming' }),
     category: category.name,
     url: canonical,
     ...(await loadShopReviewLd(supabaseClient, { familySku: product.sku, slug: product.slug })),
@@ -2907,7 +2923,7 @@ async function renderPriceCard(supabase, categorySlug, cardSlug) {
       category: `${categoryLabel} Trading Cards`,
       url: `${BASE_URL}${canonicalPath}`,
       ...(publicImageUrl(card.image_url) ? { image: publicImageUrl(card.image_url) } : {}),
-      ...(card.card_number ? { sku: card.card_number, mpn: card.card_number } : {}),
+      ...cardIdentifiersLd({ brand: categoryLabel || card.category, setName: card.set_name, cardNumber: card.card_number }),
       offers: {
         '@type': 'AggregateOffer',
         priceCurrency: 'AUD',

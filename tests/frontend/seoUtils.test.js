@@ -257,6 +257,18 @@ describe('generateProductSchema', () => {
     expect(data.offers.seller.name).toBe('Ash Cards');
   });
 
+  it('files a set + card number under mpn and only a real barcode under gtin', () => {
+    const card = generateProductSchema({ name: 'Charizard', price: 10, setName: 'Base Set', cardNumber: '4/102' });
+    expect(card.mpn).toBe('Base Set 4/102');
+    expect(card.gtin).toBeUndefined();
+    const boxed = generateProductSchema({ name: 'Box', price: 10, identifier: '1209202001436' });
+    expect(boxed.gtin).toBe('1209202001436');
+    expect(boxed.mpn).toBeUndefined();
+    const other = generateProductSchema({ name: 'Box', price: 10, identifier: 'ABC-123' });
+    expect(other.gtin).toBeUndefined();
+    expect(other.mpn).toBe('ABC-123');
+  });
+
   it('returns null when there is no price (a Product needs offers for Google)', () => {
     expect(generateProductSchema({ name: 'Mystery Card' })).toBeNull();
     expect(generateProductSchema({ name: 'Mystery Card', price: 0 })).toBeNull();
