@@ -9,7 +9,7 @@ const ImageZoomModal = lazy(() => import('@/components/ImageZoomModal.jsx'));
 import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
-import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
+import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import VerifiedBadge from '@/components/VerifiedBadge.jsx';
@@ -24,7 +24,7 @@ import { useWatchlist } from '@/hooks/useWatchlist.js';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
-import CardPopLogo from '@/components/CardPopLogo.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { sellerFromProfile } from '@/lib/sellerIdentity.js';
 
 const MarketplaceListingCard = ({ listing, priority = false }) => {
@@ -264,15 +264,12 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
               to={`/seller/${sellerId}`} 
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                {sellerInfo.type === 'official' ? (
-                  <CardPopLogo variant="icon" iconClassName="w-4 h-5" />
-                ) : sellerInfo.logoUrl ? (
-                  <img src={toCdnUrl(sellerInfo.logoUrl)} alt={sellerInfo.business_name} className="w-full h-full object-cover" width="32" height="32" loading="lazy" decoding="async" />
-                ) : (
-                  (sellerObj?.display_name || sellerObj?.username || 'S')[0].toUpperCase()
-                )}
-              </div>
+              <ProfileAvatar
+                profile={sellerObj}
+                size="sm"
+                preferBusinessLogo
+                name={sellerInfo.business_name || sellerObj?.display_name || sellerObj?.username || 'S'}
+              />
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">

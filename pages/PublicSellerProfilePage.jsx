@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 
 const PublicSellerProfilePage = () => {
@@ -50,7 +50,7 @@ const PublicSellerProfilePage = () => {
         // Fetch Marketplace listings (with full vault_item and seller data)
         const { data: marketplaceData } = await supabase
           .from('listings')
-          .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
+          .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`)
           .eq('seller_id', userId)
           // Sold cards stay on the storefront, badged "Sold" — a seller's
           // sales history is part of what a buyer is judging.
@@ -62,7 +62,7 @@ const PublicSellerProfilePage = () => {
         const listedVaultIds = new Set((marketplaceData || []).map(l => l.vault_item_id).filter(Boolean));
         const { data: vaultData } = await supabase
           .from('vault_items')
-          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_admin, profile_photo_or_character, is_verified, seller_tier, rating, reviews_count)`)
           .eq('owner_id', userId)
           .eq('is_public', true)
           .neq('listing_type', 'Private')
@@ -129,9 +129,6 @@ const PublicSellerProfilePage = () => {
     );
   }
 
-  const avatarUrl = seller.profile_photo_or_character
-    ? (publicImageUrl(seller.profile_photo_or_character))
-    : null;
   const sellerVerified = seller.is_admin === true || isVerified(seller.is_verified);
 
   return (
@@ -153,15 +150,12 @@ const PublicSellerProfilePage = () => {
             
             {/* Avatar */}
             <div className="shrink-0 relative">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-[2rem] bg-muted border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={seller.display_name || seller.name} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-5xl font-bold text-muted-foreground">
-                    {(seller.display_name || seller.name || 'U').charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
+              <ProfileAvatar
+                profile={seller}
+                size="xl"
+                name={seller.display_name || seller.name}
+                className="border-4 border-card shadow-xl"
+              />
               {sellerVerified && (
                 <div className="absolute -bottom-2 -right-2 bg-[hsl(var(--verified-badge))] text-white p-2 rounded-xl shadow-lg border-2 border-card" title="Verified Collector">
                   <ShieldCheck className="w-6 h-6" />

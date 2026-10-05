@@ -12,10 +12,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Link } from 'react-router-dom';
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 
 const UserProfilePage = () => {
   const { currentUser } = useAuth();
@@ -126,9 +126,12 @@ const UserProfilePage = () => {
           .from('vault-images')
           .upload(filePath, compressed, { upsert: true, cacheControl: '31536000' });
         if (uploadError) throw uploadError;
-        updatePayload.profile_photo_or_character = filePath;
+        // Full public URL, written to both photo columns so the header, cards
+        // and seller pages all show the same picture.
+        const { data: urlData } = supabase.storage.from('vault-images').getPublicUrl(filePath);
+        Object.assign(updatePayload, profilePhotoColumns(urlData.publicUrl));
       } else if (removeAvatar) {
-        updatePayload.profile_photo_or_character = null;
+        Object.assign(updatePayload, profilePhotoColumns(null));
       }
 
       let updatedProfile;
@@ -175,9 +178,7 @@ const UserProfilePage = () => {
 
   // Generate fallback UI if public profile doesn't exist
   const isProfileEmpty = !profile && !isEditing;
-  const currentPhotoUrl = profile?.profile_photo_or_character
-    ? (publicImageUrl(profile.profile_photo_or_character))
-    : null;
+  const currentPhotoUrl = profilePhotoUrl(profile);
 
   return (
     <div className="w-full container-default py-8 md:py-16 font-sans">
@@ -223,16 +224,13 @@ const UserProfilePage = () => {
           <div className="px-6 sm:px-10 pb-10 relative">
             <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-12 mb-6">
               <div className="relative group shrink-0 flex flex-col items-center z-10">
-                <Avatar className="w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] border-4 border-card shadow-sm bg-muted text-primary">
-                  {avatarPreview ? (
-                    <AvatarImage src={avatarPreview} className="object-cover" />
-                  ) : (currentPhotoUrl && !removeAvatar) ? (
-                    <AvatarImage src={currentPhotoUrl} className="object-cover" />
-                  ) : null}
-                  <AvatarFallback className="rounded-[2rem] text-4xl font-bold bg-secondary/30">
-                    {(profile?.display_name || currentUser?.email || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <ProfileAvatar
+                  profile={profile}
+                  size="xl"
+                  src={avatarPreview ?? (removeAvatar ? null : undefined)}
+                  name={profile?.display_name || currentUser?.email || 'U'}
+                />
+
                 
                 {isEditing && (
                   <div className="absolute -bottom-3 flex gap-2">

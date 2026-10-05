@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { toast } from 'sonner';
 
 const REASON_META = {
@@ -133,11 +133,7 @@ const LeaderboardPage = () => {
                     <span className={`w-9 h-9 rounded-full border flex items-center justify-center text-sm font-extrabold tabular-nums shrink-0 ${RANK_STYLES[i] || 'bg-muted/40 text-muted-foreground border-border'}`}>
                       {i + 1}
                     </span>
-                    <div className="w-9 h-9 rounded-full bg-primary/10 overflow-hidden flex items-center justify-center font-bold text-primary shrink-0">
-                      {row.avatar_url
-                        ? <img src={toCdnUrl(row.avatar_url)} alt="" className="w-full h-full object-cover" />
-                        : (row.display_name || row.username || '?')[0].toUpperCase()}
-                    </div>
+                    <ProfileAvatar profile={row} size="sm" />
                     <p className="font-bold text-sm truncate flex-1">
                       {row.display_name || row.username || 'Collector'}
                       {isMe && <span className="ml-2 text-xs font-semibold text-primary">You</span>}

@@ -5,12 +5,11 @@ import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { fetchParticipantRoles, EVENT_ROLE_LABELS } from '@/lib/eventBoard.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { toast } from 'sonner';
 import { MessageSquare, CalendarDays, Trash2, Loader2 } from 'lucide-react';
 
@@ -137,11 +136,6 @@ const CommunityDiscussionPage = () => {
     }
   };
 
-  const resolveAvatar = (profile) => {
-    const raw = profile?.avatar_url || profile?.profile_photo_or_character;
-    return raw ? publicImageUrl(raw) : null;
-  };
-
   const authorName = (profile) => profile?.display_name || profile?.username || 'Collector';
 
   const roleBadge = (authorId) => {
@@ -197,12 +191,7 @@ const CommunityDiscussionPage = () => {
               <div key={reply.id} className="bg-card border border-border rounded-2xl p-5">
                 <div className="flex items-center justify-between gap-3 mb-2">
                   <div className="flex items-center gap-2 flex-wrap text-sm">
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={resolveAvatar(reply.profiles)} />
-                      <AvatarFallback className="text-[10px]">
-                        {authorName(reply.profiles).charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <ProfileAvatar profile={reply.profiles} size="xs" name={authorName(reply.profiles)} />
                     <span className="font-bold">{authorName(reply.profiles)}</span>
                     {roleBadge(reply.author_id)}
                     <span className="text-xs text-muted-foreground">· {timeAgo(reply.created_at)}</span>

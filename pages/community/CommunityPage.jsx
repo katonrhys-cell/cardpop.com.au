@@ -11,7 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 
 const TOTAL_SLIDES = 3;
 
@@ -350,16 +350,10 @@ const CommunityPage = () => {
             ) : profiles.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {profiles.map(profile => {
-                  const avatarUrl = profile.avatar_url || profile.profile_photo_or_character || null;
                   return (
                     <div key={profile.id} className="bg-card border border-border p-5 rounded-2xl flex flex-col gap-3">
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-12 w-12 flex-shrink-0">
-                          <AvatarImage src={avatarUrl} className="object-cover" />
-                          <AvatarFallback>
-                            {(profile.display_name || 'C').charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ProfileAvatar profile={profile} size="md" name={profile.display_name || 'C'} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold truncate">{profile.display_name || 'Collector'}</span>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Send, MessageSquare, AlertCircle, Shield, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -80,13 +81,13 @@ const MessagingPage = () => {
           if (uniqueIds.length > 0) {
             const { data: profiles } = await supabase
               .from('profiles')
-              .select('id, display_name, avatar_url')
+              .select('id, display_name, avatar_url, profile_photo_or_character')
               .in('id', uniqueIds);
 
             (profiles || []).forEach(u => {
               if (convMap.has(u.id)) {
                 convMap.get(u.id).otherUserName = u.display_name || 'Anonymous';
-                convMap.get(u.id).avatar = u.avatar_url || null;
+                convMap.get(u.id).avatar = u.avatar_url || u.profile_photo_or_character || null;
               }
             });
           }
@@ -126,14 +127,14 @@ const MessagingPage = () => {
     (async () => {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('id, display_name, avatar_url')
+        .select('id, display_name, avatar_url, profile_photo_or_character')
         .eq('id', recipientId)
         .maybeSingle();
       if (cancelled || !profile) return;
       setConversations(prev => prev.some(c => c.otherUserId === recipientId) ? prev : [{
         otherUserId: profile.id,
         otherUserName: profile.display_name || 'Anonymous',
-        avatar: profile.avatar_url || null,
+        avatar: profile.avatar_url || profile.profile_photo_or_character || null,
         lastMessage: '',
         timestamp: new Date().toISOString(),
         unreadCount: 0,
@@ -177,11 +178,11 @@ const MessagingPage = () => {
     });
     // First message from someone new — fetch just their profile for the label.
     if (isNewConversation) {
-      supabase.from('profiles').select('id, display_name, avatar_url').eq('id', otherId).single()
+      supabase.from('profiles').select('id, display_name, avatar_url, profile_photo_or_character').eq('id', otherId).single()
         .then(({ data }) => {
           if (data && isMounted.current) {
             setConversations(prev => prev.map(c => c.otherUserId === otherId
-              ? { ...c, otherUserName: data.display_name || 'Anonymous', avatar: data.avatar_url || null }
+              ? { ...c, otherUserName: data.display_name || 'Anonymous', avatar: data.avatar_url || data.profile_photo_or_character || null }
               : c));
           }
         }, () => {});
@@ -267,13 +268,13 @@ const MessagingPage = () => {
       if (uniqueIds.length > 0) {
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, display_name, avatar_url')
+          .select('id, display_name, avatar_url, profile_photo_or_character')
           .in('id', uniqueIds);
 
         (profiles || []).forEach(u => {
           if (convMap.has(u.id)) {
             convMap.get(u.id).otherUserName = u.display_name || 'Anonymous';
-            convMap.get(u.id).avatar = u.avatar_url || null;
+            convMap.get(u.id).avatar = u.avatar_url || u.profile_photo_or_character || null;
           }
         });
       }
@@ -424,13 +425,7 @@ const MessagingPage = () => {
                       selectedUserId === conv.otherUserId ? 'bg-primary/5 border-l-4 border-primary' : 'hover:bg-muted/50 border-l-4 border-transparent'
                     }`}
                   >
-                    <div className="w-12 h-12 bg-secondary rounded-2xl flex items-center justify-center shrink-0 border border-border text-primary font-bold overflow-hidden">
-                      {conv.avatar ? (
-                        <img src={conv.avatar} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                         conv.otherUserName?.charAt(0).toUpperCase() || 'U'
-                      )}
-                    </div>
+                    <ProfileAvatar size="md" src={conv.avatar} name={conv.otherUserName || 'U'} />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-baseline mb-1">
                         <p className={`font-bold truncate ${selectedUserId === conv.otherUserId ? 'text-primary' : 'text-foreground'}`}>
@@ -462,13 +457,7 @@ const MessagingPage = () => {
                 <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSelectedUserId(null)}>
                   <AlertCircle className="w-5 h-5 rotate-90" />
                 </Button>
-                <div className="w-10 h-10 bg-secondary rounded-xl flex items-center justify-center text-primary font-bold overflow-hidden border border-border">
-                  {activeUser?.avatar ? (
-                    <img src={activeUser.avatar} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    activeUser?.otherUserName?.charAt(0).toUpperCase() || 'U'
-                  )}
-                </div>
+                <ProfileAvatar size="sm" src={activeUser?.avatar} name={activeUser?.otherUserName || 'U'} />
                 <div>
                   <h2 className="font-bold text-foreground">{activeUser?.otherUserName || 'Loading...'}</h2>
                 </div>

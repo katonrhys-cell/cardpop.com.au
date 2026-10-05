@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Star, ShieldCheck, RefreshCw } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { isVerified } from '@/utils/verification.js';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -33,11 +33,7 @@ const ReviewCard = ({ review }) => {
     <div className="bg-card border border-border rounded-2xl p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary shrink-0 overflow-hidden">
-            {author?.avatar_url
-              ? <img src={toCdnUrl(author.avatar_url)} alt={author.display_name} className="w-full h-full object-cover" />
-              : (author?.display_name || author?.username || '?')[0].toUpperCase()}
-          </div>
+          <ProfileAvatar profile={author} size="sm" name={author?.display_name || author?.username || '?'} />
           <div>
             <div className="flex items-center gap-1.5">
               <p className="font-bold text-sm">{author?.display_name || author?.username || 'Anonymous'}</p>

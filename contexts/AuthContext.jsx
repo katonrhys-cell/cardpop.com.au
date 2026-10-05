@@ -462,7 +462,16 @@ export const AuthProvider = ({ children }) => {
   // user/profile (e.g. loading/mfaRequired toggles). Consumers that key effects
   // on currentUser would otherwise re-fire on every AuthProvider render.
   const mergedUser = useMemo(
-    () => (currentUser ? { ...currentUser, ...profile, id: currentUser.id } : null),
+    () => {
+      if (!currentUser) return null;
+      const merged = { ...currentUser, ...profile, id: currentUser.id };
+      // A photo may sit in either column depending on which form saved it
+      // (see utils/profileAvatar.js); expose one `avatar_url` to every consumer.
+      if (!merged.avatar_url && merged.profile_photo_or_character) {
+        merged.avatar_url = merged.profile_photo_or_character;
+      }
+      return merged;
+    },
     [currentUser, profile],
   );
 

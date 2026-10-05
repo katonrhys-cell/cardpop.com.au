@@ -3,11 +3,10 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { fetchParticipantRoles, EVENT_ROLE_LABELS } from '@/lib/eventBoard.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { MessageSquare, Plus, Pin } from 'lucide-react';
 
 const timeAgo = (iso) => {
@@ -65,11 +64,6 @@ const EventDiscussion = ({ event }) => {
   }, [eventId, isAuthenticated]);
 
   useEffect(() => { load(); }, [load]);
-
-  const resolveAvatar = (profile) => {
-    const raw = profile?.avatar_url || profile?.profile_photo_or_character;
-    return raw ? publicImageUrl(raw) : null;
-  };
 
   return (
     <section className="mt-10">
@@ -138,12 +132,7 @@ const EventDiscussion = ({ event }) => {
                   <span className="flex items-center gap-1.5 ml-auto">
                     {profile && (
                       <>
-                        <Avatar className="h-4 w-4">
-                          <AvatarImage src={resolveAvatar(profile)} />
-                          <AvatarFallback className="text-[9px]">
-                            {(profile.display_name || 'C').charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ProfileAvatar profile={profile} size="xs" name={profile.display_name || 'C'} />
                         <span className="font-medium">{profile.display_name || profile.username || 'Collector'}</span>
                         {role && (
                           <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-wide">

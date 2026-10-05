@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, Check, CalendarDays, Tv2 } from 'lucide-react';
+import { LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, Check, CalendarDays, Tv2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 
 const VaultDropdown = ({ isMobile = false }) => {
   const { currentUser, logout, isVerified, isAdmin } = useAuth();
@@ -38,17 +38,7 @@ const VaultDropdown = ({ isMobile = false }) => {
             className="w-full justify-start h-14 px-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50"
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
-                {currentUser.avatar_url ? (
-                  <img
-                    src={toCdnUrl(currentUser.avatar_url)}
-                    alt={displayName}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <User className="h-4 w-4 text-primary" />
-                )}
-              </div>
+              <ProfileAvatar profile={currentUser} size="sm" name={displayName} />
               <div className="flex flex-col items-start overflow-hidden flex-1">
                 <span className="text-sm font-bold truncate w-full text-left">{displayName}</span>
                 <span className="text-xs text-muted-foreground truncate w-full text-left">View Profile Options</span>
@@ -60,15 +50,7 @@ const VaultDropdown = ({ isMobile = false }) => {
             variant="ghost"
             className="relative h-10 w-10 rounded-full border border-border/50 bg-background/50 hover:bg-accent"
           >
-            {currentUser.avatar_url ? (
-              <img
-                src={toCdnUrl(currentUser.avatar_url)}
-                alt={displayName}
-                className="h-full w-full rounded-full object-cover"
-              />
-            ) : (
-              <User className="h-5 w-5 text-foreground" />
-            )}
+            <ProfileAvatar profile={currentUser} size="sm" name={displayName} />
             {isVerified && (
               // Sits on the avatar's rim at the bottom-right (the 45° point of a
               // 40px circle is ~6px in from the box corner), not at the corner
