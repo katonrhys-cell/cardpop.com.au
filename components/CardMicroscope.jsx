@@ -1,39 +1,35 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ZoomIn, ZoomOut, RotateCcw, Move, Eye } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Search } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 
-const PRESET_ZONES = {
-  center: { x: 50, y: 50, zoom: 2, label: 'Center' },
-  topLeft: { x: 25, y: 25, zoom: 3, label: 'Top Left' },
-  topRight: { x: 75, y: 25, zoom: 3, label: 'Top Right' },
-  bottomLeft: { x: 25, y: 75, zoom: 3, label: 'Bottom Left' },
-  bottomRight: { x: 75, y: 75, zoom: 3, label: 'Bottom Right' },
-  topEdge: { x: 50, y: 15, zoom: 2.5, label: 'Top Edge' },
-  bottomEdge: { x: 50, y: 85, zoom: 2.5, label: 'Bottom Edge' },
-  leftEdge: { x: 15, y: 50, zoom: 2.5, label: 'Left Edge' },
-  rightEdge: { x: 85, y: 50, zoom: 2.5, label: 'Right Edge' },
-};
+const MIN_ZOOM = 2;
+const MAX_ZOOM = 8;
+const DEFAULT_ZOOM = 3;
+const ZOOM_STEP = 0.5;
 
+// Lens diameter: bigger on desktop, smaller on phones so it doesn't swallow the card.
+const lensSizeFor = () =>
+  typeof window !== 'undefined' && window.innerWidth < 640 ? 150 : 200;
+
+/**
+ * Magnifier-style card inspector. The whole card is shown fit-to-screen and a
+ * round lens follows the cursor (hover) or finger (touch-drag), showing that
+ * spot magnified. No panning or preset zones needed — just move over the area
+ * you want to look at.
+ */
 const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
-  const [scale, setScale] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-  const containerRef = useRef(null);
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [lens, setLens] = useState(null); // { x, y, w, h, touch } — x/y relative to the image
+  const [lensSize, setLensSize] = useState(lensSizeFor);
   const imageRef = useRef(null);
 
-  const MIN_SCALE = 1;
-  const MAX_SCALE = 5;
-
-  // Reset to the full-card (fit) view each time the microscope opens.
   useEffect(() => {
     if (isOpen) {
-      setScale(1);
-      setPanX(0);
-      setPanY(0);
+      setZoom(DEFAULT_ZOOM);
+      setLens(null);
+      setLensSize(lensSizeFor());
     }
   }, [isOpen]);
 
@@ -42,15 +38,8 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
 
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') onClose();
-      if (e.key === '=' || e.key === '+') handleZoom(0.5);
-      if (e.key === '-') handleZoom(-0.5);
-      if (e.key === 'r' || e.key === 'R') resetView();
-
-      const panStep = 30;
-      if (e.key === 'ArrowUp') setPanY(prev => prev + panStep);
-      if (e.key === 'ArrowDown') setPanY(prev => prev - panStep);
-      if (e.key === 'ArrowLeft') setPanX(prev => prev + panStep);
-      if (e.key === 'ArrowRight') setPanX(prev => prev - panStep);
+      if (e.key === '=' || e.key === '+') setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP));
+      if (e.key === '-') setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP));
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -62,58 +51,60 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
     };
   }, [isOpen, onClose]);
 
-  const handleZoom = (delta) => {
-    setScale(prev => Math.min(Math.max(prev + delta, MIN_SCALE), MAX_SCALE));
+  const updateLens = useCallback((e) => {
+    const img = imageRef.current;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const inside = x >= 0 && y >= 0 && x <= rect.width && y <= rect.height;
+    if (!inside && e.pointerType !== 'touch') {
+      setLens(null);
+      return;
+    }
+    setLens({
+      x: Math.max(0, Math.min(rect.width, x)),
+      y: Math.max(0, Math.min(rect.height, y)),
+      w: rect.width,
+      h: rect.height,
+      touch: e.pointerType === 'touch',
+    });
+  }, []);
+
+  const handlePointerDown = (e) => {
+    // Keep receiving moves while the finger slides off the image.
+    if (e.pointerType === 'touch') e.currentTarget.setPointerCapture?.(e.pointerId);
+    updateLens(e);
   };
 
-  const handleWheel = (e) => {
-    e.preventDefault();
-    const delta = e.deltaY * -0.001;
-    handleZoom(delta);
+  const handlePointerLeave = (e) => {
+    if (e.pointerType !== 'touch') setLens(null);
   };
 
-  const handleMouseDown = (e) => {
-    if (scale <= 1) return;
-    setIsDragging(true);
-    setDragStart({ x: e.clientX - panX, y: e.clientY - panY });
-  };
-
-  const handleMouseMove = (e) => {
-    if (!isDragging || !containerRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const maxPan = (scale - 1) * (rect.width / 2);
-
-    let newPanX = e.clientX - dragStart.x;
-    let newPanY = e.clientY - dragStart.y;
-
-    newPanX = Math.max(-maxPan, Math.min(maxPan, newPanX));
-    newPanY = Math.max(-maxPan, Math.min(maxPan, newPanY));
-
-    setPanX(newPanX);
-    setPanY(newPanY);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const resetView = () => {
-    setScale(1);
-    setPanX(0);
-    setPanY(0);
-  };
-
-  const focusOnZone = (zone) => {
-    const containerWidth = containerRef.current?.clientWidth || 800;
-    const containerHeight = containerRef.current?.clientHeight || 600;
-
-    setScale(zone.zoom);
-    setPanX(-((zone.x / 100) * containerWidth - containerWidth / 2));
-    setPanY(-((zone.y / 100) * containerHeight - containerHeight / 2));
+  // Fingers cover the area being inspected, so on touch the lens floats above them.
+  const lensStyle = () => {
+    if (!lens) return null;
+    const r = lensSize / 2;
+    const imgRect = imageRef.current?.getBoundingClientRect();
+    if (!imgRect) return null;
+    const lift = lens.touch ? r + 32 : 0;
+    const cx = imgRect.left + lens.x;
+    const cy = imgRect.top + lens.y - lift;
+    return {
+      width: lensSize,
+      height: lensSize,
+      left: cx - r,
+      top: cy - r,
+      backgroundImage: `url("${imageUrl}")`,
+      backgroundRepeat: 'no-repeat',
+      backgroundSize: `${lens.w * zoom}px ${lens.h * zoom}px`,
+      backgroundPosition: `${r - lens.x * zoom}px ${r - lens.y * zoom}px`,
+    };
   };
 
   if (typeof document === 'undefined') return null;
+
+  const style = lensStyle();
 
   return createPortal(
     <AnimatePresence>
@@ -124,152 +115,93 @@ const CardMicroscope = ({ isOpen, onClose, imageUrl, altText }) => {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className="fixed inset-0 z-[100] bg-black/95 flex flex-col items-center justify-center"
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
         >
           {/* Top Bar */}
-          <div className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent">
+          <div className="absolute top-0 left-0 right-0 p-4 sm:p-6 flex justify-between items-center z-20 bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
             <div className="text-white/80 font-medium text-sm bg-black/40 px-3 py-1.5 rounded-full backdrop-blur-sm">
-              {Math.round(scale * 100)}%
+              {zoom.toFixed(1).replace(/\.0$/, '')}x
             </div>
             <button
               onClick={onClose}
-              className="p-2 text-white/70 hover:text-white bg-black/40 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm"
-              aria-label="Close microscope"
+              className="pointer-events-auto p-2 text-white/70 hover:text-white bg-black/40 hover:bg-white/20 rounded-full transition-all backdrop-blur-sm"
+              aria-label="Close magnifier"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
 
-          {/* Main Viewer */}
-          <div
-            ref={containerRef}
-            className="relative w-full h-full flex items-center justify-center overflow-hidden"
-            style={{ cursor: scale > 1 && isDragging ? 'grabbing' : scale > 1 ? 'grab' : 'default' }}
-            onMouseDown={handleMouseDown}
-          >
-            <motion.img
+          {/* Image + lens */}
+          <div className="w-full h-full flex items-center justify-center pb-24 pt-16">
+            <img
               ref={imageRef}
               src={imageUrl}
               alt={altText}
-              className="max-w-[90vw] max-h-[68vh] object-contain pointer-events-none select-none drop-shadow-2xl"
-              style={{
-                scale,
-                x: panX,
-                y: panY,
-              }}
-              drag={scale > 1}
-              dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
-              dragElastic={0}
-              onDrag={(event, info) => {
-                if (scale > 1) {
-                  const maxPan = (scale - 1) * 200;
-                  setPanX(Math.max(-maxPan, Math.min(maxPan, info.offset.x)));
-                  setPanY(Math.max(-maxPan, Math.min(maxPan, info.offset.y)));
-                }
-              }}
+              draggable={false}
+              className="max-w-[92vw] max-h-[72vh] object-contain select-none drop-shadow-2xl cursor-none"
+              style={{ touchAction: 'none' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={updateLens}
+              onPointerLeave={handlePointerLeave}
             />
-
-            {/* Minimap */}
-            <div className="absolute bottom-20 right-6 bg-black/60 backdrop-blur-md p-2 rounded-lg border border-white/10 hidden md:block">
-              <div className="w-28 h-36 bg-white/5 rounded border border-white/20 relative overflow-hidden">
-                <img
-                  src={imageUrl}
-                  alt="Minimap"
-                  className="w-full h-full object-contain opacity-40"
-                />
-                {scale > 1 && (
-                  <div
-                    className="absolute border-2 border-primary/60 bg-primary/10 rounded transition-all"
-                    style={{
-                      width: `${(1 / scale) * 100}%`,
-                      height: `${(1 / scale) * 100}%`,
-                      left: `${(50 - (panX / 200) - (1 / scale) * 50)}%`,
-                      top: `${(50 - (panY / 200) - (1 / scale) * 50)}%`,
-                    }}
-                  />
-                )}
-              </div>
-            </div>
           </div>
 
-          {/* Bottom Controls */}
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col gap-4 w-[90vw] max-w-2xl">
-            {/* Zoom and Pan Controls */}
-            <div className="flex items-center justify-center gap-3 bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex-wrap">
+          {style && (
+            <div
+              className="fixed z-30 rounded-full pointer-events-none border-4 border-white/90 shadow-[0_8px_30px_rgba(0,0,0,0.6)] bg-black"
+              style={style}
+              aria-hidden="true"
+            >
+              {/* crosshair dot marking the exact spot */}
+              <div className="absolute left-1/2 top-1/2 w-1.5 h-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 ring-1 ring-black/40" />
+            </div>
+          )}
+
+          {!lens && (
+            <div className="absolute top-20 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 text-white/80 text-sm bg-black/50 px-4 py-2 rounded-full backdrop-blur-sm pointer-events-none">
+              <Search className="w-4 h-4" />
+              <span className="hidden sm:inline">Move your cursor over the card to magnify</span>
+              <span className="sm:hidden">Touch and drag over the card to magnify</span>
+            </div>
+          )}
+
+          {/* Zoom strength */}
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[90vw] max-w-md">
+            <div className="flex items-center justify-center gap-3 bg-black/60 backdrop-blur-md p-3 rounded-2xl border border-white/10">
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleZoom(-0.5)}
-                disabled={scale <= MIN_SCALE}
+                onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z - ZOOM_STEP))}
+                disabled={zoom <= MIN_ZOOM}
                 className="text-white hover:bg-white/20 rounded-lg h-10 w-10"
-                title="Zoom Out (- key)"
+                title="Less magnification (- key)"
               >
                 <ZoomOut className="w-5 h-5" />
               </Button>
 
               <input
                 type="range"
-                min={MIN_SCALE}
-                max={MAX_SCALE}
-                step="0.1"
-                value={scale}
-                onChange={(e) => setScale(parseFloat(e.target.value))}
-                className="w-32 sm:w-48 accent-primary"
-                title="Drag to zoom"
+                min={MIN_ZOOM}
+                max={MAX_ZOOM}
+                step="0.5"
+                value={zoom}
+                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                className="w-40 sm:w-56 accent-primary"
+                aria-label="Magnification"
               />
 
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => handleZoom(0.5)}
-                disabled={scale >= MAX_SCALE}
+                onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z + ZOOM_STEP))}
+                disabled={zoom >= MAX_ZOOM}
                 className="text-white hover:bg-white/20 rounded-lg h-10 w-10"
-                title="Zoom In (+ key)"
+                title="More magnification (+ key)"
               >
                 <ZoomIn className="w-5 h-5" />
               </Button>
-
-              <div className="w-px h-6 bg-white/20" />
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={resetView}
-                disabled={scale === MIN_SCALE && panX === 0 && panY === 0}
-                className="text-white hover:bg-white/20 rounded-lg h-10 w-10"
-                title="Reset View (R key)"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
             </div>
-
-            {/* Preset Zones */}
-            <div className="bg-black/60 backdrop-blur-md p-4 rounded-2xl border border-white/10">
-              <p className="text-white/60 text-xs font-medium mb-3 flex items-center gap-1.5">
-                <Eye className="w-3.5 h-3.5" /> Inspect Edges & Details
-              </p>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                {Object.entries(PRESET_ZONES).map(([key, zone]) => (
-                  <Button
-                    key={key}
-                    variant="outline"
-                    size="sm"
-                    onClick={() => focusOnZone(zone)}
-                    className="text-xs font-medium h-8 px-2 rounded-lg border-white/40 bg-white/15 text-white hover:bg-white/25 transition-all"
-                    title={`Focus on ${zone.label}`}
-                  >
-                    {zone.label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            {/* Keyboard Shortcuts */}
-            <p className="text-white/40 text-xs text-center">
-              Use arrow keys to pan, +/- to zoom, R to reset, Esc to close
+            <p className="text-white/40 text-xs text-center mt-2 hidden sm:block">
+              +/- to change magnification, Esc to close
             </p>
           </div>
         </motion.div>
