@@ -7,9 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
-import { publicImageUrl } from '@/utils/imageUrl.js';
 import { PAID_TIERS } from '@/config/plans.js';
 
 const AU_STATES = [
@@ -103,7 +102,7 @@ const LocalTradersPage = () => {
     let cancelled = false;
     supabase
       .from('profiles')
-      .select('id, store_slug, business_name, business_tagline, business_logo_url, avatar_url, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
+      .select('id, store_slug, business_name, business_tagline, business_logo_url, avatar_url, profile_photo_or_character, business_categories, location_state, location_suburb, rating, reviews_count, total_sales, seller_tier, display_name, username, is_verified, is_featured_seller')
       .eq('is_sole_trader', true)
       .eq('is_public', true)
       // Store pages are a paid-membership perk: only Pro-and-above accounts
@@ -136,12 +135,6 @@ const LocalTradersPage = () => {
         (t.location_suburb || '').toLowerCase().includes(search.toLowerCase())
       )
     : traders;
-
-  const resolveAvatar = (t) => {
-    const raw = t.avatar_url || t.profile_photo_or_character;
-    if (!raw) return null;
-    return publicImageUrl(raw);
-  };
 
   const stateLabel = selectedState
     ? (AU_STATES.find(s => s.code === selectedState)?.label ?? selectedState)
@@ -244,7 +237,6 @@ const LocalTradersPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {stores.map(store => {
                 const storeName = store.business_name || store.display_name || store.username || 'Store';
-                const logo = store.business_logo_url || resolveAvatar(store);
                 const storeLocation = [store.location_suburb, store.location_state].filter(Boolean).join(', ');
                 const cats = (store.business_categories || []).slice(0, 3);
                 return (
@@ -255,13 +247,7 @@ const LocalTradersPage = () => {
                   >
                     {/* Logo / thumbnail */}
                     <div className="relative shrink-0">
-                      <div className="w-20 h-20 rounded-2xl bg-muted border border-border overflow-hidden flex items-center justify-center">
-                        {logo ? (
-                          <img src={logo} alt={storeName} className="w-full h-full object-cover" />
-                        ) : (
-                          <Store className="w-8 h-8 text-muted-foreground" />
-                        )}
-                      </div>
+                      <ProfileAvatar profile={store} size="lg" name={storeName} preferBusinessLogo />
                       {store.is_verified && (
                         <div className="absolute -bottom-1.5 -right-1.5 text-white p-1 rounded-lg shadow-md border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">
                           <BadgeCheck className="w-4 h-4" />
@@ -420,12 +406,7 @@ const LocalTradersPage = () => {
                 >
                   {/* Avatar + identity */}
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border transition-all">
-                      <AvatarImage src={resolveAvatar(trader)} className="object-cover" />
-                      <AvatarFallback className="font-bold text-base">
-                        {name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <ProfileAvatar profile={trader} size="md" name={name} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                         <span className="font-bold text-sm truncate">{name}</span>

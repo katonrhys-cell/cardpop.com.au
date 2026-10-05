@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { orFilterTerm } from '@/src/utils/orFilterTerm.js';
 
 // Admin chat moderation / search.
@@ -32,15 +32,6 @@ const PAGE_LIMIT = 100;
 const sanitizeTerm = (raw) => orFilterTerm(raw);
 
 const nameOf = (p) => p?.display_name || p?.username || 'Unknown user';
-const initial = (p) => (nameOf(p)[0] || '?').toUpperCase();
-
-const Avatar = ({ profile }) => (
-  <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0 text-[10px] font-bold text-muted-foreground">
-    {profile?.avatar_url
-      ? <img src={toCdnUrl(profile.avatar_url)} alt="" className="w-full h-full object-cover" />
-      : initial(profile)}
-  </div>
-);
 
 const ChatModerationPage = () => {
   const [term, setTerm] = useState('');
@@ -58,7 +49,7 @@ const ChatModerationPage = () => {
     if (unique.length === 0) return {};
     const { data } = await supabase
       .from('profiles')
-      .select('id, display_name, username, avatar_url')
+      .select('id, display_name, username, avatar_url, profile_photo_or_character, is_admin')
       .in('id', unique);
     return Object.fromEntries((data ?? []).map((p) => [p.id, p]));
   }, []);
@@ -220,10 +211,10 @@ const ChatModerationPage = () => {
                 className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex flex-col gap-2"
               >
                 <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                  <Avatar profile={sender} />
+                  <ProfileAvatar profile={sender} size="xs" name={nameOf(sender)} />
                   <span className="font-bold text-foreground">{nameOf(sender)}</span>
                   <ArrowRight className="w-3 h-3" />
-                  <Avatar profile={recipient} />
+                  <ProfileAvatar profile={recipient} size="xs" name={nameOf(recipient)} />
                   <span className="font-bold text-foreground">{nameOf(recipient)}</span>
                   {!m.read_at && <Badge variant="outline" className="text-[10px] border-amber-300 text-amber-600">Unread</Badge>}
                   <span className="ml-auto">{format(new Date(m.created_at), 'd MMM yyyy, h:mm a')}</span>

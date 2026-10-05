@@ -11,7 +11,7 @@ import React, { useState, useEffect, useRef, startTransition } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   ArrowRightLeft, LayoutDashboard, Package, Users, Calendar, FileText, Building2,
-  Layers, CheckCircle, Sun, Moon, ChevronDown, ChevronRight, ArrowRight, Layers2, User, LogOut,
+  Layers, CheckCircle, Sun, Moon, ChevronDown, ChevronRight, ArrowRight, Layers2, LogOut,
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Award, TrendingUp, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { SheetClose } from '@/components/ui/sheet';
@@ -1089,13 +1089,7 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
         className="w-full flex items-center gap-3 h-14 px-4 rounded-xl bg-muted/30 hover:bg-muted/50 border border-border/50 transition-colors"
         onClick={() => setExpanded(o => !o)}
       >
-        <div className="relative h-8 w-8 rounded-full overflow-hidden shrink-0 bg-primary/10 flex items-center justify-center">
-          {currentUser.avatar_url ? (
-            <img src={publicImageUrl(currentUser.avatar_url)} alt={currentUser.name} className="h-full w-full object-cover" width="32" height="32" />
-          ) : (
-            <User className="h-4 w-4 text-primary" />
-          )}
-        </div>
+        <ProfileAvatar profile={currentUser} size="sm" name={currentUser.display_name || currentUser.name} />
         <div className="flex flex-col items-start overflow-hidden flex-1">
           <span className="text-sm font-bold truncate w-full text-left">{currentUser.display_name || currentUser.name || 'Collector'}</span>
           <span className="text-xs text-muted-foreground truncate w-full text-left">View Profile Options</span>

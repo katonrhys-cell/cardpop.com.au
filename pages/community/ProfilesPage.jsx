@@ -10,9 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Users, Search, ShieldCheck, Star, UserPlus, Package } from 'lucide-react';
-import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const FILTERS = ['All', 'Verified'];
 
@@ -65,12 +64,6 @@ const ProfilesPage = () => {
         (p.username || '').toLowerCase().includes(search.toLowerCase())
       )
     : profiles;
-
-  const resolveAvatar = (profile) => {
-    const raw = profile?.avatar_url || profile?.business_logo_url || profile?.profile_photo_or_character;
-    if (!raw) return null;
-    return publicImageUrl(raw);
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -170,7 +163,6 @@ const ProfilesPage = () => {
         ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map(profile => {
-              const avatarUrl = resolveAvatar(profile);
               const profileVerified = isVerified(profile.is_verified);
               const name = profile.display_name || profile.username || 'Collector';
 
@@ -180,12 +172,7 @@ const ProfilesPage = () => {
                   className="bg-card border border-border p-5 rounded-2xl flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all group"
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 flex-shrink-0 ring-2 ring-border group-hover:ring-primary/30 transition-all">
-                      <AvatarImage src={avatarUrl} className="object-cover" />
-                      <AvatarFallback className="font-bold text-base">
-                        {name.charAt(0).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
+                    <ProfileAvatar profile={profile} size="md" name={name} preferBusinessLogo />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
                         <span className="font-bold truncate text-sm">{name}</span>

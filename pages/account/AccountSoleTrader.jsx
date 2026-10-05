@@ -11,7 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Link } from 'react-router-dom';
 
@@ -273,14 +273,7 @@ const AccountSoleTrader = () => {
             {/* Logo */}
             <div className="flex flex-col sm:flex-row gap-6 items-start">
               <div className="relative group shrink-0 flex flex-col items-center">
-                <Avatar className="w-28 h-28 rounded-2xl border-2 border-border bg-muted text-foreground">
-                  {currentLogoUrl ? (
-                    <AvatarImage src={currentLogoUrl} className="object-cover" />
-                  ) : null}
-                  <AvatarFallback className="rounded-2xl text-3xl font-bold bg-muted/50">
-                    <Store className="w-10 h-10 text-muted-foreground" />
-                  </AvatarFallback>
-                </Avatar>
+                <ProfileAvatar size="xl" src={currentLogoUrl} name={formData.business_name || 'Store'} />
                 <div className="absolute -bottom-3 flex gap-2">
                   <Label htmlFor="logo-upload" className="bg-foreground text-background p-2 rounded-full shadow-md cursor-pointer hover:scale-105 transition-transform">
                     <Upload className="w-4 h-4" />

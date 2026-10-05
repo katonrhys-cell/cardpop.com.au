@@ -11,14 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
 import { isVerified } from '@/utils/verification.js';
 import { toast } from 'sonner';
 import { useAdmin } from '@/contexts/AdminContext.jsx';
 import { useDebounce } from '@/hooks/useDebounce.js';
-import { toCdnUrl } from '@/utils/imageUrl.js';
 import { orFilterTerm } from '@/src/utils/orFilterTerm.js';
 
 const SellersManagementPage = () => {
@@ -43,7 +42,7 @@ const SellersManagementPage = () => {
     try {
       let query = supabase
         .from('profiles')
-        .select('id, display_name, username, business_name, avatar_url, business_logo_url, is_featured_seller, is_verified, is_active, rating, reviews_count, seller_tier, location_state', { count: 'exact' })
+        .select('id, display_name, username, business_name, avatar_url, profile_photo_or_character, is_admin, business_logo_url, is_featured_seller, is_verified, is_active, rating, reviews_count, seller_tier, location_state', { count: 'exact' })
         .eq('is_sole_trader', true)
         .eq('is_active', true)
         .order('is_featured_seller', { ascending: false })
@@ -117,11 +116,6 @@ const SellersManagementPage = () => {
     setFeaturedFilter('all');
     setVerifiedFilter('all');
     setPage(1);
-  };
-
-  const getInitials = (seller) => {
-    const name = seller.display_name || seller.username || 'S';
-    return name.substring(0, 2).toUpperCase();
   };
 
   return (
@@ -226,12 +220,7 @@ const SellersManagementPage = () => {
                   <TableRow key={seller.id} className="hover:bg-muted/30 transition-colors">
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={toCdnUrl(seller.avatar_url || seller.business_logo_url)} alt={seller.display_name} />
-                          <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                            {getInitials(seller)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <ProfileAvatar profile={seller} size="sm" />
                         <div className="flex flex-col">
                           <span className="font-medium text-foreground">{seller.display_name || seller.username}</span>
                           <span className="text-xs text-muted-foreground">@{seller.username}</span>
@@ -350,12 +339,7 @@ const SellersManagementPage = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {sellers.filter(s => s.is_featured_seller).map(seller => (
               <div key={seller.id} className="p-4 rounded-xl bg-muted/30 border border-border hover:border-primary/50 transition-colors">
-                <Avatar className="h-16 w-16 mb-3 mx-auto">
-                  <AvatarImage src={toCdnUrl(seller.business_logo_url || seller.avatar_url)} alt={seller.business_name} />
-                  <AvatarFallback className="text-lg bg-primary/10 text-primary">
-                    {getInitials(seller)}
-                  </AvatarFallback>
-                </Avatar>
+                <ProfileAvatar profile={seller} size="lg" preferBusinessLogo className="mb-3 mx-auto" />
                 <h4 className="font-semibold text-foreground text-center mb-1">{seller.business_name || seller.display_name}</h4>
                 <p className="text-xs text-muted-foreground text-center mb-2">@{seller.username}</p>
                 <div className="flex items-center justify-center gap-1 text-sm">

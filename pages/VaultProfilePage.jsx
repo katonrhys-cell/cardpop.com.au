@@ -17,6 +17,7 @@ import { VerificationBadge } from '@/components/VerificationBadge.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import { toast } from 'sonner';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 
 const VaultProfilePage = () => {
@@ -219,15 +220,12 @@ const VaultProfilePage = () => {
             <div className="bg-card rounded-2xl shadow-sm border border-border p-6 sm:p-8">
               <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end mb-8">
                 <div className="relative group">
-                  <div className="w-32 h-32 rounded-full border-4 border-card bg-muted overflow-hidden shadow-md">
-                    {avatarPreview ? (
-                      <img src={avatarPreview} alt="Profile" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-primary/10 text-primary text-4xl font-bold">
-                        {(formData.name || profile?.email || 'U').substring(0, 1).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
+                  <ProfileAvatar
+                    profile={profile}
+                    size="xl"
+                    src={avatarPreview || null}
+                    name={formData.name || profile?.email || 'U'}
+                  />
                   {isEditing && (
                     <button 
                       onClick={() => fileInputRef.current?.click()}
