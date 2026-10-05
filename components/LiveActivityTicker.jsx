@@ -108,7 +108,7 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
 
   const body = (
     <div className={`overflow-hidden ${className}`}>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-2 pl-2 py-1">
         <span className="relative flex h-2.5 w-2.5">
           <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
           <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary" />
