@@ -28,8 +28,8 @@
     <!-- Preload the self-hosted Syne heading font (crossorigin required even
          same-origin — fonts fetch in CORS/anonymous mode). @font-face is in index.css.
          fetchpriority=high so the font beats the modulepreloaded JS chunks in the
-         bandwidth race — @font-face uses font-display: fallback, so Syne arriving
-         inside the ~100ms block window means the first paint needs no font swap.
+         bandwidth race — @font-face uses font-display: swap with a metric-matched
+         fallback face, so the swap (if any) never moves the layout.
          The same preload is also sent as a Link header on "/" (vercel.json) so
          Cloudflare Early Hints can start the fetch before the HTML body arrives. -->
     <link rel="preload" as="font" type="font/woff2" href="/fonts/syne-latin-var.woff2" crossorigin fetchpriority="high" />

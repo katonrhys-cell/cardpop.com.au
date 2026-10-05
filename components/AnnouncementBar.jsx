@@ -17,17 +17,30 @@ const readDismissed = () => {
   try { return window.sessionStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
 };
 
+// Same cached-session sniff as Header's optimisticAuth: while auth is still
+// resolving, a visitor with no stored Supabase session is treated as signed
+// out so the bar renders on React's first commit. The static homepage shell
+// (tools/home-shell.html) already shows it for exactly those visitors, so
+// waiting for auth to settle meant the bar popped in ~1 s later and pushed the
+// whole page down — a layout shift on every anonymous homepage load.
+export const AUTH_TOKEN_STORAGE_KEY = 'sb-vrfsaazuqjxotnieqlkd-auth-token';
+const hasCachedSession = () => {
+  try { return !!window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY); } catch { return false; }
+};
+
 const AnnouncementBar = () => {
   const { pathname } = useLocation();
   const { isAuthenticated, loading } = useAuth();
   const [dismissed, setDismissed] = useState(readDismissed);
+  const [optimisticSignedOut] = useState(() => !hasCachedSession());
 
   useEffect(() => {
     if (!dismissed) return;
     try { window.sessionStorage.setItem(STORAGE_KEY, '1'); } catch { /* private mode */ }
   }, [dismissed]);
 
-  if (dismissed || loading || isAuthenticated) return null;
+  if (dismissed || isAuthenticated) return null;
+  if (loading && !optimisticSignedOut) return null;
   if (QUIET_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
 
   return (

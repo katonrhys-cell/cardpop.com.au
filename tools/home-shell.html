@@ -19,6 +19,21 @@
   destination exists, so the header is usable even before hydration).
 -->
 <div class="flex flex-col min-h-screen bg-background text-foreground">
+  <!-- Announcement bar — mirrors components/AnnouncementBar.jsx for a signed-out
+       visitor (copy, classes and height). React renders the same bar on its
+       first commit, so nothing moves when it takes over; before this it popped
+       in once auth resolved and pushed the whole page down (layout shift on
+       every anonymous load). The CSP bootstrap (vite.config.js) removes it
+       before first paint when the session has dismissed it or a Supabase
+       session is cached, so returning members never see it flash. Keep the
+       discount in sync with config/welcomeOffer.js (a test checks it). -->
+  <div id="cardpop-shell-announcement" class="relative z-40 bg-brand-charcoal text-white">
+    <div class="mx-auto flex max-w-[90rem] items-center justify-center gap-2 px-10 py-2 text-center text-xs font-semibold sm:text-sm">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="hidden h-4 w-4 shrink-0 text-red-400 sm:block" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/></svg>
+      <p><span class="text-red-400">10% off your first order</span> when you join free · <a href="/signup" class="underline underline-offset-2">Create your account</a></p>
+      <span aria-hidden="true" class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-white/70"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></span>
+    </div>
+  </div>
   <header class="sticky top-0 z-50 w-full bg-background border-b border-border/50">
     <div class="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Row 1: logo + search + action placeholders — mirrors Header.jsx row 1 -->
@@ -130,4 +145,18 @@
       </div>
     </section>
   </main>
+  <!-- Cookie banner — mirrors components/CookieConsentBanner.jsx (fixed, so it
+       never affects layout; it's here so the first frame already matches the
+       final one instead of the banner appearing when React mounts). Inert
+       lookalike buttons; the CSP bootstrap removes the whole thing before
+       first paint when a choice is already stored (lib/consent.js). -->
+  <div id="cardpop-shell-cookie" class="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-[0_-8px_30px_-12px_rgba(0,0,0,0.25)]" aria-hidden="true">
+    <div class="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:gap-6">
+      <p class="text-sm text-muted-foreground sm:flex-1">We use cookies to run the site and measure what works. With your OK we also use Google Ads and Meta cookies to see which ads bring collectors here. <a href="/privacy#cookies" class="font-medium text-primary">Cookie details</a></p>
+      <div class="flex shrink-0 gap-2">
+        <span class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-button text-sm font-medium border border-input bg-background shadow-sm h-9 px-3 text-xs h-10 rounded-lg">Essentials only</span>
+        <span class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-button text-sm font-medium bg-primary text-primary-foreground shadow h-9 px-3 text-xs h-10 rounded-lg font-semibold">Accept all</span>
+      </div>
+    </div>
+  </div>
 </div>

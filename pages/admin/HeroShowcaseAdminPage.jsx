@@ -18,7 +18,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { publicImageUrl, toCdnUrl } from '@/utils/imageUrl.js';
-import { compressImage } from '@/utils/compressImage.js';
+import { uploadShopImage } from '@/utils/uploadProductImages.js';
+
+const HERO_SHOWCASE_IMAGE_PREFIX = 'hero-showcase';
 
 // Resolve a vault image reference (storage path or full URL) to a usable URL.
 const resolveVaultImage = (raw) => {
@@ -150,14 +152,14 @@ const HeroShowcaseAdminPage = () => {
   const resolveImageUrl = async () => {
     if (tab === 'upload') {
       if (!file) return null;
-      // Hero images render on the homepage — compress before upload so every
-      // first-view costs a fraction of the egress.
-      const compressed = await compressImage(file);
-      const ext = (compressed.name || file.name).split('.').pop().toLowerCase();
-      const path = `hero-showcase/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { cacheControl: '31536000' });
-      if (upErr) throw upErr;
-      return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
+      // Hero images render on the homepage — the shared pipeline compresses
+      // the upload AND writes the 480 px companion thumbnail that the showcase
+      // (68 px shelf cards, 160 px featured card) actually displays, so a
+      // first view never downloads the full-size scan. Existing rows uploaded
+      // before this change can be converted with
+      // `node scripts/optimize-shop-images.mjs --table hero_showcase_cards --bucket media`.
+      const { url } = await uploadShopImage(file, { prefix: HERO_SHOWCASE_IMAGE_PREFIX });
+      return url;
     }
     if (tab === 'url') return urlInput.trim() || null;
     if (tab === 'marketplace') return resolveVaultImage(selectedVault?.image_urls?.[0]);

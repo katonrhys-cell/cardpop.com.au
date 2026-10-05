@@ -2,10 +2,21 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { getCardImage } from '@/utils/imageUrl.js';
+import { onFirstInteractionOrLoad } from '@/lib/deferredLoad.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MAX_EVENTS = 16;
+
+// The strip shows each card at 36×48 px, so serve the pre-generated 480 px
+// grid thumbnail wherever one exists (uploads since THUMBNAILS_SINCE) instead
+// of the full 1600 px upload — up to 16 of these load on the homepage, and
+// the full images were the bulk of PageSpeed's "Improve image delivery".
+export const tickerImageUrl = (vaultItem) => {
+  const raw = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
+  const art = getCardImage(raw);
+  return art.thumbSrc || art.src || null;
+};
 
 const eventFromListing = (listing, kind) => {
   const raw = kind === 'sold' ? (listing.updated_at || listing.created_at) : listing.created_at;
@@ -16,11 +27,7 @@ const eventFromListing = (listing, kind) => {
     listingId: listing.id,
     name: listing.vault_item?.card_name || 'A card',
     price: Number(listing.price_aud || 0),
-    image: publicImageUrl(
-      listing.vault_item?.card_image
-        || listing.vault_item?.vault_images?.[0]?.storage_path
-        || null,
-    ),
+    image: tickerImageUrl(listing.vault_item),
     // A malformed timestamp must degrade to "no time label", never a crash.
     at: at && Number.isFinite(at.getTime()) ? at : null,
   };
@@ -82,22 +89,31 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
       }
     };
 
-    try {
-      channelRef.current = supabase
-        .channel('live-activity-ticker')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'listings' },
-          payload => { if (payload.new?.status === 'active') hydrate(payload.new, 'listed'); })
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings' },
-          payload => {
-            if (payload.new?.status === 'sold' && payload.old?.status !== 'sold') hydrate(payload.new, 'sold');
-          })
-        .subscribe();
-    } catch (err) {
-      console.warn('[LiveActivityTicker] realtime unavailable:', err?.message);
-    }
+    // The realtime subscription (websocket connect + channel join) is a
+    // decoration on a decoration: the seed query above is what fills the
+    // strip, so the live feed waits for the first interaction — or a few
+    // seconds after load — instead of competing with the initial render.
+    const subscribe = () => {
+      if (cancelled) return;
+      try {
+        channelRef.current = supabase
+          .channel('live-activity-ticker')
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'listings' },
+            payload => { if (payload.new?.status === 'active') hydrate(payload.new, 'listed'); })
+          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings' },
+            payload => {
+              if (payload.new?.status === 'sold' && payload.old?.status !== 'sold') hydrate(payload.new, 'sold');
+            })
+          .subscribe();
+      } catch (err) {
+        console.warn('[LiveActivityTicker] realtime unavailable:', err?.message);
+      }
+    };
+    const cancelSubscribe = onFirstInteractionOrLoad(subscribe);
 
     return () => {
       cancelled = true;
+      cancelSubscribe();
       try {
         if (channelRef.current) supabase.removeChannel(channelRef.current);
       } catch { /* channel already gone */ }
@@ -124,7 +140,7 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
           >
             <div className="w-9 h-12 rounded-lg bg-muted/40 overflow-hidden flex items-center justify-center shrink-0">
               {ev.image
-                ? <img src={ev.image} alt="" className="w-full h-full object-cover" loading="lazy" />
+                ? <img src={ev.image} alt="" width="36" height="48" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                 : <span className="text-[10px] text-muted-foreground">🃏</span>}
             </div>
             <div className="min-w-0">

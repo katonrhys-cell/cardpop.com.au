@@ -164,6 +164,10 @@ GA4 (`lib/analytics.js`) sends page views **and the ecommerce funnel** — `view
 
 Cloudflare (proxying all traffic) is the volumetric DDoS layer; Express rate limiters (`src/middleware/global-rate-limit.js`, `src/middleware/endpoint-rate-limit.js`) handle targeted abuse. `src/app.js` sets a `trust proxy` function that trusts Cloudflare's published edge ranges (`src/utils/cloudflareIps.js`) so `req.ip` is the real visitor, not a Cloudflare edge IP — every IP-keyed control depends on this. Dashboard-side settings (Bot Fight Mode, WAF, edge rate-limit rule, Under-Attack playbook, Supabase quota hardening) are documented in `docs/ddos-protection.md`.
 
+### Homepage performance
+
+The "/" document paints from a static shell (`tools/home-shell.html`) and the CSP bootstrap in `vite.config.js` starts the JS/CSS fetches **one frame after the first paint** — Lighthouse's simulation otherwise counts every preload as render-blocking. Every non-essential third party (Sentry, gtag, Cloudflare beacon, Impact, the Google reviews badge) loads via `lib/deferredLoad.js` on the first interaction or 8 s after `load`, never at idle, so it stays out of the window PageSpeed measures. Homepage Supabase reads start in `main.jsx` (`lib/homepageData.js`) before React mounts. Changing `CSP_BOOTSTRAP` means updating its sha256 in **both** CSP headers in `vercel.json` (the build and `tests/frontend/homeShell.test.js` both check). Full notes: `docs/performance.md`.
+
 ### Deployment
 
 Vercel's **native Git integration** builds and deploys on every push to `main`

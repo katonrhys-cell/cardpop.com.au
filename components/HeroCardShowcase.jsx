@@ -60,7 +60,7 @@ const CardArt = ({ image, padding = 'p-1', sizes = '160px' }) => {
   if (hasFileExtension(image)) {
     return <RemoteCardArt image={image} padding={padding} sizes={sizes} />;
   }
-  return <HeroCardImage stem={image} alt="" />;
+  return <HeroCardImage stem={image} alt="" sizes={sizes} />;
 };
 
 /**
@@ -99,6 +99,13 @@ const SHELF_ROW_STEP = 125; // vertical distance between stacked shelf rows
 const HeroCardShowcase = ({ cards = [] }) => {
   const prefersReduced = useReducedMotion();
   const [active, setActive] = useState(0);
+  // The first card is shown already settled on the stand; the shelf → stand
+  // flight only plays from the second card on. The showcase mounts a moment
+  // after the hero paints, so a four-second entrance there kept the above-
+  // the-fold pixels changing long after the page was usable — Lighthouse's
+  // Speed Index (desktop 2.9 s against a 0.8 s LCP) measured exactly that.
+  // Nothing is lost: the full sequence still runs every CYCLE_MS.
+  const [introDone, setIntroDone] = useState(false);
 
   const count = cards.length;
 
@@ -106,10 +113,12 @@ const HeroCardShowcase = ({ cards = [] }) => {
   useEffect(() => {
     if (prefersReduced || count <= 1) return;
     const id = setInterval(() => {
+      setIntroDone(true);
       setActive((i) => (i + 1) % count);
     }, CYCLE_MS);
     return () => clearInterval(id);
   }, [prefersReduced, count]);
+  const holdStill = prefersReduced || !introDone;
 
   const shelfRows = useMemo(() => {
     const out = [];
@@ -168,7 +177,7 @@ const HeroCardShowcase = ({ cards = [] }) => {
             <div className="relative flex items-end justify-center gap-3 px-4">
               {row.map((card, colIndex) => {
                 const i = rowIndex * SHELF_ROW_SIZE + colIndex;
-                const isOut = !prefersReduced && i === active;
+                const isOut = !holdStill && i === active;
                 return (
                   <div key={i} className="relative w-[68px] h-[94px] flex-shrink-0">
                     {/* Empty-slot glow shown while this card is "in flight" */}
@@ -215,13 +224,13 @@ const HeroCardShowcase = ({ cards = [] }) => {
               'radial-gradient(ellipse 50% 60% at 50% 35%, rgba(255,235,170,0.30) 0%, rgba(255,220,120,0.10) 45%, transparent 72%)',
             filter: 'blur(6px)',
           }}
-          initial={{ opacity: 0 }}
+          initial={holdStill ? { opacity: 0.9 } : { opacity: 0 }}
           animate={
-            prefersReduced
+            holdStill
               ? { opacity: 0.9 }
               : { opacity: [0, 0, 0.2, 0.55, 0.95, 0.95, 0] }
           }
-          transition={prefersReduced ? { duration: 0.6 } : { duration: CYCLE_MS / 1000, times, ease: 'easeInOut' }}
+          transition={holdStill ? { duration: 0.6 } : { duration: CYCLE_MS / 1000, times, ease: 'easeInOut' }}
         />
       </AnimatePresence>
 
@@ -239,17 +248,17 @@ const HeroCardShowcase = ({ cards = [] }) => {
               '0 40px 80px -16px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.07), 0 0 60px -10px rgba(255,210,90,0.35)',
           }}
           initial={
-            prefersReduced
+            holdStill
               ? { opacity: 1, x: 0, y: 60 + landingShift, scale: 1, rotateZ: 0 }
               : { opacity: 0, x: sx, y: shelfY, scale: 0.42, rotateZ: -3 }
           }
           animate={
-            prefersReduced
+            holdStill
               ? { opacity: 1, x: 0, y: 60 + landingShift, scale: 1, rotateZ: 0 }
               : flyKeyframes
           }
           transition={
-            prefersReduced
+            holdStill
               ? { duration: 0.6 }
               : { duration: CYCLE_MS / 1000, times, ease: [0.22, 0.61, 0.36, 1] }
           }

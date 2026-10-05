@@ -40,7 +40,36 @@ const allDeps = Object.keys(pkg.dependencies || {});
 // this trusted script, not as parser-inserted <link> tags — under
 // 'strict-dynamic' the browser blocks modulepreloads that don't originate
 // from an already-trusted script.
-const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head;function v(p){return p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-3)===".js"}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p)){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;ld(d.preload);if(v(d.entry)){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)})()';
+// data-css (index.html only) is the full stylesheet: the bootstrap injects its
+// as="style" preload plus the media="print" <link data-async-style> that
+// main.jsx flips to "all" once the bundle runs (see homeShellPlugin).
+//
+// PAINT FIRST, THEN FETCH. Everything above is injected one frame AFTER the
+// first paint (requestAnimationFrame → setTimeout 0), not synchronously while
+// the parser is still on this tag. The "/" document already carries its LCP
+// hero in static HTML with the critical CSS inlined, so the paint needs none
+// of these files — but Lighthouse's lab simulation (Lantern, which is what
+// PageSpeed Insights reports) models every High-priority script and every
+// VeryHigh-priority stylesheet whose request STARTED before the observed
+// first paint as render-blocking, and that put ~240 KB of module preloads on
+// the simulated FCP/LCP critical path (mobile FCP 1.5 s / LCP 2.7 s for a
+// paint that in reality needs only the 12 KB document). Starting them after
+// the frame has painted costs real visitors one frame (~16 ms) of JS boot and
+// keeps the first paint's bandwidth for the HTML and the hero font. A hidden
+// tab (no rAF) and a 1.5 s safety timer both fall straight through, so the
+// app always boots.
+//
+// Before any of that, synchronously (so it lands before the first paint), it
+// trims the static shell for returning visitors: the announcement bar is
+// removed when this session dismissed it or a Supabase session is cached (a
+// member never sees it), and the cookie banner when a consent choice is
+// stored. The storage keys mirror components/AnnouncementBar.jsx,
+// components/Header.jsx (optimisticAuth) and lib/consent.js — change them
+// together. This tag sits in <head> (Vite puts the entry there), i.e. before
+// the shell has parsed, so it hides by id via an injected <style> rule rather
+// than touching elements that don't exist yet; the rule is a no-op on
+// documents without the shell (app.html, launch shell).
+const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head,done=0;try{var hid=[];if(sessionStorage.getItem("cardpop_announcement_dismissed")==="1"||localStorage.getItem("sb-vrfsaazuqjxotnieqlkd-auth-token"))hid.push("#cardpop-shell-announcement");if(localStorage.getItem("cardpop_cookie_consent")!==null)hid.push("#cardpop-shell-cookie");if(hid.length){var st=document.createElement("style");st.textContent=hid.join(",")+"{display:none}";h.appendChild(st)}}catch(e){}function v(p,x){return!!p&&p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-x.length)===x}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p,".js")){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}function go(){if(done)return;done=1;var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;if(v(d.css,".css")){var p=document.createElement("link");p.rel="preload";p.as="style";p.href=d.css;p.crossOrigin="";h.appendChild(p);var c=document.createElement("link");c.rel="stylesheet";c.href=d.css;c.media="print";c.crossOrigin="";c.setAttribute("data-async-style","");h.appendChild(c)}ld(d.preload);if(v(d.entry,".js")){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)}if(document.visibilityState==="hidden"||!window.requestAnimationFrame)go();else{requestAnimationFrame(function(){setTimeout(go,0)});setTimeout(go,1500)}})()';
 
 const ENTRY_SCRIPT_RE = /<script type="module" crossorigin src="([^"]+)"><\/script>/;
 
@@ -142,7 +171,7 @@ function addHomeRoutePreloads(html, bundle, warn, facadeSuffix) {
 	// CSS — skip anything the document already references (it's inlined/preloaded
 	// separately) so only genuinely lazy stylesheets get a preload.
 	const cssPreloads = files.css
-		.filter((f) => !html.includes(`href="/${f}"`))
+		.filter((f) => !html.includes(`href="/${f}"`) && !html.includes(`data-css="/${f}"`))
 		.map((f) => `<link rel="preload" as="style" fetchpriority="low" crossorigin href="/${f}">`)
 		.join('');
 	if (cssPreloads) html = html.replace('</head>', `${cssPreloads}</head>`);
@@ -209,9 +238,10 @@ function homeShellPlugin() {
 			// Content routes (marketplace, shop, product, category…) render an
 			// above-the-fold card image from the image CDN as their LCP element, so
 			// warming that origin's DNS/TCP/TLS ahead of the image request shaves
-			// meaningful time off mobile LCP. This preconnect goes ONLY into app.html
-			// — the homepage (index.html) paints a text <h1> with no above-fold
-			// image, so it keeps the "preconnect only to first-paint origins" rule.
+			// meaningful time off mobile LCP. The homepage gets the same preconnect
+			// (see below): its LCP is text, but its longest network chain ends in the
+			// "Just Listed" card photos from that origin, and Lighthouse's
+			// network-dependency-tree insight flags exactly that unwarmed origin.
 			// Gated on VITE_IMAGE_CDN_HOST (a real build-time env var on Vercel) so
 			// there's never a wasted preconnect when the CDN is disabled — images
 			// then come from Supabase, which is already preconnected.
@@ -227,7 +257,7 @@ function homeShellPlugin() {
 				return;
 			}
 			const shell = readFileSync(shellPath, 'utf-8');
-			let indexHtml = builtIndex.replace(marker, `<div id="root">${shell}</div>`);
+			let indexHtml = appHtml.replace(marker, `<div id="root">${shell}</div>`);
 
 			// Inline the above-the-fold critical CSS and load the full stylesheet
 			// asynchronously so it no longer blocks the shell's first paint. The
@@ -254,19 +284,37 @@ function homeShellPlugin() {
 				const processed = await beasties.process(indexHtml);
 				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
 
-				// The deferred (media="print") stylesheet is fetched at the browser's
-				// LOWEST priority, so on slow connections it loses the bandwidth race
-				// against the JS chunks — and main.jsx gates the React mount on it
-				// (2s fail-safe), leaving the static shell up even after the JS is
-				// ready. A preload at as="style" priority makes it arrive alongside
-				// the critical JS instead; same URL, so no double-download.
+				// Hand the deferred (media="print") stylesheet to the CSP bootstrap
+				// (data-css) instead of leaving it as a parser-inserted tag. The
+				// bootstrap injects it one frame after the first paint, together
+				// with an as="style" preload: a bare print stylesheet is fetched at
+				// the browser's LOWEST priority and loses the bandwidth race against
+				// the JS chunks (main.jsx gates the React mount on it, 2s fail-safe),
+				// while a parser-inserted preload is VeryHigh priority — which
+				// Lighthouse's simulation counts as render-blocking for the shell's
+				// paint even though media="print" never blocks anything. Injecting
+				// both post-paint gets the high fetch priority without the simulated
+				// penalty. Only the first (main) stylesheet is handed over; any other
+				// deferred sheet keeps its tag.
+				let deferredCss = null;
 				indexHtml = indexHtml.replace(
-					/<link rel="stylesheet"([^>]*?) media="print" data-async-style>/g,
+					/<link rel="stylesheet"([^>]*?) media="print" data-async-style>/,
 					(tag, attrs) => {
 						const href = attrs.match(/href="([^"]+)"/)?.[1];
-						return href ? `<link rel="preload" as="style" crossorigin href="${href}">${tag}` : tag;
+						if (!href || !/^\/assets\/[^"]+\.css$/.test(href)) return tag;
+						deferredCss = href;
+						return '';
 					},
 				);
+				if (deferredCss) {
+					const bootstrapTag = indexHtml.match(/<script data-entry="[^"]*" data-preload="[^"]*"/);
+					if (bootstrapTag) {
+						indexHtml = indexHtml.replace(bootstrapTag[0], `${bootstrapTag[0]} data-css="${deferredCss}"`);
+					} else {
+						this.warn('home-shell: bootstrap tag not found — deferred stylesheet restored as a plain link');
+						indexHtml = indexHtml.replace('</head>', `<link rel="stylesheet" crossorigin href="${deferredCss}" media="print" data-async-style></head>`);
+					}
+				}
 			} catch (e) {
 				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
 			}

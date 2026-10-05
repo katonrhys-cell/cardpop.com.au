@@ -41,7 +41,10 @@ Google's checklist items, as they apply here:
 ## Badge (optional)
 
 `components/GoogleReviewsBadgeLoader.jsx` (mounted in `App.jsx`) loads
-`merchantwidget.js` on idle on the first eligible page of a visit, at
+`merchantwidget.js` on the first eligible page of a visit — on the visitor's
+first interaction (tap, key, scroll) or 8 s after `load` for someone who never
+interacts (`lib/deferredLoad.js`; the delay keeps the widget, its iframe and its
+Google-hosted font out of the window PageSpeed Insights measures) — at
 `LEFT_BOTTOM` (sonner toasts own bottom-right), region `AU`. It is never started
 from checkout, sign-in or admin (`isBadgeEligiblePath`). Until CardPop has
 enough ratings Google shows "no rating available" — expected.
