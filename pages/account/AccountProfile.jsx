@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
@@ -154,16 +154,12 @@ const AccountProfile = () => {
               <DialogTitle>Profile Preview</DialogTitle>
             </DialogHeader>
             <div className="bg-muted/30 p-8 border-b border-border flex items-center gap-6">
-              <Avatar className="w-24 h-24 rounded-2xl border-2 border-card shadow-sm">
-                {avatarPreview ? (
-                  <AvatarImage src={avatarPreview} className="object-cover" />
-                ) : (currentPhotoUrl && !removeAvatar) ? (
-                  <AvatarImage src={currentPhotoUrl} className="object-cover" />
-                ) : null}
-                <AvatarFallback className="text-2xl font-bold bg-muted text-foreground">
-                  {(formData.display_name || 'U').charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <ProfileAvatar
+                profile={currentUser}
+                size="lg"
+                src={avatarPreview ?? (removeAvatar ? null : undefined)}
+                name={formData.display_name || 'U'}
+              />
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h2 className="text-2xl font-bold font-serif tracking-tight text-foreground">
@@ -201,16 +197,12 @@ const AccountProfile = () => {
             {/* Avatar upload */}
             <div className="flex flex-col sm:flex-row gap-6 items-start">
               <div className="relative group shrink-0 flex flex-col items-center">
-                <Avatar className="w-32 h-32 rounded-2xl border-2 border-border bg-muted text-foreground">
-                  {avatarPreview ? (
-                    <AvatarImage src={avatarPreview} className="object-cover" />
-                  ) : (currentPhotoUrl && !removeAvatar) ? (
-                    <AvatarImage src={currentPhotoUrl} className="object-cover" />
-                  ) : null}
-                  <AvatarFallback className="rounded-2xl text-4xl font-bold bg-muted/50">
-                    {(formData.display_name || currentUser?.email || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <ProfileAvatar
+                  profile={currentUser}
+                  size="xl"
+                  src={avatarPreview ?? (removeAvatar ? null : undefined)}
+                  name={formData.display_name || currentUser?.email || 'U'}
+                />
 
                 <div className="absolute -bottom-3 flex gap-2">
                   <Label htmlFor="avatar-upload" className="bg-foreground text-background p-2 rounded-full shadow-md cursor-pointer hover:scale-105 transition-transform">

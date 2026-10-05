@@ -16,8 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
-import { profilePhotoUrl, isOfficialProfile } from '@/utils/profileAvatar.js';
-import CardPopLogo from '@/components/CardPopLogo.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 
 const PublicSellerProfilePage = () => {
@@ -130,7 +129,6 @@ const PublicSellerProfilePage = () => {
     );
   }
 
-  const avatarUrl = profilePhotoUrl(seller);
   const sellerVerified = seller.is_admin === true || isVerified(seller.is_verified);
 
   return (
@@ -152,17 +150,12 @@ const PublicSellerProfilePage = () => {
             
             {/* Avatar */}
             <div className="shrink-0 relative">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-[2rem] bg-muted border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt={seller.display_name || seller.name} className="w-full h-full object-cover" />
-                ) : isOfficialProfile(seller) ? (
-                  <CardPopLogo variant="icon" iconClassName="w-16 h-20" />
-                ) : (
-                  <span className="text-5xl font-bold text-muted-foreground">
-                    {(seller.display_name || seller.name || 'U').charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
+              <ProfileAvatar
+                profile={seller}
+                size="xl"
+                name={seller.display_name || seller.name}
+                className="border-4 border-card shadow-xl"
+              />
               {sellerVerified && (
                 <div className="absolute -bottom-2 -right-2 bg-[hsl(var(--verified-badge))] text-white p-2 rounded-xl shadow-lg border-2 border-card" title="Verified Collector">
                   <ShieldCheck className="w-6 h-6" />

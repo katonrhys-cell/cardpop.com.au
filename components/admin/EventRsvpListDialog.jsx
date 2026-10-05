@@ -12,10 +12,10 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
-import { Download, Store, Users, AlertTriangle } from 'lucide-react';
+import { Download, AlertTriangle } from 'lucide-react';
 import apiServerClient from '@/lib/apiServerClient';
 import { toCsv } from '@/utils/finance.js';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import EventOrganiserAccess from '@/components/admin/EventOrganiserAccess.jsx';
 
 // Admin list of everyone who has RSVP'd to an event — attendees ("buyer") and
@@ -126,15 +126,7 @@ const EventRsvpListDialog = ({ event, onClose }) => {
             <ul className="divide-y divide-border rounded-lg border border-border">
               {visible.map((r) => (
                 <li key={r.user_id} className="flex items-center gap-3 p-3">
-                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                    {r.avatar_url ? (
-                      <img src={toCdnUrl(r.avatar_url)} alt="" loading="lazy" className="w-full h-full object-cover" />
-                    ) : r.role === 'vendor' ? (
-                      <Store className="w-4 h-4 text-muted-foreground" />
-                    ) : (
-                      <Users className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
+                  <ProfileAvatar profile={r} size="sm" />
                   <div className="min-w-0 flex-1">
                     <Link
                       to={`/seller/${r.user_id}`}

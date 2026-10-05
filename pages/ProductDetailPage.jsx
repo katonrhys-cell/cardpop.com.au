@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, User, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare, Clock, CalendarClock } from 'lucide-react';
+import { ShoppingCart, PackageX, Store, ArrowLeft, ShieldCheck, Lock, ArrowRightLeft, HandCoins, Tag, MessageSquare, Clock, CalendarClock } from 'lucide-react';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
@@ -29,7 +29,7 @@ import BnplMessage from '@/components/BnplMessage.jsx';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVariantChips } from '@/lib/cardAttributeLabels.js';
 import { sellerFromProfile, OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
-import CardPopLogo from '@/components/CardPopLogo.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta } from '@/utils/shopStock.js';
@@ -796,17 +796,12 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             {seller && (
               <div className="flex items-center justify-between gap-4 mb-8 p-5 bg-card border border-border rounded-2xl shadow-sm">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0 overflow-hidden">
-                    {seller.type === 'official' ? (
-                      <CardPopLogo variant="icon" iconClassName="w-6 h-[30px]" />
-                    ) : seller.logoUrl ? (
-                      <img src={publicImageUrl(seller.logoUrl)} alt={`${seller.business_name} logo`} className="w-full h-full object-cover" />
-                    ) : seller.isDealer ? (
-                      <Store className="w-6 h-6" />
-                    ) : (
-                      <User className="w-6 h-6" />
-                    )}
-                  </div>
+                  <ProfileAvatar
+                    profile={seller.type === 'official' ? { is_admin: true } : null}
+                    size="md"
+                    src={seller.type === 'official' ? null : seller.logoUrl}
+                    name={seller.business_name}
+                  />
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-0.5">{isShop ? 'Sold by' : 'Seller'}</p>
                     <p className="font-bold text-base text-foreground flex items-center gap-1.5">

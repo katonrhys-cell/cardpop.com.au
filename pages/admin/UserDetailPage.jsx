@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { useUserDetails } from '@/hooks/useUserDetails.js';
@@ -185,9 +185,7 @@ const UserDetailPage = () => {
     );
   }
 
-  const avatarUrl = user.avatar_url || null;
   const displayName = user.display_name || user.username || user.email || 'User';
-  const initials = displayName.substring(0, 2).toUpperCase();
 
   return (
     <div className="w-full space-y-8 animate-in fade-in duration-300 py-6 px-5 sm:px-8 md:px-12 xl:px-16 max-w-[90rem] mx-auto">
@@ -204,10 +202,7 @@ const UserDetailPage = () => {
         {/* Profile Sidebar */}
         <Card className="border-border shadow-sm rounded-2xl lg:col-span-1 h-fit">
           <CardContent className="p-6 flex flex-col items-center text-center">
-            <Avatar className="w-24 h-24 mb-4 border-4 border-background shadow-sm">
-              <AvatarImage src={avatarUrl} alt={displayName} />
-              <AvatarFallback className="text-2xl bg-primary/10 text-primary">{initials}</AvatarFallback>
-            </Avatar>
+            <ProfileAvatar profile={user} size="xl" name={displayName} className="mb-4" />
             <h2 className="text-2xl font-bold font-serif">{displayName}</h2>
             <p className="text-muted-foreground mb-4">@{user.username || user.id}</p>
             

@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Link } from 'react-router-dom';
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
 import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
@@ -224,16 +224,13 @@ const UserProfilePage = () => {
           <div className="px-6 sm:px-10 pb-10 relative">
             <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-12 mb-6">
               <div className="relative group shrink-0 flex flex-col items-center z-10">
-                <Avatar className="w-24 h-24 sm:w-32 sm:h-32 rounded-[2rem] border-4 border-card shadow-sm bg-muted text-primary">
-                  {avatarPreview ? (
-                    <AvatarImage src={avatarPreview} className="object-cover" />
-                  ) : (currentPhotoUrl && !removeAvatar) ? (
-                    <AvatarImage src={currentPhotoUrl} className="object-cover" />
-                  ) : null}
-                  <AvatarFallback className="rounded-[2rem] text-4xl font-bold bg-secondary/30">
-                    {(profile?.display_name || currentUser?.email || 'U').charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                <ProfileAvatar
+                  profile={profile}
+                  size="xl"
+                  src={avatarPreview ?? (removeAvatar ? null : undefined)}
+                  name={profile?.display_name || currentUser?.email || 'U'}
+                />
+
                 
                 {isEditing && (
                   <div className="absolute -bottom-3 flex gap-2">

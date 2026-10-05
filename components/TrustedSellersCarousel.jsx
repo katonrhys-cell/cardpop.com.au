@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Star, MapPin, User, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Star, MapPin, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { isVerified } from '@/utils/verification.js';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Button } from '@/components/ui/button';
 
 const TrustedSellersCarousel = () => {
@@ -106,7 +106,7 @@ const TrustedSellersCarousel = () => {
       <div className="flex gap-6 overflow-hidden pb-4">
         {[...Array(3)].map((_, i) => (
           <div key={i} className="w-full sm:w-1/2 lg:w-1/3 flex-shrink-0 bg-card rounded-2xl border border-border p-6 flex flex-col items-center text-center">
-            <Skeleton className="w-24 h-24 rounded-full mb-4" />
+            <Skeleton className="w-16 h-16 rounded-full mb-4" />
             <Skeleton className="h-6 w-1/2 mb-3" />
             <Skeleton className="h-4 w-1/3 mb-6" />
             <Skeleton className="h-10 w-full rounded-xl" />
@@ -177,19 +177,7 @@ const TrustedSellersCarousel = () => {
               <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center text-center transition-all duration-300 hover:shadow-xl hover:-translate-y-1 h-full">
                 
                 <div className="relative mb-5 group/avatar">
-                  {seller.avatar_url ? (
-                    <img
-                      src={toCdnUrl(seller.avatar_url)}
-                      alt={`${seller.display_name || seller.name || 'Seller'} avatar`}
-                      className="w-24 h-24 rounded-2xl object-cover shadow-sm ring-4 ring-background"
-                      width="96"
-                      height="96"
-                    />
-                  ) : (
-                    <div className="w-24 h-24 rounded-2xl bg-muted flex items-center justify-center shadow-sm ring-4 ring-background">
-                      <User className="w-10 h-10 text-muted-foreground/50" />
-                    </div>
-                  )}
+                  <ProfileAvatar profile={seller} size="lg" className="shadow-sm ring-4 ring-background" />
                   {isVerified(seller.is_verified) && (
                     <div className="absolute -bottom-2 -right-2 bg-background rounded-full p-0.5 shadow-sm">
                       <CheckCircle2 className="w-6 h-6 text-primary fill-background" />

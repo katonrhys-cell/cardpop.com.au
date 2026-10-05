@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED, VAULT_ITEM_CARD_SELECT } from '@/lib/listingCardColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
-import CardPopLogo from '@/components/CardPopLogo.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
   Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw, Instagram,
@@ -259,18 +259,13 @@ const SoleTraderStorePage = () => {
 
             {/* Logo */}
             <div className="shrink-0 relative">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-black border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={displayName} className="w-full h-full rounded-2xl object-cover" />
-                ) : dealer.is_admin ? (
-                  // The platform's own store gets the brand mark, not a letter.
-                  <CardPopLogo variant="icon" iconClassName="w-16 h-[78px]" />
-                ) : (
-                  <span className="text-5xl font-bold text-white">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
+              <ProfileAvatar
+                profile={dealer}
+                size="xl"
+                preferBusinessLogo
+                name={displayName}
+                className="border-4 border-card shadow-xl"
+              />
               {isDealer && (
                 <div className="absolute -bottom-2 -right-2 text-white p-2 rounded-xl shadow-lg border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">
                   <BadgeCheck className="w-6 h-6" />

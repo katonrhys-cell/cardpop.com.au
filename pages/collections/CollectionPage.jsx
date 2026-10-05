@@ -17,6 +17,7 @@ import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
@@ -179,7 +180,6 @@ const HolyGrailCard = ({ card, accentHex }) => {
   const { eyebrow, detailBits } = cardDetails(card);
   const sellerName = card.owner?.display_name || card.owner?.username || 'Seller';
   const sellerId = card.owner_id;
-  const avatarSrc = card.owner?.avatar_url || null;
   const source = card.source ?? 'vault';
   // Same rule as MiniListingCard: the vault row's embedded listing is the only
   // place "sold" lives, and it's also the right page to link to.
@@ -251,13 +251,7 @@ const HolyGrailCard = ({ card, accentHex }) => {
               className="flex items-center gap-1.5 group/seller"
               onClick={e => e.stopPropagation()}
             >
-              {avatarSrc ? (
-                <img src={avatarSrc} alt={sellerName} className="w-6 h-6 rounded-full object-cover border border-border" />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                  {sellerName?.[0]?.toUpperCase() ?? '?'}
-                </div>
-              )}
+              <ProfileAvatar profile={card.owner} size="xs" name={sellerName} />
               <span className="text-xs text-muted-foreground group-hover/seller:text-foreground transition-colors line-clamp-1 max-w-[80px]">
                 {sellerName}
               </span>

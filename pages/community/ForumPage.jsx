@@ -8,9 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { MessageSquare, Search, TrendingUp, Clock, Plus, Flame, Pin } from 'lucide-react';
-import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const CATEGORIES = ['All', 'General', 'Trading', 'Grading', 'Market Talk', 'Buying Advice', 'Show & Tell', 'Events'];
 
@@ -71,12 +70,6 @@ const ForumPage = () => {
   const filtered = search.trim()
     ? posts.filter(p => (p.title || '').toLowerCase().includes(search.toLowerCase()))
     : posts;
-
-  const resolveAvatar = (profile) => {
-    const raw = profile?.avatar_url || profile?.profile_photo_or_character;
-    if (!raw) return null;
-    return publicImageUrl(raw);
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -228,12 +221,7 @@ const ForumPage = () => {
                         <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
                           {profile && (
                             <>
-                              <Avatar className="h-4 w-4">
-                                <AvatarImage src={resolveAvatar(profile)} />
-                                <AvatarFallback className="text-[9px]">
-                                  {(profile.display_name || 'C').charAt(0).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
+                              <ProfileAvatar profile={profile} size="xs" name={profile.display_name || 'C'} />
                               <span className="font-medium">{profile.display_name || 'Collector'}</span>
                               <span>·</span>
                             </>

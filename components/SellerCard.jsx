@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CheckCircle2, User } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { isVerified } from '@/utils/verification.js';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ const SellerCard = ({ seller }) => {
     ? new Date(seller.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
     : 'Unknown';
 
-  const avatarUrl = seller.business_logo_url || seller.avatar_url || null;
   const sellerName = seller.display_name || seller.name || 'Anonymous Seller';
   const location = seller.location_suburb && seller.location_state
     ? `${seller.location_suburb}, ${seller.location_state}`
@@ -37,21 +37,13 @@ const SellerCard = ({ seller }) => {
     >
       {/* Avatar */}
       <div className="shrink-0 relative mb-4">
-        {avatarUrl ? (
-          <div className="w-20 h-20 rounded-2xl bg-black flex items-center justify-center overflow-hidden ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
-            <img
-              src={avatarUrl}
-              alt={`${sellerName} avatar`}
-              className="w-full h-full rounded-2xl object-cover"
-              width="80"
-              height="80"
-            />
-          </div>
-        ) : (
-          <div className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
-            <User className="w-8 h-8 text-muted-foreground" />
-          </div>
-        )}
+        <ProfileAvatar
+          profile={seller}
+          size="lg"
+          preferBusinessLogo
+          name={sellerName}
+          className="ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all"
+        />
       </div>
 
       {/* Seller Name */}

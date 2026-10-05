@@ -279,7 +279,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
               to={`/seller/${sellerId}`} 
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
-              <ProfileAvatar profile={sellerObj} fallbackName="S" />
+              <ProfileAvatar profile={sellerObj} name="Seller" />
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
