@@ -150,7 +150,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
           onClick={onNavigate}
           className="flex items-center justify-between gap-2 px-4 py-3 mb-1 rounded-xl bg-primary/10 hover:bg-primary/15 transition-colors text-sm font-bold text-foreground"
         >
-          <span className="flex items-center gap-2"><Store className="w-4 h-4 text-primary" aria-hidden="true" />Browse all cards</span>
+          <span className="flex items-center gap-2"><Store className="w-4 h-4 text-primary" aria-hidden="true" />Browse All Cards</span>
           <ArrowRight className="w-4 h-4 text-primary" aria-hidden="true" />
         </Link>
       </SheetClose>
@@ -304,7 +304,7 @@ const BrowseDropdown = ({ onNavigate }) => {
             onClick={() => { setOpen(false); onNavigate?.(); }}
             className="flex items-center justify-between px-5 py-3.5 border-b border-border hover:bg-muted/60 transition-colors group"
           >
-            <span className="text-sm font-bold text-foreground">Browse all cards</span>
+            <span className="text-sm font-bold text-foreground">Browse All Cards</span>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
           </Link>
 
