@@ -830,7 +830,7 @@ const HomePage = () => {
 
           <div className="mt-8 md:mt-14 text-center">
             <Button asChild size="lg" className="h-14 px-10 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
-              <Link to="/marketplace">Start browsing <ArrowRight className="ml-2 w-5 h-5" /></Link>
+              <Link to="/marketplace">Start Browsing <ArrowRight className="ml-2 w-5 h-5" /></Link>
             </Button>
           </div>
         </div>
