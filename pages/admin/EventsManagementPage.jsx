@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -281,6 +282,17 @@ const EventsManagementPage = () => {
                           aria-label={`Attendees and vendors for ${event.title}`}
                         >
                           <Users className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg shadow-sm"
+                          title="Write a review of this event"
+                        >
+                          <Link to={`/admin/event-reviews/new?eventId=${event.id}`} aria-label={`Write a review of ${event.title}`}>
+                            <ClipboardPen className="w-4 h-4" />
+                          </Link>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleOpenModal(event)} className="rounded-lg shadow-sm">
                           <Pencil className="w-4 h-4" />

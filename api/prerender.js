@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
+import { buildEventReviewJsonLd } from '../utils/eventReview.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { PAID_TIERS, hasStorefront } from '../config/plans.js';
 import {
@@ -529,7 +530,23 @@ async function renderBlogArticle(supabase, param) {
   ${faqHtml}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
+  // Event reviews (docs/event-reviews.md) add a Review node: the structured
+  // row lives in event_reviews and the reviewed event in events. Both lookups
+  // are best-effort — a plain article has neither and skips this.
+  let reviewLd = null;
+  if (article.category === 'event-reviews') {
+    const { data: reviewRow } = await supabase.from('event_reviews').select('overall_rating, event_id').eq('article_id', article.id).maybeSingle();
+    if (reviewRow) {
+      let event = null;
+      if (reviewRow.event_id) {
+        const { data: ev } = await supabase.from('events').select('id, slug, title, start_date, venue_name, address, suburb, state, postcode, image_url').eq('id', reviewRow.event_id).maybeSingle();
+        event = ev || null;
+      }
+      reviewLd = buildEventReviewJsonLd({ article, review: reviewRow, event, siteUrl: BASE_URL });
+    }
+  }
+
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
 }
 
 async function renderListing(supabase, id, slugParam) {
