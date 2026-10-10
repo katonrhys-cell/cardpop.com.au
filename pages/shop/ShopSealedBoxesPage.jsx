@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Package } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
@@ -112,18 +113,9 @@ const ShopSealedBoxesPage = () => {
     };
   }, [sort, minPrice, maxPrice, selectionKey, filterRows, facets.waiting]);
 
-  useEffect(() => {
-    // Scoped to this page's own product_type so a change to a different
-    // category (e.g. singles) doesn't refetch every open sealed-boxes page.
-    const channel = supabase
-      .channel('shop-sealed-boxes')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: 'product_type=eq.sealed' },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  // Stock and price changes reach a returning visitor on the next look at the
+  // tab; no realtime channel is held open for the grid (see useRefreshOnReturn).
+  useRefreshOnReturn(() => fetchRef.current?.());
 
   const handleAddToCart = (product) => {
     // Build a proper cart product/variant from the real shop_products columns

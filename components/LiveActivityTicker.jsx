@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { getCardImage } from '@/utils/imageUrl.js';
-import { onFirstInteractionOrLoad } from '@/lib/deferredLoad.js';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MAX_EVENTS = 16;
@@ -33,92 +33,54 @@ const eventFromListing = (listing, kind) => {
   };
 };
 
-// Live "just listed / just sold" strip. Seeds from the newest active and sold
-// listings, then prepends events from the realtime channel the marketplace
-// already streams on. Renders nothing until it has something to show, so it
-// can sit on any page without reserving empty space — `framed` additionally
-// wraps it in its own full-width bordered section (used on the homepage).
+const TICKER_SELECT = 'id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))';
+
+/** The newest active and sold listings, merged newest-first. Exported for tests. */
+export async function loadTickerEvents(client = supabase) {
+  const [listed, sold] = await Promise.all([
+    client.from('listings').select(TICKER_SELECT)
+      .eq('status', 'active').order('created_at', { ascending: false }).limit(10),
+    client.from('listings').select(TICKER_SELECT)
+      .eq('status', 'sold').order('updated_at', { ascending: false }).limit(6),
+  ]);
+  return [
+    ...(listed.data || []).map(l => eventFromListing(l, 'listed')),
+    ...(sold.data || []).map(l => eventFromListing(l, 'sold')),
+  ].sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0)).slice(0, MAX_EVENTS);
+}
+
+// "Just listed / just sold" strip. Seeds from the newest active and sold
+// listings and re-seeds when the visitor comes back to the tab. Renders
+// nothing until it has something to show, so it can sit on any page without
+// reserving empty space — `framed` additionally wraps it in its own
+// full-width bordered section (used on the homepage).
+//
+// It deliberately holds NO realtime channel. It used to subscribe every
+// visitor of the homepage and marketplace — signed in or not — to every
+// `listings` INSERT and UPDATE on the site. Supabase polls the WAL for as long
+// as any client is subscribed, so the strip alone kept that poller running
+// whenever anyone had the homepage open; it was the single largest consumer of
+// database time on the project, for a decoration. A visitor looking at the
+// strip sees what was live when the page loaded; one who tabbed away gets a
+// fresh strip on return (useRefreshOnReturn).
 const LiveActivityTicker = ({ className = '', framed = false }) => {
   const [events, setEvents] = useState([]);
-  const channelRef = useRef(null);
 
   // Everything below is best-effort: the strip is decoration, so a failed
-  // query or an environment without realtime must degrade to "no ticker",
-  // never break the page hosting it.
+  // query must degrade to "no ticker", never break the page hosting it.
   useEffect(() => {
     let cancelled = false;
-
-    const seed = async () => {
-      try {
-        const base = 'id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))';
-        const [listed, sold] = await Promise.all([
-          supabase.from('listings').select(base)
-            .eq('status', 'active').order('created_at', { ascending: false }).limit(10),
-          supabase.from('listings').select(base)
-            .eq('status', 'sold').order('updated_at', { ascending: false }).limit(6),
-        ]);
-        if (cancelled) return;
-        const merged = [
-          ...(listed.data || []).map(l => eventFromListing(l, 'listed')),
-          ...(sold.data || []).map(l => eventFromListing(l, 'sold')),
-        ].sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0)).slice(0, MAX_EVENTS);
-        setEvents(merged);
-      } catch (err) {
-        console.warn('[LiveActivityTicker] seed failed:', err?.message);
-      }
-    };
-    seed();
-
-    // The payload has no vault_item embed — fetch the card name for the one
-    // row that changed rather than refetching the whole strip.
-    const hydrate = async (row, kind) => {
-      try {
-        const { data } = await supabase
-          .from('listings')
-          .select('id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))')
-          .eq('id', row.id)
-          .maybeSingle();
-        if (cancelled || !data) return;
-        setEvents(prev => {
-          const ev = eventFromListing(data, kind);
-          if (prev.some(e => e.key === ev.key)) return prev;
-          return [ev, ...prev].slice(0, MAX_EVENTS);
-        });
-      } catch (err) {
-        console.warn('[LiveActivityTicker] hydrate failed:', err?.message);
-      }
-    };
-
-    // The realtime subscription (websocket connect + channel join) is a
-    // decoration on a decoration: the seed query above is what fills the
-    // strip, so the live feed waits for the first interaction — or a few
-    // seconds after load — instead of competing with the initial render.
-    const subscribe = () => {
-      if (cancelled) return;
-      try {
-        channelRef.current = supabase
-          .channel('live-activity-ticker')
-          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'listings' },
-            payload => { if (payload.new?.status === 'active') hydrate(payload.new, 'listed'); })
-          .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings' },
-            payload => {
-              if (payload.new?.status === 'sold' && payload.old?.status !== 'sold') hydrate(payload.new, 'sold');
-            })
-          .subscribe();
-      } catch (err) {
-        console.warn('[LiveActivityTicker] realtime unavailable:', err?.message);
-      }
-    };
-    const cancelSubscribe = onFirstInteractionOrLoad(subscribe);
-
-    return () => {
-      cancelled = true;
-      cancelSubscribe();
-      try {
-        if (channelRef.current) supabase.removeChannel(channelRef.current);
-      } catch { /* channel already gone */ }
-    };
+    loadTickerEvents()
+      .then(merged => { if (!cancelled) setEvents(merged); })
+      .catch(err => console.warn('[LiveActivityTicker] seed failed:', err?.message));
+    return () => { cancelled = true; };
   }, []);
+
+  useRefreshOnReturn(() => {
+    loadTickerEvents()
+      .then(setEvents)
+      .catch(err => console.warn('[LiveActivityTicker] refresh failed:', err?.message));
+  });
 
   if (events.length === 0) return null;
 

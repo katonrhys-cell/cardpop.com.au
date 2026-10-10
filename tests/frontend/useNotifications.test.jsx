@@ -1,3 +1,4 @@
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
@@ -18,7 +19,12 @@ vi.mock('@/lib/supabaseClient.js', () => {
 const authState = vi.hoisted(() => ({ currentUser: { id: 'u1' }, isAuthenticated: true }));
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => authState }));
 
+import { supabase } from '@/lib/supabaseClient.js';
 import { useNotifications } from '@/hooks/useNotifications.js';
+import { NotificationsProvider } from '@/contexts/NotificationsContext.jsx';
+
+const wrapper = ({ children }) => <NotificationsProvider>{children}</NotificationsProvider>;
+const renderNotifications = () => renderHook(() => useNotifications(), { wrapper });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,7 +38,7 @@ describe('useNotifications', () => {
     h.result = { data: [
       { id: 'n1', is_read: false }, { id: 'n2', is_read: true }, { id: 'n3', is_read: false },
     ], error: null };
-    const { result } = renderHook(() => useNotifications());
+    const { result } = renderNotifications();
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.notifications).toHaveLength(3);
     expect(result.current.unreadCount).toBe(2);
@@ -41,15 +47,16 @@ describe('useNotifications', () => {
   it('is empty for an unauthenticated user', async () => {
     authState.isAuthenticated = false;
     authState.currentUser = null;
-    const { result } = renderHook(() => useNotifications());
+    const { result } = renderNotifications();
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.notifications).toEqual([]);
     expect(result.current.unreadCount).toBe(0);
+    expect(supabase.channel).not.toHaveBeenCalled();
   });
 
   it('markRead flips a single notification and updates the count', async () => {
     h.result = { data: [{ id: 'n1', is_read: false }, { id: 'n2', is_read: false }], error: null };
-    const { result } = renderHook(() => useNotifications());
+    const { result } = renderNotifications();
     await waitFor(() => expect(result.current.unreadCount).toBe(2));
 
     await act(async () => { await result.current.markRead('n1'); });
@@ -60,10 +67,37 @@ describe('useNotifications', () => {
 
   it('markAllRead clears the unread count', async () => {
     h.result = { data: [{ id: 'n1', is_read: false }, { id: 'n2', is_read: false }], error: null };
-    const { result } = renderHook(() => useNotifications());
+    const { result } = renderNotifications();
     await waitFor(() => expect(result.current.unreadCount).toBe(2));
 
     await act(async () => { await result.current.markAllRead(); });
+    expect(result.current.unreadCount).toBe(0);
+  });
+
+  it('two consumers share one query and one realtime channel', async () => {
+    // The header bell and Account → Notifications both mount this hook. They
+    // used to each open `notifications-${uid}`; supabase.channel() returns the
+    // existing channel for a repeated topic, so the second `.on()` threw and
+    // either unmount tore down the other's subscription.
+    h.result = { data: [{ id: 'n1', is_read: false }], error: null };
+    const { result } = renderHook(() => [useNotifications(), useNotifications()], { wrapper });
+    await waitFor(() => expect(result.current[0].loading).toBe(false));
+    expect(result.current[0].unreadCount).toBe(1);
+    expect(result.current[1].unreadCount).toBe(1);
+    expect(supabase.from).toHaveBeenCalledTimes(1);
+    expect(supabase.channel).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a mount-unique channel topic', async () => {
+    renderNotifications();
+    await waitFor(() => expect(supabase.channel).toHaveBeenCalled());
+    const [topic] = supabase.channel.mock.calls[0];
+    expect(topic).toMatch(/^notifications-u1-\d+$/);
+  });
+
+  it('is safe to read outside the provider', () => {
+    const { result } = renderHook(() => useNotifications());
+    expect(result.current.notifications).toEqual([]);
     expect(result.current.unreadCount).toBe(0);
   });
 });

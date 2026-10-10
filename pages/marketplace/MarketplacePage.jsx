@@ -10,6 +10,7 @@ import { buildCardSearchOr, buildVariantOr } from '@/src/utils/cardSearchFilter.
 import { useCategories } from '@/hooks/useCategories.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { FilterChip, CheckRow, RadioRow } from '@/components/FilterChip.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import {
@@ -561,31 +562,15 @@ const MarketplacePage = () => {
     }
   }, [debouncedSearch, filterMode, includeSold, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures, debouncedMin, debouncedMax, page, setSearchParams]);
 
-  // Realtime subscription to vault_items changes to refresh listings.
-  // The subscription is unfiltered (any user's vault edit fires it), so
-  // coalesce bursts into at most one refetch per window — otherwise a seller
-  // bulk-editing their vault triggers a full list query per update on every
-  // connected viewer at once.
-  useEffect(() => {
-    let refreshTimer = null;
-    const channel = supabase
-      .channel('marketplace-vault-items')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
-        () => {
-          if (refreshTimer) return;
-          refreshTimer = setTimeout(() => {
-            refreshTimer = null;
-            if (fetchRef.current) fetchRef.current();
-          }, 5000);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Refresh the grid when the visitor comes back to the tab after a while.
+  // This page used to hold an UNFILTERED realtime subscription to every
+  // `vault_items` UPDATE for every visitor, signed in or not: any seller
+  // editing any private card re-ran the full listing query in every open
+  // marketplace tab, and the open subscriptions kept Supabase's WAL poller
+  // running around the clock (the largest consumer of DB time on the
+  // project). Nobody needs a push here — the grid is a snapshot, and the
+  // refresh button / return-to-tab cover staleness.
+  useRefreshOnReturn(() => fetchRef.current?.());
 
   const clearFilters = () => {
     setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');

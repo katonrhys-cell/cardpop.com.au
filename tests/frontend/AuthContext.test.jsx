@@ -202,6 +202,43 @@ describe('AuthProvider — session state', () => {
     expect(txt('authToken')).toBe('token-refreshed');
   });
 
+  it('keeps currentUser’s identity and does not re-read the profile when the same session is re-announced', async () => {
+    // supabase-js fires SIGNED_IN / TOKEN_REFRESHED with a freshly deserialised
+    // user object every time the tab regains focus. Handing that to consumers
+    // re-ran every effect keyed on `currentUser` (a dozen pages refetched on
+    // each alt-tab) and re-read the profile each time.
+    h.profileResult = { data: { is_admin: true, full_name: 'Ada Lovelace' }, error: null };
+    let identityChanges = -1;
+    let lastUser;
+    const IdentityProbe = () => {
+      const { currentUser } = useAuth();
+      if (currentUser !== lastUser) { lastUser = currentUser; identityChanges += 1; }
+      return null;
+    };
+    render(<AuthProvider><Consumer /><IdentityProbe /></AuthProvider>);
+    await emitAuth('SIGNED_IN', SESSION);
+    const profileReads = () => supabase.from.mock.calls.filter(([t]) => t === 'profiles').length;
+    expect(profileReads()).toBe(1);
+    const changesAfterSignIn = identityChanges;
+
+    // Same user, same token (a focus re-announce) — nothing may move.
+    await emitAuth('SIGNED_IN', { ...SESSION, user: { ...SESSION.user } });
+    // Same user, new token — the token must update, the user identity must not.
+    await emitAuth('TOKEN_REFRESHED', { ...SESSION, access_token: 'token-refreshed', user: { ...SESSION.user } });
+
+    expect(identityChanges).toBe(changesAfterSignIn);
+    expect(profileReads()).toBe(1);
+    expect(txt('authToken')).toBe('token-refreshed');
+    expect(txt('userName')).toBe('Ada Lovelace');
+
+    // A real change to the user record still propagates and re-reads the profile.
+    h.profileResult = { data: { is_admin: true, full_name: 'Ada K. Lovelace' }, error: null };
+    await emitAuth('USER_UPDATED', { ...SESSION, access_token: 'token-refreshed', user: { ...SESSION.user, updated_at: '2026-10-10T00:00:00Z' } });
+    expect(identityChanges).toBe(changesAfterSignIn + 1);
+    expect(profileReads()).toBe(2);
+    expect(txt('userName')).toBe('Ada K. Lovelace');
+  });
+
   it('keeps the last good profile when a background profile re-fetch fails', async () => {
     // A transient profiles read failure on refocus must not wipe isAdmin —
     // that would bounce an admin out of /admin mid-edit.

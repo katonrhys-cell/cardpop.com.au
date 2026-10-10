@@ -1,4 +1,4 @@
-import { supabase } from '../utils/supabaseClient.js';
+import { getUserForToken } from '../utils/authTokenCache.js';
 
 export async function supabaseAuth(req, res, next) {
   const token = req.headers.authorization?.split(' ')?.[1];
@@ -8,7 +8,8 @@ export async function supabaseAuth(req, res, next) {
   }
 
   try {
-    const { data, error } = await supabase.auth.getUser(token);
+    // Cached per token for a short window — see src/utils/authTokenCache.js.
+    const { data, error } = await getUserForToken(token);
     if (!error && data?.user) {
       req.userId = data.user.id;
     }
