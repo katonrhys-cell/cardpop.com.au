@@ -139,3 +139,35 @@ npx lighthouse http://127.0.0.1:4173/ --only-categories=performance --output=jso
 Local runs can't reach Supabase or the third parties, so compare lab metrics
 relative to the previous build and confirm the live numbers on
 [pagespeed.web.dev](https://pagespeed.web.dev/) after deploy.
+
+## Edge caching (vercel.json `headers`)
+
+Two rules of Vercel's header matching shape the `headers` array, and
+`tests/backend/vercelHeaders.test.js` pins both:
+
+- **Every matching rule applies, in order, and for a repeated key the last
+  match wins.** The catch-all `/(.*)` (which sets `Cache-Control: public,
+  max-age=0, must-revalidate` plus the security headers on every path)
+  therefore has to come *before* the long-cache rules for `/assets/`,
+  `/images/`, fonts, icons and the unhashed public files, or it silently
+  cancels them. A long-cache rule placed before it is dead weight — four such
+  duplicate blocks used to open the array, and `/index.html`'s own
+  `max-age=3600` was overridden the same way.
+- **A function's own `Cache-Control` wins over any `headers` rule.** So the
+  catch-all's `max-age=0` does not reach the prerender, sitemap or settings
+  responses, which set `s-maxage` themselves; those are cached at the edge as
+  they intend. (Confirmed in Vercel's docs: a header set in a Serverless
+  Function "overrides any matching route headers defined in vercel.json".)
+
+What is cached how:
+
+| Path | Cache-Control | Why |
+|---|---|---|
+| `/assets/*`, `/images/*`, `*.woff2` | 1 year, `immutable` | Content-hashed / never rewritten in place |
+| favicons, PWA icons, `/og-image.jpg` | 7 days + 1 day stale-while-revalidate | Unhashed, rarely change; og-image is 207 KB and fetched by every link unfurl |
+| `manifest.json`, `robots.txt`, `llms.txt`, `openapi.json`, `ads.txt` | 1 hour + 1 day stale-while-revalidate | Unhashed, read by every crawler and install prompt |
+| `/sw.js`, `/app.html`, everything else | `max-age=0, must-revalidate` | A cached shell references deleted chunk hashes after a deploy |
+| `/api/*` | `no-store` | Per-user |
+
+Cloudflare honours these in front of Vercel, so a positive `max-age` here also
+keeps the request off Vercel's origin for repeat visitors and bots.

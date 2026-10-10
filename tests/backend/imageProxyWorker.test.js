@@ -121,13 +121,34 @@ describe('worker fetch handler', () => {
     expect(res.headers.get('Content-Security-Policy')).toBeNull();
   });
 
-  it('scopes the year-long edge cache TTL to 2xx only, so a transient error is never pinned at the edge for a year', async () => {
+  it('scopes the year-long edge cache TTL to 2xx, remembers a 404 briefly, and never pins a 5xx', async () => {
     await run(OBJECT_PATH);
     const cf = fetchSpy.mock.calls[0][1].cf;
     expect(cf.cacheEverything).toBe(true);
     expect(cf.cacheTtlByStatus['200-299']).toBe(31536000);
-    expect(cf.cacheTtlByStatus['400-599']).toBe(0);
+    // Negative caching: a missing object (a thumb that never landed) used to
+    // cost an origin request on every grid view, forever.
+    expect(cf.cacheTtlByStatus['404']).toBe(300);
+    // …but an origin outage must not outlive itself.
+    expect(cf.cacheTtlByStatus['405-599']).toBe(0);
+    expect(cf.cacheTtlByStatus['400-403']).toBe(0);
+    expect(cf.cacheTtlByStatus['300-399']).toBe(0);
     expect(cf.cacheTtl).toBeUndefined();
+  });
+
+  it('tells the browser to hold a 404 for a few minutes too', async () => {
+    fetchSpy.mockResolvedValue(new Response('missing', { status: 404 }));
+    const res = await run(OBJECT_PATH);
+    expect(res.status).toBe(404);
+    expect(res.headers.get('Cache-Control')).toBe('public, max-age=300');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('*');
+  });
+
+  it('leaves a 5xx uncached for the browser as well', async () => {
+    fetchSpy.mockResolvedValue(new Response('down', { status: 503 }));
+    const res = await run(OBJECT_PATH);
+    expect(res.status).toBe(503);
+    expect(res.headers.get('Cache-Control')).toBeNull();
   });
 });
 
@@ -240,6 +261,52 @@ describe('worker R2 fast path', () => {
     const res = await run(OBJECT_PATH, env);
     expect(res.status).toBe(404);
     expect(env.IMAGES.put).not.toHaveBeenCalled();
+  });
+
+  // ── negative caching ──────────────────────────────────────────────────────
+
+  it('remembers an origin 404 under the query-free cache key so the next request skips R2 and Supabase', async () => {
+    fetchSpy.mockResolvedValue(new Response('missing', { status: 404 }));
+    const env = { IMAGES: bucketWith('not-this-key') };
+    const res = await run(`${OBJECT_PATH}?cachebust=1`, env);
+    expect(res.status).toBe(404);
+
+    // The miss is written to the edge cache as a bodyless 404 with a short TTL…
+    const negative = cachePut.mock.calls.find(([, response]) => response.status === 404);
+    expect(negative).toBeTruthy();
+    const [key, stored] = negative;
+    expect(key.url).toBe(`https://img.cardpop.com.au${OBJECT_PATH}`); // query stripped
+    expect(stored.headers.get('Cache-Control')).toBe('public, max-age=300');
+    expect(stored.headers.get('x-image-source')).toBe('negative-cache');
+  });
+
+  it('serves a remembered 404 without an R2 read or an origin fetch', async () => {
+    const remembered = new Response('Not found', {
+      status: 404,
+      headers: { 'Cache-Control': 'public, max-age=300', 'x-image-source': 'negative-cache' },
+    });
+    globalThis.caches.default.match.mockResolvedValue(remembered);
+    const env = { IMAGES: bucketWith('vault-images/123-card.webp') }; // present, but never asked
+    const res = await run(OBJECT_PATH, env);
+    expect(res.status).toBe(404);
+    expect(env.IMAGES.get).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('does not remember a 404 for a HEAD request or a render path', async () => {
+    fetchSpy.mockResolvedValue(new Response('missing', { status: 404 }));
+    const env = { IMAGES: bucketWith('not-this-key') };
+    await run(OBJECT_PATH, env, { method: 'HEAD' });
+    await run(RENDER_PATH, env);
+    expect(cachePut.mock.calls.filter(([, response]) => response.status === 404)).toHaveLength(0);
+  });
+
+  it('never remembers a 5xx', async () => {
+    fetchSpy.mockResolvedValue(new Response('down', { status: 503 }));
+    const env = { IMAGES: bucketWith('not-this-key') };
+    const res = await run(OBJECT_PATH, env);
+    expect(res.status).toBe(503);
+    expect(cachePut).not.toHaveBeenCalled();
   });
 
   it('never write-through migrates render/transform paths', async () => {
