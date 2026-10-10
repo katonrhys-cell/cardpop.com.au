@@ -14,6 +14,7 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import AccountPlanBanner from '@/components/AccountPlanBanner.jsx';
 import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { uniqueTopic } from '@/lib/realtimeTopic.js';
 import { toast } from 'sonner';
 
 const AccountDashboard = () => {
@@ -147,24 +148,37 @@ const AccountDashboard = () => {
   // write anywhere would refetch every logged-in dashboard. Tables where the
   // user can sit on either side (orders, trades) get one listener per column,
   // since postgres_changes filters can't express OR.
+  // Each stats refetch is an RPC plus three exact counts, so a burst of events
+  // (a bulk vault edit, a cart sale touching orders + listings + vault_items
+  // at once) is coalesced into one refetch per table group instead of one per
+  // row.
   useEffect(() => {
     if (!currentUser?.id) return;
     const uid = currentUser.id;
-    const channel = supabase.channel(`dashboard-rt-${uid}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `buyer_id=eq.${uid}` },
-        () => fetchStatsRef.current?.())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `seller_id=eq.${uid}` },
-        () => fetchStatsRef.current?.())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings', filter: `seller_id=eq.${uid}` },
-        () => fetchStatsRef.current?.())
+    let statsTimer = null;
+    let vaultTimer = null;
+    const refreshStats = () => {
+      if (statsTimer) return;
+      statsTimer = setTimeout(() => { statsTimer = null; fetchStatsRef.current?.(); }, 500);
+    };
+    const refreshVault = () => {
+      if (vaultTimer) return;
+      vaultTimer = setTimeout(() => { vaultTimer = null; fetchVaultRef.current?.(); }, 500);
+    };
+    const channel = supabase.channel(uniqueTopic(`dashboard-rt-${uid}`))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `buyer_id=eq.${uid}` }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter: `seller_id=eq.${uid}` }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'listings', filter: `seller_id=eq.${uid}` }, refreshStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items', filter: `owner_id=eq.${uid}` },
-        () => { fetchStatsRef.current?.(); fetchVaultRef.current?.(); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `initiator_id=eq.${uid}` },
-        () => fetchStatsRef.current?.())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${uid}` },
-        () => fetchStatsRef.current?.())
+        () => { refreshStats(); refreshVault(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `initiator_id=eq.${uid}` }, refreshStats)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${uid}` }, refreshStats)
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => {
+      if (statsTimer) clearTimeout(statsTimer);
+      if (vaultTimer) clearTimeout(vaultTimer);
+      supabase.removeChannel(channel);
+    };
   }, [currentUser?.id]);
 
   const handleRefresh = () => {
