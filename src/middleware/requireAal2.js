@@ -1,6 +1,23 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { isAdminUser } from './auth.js';
+import { createTtlCache } from '../utils/ttlCache.js';
+
+// Whether a user has a verified MFA factor, cached briefly per user. Every
+// admin request with an AAL1 token used to call auth.admin.mfa.listFactors —
+// a GoTrue round-trip on top of token verification — and the admin panel
+// issues many per page. Enrolling or removing a factor is visible within
+// MFA_FACTORS_CACHE_TTL_MS (default 30 s); a failed lookup is never cached, so
+// the fail-closed 403 below still fires on every attempt while GoTrue is down.
+const verifiedFactorCache = createTtlCache({ ttlMs: () => process.env.MFA_FACTORS_CACHE_TTL_MS ?? 30_000 });
+
+async function hasVerifiedMfaFactor(userId) {
+  return verifiedFactorCache.get(userId, async () => {
+    const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId });
+    if (error) throw error;
+    return (data?.factors ?? []).some((f) => f.status === 'verified');
+  });
+}
 
 // Read the `aal` (Authenticator Assurance Level) claim from a Supabase access
 // token WITHOUT verifying the signature. This is safe here because the token has
@@ -52,13 +69,14 @@ export async function requireAal2(req, res, next) {
     if (decodeAal(token) === 'aal2') return next();
 
     // AAL1 (or unknown): allowed only if the user has NO verified factor.
-    const { data, error } = await supabase.auth.admin.mfa.listFactors({ userId: req.user.id });
-    if (error) {
+    let hasVerifiedFactor;
+    try {
+      hasVerifiedFactor = await hasVerifiedMfaFactor(req.user.id);
+    } catch (error) {
       logger.error('requireAal2: listFactors failed:', error);
       return res.status(403).json({ error: 'Could not verify MFA status', code: 'mfa_check_failed' });
     }
 
-    const hasVerifiedFactor = (data?.factors ?? []).some((f) => f.status === 'verified');
     if (hasVerifiedFactor) {
       return res.status(403).json({
         error: 'Multi-factor authentication required. Complete the MFA challenge and try again.',

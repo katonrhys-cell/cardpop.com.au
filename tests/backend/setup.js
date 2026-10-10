@@ -13,3 +13,12 @@ process.env.PSA_API_TOKEN = 'vitest_dummy_psa_token';
 // Payment return URLs are pinned to the app's own origins (src/utils/returnUrl.js);
 // the route tests use https://example.com, so allow it here.
 process.env.CHECKOUT_RETURN_ORIGINS = 'https://example.com';
+// Per-instance caches (token verdicts, admin flag, MFA factors, platform
+// settings — src/utils/ttlCache.js users) are OFF in tests so every stubbed
+// Supabase call is observed exactly as before. The cache tests set these
+// themselves.
+process.env.AUTH_TOKEN_CACHE_TTL_MS = '0';
+process.env.AUTH_TOKEN_NEGATIVE_TTL_MS = '0';
+process.env.ADMIN_FLAG_CACHE_TTL_MS = '0';
+process.env.MFA_FACTORS_CACHE_TTL_MS = '0';
+process.env.PLATFORM_SETTINGS_TTL_MS = '0';
