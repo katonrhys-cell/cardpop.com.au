@@ -25,21 +25,23 @@ const loadServiceWorker = ({
   put = async () => {},
   match = async () => undefined,
   fetchImpl = async () => okResponse(),
+  keys = async () => [],
 } = {}) => {
   const stored = [];
+  const deleted = [];
   const cache = {
     put: async (request, response) => {
       await put(request, response);
       stored.push(request.url ?? String(request));
     },
     match,
-    keys: async () => [],
-    delete: async () => true,
+    keys,
+    delete: async (request) => { deleted.push(request.url ?? String(request)); return true; },
   };
 
   const factory = new Function(
     'self', 'caches', 'fetch', 'console',
-    `${SW_SRC}\nreturn { cacheFirst, networkFirst, MAX_STATIC_ENTRY_BYTES };`,
+    `${SW_SRC}\nreturn { cacheFirst, networkFirst, MAX_STATIC_ENTRY_BYTES, isStorageImage, isStorageVideo, isRangeRequest, purgeCachedVideos };`,
   );
 
   const api = factory(
@@ -55,7 +57,7 @@ const loadServiceWorker = ({
     { log: () => {}, error: () => {} },
   );
 
-  return { ...api, stored };
+  return { ...api, stored, deleted };
 };
 
 const assetRequest = () => new Request('https://cardpop.com.au/assets/opencv-BarwkdDu.js');
@@ -118,6 +120,80 @@ describe('service worker cacheFirst', () => {
     });
 
     expect((await cacheFirst(assetRequest())).status).toBe(503);
+  });
+
+  // Content-hashed chunks are immutable: a new build has new filenames, so
+  // re-fetching a cached chunk on every hit only doubled the JS transferred.
+  it('serves a cached content-hashed chunk without re-fetching it', async () => {
+    let fetches = 0;
+    const { cacheFirst } = loadServiceWorker({
+      match: async () => okResponse('/* cached */'),
+      fetchImpl: async () => { fetches += 1; return okResponse(); },
+    });
+
+    const res = await cacheFirst(assetRequest());
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(await res.text()).toBe('/* cached */');
+    expect(fetches).toBe(0);
+  });
+
+  it('still revalidates an unhashed file in the background', async () => {
+    let fetches = 0;
+    const { cacheFirst } = loadServiceWorker({
+      match: async () => okResponse('/* cached */'),
+      fetchImpl: async () => { fetches += 1; return okResponse(); },
+    });
+
+    const res = await cacheFirst(new Request('https://cardpop.com.au/images/shop/binder_front.jpg'));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(await res.text()).toBe('/* cached */');
+    expect(fetches).toBe(1);
+  });
+});
+
+// Card clips share the public bucket with the photos but must never be treated
+// as images: <video> needs Range responses (Safari won't play without them),
+// a 206 can't be stored, and one 20 MB clip evicts forty photos.
+describe('service worker storage media routing', () => {
+  const STORAGE = 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images';
+
+  it('treats storage photos as images and storage clips as video', () => {
+    const { isStorageImage, isStorageVideo } = loadServiceWorker();
+
+    expect(isStorageImage(new URL(`${STORAGE}/u1/1760000000000-front.webp`))).toBe(true);
+    expect(isStorageVideo(new URL(`${STORAGE}/u1/1760000000000-front.webp`))).toBe(false);
+
+    for (const ext of ['mp4', 'webm', 'mov', 'MP4']) {
+      const clip = new URL(`${STORAGE}/u1/1760000000000-clip.${ext}`);
+      expect(isStorageVideo(clip)).toBe(true);
+      expect(isStorageImage(clip)).toBe(false);
+    }
+
+    // The same rule on the image CDN host and the transform endpoint.
+    expect(isStorageVideo(new URL('https://img.cardpop.com.au/storage/v1/object/public/vault-images/u1/c.mp4'))).toBe(true);
+    expect(isStorageImage(new URL('https://img.cardpop.com.au/storage/v1/render/image/public/vault-images/u1/c.webp?width=480'))).toBe(true);
+  });
+
+  it('recognises a Range request whatever the URL', () => {
+    const { isRangeRequest } = loadServiceWorker();
+    expect(isRangeRequest(new Request(`${STORAGE}/u1/c.mp4`, { headers: { Range: 'bytes=0-' } }))).toBe(true);
+    expect(isRangeRequest(new Request(`${STORAGE}/u1/c.mp4`))).toBe(false);
+  });
+
+  it('purges clips an earlier version stored in the image cache, keeping the photos', async () => {
+    const { purgeCachedVideos, deleted } = loadServiceWorker({
+      keys: async () => [
+        new Request(`${STORAGE}/u1/a.webp`),
+        new Request(`${STORAGE}/u1/b.mp4`),
+        new Request(`${STORAGE}/u1/c.webm`),
+      ],
+    });
+
+    await purgeCachedVideos();
+
+    expect(deleted).toEqual([`${STORAGE}/u1/b.mp4`, `${STORAGE}/u1/c.webm`]);
   });
 });
 

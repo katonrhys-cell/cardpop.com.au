@@ -1,7 +1,7 @@
 /**
  * Site traffic sync — GA4 → site_traffic_daily / site_traffic_summary.
  *
- * Run nightly by .github/workflows/cron-site-traffic.yml (GET
+ * Run nightly by .github/workflows/cron-daily.yml (GET
  * /api/site-traffic/sync) and on demand from Admin → Dashboard → Visitors →
  * "Sync now" (POST /admin/site-traffic/sync). Two GA4 reports per run:
  *

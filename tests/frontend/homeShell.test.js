@@ -6,6 +6,7 @@ import process from 'node:process';
 import { WELCOME_DISCOUNT_PCT } from '@/config/welcomeOffer.js';
 import { CONSENT_STORAGE_KEY } from '@/lib/consent.js';
 import { AUTH_TOKEN_STORAGE_KEY } from '@/components/AnnouncementBar.jsx';
+import { appShellFromHomeShell, APP_SHELL_MAIN } from '../../tools/appShell.mjs';
 
 // The static homepage shell is what the first paint shows before any JS runs.
 // It must match what React renders on its first commit (or the takeover shifts
@@ -13,8 +14,9 @@ import { AUTH_TOKEN_STORAGE_KEY } from '@/components/AnnouncementBar.jsx';
 // returning visitors must agree with the app on element ids and storage keys.
 
 const root = process.cwd();
+const rawShell = readFileSync(path.join(root, 'tools/home-shell.html'), 'utf8');
 // Comments stripped: the file's own notes mention <button> in prose.
-const shell = readFileSync(path.join(root, 'tools/home-shell.html'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+const shell = rawShell.replace(/<!--[\s\S]*?-->/g, '');
 const viteConfig = readFileSync(path.join(root, 'vite.config.js'), 'utf8');
 const vercel = readFileSync(path.join(root, 'vercel.json'), 'utf8');
 const bootstrap = viteConfig.match(/const CSP_BOOTSTRAP = '(.*)';/)[1];
@@ -49,6 +51,24 @@ describe('static homepage shell', () => {
     expect(bootstrap).toContain('data-async-style');
   });
 
+  it('bootstrap preloads the current route’s chunk graph from data-route-preload', () => {
+    expect(bootstrap).toContain('d.routePreload');
+    expect(bootstrap).toContain('location.pathname');
+    // Only the bare chunk basename travels in the map; the URL is rebuilt and
+    // re-validated against /assets/*.js.
+    expect(bootstrap).toContain('"/assets/"+n+".js"');
+    // It contains no backslash escapes: this test hashes the raw source text,
+    // and an escape would make that differ from the runtime string.
+    expect(bootstrap).not.toContain('\\');
+  });
+
+  it('bootstrap hands the deferred stylesheet to main.jsx on every document', () => {
+    // inlineCriticalCss runs for index.html AND app.html; both rely on the
+    // bootstrap injecting data-css as a media="print" data-async-style link.
+    expect(viteConfig).toMatch(/inlineCriticalCss\([^)]*'app-shell'/);
+    expect(viteConfig).toMatch(/inlineCriticalCss\([^)]*'home-shell'/);
+  });
+
   it('bootstrap hash is pinned in every CSP header in vercel.json', () => {
     // eslint-disable-next-line no-new-func
     new Function(bootstrap); // must at least parse
@@ -56,5 +76,46 @@ describe('static homepage shell', () => {
     const headers = vercel.match(/"Content-Security-Policy"/g) || [];
     expect(headers.length).toBeGreaterThan(0);
     expect(vercel.split(hash).length - 1).toBe(headers.length);
+  });
+});
+
+// app.html (every route but "/") paints the same chrome from HTML, derived at
+// build time from the homepage shell so the header can't drift between the two
+// documents, with the route loader where the hero was.
+describe('static app shell', () => {
+  const appShell = appShellFromHomeShell(rawShell);
+
+  it('keeps the announcement bar, header and cookie banner', () => {
+    for (const id of ['cardpop-shell-announcement', 'cardpop-shell-cookie']) {
+      expect(appShell).toContain(`id="${id}"`);
+    }
+    expect(appShell).toContain('<header');
+    expect(appShell).toContain('aria-label="CardPop — back to home"');
+  });
+
+  it('drops the homepage hero and shows the route loader instead', () => {
+    expect(appShell).not.toContain('<h1');
+    expect(appShell).not.toContain('Buy and Sell Trading Cards');
+    expect(appShell).toContain(APP_SHELL_MAIN);
+    // One <main>, and it is the loader.
+    expect(appShell.match(/<main\b/g)).toHaveLength(1);
+  });
+
+  it('mirrors PageLoader.jsx so React’s first commit moves nothing', () => {
+    const loader = readFileSync(path.join(root, 'components/PageLoader.jsx'), 'utf8');
+    for (const cls of ['min-h-[calc(100vh-8rem)]', 'animate-in fade-in duration-500', 'w-10 h-10 text-primary animate-spin relative z-10']) {
+      expect(loader).toContain(cls);
+      expect(APP_SHELL_MAIN).toContain(cls);
+    }
+    expect(loader).toContain('Loading content...');
+    expect(APP_SHELL_MAIN).toContain('Loading content...');
+  });
+
+  it('is fully inert (no <button> at all)', () => {
+    expect(appShell.match(/<button\b/gi) || []).toHaveLength(0);
+  });
+
+  it('refuses a shell without a <main> rather than shipping the hero everywhere', () => {
+    expect(() => appShellFromHomeShell('<div id="x"></div>')).toThrow(/<main>/);
   });
 });

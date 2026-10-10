@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Heart, ExternalLink, RefreshCw, Clock, Tag, Trash2 } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
@@ -8,10 +8,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { useWatchlist } from '@/hooks/useWatchlist.js';
 import { supabase } from '@/lib/supabaseClient.js';
+import { uniqueTopic } from '@/lib/realtimeTopic.js';
 import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
 import GradeBadge from '@/components/GradeBadge.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
 // ── Auction countdown ─────────────────────────────────────────────────────────
@@ -74,9 +75,8 @@ const WatchlistRow = ({ entry, onRemove }) => {
     || vi?.vault_images?.find(i => i.is_primary)?.storage_path
     || vi?.vault_images?.[0]?.storage_path
     || null;
-  const imgSrc = imgPath
-    ? (publicImageUrl(imgPath))
-    : null;
+  // 64 px row thumbnail: the 480 px companion, never the full upload.
+  const imgSrc = cardThumbUrl(imgPath);
   const detailPath = `/marketplace/${listing.id}/${slugify(vi?.card_name || 'card')}`;
   const statusCfg = getStatusCfg(listing);
   const isAuction = listing.listing_type === 'auction';
@@ -236,18 +236,46 @@ const AccountWatchlist = () => {
     fetchRef.current = run;
     run();
 
+    // Cross-tab / cross-device adds and removes: the row set changed, refetch.
     const channel = supabase
-      .channel(`watchlist-page-${uid}`)
+      .channel(uniqueTopic(`watchlist-page-${uid}`))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'watchlist', filter: `user_id=eq.${uid}` },
-        () => fetchRef.current?.()
-      )
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings' },
         () => fetchRef.current?.()
       )
       .subscribe();
 
     return () => { cancelled = true; supabase.removeChannel(channel); };
   }, [currentUser?.id]);
+
+  // Price / status / bid changes on the WATCHED listings only. This used to be
+  // an unfiltered `listings` UPDATE binding that refetched the whole nested
+  // watchlist whenever any listing anywhere on the site changed — and every
+  // such event was RLS-checked against this client first. Filter to the
+  // watched ids and patch the one row in place instead. The topic is unique
+  // per subscription because the id set (and so this effect) changes as
+  // entries come and go, and `supabase.channel()` would otherwise hand back
+  // the previous, still-leaving channel.
+  const watchedIdsKey = useMemo(
+    () => entries.map(e => e.listing_id).filter(Boolean).sort().join(','),
+    [entries],
+  );
+  useEffect(() => {
+    if (!currentUser?.id || !watchedIdsKey) return undefined;
+    const channel = supabase
+      .channel(uniqueTopic(`watchlist-listings-${currentUser.id}`))
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'listings', filter: `id=in.(${watchedIdsKey})` },
+        (payload) => {
+          const row = payload.new;
+          if (!row?.id) return;
+          setEntries(prev => prev.map(e => (
+            e.listing_id === row.id && e.listing ? { ...e, listing: { ...e.listing, ...row } } : e
+          )));
+        }
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [currentUser?.id, watchedIdsKey]);
 
   const handleRemove = async (listingId) => {
     setEntries(prev => prev.filter(e => e.listing_id !== listingId));

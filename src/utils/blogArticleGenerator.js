@@ -14,7 +14,11 @@ import { checkDraft, BANNED_PHRASE_LIST } from './blogStyleGuard.js';
 // a named author byline, so a human approves before it goes live. Set
 // BLOG_AUTOPUBLISH=true to publish on generation instead.
 
-const MODEL = 'claude-opus-5';
+// Claude Opus 5.5: the current Opus, $4 / $20 per MTok against Claude Opus 5's
+// $5 / $25, same context window and tokenizer. Thinking is always on and
+// effort is the control (set explicitly below — the default dropped to
+// medium); no forced tool_choice is used here, so nothing else changes.
+const MODEL = 'claude-opus-5-5';
 const MAX_ATTEMPTS = 2;
 // How far down the queue a single run will look for a topic whose data gate is
 // satisfied. Only ever produces one article — the window is for skipping past
@@ -168,7 +172,10 @@ async function requestDraft(topic, priceContext, violations) {
       effort: 'high',
       format: { type: 'json_schema', schema: ARTICLE_SCHEMA },
     },
-    system: SYSTEM_PROMPT,
+    // The ~13 KB house-style prompt is identical on every call; cache it so the
+    // style-guard retry a few seconds later (and any other draft within the
+    // five-minute window) reads it at a tenth of the price.
+    system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: buildUserPrompt(topic, priceContext, violations) }],
   });
 

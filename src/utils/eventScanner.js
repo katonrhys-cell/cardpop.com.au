@@ -33,7 +33,11 @@ import {
 //
 // Full runbook: docs/event-scanning.md
 
-const MODEL = 'claude-opus-5';
+// Claude Opus 5.5: the current Opus, $4 / $20 per MTok against Claude Opus 5's
+// $5 / $25, same context window and tokenizer. Both calls below already set
+// effort explicitly (the default dropped to medium) and use no forced
+// tool_choice, so nothing else changes.
+const MODEL = 'claude-opus-5-5';
 
 // Per-run budgets. The cron function has a 300s ceiling (vercel.json), and one
 // slow page plus one extraction is comfortably 20s, so these are sized to
@@ -369,7 +373,10 @@ export async function extractEventFromPage(pageText, sourceUrl) {
       effort: 'low',
       format: { type: 'json_schema', schema: EVENT_SCHEMA },
     },
-    system: EventScraperPrompt,
+    // One extraction per new page, several per run within minutes of each
+    // other: cache the shared extraction prompt so only the page text is
+    // billed at full price after the first.
+    system: [{ type: 'text', text: EventScraperPrompt, cache_control: { type: 'ephemeral' } }],
     messages: [
       {
         role: 'user',

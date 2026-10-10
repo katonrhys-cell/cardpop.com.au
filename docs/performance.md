@@ -1,18 +1,26 @@
-# Homepage performance (PageSpeed Insights)
+# Page-load performance (PageSpeed Insights)
 
-How the homepage is built to load fast, and the reasoning behind the parts that
+How the site is built to load fast, and the reasoning behind the parts that
 look odd. Measured with Lighthouse / PageSpeed Insights on `https://cardpop.com.au/`;
 the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
 
-## How "/" paints
+## How a page paints
 
-1. **Static shell.** `tools/home-shell.html` is injected into `index.html` at build
-   (`homeShellPlugin` in `vite.config.js`) so the hero `<h1>` — the LCP element —
-   the header, the announcement bar and the cookie banner all paint from HTML
-   with the inlined critical CSS, before any JavaScript. React renders the same
-   markup on its first commit (`HeroSection`, `Header`, `AnnouncementBar`,
-   `CookieConsentBanner`), so the takeover moves nothing. Every other route is
-   served the shell-less `app.html`.
+1. **Static shell, on every route.** `tools/home-shell.html` is injected into
+   `index.html` at build (`homeShellPlugin` in `vite.config.js`) so the hero
+   `<h1>` — the LCP element — the header, the announcement bar and the cookie
+   banner all paint from HTML with the inlined critical CSS, before any
+   JavaScript. React renders the same markup on its first commit (`HeroSection`,
+   `Header`, `AnnouncementBar`, `CookieConsentBanner`), so the takeover moves
+   nothing. Every other route is served `app.html`, which carries the **same
+   chrome** with the route loader (`PageLoader`) in place of the hero:
+   `tools/appShell.mjs` derives it from the homepage shell at build time, so
+   there is one copy of the header markup to keep in sync with `Header.jsx`.
+   Before this, `app.html` was the bare Vite document behind a parser-blocking
+   stylesheet and nothing painted until React mounted — mobile FCP 2.0–2.8 s and
+   lab LCP 4–6 s on `/marketplace`, `/shop` and `/events` against 0.9 s / 1.4 s
+   on `/`. Both documents go through the same critical-CSS inlining
+   (`inlineCriticalCss`), each computed from its own shell.
 2. **Paint first, then fetch.** The CSP bootstrap (`CSP_BOOTSTRAP`) injects the
    full stylesheet, the module preloads and the entry script *one frame after the
    first paint* (`requestAnimationFrame` → `setTimeout 0`; immediately in a hidden
@@ -23,7 +31,18 @@ the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
    during HTML parse, simulated mobile FCP/LCP were 1.5 s / 2.7 s for a paint that
    needs only the 12 KB document. Real cost to visitors: one frame of JS boot.
    The bootstrap also removes the shell's announcement bar / cookie banner before
-   first paint for visitors who already dismissed or decided them.
+   first paint for visitors who already dismissed or decided them (on both
+   documents — the ids are the same).
+   **Route chunks are preloaded too.** `index.html` carries the homepage's lazy
+   chunk graph in `data-preload-low`; `app.html` carries `data-route-preload`, a
+   per-release map from route path to that route's chunk graph for the public
+   entry points (`ROUTE_PRELOADS` in `vite.config.js`), and the bootstrap
+   preloads the entry matching `location.pathname` at low priority. Without it
+   a route's chunk is only discovered after the entry has downloaded and React
+   has mounted — a second full round-trip. The remaining gap on `/shop` and
+   `/events` is chunk *count* (67 and 38 files for one page, lucide icons
+   split one per file); Lighthouse's simulation charges each request, so
+   grouping those is the next lever.
 3. **Fonts.** Syne is self-hosted, preloaded (also via an Early Hints `Link`
    header in `vercel.json`) and declared `font-display: swap` with the
    metric-matched `Syne Fallback` face, so text is never invisible and the swap
@@ -77,6 +96,39 @@ AdSense never loads on the homepage (`NO_AD_PREFIXES` in `lib/adsense.js`).
 - Built-in hero cards (`HeroCardImage`) declare their real rendered width in
   `sizes` so 2× screens don't fetch the 720 w files for a 160 px slot.
 
+## Realtime discipline
+
+Supabase Realtime polls the database's WAL for as long as *any* client holds a
+`postgres_changes` subscription, and every event is RLS-checked against every
+subscriber. In October 2026 that poller was the single largest consumer of
+database time on the project (1.08 M polling calls, more than every application
+query combined), kept alive by channels opened for anonymous visitors. The
+rules that came out of it:
+
+1. **No realtime for anonymous visitors.** Public grids (`MarketplacePage`,
+   `/shop`, singles, sealed, `ShopCategoryPage`), `ProductDetailPage` for a
+   logged-out reader and `LiveActivityTicker` hold no channel. They refetch
+   through `hooks/useRefreshOnReturn.js` when the tab becomes visible again
+   after a minute away — a page view is a snapshot, not a feed.
+2. **Shared state has one provider.** Notifications live in
+   `contexts/NotificationsContext.jsx` (mounted once in `App.jsx`); the header
+   bell and Account → Notifications both read it through `useNotifications()`.
+   Two components opening the same topic is a bug, not a convenience:
+   `supabase.channel(topic)` returns the *existing* channel for a registered
+   topic, so the second `.on()` throws ("cannot add callbacks after
+   subscribe()") and either unmount tears down the other's subscription.
+3. **Per-mount topics are unique.** Use `uniqueTopic(base)` from
+   `lib/realtimeTopic.js` for any subscription an effect may re-create
+   (`ProductDetailPage`, `AccountWatchlist`, `AccountDashboard`, the header
+   badges). A channel stays registered until its leave round-trip completes,
+   so an effect that tears down and re-opens the same topic in one render gets
+   the dying channel back and its new bindings never fire.
+4. **Filter to the viewer's rows, then coalesce.** Every binding carries a
+   `filter` (`user_id=eq.`, `id=in.(…)`); a burst of events (mark-all-read,
+   a bulk vault edit) is debounced into one refetch, and payloads are applied
+   in place where the row is already on screen (notifications, the watchlist's
+   listing rows).
+
 ## Checking a change
 
 ```bash
@@ -124,3 +176,35 @@ Rules that keep it from growing:
   `vercel.json` `includeFiles` is `node_modules/@img/sharp-*linux-x64/**`
   (the glibc x64 binary + libvips, ~19 MB) rather than `@img/**` (~46 MB,
   including musl and wasm builds Vercel's runtime cannot load).
+
+## Edge caching (vercel.json `headers`)
+
+Two rules of Vercel's header matching shape the `headers` array, and
+`tests/backend/vercelHeaders.test.js` pins both:
+
+- **Every matching rule applies, in order, and for a repeated key the last
+  match wins.** The catch-all `/(.*)` (which sets `Cache-Control: public,
+  max-age=0, must-revalidate` plus the security headers on every path)
+  therefore has to come *before* the long-cache rules for `/assets/`,
+  `/images/`, fonts, icons and the unhashed public files, or it silently
+  cancels them. A long-cache rule placed before it is dead weight — four such
+  duplicate blocks used to open the array, and `/index.html`'s own
+  `max-age=3600` was overridden the same way.
+- **A function's own `Cache-Control` wins over any `headers` rule.** So the
+  catch-all's `max-age=0` does not reach the prerender, sitemap or settings
+  responses, which set `s-maxage` themselves; those are cached at the edge as
+  they intend. (Confirmed in Vercel's docs: a header set in a Serverless
+  Function "overrides any matching route headers defined in vercel.json".)
+
+What is cached how:
+
+| Path | Cache-Control | Why |
+|---|---|---|
+| `/assets/*`, `/images/*`, `*.woff2` | 1 year, `immutable` | Content-hashed / never rewritten in place |
+| favicons, PWA icons, `/og-image.jpg` | 7 days + 1 day stale-while-revalidate | Unhashed, rarely change; og-image is 207 KB and fetched by every link unfurl |
+| `manifest.json`, `robots.txt`, `llms.txt`, `openapi.json`, `ads.txt` | 1 hour + 1 day stale-while-revalidate | Unhashed, read by every crawler and install prompt |
+| `/sw.js`, `/app.html`, everything else | `max-age=0, must-revalidate` | A cached shell references deleted chunk hashes after a deploy |
+| `/api/*` | `no-store` | Per-user |
+
+Cloudflare honours these in front of Vercel, so a positive `max-age` here also
+keeps the request off Vercel's origin for repeat visitors and bots.

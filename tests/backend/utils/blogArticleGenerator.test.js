@@ -152,7 +152,7 @@ describe('runScheduledGeneration', () => {
     expect(insert.row.is_published).toBe(false);
     expect(insert.row.published_at).toBeNull();
     expect(insert.row.auto_generated).toBe(true);
-    expect(insert.row.generation_model).toBe('claude-opus-5');
+    expect(insert.row.generation_model).toBe('claude-opus-5-5');
     expect(insert.row.slug).toBe(t.slug);
     // Topic metadata wins over anything the model might have invented.
     expect(insert.row.marketplace_keywords).toEqual(['psa 10']);
@@ -377,11 +377,16 @@ describe('runScheduledGeneration', () => {
     await runScheduledGeneration();
 
     const request = mockStream.mock.calls[0][0];
-    expect(request.model).toBe('claude-opus-5');
+    expect(request.model).toBe('claude-opus-5-5');
     expect(request.output_config.format.type).toBe('json_schema');
     expect(request.output_config.format.schema.required).toContain('content');
     expect(request.thinking).toEqual({ type: 'adaptive' });
-    expect(request.system).toContain('never invent a figure');
+    // Effort is set explicitly: Claude Opus 5.5 defaults to medium.
+    expect(request.output_config.effort).toBe('high');
+    // The house-style prompt is a cached system block.
+    expect(request.system).toHaveLength(1);
+    expect(request.system[0].text).toContain('never invent a figure');
+    expect(request.system[0].cache_control).toEqual({ type: 'ephemeral' });
     expect(request.messages[0].content).toContain('psa grading australia');
   });
 });

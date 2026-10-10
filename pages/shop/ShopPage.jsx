@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import ShopCategoryBrowse from '@/components/ShopCategoryBrowse.jsx';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -75,7 +77,7 @@ const ShopPage = () => {
 
         let query = supabase
           .from('shop_products')
-          .select('*')
+          .select(SHOP_CARD_COLUMNS)
           .in('status', PUBLIC_SHOP_STATUSES)
           .range(from, from + PAGE_LIMIT - 1);
 
@@ -116,19 +118,9 @@ const ShopPage = () => {
     return () => { cancelled = true; };
   }, [sort, searchTerm, selectionKey, filterRows, facets.waiting]);
 
-  useEffect(() => {
-    // Scoped to publicly visible products (active + coming soon) — this page
-    // only ever queries those, so a change to a draft/archived product
-    // shouldn't trigger every open shop page to refetch.
-    const channel = supabase
-      .channel('shop-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: PUBLIC_SHOP_STATUS_FILTER },
-        () => { fetchRef.current?.(0, { append: false }); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  // Stock and price changes reach a returning visitor on the next look at the
+  // tab; no realtime channel is held open for the grid (see useRefreshOnReturn).
+  useRefreshOnReturn(() => fetchRef.current?.(0, { append: false }));
 
   const loadMore = () => {
     if (loadingMore || !hasMore) return;

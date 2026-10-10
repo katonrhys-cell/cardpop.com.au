@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
@@ -104,7 +106,9 @@ const ShopCategoryPage = () => {
         // small, so the exact count is inexpensive.
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'exact' })
+          // `estimated` is exact below PostgREST's 1,000-row cap (the whole
+          // catalogue today) and stops costing a second scan beyond it.
+          .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
           .in('status', PUBLIC_SHOP_STATUSES);
 
         // shop_products stores a free-text category; match the resolved
@@ -147,16 +151,9 @@ const ShopCategoryPage = () => {
     // selection is tracked by value via selectionKey for the same reason.
   }, [categoryName, page, sort, debouncedSearch, contextLoading, selectionKey, filterRows, facets.waiting]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('shop-category-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  // Stock and price changes reach a returning visitor on the next look at the
+  // tab; no realtime channel is held open for the grid (see useRefreshOnReturn).
+  useRefreshOnReturn(() => fetchRef.current?.());
 
   const handleAddToCart = (product) => {
     // Build the cart product/variant from the real shop_products columns

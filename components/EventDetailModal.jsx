@@ -7,6 +7,7 @@ import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink, Accessibility, Shi
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const EventDetailModal = ({ isOpen, onClose, event }) => {
   if (!event) return null;
@@ -17,7 +18,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
   const formattedLocation = formatEventLocation(event);
   const ticketLink = event.ticket_url || event.website_url || event.ticketLink;
 
-  const imageUrl = event.image_url || event.image || null;
+  const imageUrl = publicImageUrl(event.image_url || event.image || null);
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>

@@ -11,6 +11,7 @@ import { useIsDesktop } from '@/hooks/useIsDesktop.js';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { uniqueTopic } from '@/lib/realtimeTopic.js';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -160,49 +161,53 @@ const Header = () => {
     if (!isAuthenticated || !currentUser) return;
 
     let isMounted = true;
+    const uid = currentUser.id;
 
-    const fetchData = async () => {
-      try {
-        const [{ count: msgCount }, { count: tradeCount }] = await Promise.all([
-          supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('recipient_id', currentUser.id)
-            .is('read_at', null),
-          supabase
-            .from('trades')
-            .select('*', { count: 'exact', head: true })
-            .eq('responder_id', currentUser.id)
-            .eq('status', 'proposed')
-        ]);
-        if (isMounted) {
-          setUnreadCount(msgCount || 0);
-          setTradeCount(tradeCount || 0);
-        }
-      } catch (err) {
-        console.error("Failed to fetch notification counts:", err);
-      }
+    const countUnreadMessages = async () => {
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', uid)
+        .is('read_at', null);
+      if (isMounted) setUnreadCount(count || 0);
+    };
+    const countPendingTrades = async () => {
+      const { count } = await supabase
+        .from('trades')
+        .select('*', { count: 'exact', head: true })
+        .eq('responder_id', uid)
+        .eq('status', 'proposed');
+      if (isMounted) setTradeCount(count || 0);
     };
 
-    fetchData();
+    Promise.all([countUnreadMessages(), countPendingTrades()])
+      .catch((err) => console.error('Failed to fetch notification counts:', err));
 
-    // Scope realtime to THIS user's rows (and use per-user channel names).
-    // Previously these subscribed to every row of messages/trades, so any
-    // write anywhere on the platform woke every connected client into a double
-    // count refetch — load that scaled with users × global write rate.
-    const msgChannel = supabase
-      .channel(`header-messages-${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `recipient_id=eq.${currentUser.id}` }, () => fetchData())
-      .subscribe();
-    const tradeChannel = supabase
-      .channel(`header-trades-${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${currentUser.id}` }, () => fetchData())
+    // One channel, scoped to THIS user's rows, and one refetch per burst.
+    // Opening a thread marks N messages read in one go, which arrives as N
+    // UPDATE events — refetching both counts on each turned a click into 2N
+    // count queries. Coalesce each table's events into a single recount, and
+    // only recount the table that changed.
+    const timers = { messages: null, trades: null };
+    const recount = (table, fn) => {
+      if (timers[table]) return;
+      timers[table] = setTimeout(() => {
+        timers[table] = null;
+        if (isMounted) fn().catch((err) => console.error(`Failed to recount ${table}:`, err));
+      }, 400);
+    };
+    const channel = supabase
+      .channel(uniqueTopic(`header-badges-${uid}`))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `recipient_id=eq.${uid}` },
+        () => recount('messages', countUnreadMessages))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${uid}` },
+        () => recount('trades', countPendingTrades))
       .subscribe();
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(msgChannel);
-      supabase.removeChannel(tradeChannel);
+      for (const t of Object.values(timers)) if (t) clearTimeout(t);
+      supabase.removeChannel(channel);
     };
   }, [isAuthenticated, currentUser?.id]);
 

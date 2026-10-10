@@ -4,11 +4,13 @@ import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { buildCardSearchOr, buildVariantOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { FilterChip, CheckRow, RadioRow } from '@/components/FilterChip.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import {
@@ -413,7 +415,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`, { count: 'estimated' })
+          .select(`${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`, { count: 'estimated' })
           // Available cards only unless the buyer opts into sold ones (badged
           // "Sold" — useful as price history). 'archived' is never shown.
           .in('status', includeSold ? ['active', 'sold'] : ['active'])
@@ -560,31 +562,15 @@ const MarketplacePage = () => {
     }
   }, [debouncedSearch, filterMode, includeSold, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures, debouncedMin, debouncedMax, page, setSearchParams]);
 
-  // Realtime subscription to vault_items changes to refresh listings.
-  // The subscription is unfiltered (any user's vault edit fires it), so
-  // coalesce bursts into at most one refetch per window — otherwise a seller
-  // bulk-editing their vault triggers a full list query per update on every
-  // connected viewer at once.
-  useEffect(() => {
-    let refreshTimer = null;
-    const channel = supabase
-      .channel('marketplace-vault-items')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
-        () => {
-          if (refreshTimer) return;
-          refreshTimer = setTimeout(() => {
-            refreshTimer = null;
-            if (fetchRef.current) fetchRef.current();
-          }, 5000);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Refresh the grid when the visitor comes back to the tab after a while.
+  // This page used to hold an UNFILTERED realtime subscription to every
+  // `vault_items` UPDATE for every visitor, signed in or not: any seller
+  // editing any private card re-ran the full listing query in every open
+  // marketplace tab, and the open subscriptions kept Supabase's WAL poller
+  // running around the clock (the largest consumer of DB time on the
+  // project). Nobody needs a push here — the grid is a snapshot, and the
+  // refresh button / return-to-tab cover staleness.
+  useRefreshOnReturn(() => fetchRef.current?.());
 
   const clearFilters = () => {
     setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');

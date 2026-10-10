@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import Beasties from 'beasties';
 import { patchOpenCvSource } from './tools/opencvCspPatch.mjs';
+import { appShellFromHomeShell } from './tools/appShell.mjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const allDeps = Object.keys(pkg.dependencies || {});
@@ -14,9 +15,14 @@ const allDeps = Object.keys(pkg.dependencies || {});
 //   • index.html — the "/"-only document, with the static hero shell injected
 //     into #root so the LCP paints from HTML before any JS runs (Vercel serves
 //     this for "/" via the filesystem index).
-//   • app.html   — a shell-less copy served for every OTHER route via the
-//     catch-all rewrite in vercel.json, so those pages never flash the homepage
-//     hero. Both reference the identical hashed JS/CSS, so the SPA boots the same.
+//   • app.html   — served for every OTHER route via the catch-all rewrite in
+//     vercel.json. It carries the same shell CHROME (announcement bar, header,
+//     cookie banner — tools/appShell.mjs derives it from the homepage shell)
+//     with the route loader in place of the hero, so those pages paint their
+//     header from HTML too instead of a blank page until React mounts, and
+//     never flash the homepage hero. Both documents get the same critical-CSS
+//     inlining and deferred stylesheet, and reference the identical hashed
+//     JS/CSS, so the SPA boots the same.
 // CSP `strict-dynamic` bootstrap. The parser-inserted module entry tag can't be
 // allowlisted by hash in a static vercel.json (its filename hash changes every
 // build), so we swap it for this CONSTANT inline script: the build-varying bits
@@ -39,10 +45,24 @@ const allDeps = Object.keys(pkg.dependencies || {});
 // competing with the critical entry/vendor chunks. It must be injected via
 // this trusted script, not as parser-inserted <link> tags — under
 // 'strict-dynamic' the browser blocks modulepreloads that don't originate
-// from an already-trusted script.
-// data-css (index.html only) is the full stylesheet: the bootstrap injects its
-// as="style" preload plus the media="print" <link data-async-style> that
-// main.jsx flips to "all" once the bundle runs (see homeShellPlugin).
+// from an already-trusted script. (The list is present only on index.html —
+// app.html serves every other route, so there is no single route graph to
+// preload. It carries data-route-preload instead, see below.)
+// data-route-preload (app.html only) is a map from route path to that
+// route's lazy chunk graph: `path:name,name;path:name…`, where each name is a
+// bare hashed chunk basename (the bootstrap re-adds /assets/ and .js, and v()
+// still validates every URL). rp() picks the entry whose key equals the
+// current pathname, or the longest key ending in "/" that prefixes it
+// (`/marketplace/` → the product page), and preloads its chunks at low
+// priority alongside the entry. Without it a route chunk is only discovered
+// after the entry has downloaded, parsed and mounted React — a second full
+// network round-trip that in Lighthouse's throttled simulation put the
+// route's first text (its LCP) at 5–6 s on /shop and /events even with the
+// header already painted from the static shell. The map is built per
+// release from the bundle graph (ROUTE_PRELOADS in homeShellPlugin).
+// data-css is the full stylesheet: the bootstrap injects its as="style"
+// preload plus the media="print" <link data-async-style> that main.jsx flips
+// to "all" once the bundle runs (see inlineCriticalCss below).
 //
 // PAINT FIRST, THEN FETCH. Everything above is injected one frame AFTER the
 // first paint (requestAnimationFrame → setTimeout 0), not synchronously while
@@ -67,9 +87,9 @@ const allDeps = Object.keys(pkg.dependencies || {});
 // components/Header.jsx (optimisticAuth) and lib/consent.js — change them
 // together. This tag sits in <head> (Vite puts the entry there), i.e. before
 // the shell has parsed, so it hides by id via an injected <style> rule rather
-// than touching elements that don't exist yet; the rule is a no-op on
-// documents without the shell (app.html, launch shell).
-const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head,done=0;try{var hid=[];if(sessionStorage.getItem("cardpop_announcement_dismissed")==="1"||localStorage.getItem("sb-vrfsaazuqjxotnieqlkd-auth-token"))hid.push("#cardpop-shell-announcement");if(localStorage.getItem("cardpop_cookie_consent")!==null)hid.push("#cardpop-shell-cookie");if(hid.length){var st=document.createElement("style");st.textContent=hid.join(",")+"{display:none}";h.appendChild(st)}}catch(e){}function v(p,x){return!!p&&p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-x.length)===x}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p,".js")){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}function go(){if(done)return;done=1;var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;if(v(d.css,".css")){var p=document.createElement("link");p.rel="preload";p.as="style";p.href=d.css;p.crossOrigin="";h.appendChild(p);var c=document.createElement("link");c.rel="stylesheet";c.href=d.css;c.media="print";c.crossOrigin="";c.setAttribute("data-async-style","");h.appendChild(c)}ld(d.preload);if(v(d.entry,".js")){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)}if(document.visibilityState==="hidden"||!window.requestAnimationFrame)go();else{requestAnimationFrame(function(){setTimeout(go,0)});setTimeout(go,1500)}})()';
+// than touching elements that don't exist yet; the rule is a no-op on a
+// document without those elements (the launch shell).
+const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head,done=0;try{var hid=[];if(sessionStorage.getItem("cardpop_announcement_dismissed")==="1"||localStorage.getItem("sb-vrfsaazuqjxotnieqlkd-auth-token"))hid.push("#cardpop-shell-announcement");if(localStorage.getItem("cardpop_cookie_consent")!==null)hid.push("#cardpop-shell-cookie");if(hid.length){var st=document.createElement("style");st.textContent=hid.join(",")+"{display:none}";h.appendChild(st)}}catch(e){}function v(p,x){return!!p&&p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-x.length)===x}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p,".js")){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}function rp(){var m=d.routePreload;if(!m)return;var p=location.pathname,b=null,r="";while(p.length>1&&p.slice(-1)==="/")p=p.slice(0,-1);m.split(";").forEach(function(e){var i=e.indexOf(":");if(i<0)return;var k=e.slice(0,i);if((k===p||(k.slice(-1)==="/"&&p.lastIndexOf(k,0)===0))&&(b===null||k.length>b.length)){b=k;r=e.slice(i+1)}});if(b!==null)ld(r.split(",").map(function(n){return"/assets/"+n+".js"}).join(","),1)}function go(){if(done)return;done=1;var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;if(v(d.css,".css")){var p=document.createElement("link");p.rel="preload";p.as="style";p.href=d.css;p.crossOrigin="";h.appendChild(p);var c=document.createElement("link");c.rel="stylesheet";c.href=d.css;c.media="print";c.crossOrigin="";c.setAttribute("data-async-style","");h.appendChild(c)}ld(d.preload);rp();if(v(d.entry,".js")){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)}if(document.visibilityState==="hidden"||!window.requestAnimationFrame)go();else{requestAnimationFrame(function(){setTimeout(go,0)});setTimeout(go,1500)}})()';
 
 const ENTRY_SCRIPT_RE = /<script type="module" crossorigin src="([^"]+)"><\/script>/;
 
@@ -118,10 +138,14 @@ function verifyCspBootstrap(ctx, htmlFiles) {
 // waterfall. Only index.html gets this (it is only ever served for "/");
 // app.html routes vary, so they keep the default on-demand loading.
 function collectRouteChunkFiles(bundle, facadeSuffix) {
-	const entryFile = Object.keys(bundle).find((f) => {
-		const c = bundle[f];
-		return c.type === 'chunk' && c.facadeModuleId?.endsWith(facadeSuffix);
-	});
+	const chunks = Object.keys(bundle).filter((f) => bundle[f].type === 'chunk');
+	// A page module that is BOTH lazily routed and statically imported elsewhere
+	// (ProductDetailPage, rendered by ShopListedProductPage too) still gets its
+	// own chunk, but rolldown reports no facadeModuleId for it — so fall back to
+	// the dynamic-entry chunk that contains the module.
+	const entryFile = chunks.find((f) => bundle[f].facadeModuleId?.endsWith(facadeSuffix))
+		?? chunks.find((f) => bundle[f].isDynamicEntry && bundle[f].moduleIds?.some((id) => id.endsWith(facadeSuffix)))
+		?? chunks.find((f) => bundle[f].moduleIds?.some((id) => id.endsWith(facadeSuffix)));
 	if (!entryFile) return null;
 	const js = [];
 	const css = new Set();
@@ -178,6 +202,56 @@ function addHomeRoutePreloads(html, bundle, warn, facadeSuffix) {
 	return html;
 }
 
+// Routes whose lazy chunk graph app.html preloads up front (see the
+// data-route-preload note above CSP_BOOTSTRAP). Keys ending in "/" match any
+// deeper path; exact keys match that path only. Values are the facade suffix
+// of the route's page module in the bundle. Keep this to the high-traffic
+// public entry points: every entry adds its chunk names to app.html.
+const ROUTE_PRELOADS = {
+	'/marketplace': 'pages/marketplace/MarketplacePage.jsx',
+	'/marketplace/': 'pages/ProductDetailPage.jsx',
+	'/shop': 'pages/shop/ShopPage.jsx',
+	'/events': 'pages/community/CommunityEventsPage.jsx',
+	'/collections': 'pages/PublicCollectionsPage.jsx',
+	'/collections/': 'pages/collections/CollectionPage.jsx',
+	'/blog': 'pages/blog/BlogPage.jsx',
+	'/grading': 'pages/grading/GradingPage.jsx',
+	'/analytics': 'pages/markets/MarketsPage.jsx',
+	'/prices': 'pages/prices/CardPricesHubPage.jsx',
+	'/card-shops': 'pages/stores/CardShopsHubPage.jsx',
+	'/login': 'pages/LoginPage.jsx',
+	'/signup': 'pages/SignupPage.jsx',
+};
+
+// Add the data-route-preload map to app.html's bootstrap tag (attribute-only:
+// the script text and its CSP hash are untouched). Chunks the document already
+// preloads (the entry graph) are left out of every route's list.
+function addRoutePreloadMap(html, bundle, warn) {
+	const preloadAttr = html.match(/data-preload="([^"]*)"/);
+	const entryAttr = html.match(/data-entry="([^"]*)"/);
+	if (!preloadAttr) {
+		warn('app-shell: data-preload attribute not found — route preload map skipped');
+		return html;
+	}
+	const existing = new Set(preloadAttr[1].split(',').filter(Boolean));
+	if (entryAttr) existing.add(entryAttr[1]);
+	const entries = [];
+	for (const [route, facade] of Object.entries(ROUTE_PRELOADS)) {
+		const files = collectRouteChunkFiles(bundle, facade);
+		if (!files) {
+			warn(`app-shell: ${facade} chunk not found in bundle — no preloads for ${route}`);
+			continue;
+		}
+		const names = files.js
+			.filter((f) => f.startsWith('assets/') && f.endsWith('.js') && !existing.has(`/${f}`))
+			.map((f) => f.slice('assets/'.length, -'.js'.length))
+			.filter((n) => /^[\w-]+$/.test(n));
+		if (names.length > 0) entries.push(`${route}:${names.join(',')}`);
+	}
+	if (entries.length === 0) return html;
+	return html.replace(preloadAttr[0], `${preloadAttr[0]} data-route-preload="${entries.join(';')}"`);
+}
+
 // The metric-adjusted fallback face for Syne, injected into the "/" document's
 // critical CSS after beasties runs (beasties' inlineFonts keeps url() faces like
 // Syne itself but drops local()-only faces, so this one needs manual injection).
@@ -216,6 +290,82 @@ function injectImageCdnPreconnect(html, warn) {
 	return html.replace('</head>', `    ${tag}\n  </head>`);
 }
 
+// Inline the above-the-fold critical CSS for the shell markup in `html` and
+// load the full stylesheet asynchronously so it no longer blocks the shell's
+// first paint. The classic media="print"/onload swap uses an inline handler
+// that our hardened CSP (no 'unsafe-inline' in script-src) blocks, so we strip
+// beasties' onload and let main.jsx flip [data-async-style] to media "all"
+// instead. Fail-safe: any error keeps the render-blocking link.
+//
+// Used for BOTH documents. The critical CSS is computed per document from its
+// own shell (the hero for index.html, the header + route loader for app.html),
+// so each inlines only what its first paint needs.
+async function inlineCriticalCss(html, outDir, label, warn) {
+	try {
+		const beasties = new Beasties({
+			path: outDir,
+			publicPath: '/',
+			preload: 'media',
+			pruneSource: false,
+			// Inline the @font-face declarations (Syne + metric-adjusted 'Syne
+			// Fallback') into the critical CSS. Without them the shell's hero
+			// <h1> paints in an arbitrary system font with no size-adjust, so
+			// the later React repaint registers as a larger LCP candidate and
+			// drags LCP from ~0.8s to whenever the JS bundle lands (see the
+			// 'Syne Fallback' comment in index.css).
+			inlineFonts: true,
+			preloadFonts: false,
+			logLevel: 'silent',
+		});
+		const processed = await beasties.process(html);
+		html = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
+
+		// Hand the deferred (media="print") stylesheet to the CSP bootstrap
+		// (data-css) instead of leaving it as a parser-inserted tag. The
+		// bootstrap injects it one frame after the first paint, together
+		// with an as="style" preload: a bare print stylesheet is fetched at
+		// the browser's LOWEST priority and loses the bandwidth race against
+		// the JS chunks (main.jsx gates the React mount on it, 2s fail-safe),
+		// while a parser-inserted preload is VeryHigh priority — which
+		// Lighthouse's simulation counts as render-blocking for the shell's
+		// paint even though media="print" never blocks anything. Injecting
+		// both post-paint gets the high fetch priority without the simulated
+		// penalty. Only the first (main) stylesheet is handed over; any other
+		// deferred sheet keeps its tag.
+		let deferredCss = null;
+		html = html.replace(
+			/<link rel="stylesheet"([^>]*?) media="print" data-async-style>/,
+			(tag, attrs) => {
+				const href = attrs.match(/href="([^"]+)"/)?.[1];
+				if (!href || !/^\/assets\/[^"]+\.css$/.test(href)) return tag;
+				deferredCss = href;
+				return '';
+			},
+		);
+		if (deferredCss) {
+			const bootstrapTag = html.match(/<script data-entry="[^"]*" data-preload="[^"]*"/);
+			if (bootstrapTag) {
+				html = html.replace(bootstrapTag[0], `${bootstrapTag[0]} data-css="${deferredCss}"`);
+			} else {
+				warn(`${label}: bootstrap tag not found — deferred stylesheet restored as a plain link`);
+				html = html.replace('</head>', `<link rel="stylesheet" crossorigin href="${deferredCss}" media="print" data-async-style></head>`);
+			}
+		}
+	} catch (e) {
+		warn(`${label}: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
+	}
+
+	// Beasties drops the local()-only 'Syne Fallback' face from the inlined
+	// critical CSS — put it back so the shell's text paints with the oversized
+	// metric-adjusted fallback (see SYNE_FALLBACK_FONT_FACE above).
+	if (html.includes('<style>')) {
+		html = html.replace('<style>', `<style>${SYNE_FALLBACK_FONT_FACE}`);
+	} else {
+		warn(`${label}: no inline <style> found — Syne Fallback face not injected`);
+	}
+	return html;
+}
+
 function homeShellPlugin() {
 	// Coming-soon builds redirect "/" to /launch on mount, so the static shell
 	// and the preloaded route graph must both be the LAUNCH page's — otherwise
@@ -223,7 +373,8 @@ function homeShellPlugin() {
 	// homepage chunks download only to be thrown away (VITE_COMING_SOON is a
 	// build-time env var, same as its use in App.jsx).
 	const comingSoon = process.env.VITE_COMING_SOON === 'true';
-	const shellPath = path.resolve(__dirname, comingSoon ? 'tools/launch-shell.html' : 'tools/home-shell.html');
+	const homeShellPath = path.resolve(__dirname, 'tools/home-shell.html');
+	const shellPath = comingSoon ? path.resolve(__dirname, 'tools/launch-shell.html') : homeShellPath;
 	const routeFacade = comingSoon ? 'pages/LaunchPage.jsx' : 'pages/HomePage.jsx';
 	return {
 		name: 'cardpop-home-shell',
@@ -231,109 +382,50 @@ function homeShellPlugin() {
 		async writeBundle(outputOptions, bundle) {
 			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
 			const indexPath = path.join(outDir, 'index.html');
+			const appPath = path.join(outDir, 'app.html');
 			if (!existsSync(indexPath)) return;
+			const warn = (m) => this.warn(m);
 
-			const builtIndex = applyCspBootstrap(readFileSync(indexPath, 'utf-8'), (m) => this.warn(m));
+			const builtIndex = applyCspBootstrap(readFileSync(indexPath, 'utf-8'), warn);
 
 			// Content routes (marketplace, shop, product, category…) render an
 			// above-the-fold card image from the image CDN as their LCP element, so
 			// warming that origin's DNS/TCP/TLS ahead of the image request shaves
-			// meaningful time off mobile LCP. The homepage gets the same preconnect
-			// (see below): its LCP is text, but its longest network chain ends in the
-			// "Just Listed" card photos from that origin, and Lighthouse's
+			// meaningful time off mobile LCP. The homepage gets the same preconnect:
+			// its LCP is text, but its longest network chain ends in the "Just
+			// Listed" card photos from that origin, and Lighthouse's
 			// network-dependency-tree insight flags exactly that unwarmed origin.
 			// Gated on VITE_IMAGE_CDN_HOST (a real build-time env var on Vercel) so
 			// there's never a wasted preconnect when the CDN is disabled — images
 			// then come from Supabase, which is already preconnected.
-			const appHtml = injectImageCdnPreconnect(builtIndex, (m) => this.warn(m));
-			// Shell-less document for all non-root routes (CSS stays render-blocking
-			// there — those pages are React-gated, so it costs them nothing).
-			writeFileSync(path.join(outDir, 'app.html'), appHtml, 'utf-8');
+			const baseHtml = injectImageCdnPreconnect(builtIndex, warn);
 
-			// Inject the hero shell into the "/"-only index.html.
 			const marker = '<div id="root"></div>';
-			if (!builtIndex.includes(marker)) {
-				this.warn('home-shell: `<div id="root"></div>` not found — shell not injected');
+			if (!baseHtml.includes(marker)) {
+				this.warn('home-shell: `<div id="root"></div>` not found — shells not injected');
+				writeFileSync(appPath, baseHtml, 'utf-8');
+				verifyCspBootstrap(this, [indexPath, appPath]);
 				return;
 			}
-			const shell = readFileSync(shellPath, 'utf-8');
-			let indexHtml = appHtml.replace(marker, `<div id="root">${shell}</div>`);
 
-			// Inline the above-the-fold critical CSS and load the full stylesheet
-			// asynchronously so it no longer blocks the shell's first paint. The
-			// classic media="print"/onload swap uses an inline handler that our
-			// hardened CSP (no 'unsafe-inline' in script-src) blocks, so we strip
-			// beasties' onload and let main.jsx flip [data-async-style] to media
-			// "all" instead. Fail-safe: any error keeps the render-blocking link.
-			try {
-				const beasties = new Beasties({
-					path: outDir,
-					publicPath: '/',
-					preload: 'media',
-					pruneSource: false,
-					// Inline the @font-face declarations (Syne + metric-adjusted 'Syne
-					// Fallback') into the critical CSS. Without them the shell's hero
-					// <h1> paints in an arbitrary system font with no size-adjust, so
-					// the later React repaint registers as a larger LCP candidate and
-					// drags LCP from ~0.8s to whenever the JS bundle lands (see the
-					// 'Syne Fallback' comment in index.css).
-					inlineFonts: true,
-					preloadFonts: false,
-					logLevel: 'silent',
-				});
-				const processed = await beasties.process(indexHtml);
-				indexHtml = processed.replace(/ onload="this\.media='all'"/g, ' data-async-style');
+			// app.html — every route but "/": the shared chrome (announcement bar,
+			// header, cookie banner) plus the route loader, from the same source
+			// file as the homepage shell so the header can't drift between them.
+			let appHtml = baseHtml.replace(marker, `<div id="root">${appShellFromHomeShell(readFileSync(homeShellPath, 'utf-8'))}</div>`);
+			appHtml = await inlineCriticalCss(appHtml, outDir, 'app-shell', warn);
+			appHtml = addRoutePreloadMap(appHtml, bundle, warn);
+			writeFileSync(appPath, appHtml, 'utf-8');
 
-				// Hand the deferred (media="print") stylesheet to the CSP bootstrap
-				// (data-css) instead of leaving it as a parser-inserted tag. The
-				// bootstrap injects it one frame after the first paint, together
-				// with an as="style" preload: a bare print stylesheet is fetched at
-				// the browser's LOWEST priority and loses the bandwidth race against
-				// the JS chunks (main.jsx gates the React mount on it, 2s fail-safe),
-				// while a parser-inserted preload is VeryHigh priority — which
-				// Lighthouse's simulation counts as render-blocking for the shell's
-				// paint even though media="print" never blocks anything. Injecting
-				// both post-paint gets the high fetch priority without the simulated
-				// penalty. Only the first (main) stylesheet is handed over; any other
-				// deferred sheet keeps its tag.
-				let deferredCss = null;
-				indexHtml = indexHtml.replace(
-					/<link rel="stylesheet"([^>]*?) media="print" data-async-style>/,
-					(tag, attrs) => {
-						const href = attrs.match(/href="([^"]+)"/)?.[1];
-						if (!href || !/^\/assets\/[^"]+\.css$/.test(href)) return tag;
-						deferredCss = href;
-						return '';
-					},
-				);
-				if (deferredCss) {
-					const bootstrapTag = indexHtml.match(/<script data-entry="[^"]*" data-preload="[^"]*"/);
-					if (bootstrapTag) {
-						indexHtml = indexHtml.replace(bootstrapTag[0], `${bootstrapTag[0]} data-css="${deferredCss}"`);
-					} else {
-						this.warn('home-shell: bootstrap tag not found — deferred stylesheet restored as a plain link');
-						indexHtml = indexHtml.replace('</head>', `<link rel="stylesheet" crossorigin href="${deferredCss}" media="print" data-async-style></head>`);
-					}
-				}
-			} catch (e) {
-				this.warn(`home-shell: critical-CSS inlining skipped (${e.message}); CSS stays render-blocking`);
-			}
+			// index.html — the "/"-only document with the hero shell.
+			let indexHtml = baseHtml.replace(marker, `<div id="root">${readFileSync(shellPath, 'utf-8')}</div>`);
+			indexHtml = await inlineCriticalCss(indexHtml, outDir, 'home-shell', warn);
 
 			// Preload the "/" route's lazy chunk graph in parallel with the
 			// critical path (see collectRouteChunkFiles above).
-			indexHtml = addHomeRoutePreloads(indexHtml, bundle, (m) => this.warn(m), routeFacade);
-
-			// Beasties drops the local()-only 'Syne Fallback' face from the inlined
-			// critical CSS — put it back so the shell's LCP <h1> paints with the
-			// oversized metric-adjusted fallback (see SYNE_FALLBACK_FONT_FACE above).
-			if (indexHtml.includes('<style>')) {
-				indexHtml = indexHtml.replace('<style>', `<style>${SYNE_FALLBACK_FONT_FACE}`);
-			} else {
-				this.warn('home-shell: no inline <style> found — Syne Fallback face not injected');
-			}
+			indexHtml = addHomeRoutePreloads(indexHtml, bundle, warn, routeFacade);
 
 			writeFileSync(indexPath, indexHtml, 'utf-8');
-			verifyCspBootstrap(this, [indexPath, path.join(outDir, 'app.html')]);
+			verifyCspBootstrap(this, [indexPath, appPath]);
 		},
 	};
 }

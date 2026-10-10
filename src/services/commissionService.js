@@ -1,14 +1,8 @@
 import { supabase } from '../utils/supabaseClient.js';
 import { processingFeeCents } from '../utils/processingFee.js';
-
-async function getPlatformSetting(key, defaultValue) {
-  const { data } = await supabase
-    .from('platform_settings')
-    .select('value')
-    .eq('key', key)
-    .maybeSingle();
-  return data?.value !== undefined ? data.value : defaultValue;
-}
+// Cached per instance for a short window (src/utils/platformSettings.js) — the
+// pricing path reads a dozen of these per cart, several per line.
+import { getPlatformSetting } from '../utils/platformSettings.js';
 
 /**
  * Looks up the fee_config row for a given seller_tier and transaction_type.

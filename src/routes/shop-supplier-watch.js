@@ -26,7 +26,7 @@ const isAuthorisedCronCall = (req) => {
 
 /**
  * GET /shop-supplier-watch/run
- * Daily cron (.github/workflows/cron-supplier-price-watch.yml): re-checks the
+ * Daily cron (.github/workflows/cron-daily.yml): re-checks the
  * supplier page of every shop product whose last check is a week old, and
  * bells admins about price changes. Reports only — never changes a price.
  */

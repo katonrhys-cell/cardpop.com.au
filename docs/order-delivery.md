@@ -46,7 +46,7 @@ email.
 
 ## The sweep — daily cron
 
-`.github/workflows/cron-delivery-sweep.yml` → `GET /api/orders/delivery-sweep`
+`.github/workflows/cron-daily.yml` (the shared daily run, `docs/scheduled-jobs.md`) → `GET /api/orders/delivery-sweep`
 (`CRON_SECRET` bearer, fail-closed) → `runDeliverySweep()`:
 
 1. Every `shipped` order with `delivered_at IS NULL`, oldest first, up to 60

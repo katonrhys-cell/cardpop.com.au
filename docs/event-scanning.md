@@ -211,8 +211,9 @@ event page, with **Re-scan weekly for updates** on by default.
 - **On save** the page is scanned straight away (the form calls
   `/cron/event-scan?mode=watches&event=<id>` — the 300s function — without
   waiting on it, and toasts the result when it lands).
-- **Then every 7 days.** A daily GitHub Actions job (`cron-event-watch.yml`,
-  02:43 AEST) calls `/cron/event-scan?mode=watches`, which scans every watch
+- **Then every 7 days.** The daily GitHub Actions maintenance run
+  (`cron-daily.yml`, 05:23 AEST — see `docs/scheduled-jobs.md`) calls
+  `/cron/event-scan?mode=watches`, which scans every watch
   whose `next_scan_at` has passed (up to 10 per run, 240s budget — anything left
   over is still due the next day) and pushes each one out another week. A failed
   scan retries the next day.

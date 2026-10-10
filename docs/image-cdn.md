@@ -56,6 +56,17 @@ Worker source and `docs/ddos-protection.md`. Free-tier limit: 100k requests/day 
 service worker means each visitor fetches each image roughly once ever, so
 this is ample headroom.
 
+**Negative caching.** A 404 from Supabase is remembered at the edge for 5
+minutes (`NEGATIVE_TTL_SECONDS`): the origin fetch caches the 404 itself, and
+for object paths a bodyless 404 is also written under the query-free cache key
+that the R2 fast path checks first, so a known-missing object costs neither an
+R2 read nor an origin request until it expires. The browser gets the same
+`max-age=300`. This matters because misses are routine, not rare: grid
+thumbnails are inferred from the upload timestamp (`utils/imageUrl.js`) while
+the thumb upload is best-effort, so a card whose thumb never landed used to
+cost an R2 read plus a Supabase request on every grid view, forever. 5xx is
+never cached, so an origin outage cannot outlive itself; 2xx stays a year.
+
 ### Setup (~10 minutes, all in the Cloudflare dashboard)
 
 1. **Create the Worker**: Cloudflare dashboard → Workers & Pages → Create →
@@ -325,7 +336,12 @@ supplier sets, then re-run the job.
 - `utils/imageCdnFallback.js` — global CDN→origin `<img>` recovery listener.
 - `public/sw.js` — service worker caches storage images cache-first on the
   client, so returning visitors generate almost no image egress even
-  without the CDN.
+  without the CDN. Storage **video** and any `Range` request are left to the
+  browser (`isStorageVideo` / `isRangeRequest`): a `<video>` needs byte-range
+  answers, a 206 can't be stored, and one 20 MB clip would evict forty photos
+  from the 500-entry image cache — which is what happened before the
+  exclusion. On activate the worker purges any clips an older version stored,
+  without evicting the photos beside them.
 - Upload sites set `cacheControl: '31536000'` (files are immutable —
   timestamped names), so browsers and CDNs can cache aggressively.
 - `scripts/backfill-image-cache-headers.mjs` — one-off script to re-upload
