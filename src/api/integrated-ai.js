@@ -6,6 +6,7 @@ import { NodeEnv } from '../constants/common.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
 import { compressImageBuffer } from '../utils/compressImageBuffer.js';
+import { OUTBOUND_TIMEOUT_MS } from '../utils/outboundTimeouts.js';
 
 dotenv.config();
 
@@ -196,6 +197,7 @@ export async function streamOneShot({ systemPrompt, userMessage }) {
 			'Authorization': `Bearer ${process.env.INTEGRATED_AI_API_KEY}`,
 			...(process.env.PROXY_ENTRANCE_ID && { 'X-Proxy-Entrance-Id': process.env.PROXY_ENTRANCE_ID }),
 		},
+		signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.aiProxy),
 		body: JSON.stringify({
 			website_id: process.env.WEBSITE_ID,
 			history: [mapUserMessage({ message: userMessage })],
@@ -244,6 +246,7 @@ export async function stream({ userId, systemPrompt, userMessage }) {
 			'Authorization': `Bearer ${process.env.INTEGRATED_AI_API_KEY}`,
 			...(process.env.PROXY_ENTRANCE_ID && { 'X-Proxy-Entrance-Id': process.env.PROXY_ENTRANCE_ID }),
 		},
+		signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.aiProxy),
 		body: JSON.stringify({
 			website_id: process.env.WEBSITE_ID,
 			history: [

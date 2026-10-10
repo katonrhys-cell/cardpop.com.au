@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 const PSA_API_BASE = 'https://api.psacard.com/publicapi';
 const PSA_API_TOKEN = process.env.PSA_API_TOKEN;
@@ -40,7 +41,8 @@ export const psaApiClient = {
             headers: {
               'authorization': `bearer ${PSA_API_TOKEN}`,
               'Content-Type': 'application/json'
-            }
+            },
+            signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.psa),
           }
         );
 
@@ -99,7 +101,8 @@ export const psaApiClient = {
           headers: {
             'authorization': `bearer ${PSA_API_TOKEN}`,
             'Content-Type': 'application/json'
-          }
+          },
+          signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.psa),
         }
       );
 

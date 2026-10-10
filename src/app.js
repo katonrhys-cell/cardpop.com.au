@@ -48,7 +48,18 @@ export function scrubSentryEvent(event) {
 
 Sentry.init({
 	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
-	tracesSampleRate: 0.2,
+	// Error capture only. Tracing was sampled at 20%, but ESM hoists imports,
+	// so `express` was loaded before this init ran and Sentry's Express
+	// auto-instrumentation never attached — the sampled traces carried no
+	// route spans, while every request still paid the span bookkeeping and
+	// the sampled ones an extra outbound envelope. Sampling at 0 keeps the
+	// error path (5xx via setupExpressErrorHandler, captureMessage in the
+	// reconciler and Connect service) and drops the rest. If tracing is ever
+	// wanted, initialise Sentry through `node --import` so it precedes
+	// express, and set SENTRY_TRACES_SAMPLE_RATE. The SDK import itself is
+	// ~300 ms of the ~800 ms cold start and is not avoidable while Sentry is
+	// in use — see docs/performance.md.
+	tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0) || 0,
 	environment: process.env.NODE_ENV || 'production',
 	sendDefaultPii: false,
 	integrations: [

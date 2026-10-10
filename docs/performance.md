@@ -87,3 +87,40 @@ npx lighthouse http://127.0.0.1:4173/ --only-categories=performance --output=jso
 Local runs can't reach Supabase or the third parties, so compare lab metrics
 relative to the previous build and confirm the live numbers on
 [pagespeed.web.dev](https://pagespeed.web.dev/) after deploy.
+
+## Backend cold start and outbound calls
+
+`api/index.js` is one Express app for every `/api/*` route, so a cold start
+pays for the whole import graph. Measured locally (`node --input-type=module -e
+"await import('./src/app.js')"` with the required env vars): ~820 ms before
+this work, dominated by `@sentry/node` (~300 ms import + ~130 ms init,
+unavoidable while Sentry is in use), `express` (~90 ms), `undici` (~130 ms,
+the SSRF-safe dispatcher in `safeFetch`) and `stripe` (~120 ms, already lazy).
+Rules that keep it from growing:
+
+- **Heavy SDKs load on first use, not at import.** The Anthropic SDK is
+  dynamic-imported inside the `anthropic()` factories in
+  `blogArticleGenerator.js`, `eventScanner.js` and `supplierPrice.js`
+  (`tests/backend/outboundTimeouts.test.js` fails on a static import of it
+  anywhere under `src/` or `api/`); `stripe` is behind the proxy in
+  `stripeClient.js`; `sharp` and `cheerio` are `await import()`ed where used.
+  `cardsightai` imports in ~8 ms and stays static.
+- **Every outbound call has a timeout.** The budgets live in one table,
+  `src/utils/outboundTimeouts.js`, and every direct `fetch()` in the backend
+  passes `signal: AbortSignal.timeout(...)` from it; the SDK clients get
+  `timeout` + `maxRetries: 1` (Anthropic) / `maxNetworkRetries: 1` (Stripe,
+  whose 80 s default was a guaranteed 504 inside the 40 s function). The test
+  above walks each known call site and refuses a bare `fetch()`, and flags any
+  file outside the list that calls the global fetch (new sites go in the list
+  or behind `safeFetch`).
+- **Tokens are shared.** eBay's OAuth token request is de-duplicated in
+  flight (a cold `/ebay/popular-cards` fans out sixteen searches), and the
+  PayPal client-credentials token is cached for its `expires_in`.
+- **Sentry is error capture only** (`tracesSampleRate` 0, overridable with
+  `SENTRY_TRACES_SAMPLE_RATE`). Express auto-instrumentation never attached
+  because ESM hoists `express` above `Sentry.init`, so the sampled traces had
+  no route spans. Tracing would need Sentry initialised via `node --import`.
+- **The function bundle ships only the sharp build it can run.**
+  `vercel.json` `includeFiles` is `node_modules/@img/sharp-*linux-x64/**`
+  (the glibc x64 binary + libvips, ~19 MB) rather than `@img/**` (~46 MB,
+  including musl and wasm builds Vercel's runtime cannot load).

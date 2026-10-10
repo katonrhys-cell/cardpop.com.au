@@ -99,6 +99,8 @@ Routes are registered in `src/routes/index.js`. Each domain has its own router f
 
 **Trade routes** are automatically protected: any request path containing `trade` passes through `authMiddleware` then `verifyTradeAccess`.
 
+**Outbound calls and cold start**: every direct `fetch()` to a third party passes `signal: AbortSignal.timeout(...)` from the one budget table `src/utils/outboundTimeouts.js` (untrusted URLs go through `safeFetch.js` instead), and the SDK clients set `timeout` + one retry — `tests/backend/outboundTimeouts.test.js` fails on a bare `fetch()` at a known site, on a new file calling the global fetch outside the list, and on any static `import … from '@anthropic-ai/sdk'` under `src/`/`api/` (the SDK is dynamic-imported inside the `anthropic()` factories so it stays off the cold start). Add a new outbound call to that list with a signal, or behind `safeFetch`. See `docs/performance.md` → Backend cold start.
+
 ### Supabase
 
 Supabase hosts the PostgreSQL database and provides Auth. The project URL is `https://vrfsaazuqjxotnieqlkd.supabase.co`.
