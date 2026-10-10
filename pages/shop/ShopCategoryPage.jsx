@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { useCategory } from '@/contexts/CategoryContext.jsx';
 import { getCategoryBySlug, getBreadcrumbs } from '@/utils/categoryUtils.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
@@ -105,7 +106,9 @@ const ShopCategoryPage = () => {
         // small, so the exact count is inexpensive.
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'exact' })
+          // `estimated` is exact below PostgREST's 1,000-row cap (the whole
+          // catalogue today) and stops costing a second scan beyond it.
+          .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
           .in('status', PUBLIC_SHOP_STATUSES);
 
         // shop_products stores a free-text category; match the resolved

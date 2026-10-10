@@ -326,6 +326,17 @@ export function getCardImage(pathOrUrl, opts = {}) {
   return { src, srcSet, fallbackSrc, canonicalSrc, thumbSrc };
 }
 
+/**
+ * The URL a small card tile should load: the 480 px companion thumbnail when
+ * the upload has one, otherwise the full image. For strips, rails, avatars of
+ * cards, watchlist rows — anywhere the image renders well under 480 px wide.
+ * Grids that render larger go through <CardImage/>, which also falls back.
+ */
+export function cardThumbUrl(pathOrUrl, bucket = DEFAULT_BUCKET) {
+  const art = getCardImage(pathOrUrl, { bucket });
+  return art.thumbSrc || art.src || null;
+}
+
 // Sensible default `sizes` for the 1→2→3→4 column card grids used across the
 // marketplace/shop/vault. Slightly generous so we never under-fetch.
 export const CARD_GRID_SIZES =

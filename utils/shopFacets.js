@@ -18,6 +18,7 @@
  */
 import { sortFamily } from '@/utils/shopFamily.js';
 import { isSoldOut, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { binderCapacity } from '@/utils/binderCapacity.js';
 
 /** Columns needed to build, filter and sort by the facets. */
@@ -256,7 +257,7 @@ export function sortFacetRows(rows, sort) {
 /** Full rows for `ids`, returned in the same order. */
 export async function fetchShopProductsByIds(supabase, ids) {
   if (!ids?.length) return [];
-  const { data, error } = await supabase.from('shop_products').select('*').in('id', ids).in('status', PUBLIC_SHOP_STATUSES);
+  const { data, error } = await supabase.from('shop_products').select(SHOP_CARD_COLUMNS).in('id', ids).in('status', PUBLIC_SHOP_STATUSES);
   if (error) throw error;
   const byId = new Map((data || []).map((r) => [r.id, r]));
   return ids.map((id) => byId.get(id)).filter(Boolean);

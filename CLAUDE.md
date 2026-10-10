@@ -63,6 +63,7 @@ The frontend has two data sources:
 
 1. **Supabase** (`lib/supabaseClient.js`) — direct Supabase JS client using the public anon key. Used for all user-facing data reads/writes via Row Level Security policies. Import as `import { supabase } from '@/lib/supabaseClient.js'`.
 
+   **Never `select('*')` for a grid, strip or search result.** Every browse surface reads an explicit projection: `LISTING_CARD_COLUMNS` + `LISTING_SELLER_EMBED` (`lib/listingColumns.js`) with the vault embed from `lib/listingCardColumns.js`; `SHOP_CARD_COLUMNS` (`utils/shopColumns.js`, the whole row minus `description`); `PROFILE_CARD_COLUMNS` for other people's profile cards vs `PUBLIC_PROFILE_COLUMNS` for the user's own / full profile (`lib/profileColumns.js`); `BLOG_CARD_COLUMNS` (no `content`) and `EVENT_CARD_COLUMNS`. Lists are bounded (`limit`/`range`, a date window for events) — a public page's cost must not grow with the table. Small tiles (strips, rails, watchlist rows) load the 480 px companion thumbnail via `cardThumbUrl()` from `utils/imageUrl.js`, never the full upload. Decorative counts use `count: 'estimated'` (exact under PostgREST's 1,000-row cap).
 2. **Express backend** (`lib/apiServerClient.js`) — proxied via `/hcgi/api` (Vercel rewrites this to `/api`). Used for operations requiring server-side secrets: eBay pricing, Stripe payments, card OCR, AI chat, auth/MFA flows, newsletter subscription. Always sends the Supabase `access_token` as a Bearer header automatically.
 
 ### Backend (Express → Vercel Serverless Function)

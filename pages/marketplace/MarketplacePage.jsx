@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { buildCardSearchOr, buildVariantOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
@@ -414,7 +415,7 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)`, { count: 'estimated' })
+          .select(`${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`, { count: 'estimated' })
           // Available cards only unless the buyer opts into sold ones (badged
           // "Sold" — useful as price history). 'archived' is never shown.
           .in('status', includeSold ? ['active', 'sold'] : ['active'])

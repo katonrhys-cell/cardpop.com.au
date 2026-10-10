@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, ShieldCheck, Users, Info } from 'lucide-react';
+import { Search, Users, Info } from 'lucide-react';
 import { COLLECTIONS_LIST, TCG_COLLECTIONS, SPORTS_COLLECTIONS } from '@/components/Header.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,18 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getCollectionImage } from '@/data/collectionImages.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
+import { LISTING_CARD_COLUMNS } from '@/lib/listingColumns.js';
+import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { slugify } from '@/lib/slugify.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
+
+// How many listings a visit loads. The page used to fetch EVERY listing on the
+// site (two unbounded `select('*')` queries, no limit) and filter in the
+// browser, so its cost grew with the marketplace; it now shows the newest
+// PAGE_SIZE and offers "Show more".
+const PAGE_SIZE = 60;
+const SELECT = `${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, name)`;
 
 // Deterministic pseudo-random index derived from an id string, used to spread
 // items across brand/series buckets. A single charCodeAt(N) is out of bounds
@@ -29,121 +39,108 @@ const SPORTS_BRANDS = ['Panini', 'Topps', 'Upper Deck', 'Bowman', 'Fleer'];
 const TCG_SERIES = ['Base Set', 'Scarlet & Violet', 'Sword & Shield', 'Sun & Moon', 'Alpha', 'Beta'];
 const SPORTS_SERIES = ['Prizm', 'Chrome', 'Select', 'Optic', 'National Treasures'];
 
+// A marketplace listing row (with its card embedded) → the shape the grid
+// renders. The card's own fields live on `vault_item`; the listing carries the
+// price and status. Exported for tests.
+export function listingToCollectionItem(row) {
+  const card = row.vault_item || {};
+  const name = card.card_name || 'Vault Card';
+  const collectionType = card.collection || 'Sports';
+  const isSportsItem = SPORTS_COLLECTIONS.includes(collectionType);
+  const brand = isSportsItem
+    ? (SPORTS_BRANDS.find(b => name.includes(b)) || SPORTS_BRANDS[idHash(row.id) % SPORTS_BRANDS.length])
+    : (TCG_BRANDS.find(b => card.grading_company?.includes(b)) || TCG_BRANDS[idHash(row.id) % TCG_BRANDS.length]);
+  const series = isSportsItem
+    ? SPORTS_SERIES[idHash(row.id) % SPORTS_SERIES.length]
+    : TCG_SERIES[idHash(row.id) % TCG_SERIES.length];
+  const type = row.listing_type ?? 'fixed';
+  const imgPath = card.card_image || card.vault_images?.[0]?.storage_path || null;
+  return {
+    id: row.id,
+    _key: `listing_${row.id}`,
+    name,
+    collectionType,
+    condition: card.condition,
+    grade: card.grading_company || null,
+    price: Number(row.price_aud) || 0,
+    tradeValue: null,
+    // ~300 px tile: the 480 px companion thumbnail, not the full upload.
+    image: cardThumbUrl(imgPath),
+    isSold: row.status === 'sold',
+    ownerName: row.seller?.display_name || row.seller?.username || row.seller?.name || 'Collector',
+    isForSale: type !== 'trade',
+    isForTrade: type === 'trade' || row.accepts_trade === true,
+    brand,
+    series,
+    link: `/marketplace/${row.id}/${slugify(name)}`,
+  };
+}
+
+async function fetchListingPage(offset) {
+  // Sold listings stay visible, pilled "Sold" — same rule as every other grid.
+  const { data, error } = await supabase
+    .from('listings')
+    .select(SELECT)
+    .in('status', ['active', 'sold'])
+    .neq('listing_type', 'vault')
+    .order('created_at', { ascending: false })
+    .range(offset, offset + PAGE_SIZE - 1);
+  if (error) throw error;
+  return (data || []).map(listingToCollectionItem);
+}
+
 const PublicCollectionsPage = () => {
   const [searchParams] = useSearchParams();
   const initialCollection = searchParams.get('collection') || 'All';
   
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [collectionFilter, setCollectionFilter] = useState(initialCollection);
   const [brandFilter, setBrandFilter] = useState('All');
   const [seriesFilter, setSeriesFilter] = useState('All');
-  const [listingTypeFilter, setListingTypeFilter] = useState('Both'); // Vault, Store, Both
 
   useEffect(() => {
     let cancelled = false;
     const fetchItems = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [officialRes, vaultRes] = await Promise.allSettled([
-        // Sold listings stay visible, pilled "Sold" — same rule as every other grid.
-        supabase.from('listings').select('*').eq('source', 'official').in('status', ['active', 'sold']),
-        supabase.from('listings').select('*, profiles:seller_id(name)').neq('source', 'official').in('status', ['active', 'sold'])
-      ]);
-
-      const getImageUrl = (item) => {
-        const img = item.image || item.card_image;
-        if (!img) return null;
-        return publicImageUrl(img);
-      };
-
-      const processVaultItem = (item) => {
-        const isSportsItem = SPORTS_COLLECTIONS.includes(item.collectionType);
-        const brand = isSportsItem
-          ? (SPORTS_BRANDS.find(b => item.card_name?.includes(b)) || SPORTS_BRANDS[idHash(item.id) % SPORTS_BRANDS.length])
-          : (TCG_BRANDS.find(b => item.grading_company?.includes(b)) || TCG_BRANDS[idHash(item.id) % TCG_BRANDS.length]);
-
-        const series = isSportsItem
-          ? SPORTS_SERIES[idHash(item.id) % SPORTS_SERIES.length]
-          : TCG_SERIES[idHash(item.id) % TCG_SERIES.length];
-
-        return {
-          id: item.id,
-          _key: `vault_${item.id}`,
-          name: item.card_name || 'Vault Card',
-          collectionType: item.collectionType || 'Sports',
-          condition: item.condition,
-          grade: item.grading_company || null,
-          price: item.price_aud || 0,
-          tradeValue: null,
-          image: getImageUrl(item),
-          source: 'Vault',
-          isSold: item.status === 'sold',
-          ownerName: item.profiles?.name || 'Collector',
-          isForSale: item.listingStatus === 'For Sale' || item.listingStatus === 'For Both',
-          isForTrade: item.listingStatus === 'For Trade' || item.listingStatus === 'For Both',
-          brand,
-          series,
-          link: `/marketplace/${item.id}`
-        };
-      };
-
-      const processStoreItem = (item) => {
-        const isSportsItem = SPORTS_COLLECTIONS.includes(item.collectionType);
-        const brand = isSportsItem
-          ? (SPORTS_BRANDS.find(b => item.name?.includes(b)) || 'Official')
-          : (TCG_BRANDS.find(b => item.name?.includes(b) || item.grading_company?.includes(b)) || 'Official');
-
-        const series = isSportsItem
-          ? SPORTS_SERIES[idHash(item.id) % SPORTS_SERIES.length]
-          : TCG_SERIES[idHash(item.id) % TCG_SERIES.length];
-
-        return {
-          id: item.id,
-          _key: `store_${item.id}`,
-          name: item.name || item.card_name,
-          collectionType: item.collectionType,
-          condition: item.condition,
-          grade: item.grading_company || null,
-          price: item.price_aud || 0,
-          tradeValue: null,
-          image: getImageUrl(item),
-          source: 'Store',
-          isSold: item.status === 'sold',
-          ownerName: 'Official Store',
-          isForSale: true,
-          isForTrade: false,
-          brand,
-          series,
-          link: `/marketplace/${item.id}`
-        };
-      };
-
-      let combined = [];
-      if (officialRes.status === 'fulfilled' && officialRes.value?.data) {
-        combined = combined.concat(officialRes.value.data.map(processStoreItem));
+      setLoading(true);
+      setError(null);
+      try {
+        const rows = await fetchListingPage(0);
+        if (!cancelled) { setItems(rows); setHasMore(rows.length === PAGE_SIZE); }
+      } catch (err) {
+        if (!cancelled) {
+          setError('Failed to load collections. Please check your connection and try again.');
+          toast.error('Failed to load collections');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      if (vaultRes.status === 'fulfilled' && vaultRes.value?.data) {
-        combined = combined.concat(vaultRes.value.data.map(processVaultItem));
-      }
-      
-      if (!cancelled) setItems(combined.sort((a, b) => b.price - a.price));
-    } catch (err) {
-      if (!cancelled) {
-        setError('Failed to load collections. Please check your connection and try again.');
-        toast.error('Failed to load collections');
-      }
-    } finally {
-      if (!cancelled) setLoading(false);
-    }
     };
     fetchItems();
     return () => { cancelled = true; };
   }, []);
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const rows = await fetchListingPage(items.length);
+      setItems(prev => {
+        const seen = new Set(prev.map(i => i._key));
+        return [...prev, ...rows.filter(r => !seen.has(r._key))];
+      });
+      setHasMore(rows.length === PAGE_SIZE);
+    } catch {
+      toast.error('Failed to load more cards');
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleCollectionChange = (val) => {
     setCollectionFilter(val);
@@ -151,15 +148,16 @@ const PublicCollectionsPage = () => {
     setSeriesFilter('All');
   };
 
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCollection = collectionFilter === 'All' || item.collectionType === collectionFilter;
-    const matchesSource = listingTypeFilter === 'Both' || item.source === listingTypeFilter;
-    const matchesBrand = brandFilter === 'All' || item.brand === brandFilter;
-    const matchesSeries = seriesFilter === 'All' || item.series === seriesFilter;
-    
-    return matchesSearch && matchesCollection && matchesSource && matchesBrand && matchesSeries;
-  });
+  const filteredItems = useMemo(() => {
+    const q = searchTerm.trim().toLowerCase();
+    return items.filter(item => {
+      const matchesSearch = !q || item.name.toLowerCase().includes(q);
+      const matchesCollection = collectionFilter === 'All' || item.collectionType === collectionFilter;
+      const matchesBrand = brandFilter === 'All' || item.brand === brandFilter;
+      const matchesSeries = seriesFilter === 'All' || item.series === seriesFilter;
+      return matchesSearch && matchesCollection && matchesBrand && matchesSeries;
+    });
+  }, [items, searchTerm, collectionFilter, brandFilter, seriesFilter]);
 
   const isSportsFilter = SPORTS_COLLECTIONS.includes(collectionFilter);
   const isTcgFilter = TCG_COLLECTIONS.includes(collectionFilter);
@@ -240,24 +238,6 @@ const PublicCollectionsPage = () => {
             </Select>
           </div>
 
-          <div>
-            <h3 className="font-bold mb-3 text-sm uppercase tracking-wider text-muted-foreground">Listing Type</h3>
-            <div className="space-y-3 bg-muted/30 p-4 rounded-xl border border-border/50">
-              {['Both', 'Store', 'Vault'].map(type => (
-                <label key={type} className="flex items-center gap-3 cursor-pointer">
-                  <input 
-                    type="radio" 
-                    name="listingType" 
-                    value={type} 
-                    checked={listingTypeFilter === type} 
-                    onChange={e => setListingTypeFilter(e.target.value)} 
-                    className="accent-primary w-4 h-4" 
-                  />
-                  <span className="text-sm font-medium">{type === 'Both' ? 'All Listings' : `${type} Only`}</span>
-                </label>
-              ))}
-            </div>
-          </div>
         </aside>
 
         <section className="flex-1">
@@ -296,22 +276,18 @@ const PublicCollectionsPage = () => {
                   <Link key={item._key} to={item.link} className="group">
                     <div className="bg-card border border-border shadow-sm hover:shadow-xl transition-all duration-300 rounded-2xl overflow-hidden h-full flex flex-col">
                       <div className="aspect-[3/4] overflow-hidden relative bg-muted p-4 flex items-center justify-center">
-                        <img 
-                          src={displayImage} 
-                          alt={item.name} 
-                          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 drop-shadow-md" 
+                        <img
+                          src={displayImage}
+                          alt={item.name}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 drop-shadow-md"
                         />
                         <div className="absolute top-3 left-3 flex flex-col items-start gap-1.5">
                           {item.isSold && <SoldBadge />}
-                          {item.source === 'Store' ? (
-                            <Badge className="bg-primary text-primary-foreground font-bold shadow-sm">
-                              <ShieldCheck className="w-3 h-3 mr-1.5" /> Store Listing
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-secondary text-secondary-foreground font-bold shadow-sm">
-                              <Users className="w-3 h-3 mr-1.5" /> Vault Listing
-                            </Badge>
-                          )}
+                          <Badge className="bg-secondary text-secondary-foreground font-bold shadow-sm">
+                            <Users className="w-3 h-3 mr-1.5" /> Vault Listing
+                          </Badge>
                         </div>
                       </div>
                       
@@ -342,6 +318,14 @@ const PublicCollectionsPage = () => {
                   </Link>
                 );
               })}
+            </div>
+          )}
+
+          {!loading && hasMore && (
+            <div className="mt-8 flex justify-center">
+              <Button variant="outline" onClick={loadMore} disabled={loadingMore} className="rounded-xl font-bold">
+                {loadingMore ? 'Loading…' : 'Show more cards'}
+              </Button>
             </div>
           )}
         </section>

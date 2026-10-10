@@ -28,7 +28,6 @@ const LISTINGS_COLUMNS = new Set([
 // (the page/route was written against a schema that never shipped). Remove an
 // entry when its file is fixed — the test fails if an entry goes stale.
 const KNOWN_BROKEN = {
-  'pages/PublicCollectionsPage.jsx': ['source'],
   'pages/admin/CategoryMappingPage.jsx': ['category_id'],
   'utils/categoryMappingEngine.js': ['category_id'],
   'src/routes/recommendations.js': ['category'],

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import ShopCategoryBrowse from '@/components/ShopCategoryBrowse.jsx';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,7 +77,7 @@ const ShopPage = () => {
 
         let query = supabase
           .from('shop_products')
-          .select('*')
+          .select(SHOP_CARD_COLUMNS)
           .in('status', PUBLIC_SHOP_STATUSES)
           .range(from, from + PAGE_LIMIT - 1);
 

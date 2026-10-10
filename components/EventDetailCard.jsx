@@ -7,6 +7,7 @@ import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } fro
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 import { toast } from 'sonner';
 
 const EventDetailCard = ({ event }) => {
@@ -69,14 +70,14 @@ const EventDetailCard = ({ event }) => {
         <div className="w-full h-64 md:h-96 lg:h-[450px] relative bg-muted overflow-hidden">
           {/* Blurred backdrop fills the frame so tall portrait posters don't leave bare side bars */}
           <img
-            src={event.image}
+            src={publicImageUrl(event.image)}
             alt=""
             aria-hidden="true"
             className="absolute inset-0 w-full h-full object-cover blur-2xl scale-110 opacity-50"
           />
           {/* Foreground poster shown in full — never cropped */}
           <img
-            src={event.image}
+            src={publicImageUrl(event.image)}
             alt={event.name}
             className="absolute inset-0 w-full h-full object-contain"
           />

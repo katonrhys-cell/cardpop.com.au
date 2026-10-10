@@ -5,6 +5,7 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, SlidersHorizontal, PackageX, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
@@ -70,7 +71,7 @@ const ShopSinglesPage = () => {
 
         let query = supabase
           .from('shop_products')
-          .select('*', { count: 'estimated' })
+          .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
           .in('status', PUBLIC_SHOP_STATUSES)
           .eq('product_type', 'single')
           .limit(PAGE_LIMIT);
