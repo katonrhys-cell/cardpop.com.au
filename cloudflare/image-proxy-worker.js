@@ -122,16 +122,60 @@ export function canonicalSearch(pathname, searchParams) {
   return s ? `?${s}` : '';
 }
 
+// ── Negative caching ──────────────────────────────────────────────────────
+//
+// A missing object costs more than a present one: an R2 read that misses, then
+// a Supabase request that 404s — on every view, forever, because nothing
+// remembered the miss. And misses are routine, not rare: grid thumbnails are
+// *inferred* from the upload timestamp (utils/imageUrl.js) while the thumb
+// upload itself is best-effort, so every card whose thumb never landed asks
+// for a URL that will never exist, once per grid render per visitor.
+//
+// So a 404 from the origin is remembered at the edge for a few minutes: the
+// `cf` fetch below caches the 404 itself, and for object paths a bodyless 404
+// is also written under the query-free cache key that serveFromR2 checks
+// FIRST, so a known-missing object skips the R2 read too. Short on purpose —
+// an upload racing a request must become visible quickly — and 5xx is never
+// cached: an origin outage should not outlive itself.
+const NEGATIVE_TTL_SECONDS = 300;
+
+// cacheTtlByStatus scopes the long TTL to 2xx only. A flat `cacheTtl` would
+// cache a transient 5xx for a year, showing every visitor a broken image long
+// after the origin recovered.
+const CACHE_TTL_BY_STATUS = {
+  '200-299': 31536000,
+  '300-399': 0,
+  '400-403': 0,
+  '404': NEGATIVE_TTL_SECONDS,
+  '405-599': 0,
+};
+
+// Canonical, query-free cache key (always GET) for an object path — collapses
+// every query variant of this object onto one edge-cache entry.
+const objectCacheKey = (url) => new Request(`${url.origin}${url.pathname}`, { method: 'GET' });
+
+function rememberMissing(url, ctx) {
+  if (!ctx || typeof ctx.waitUntil !== 'function') return;
+  const headers = new Headers({
+    'Cache-Control': `public, max-age=${NEGATIVE_TTL_SECONDS}`,
+    'Access-Control-Allow-Origin': '*',
+    'x-image-source': 'negative-cache',
+  });
+  ctx.waitUntil(
+    caches.default.put(objectCacheKey(url), new Response('Not found', { status: 404, headers })).catch(() => {}),
+  );
+}
+
 // Serve an object request from R2 if the object exists there, else return null
 // so the caller can fall back to the Supabase proxy. Uses a query-stripped
 // cache key so cache-busting query strings can't multiply edge entries or R2
 // reads (object paths ignore the query entirely — see canonicalSearch).
 async function serveFromR2(request, url, bucket, ctx) {
   const cache = caches.default;
-  // Canonical, query-free cache key (always GET) — collapses every query
-  // variant of this object onto one edge-cache entry.
-  const cacheKey = new Request(`${url.origin}${url.pathname}`, { method: 'GET' });
+  const cacheKey = objectCacheKey(url);
 
+  // A hit here may be a remembered 404 (rememberMissing) — served as-is, so a
+  // known-missing object costs neither an R2 read nor an origin request.
   const cached = await cache.match(cacheKey);
   if (cached) {
     // HEAD must not return a body, even on a cached GET response.
@@ -219,10 +263,7 @@ async function serveCardArt(request, url, env, ctx) {
 
   // ── Miss → fetch upstream (with the full src incl. query) ──────────────────
   const upstream = await fetch(target.toString(), {
-    cf: {
-      cacheEverything: true,
-      cacheTtlByStatus: { '200-299': 31536000, '300-399': 0, '400-599': 0 },
-    },
+    cf: { cacheEverything: true, cacheTtlByStatus: CACHE_TTL_BY_STATUS },
   });
 
   const headers = new Headers();
@@ -288,17 +329,11 @@ export default {
     // Cloudflare's edge for a year regardless of the origin's Cache-Control
     // (some older uploads still carry max-age=3600). Uploads use immutable
     // timestamped filenames, so long TTLs can never serve stale content for
-    // a 2xx. But a flat `cacheTtl` applies to EVERY status, including a
-    // transient 404/5xx (a deleted object, a race with an in-flight upload,
-    // an origin outage) — that would cache the error at the edge for a full
-    // year, showing every visitor a broken image long after the origin
-    // recovered. cacheTtlByStatus scopes the long TTL to 2xx only.
+    // a 2xx; a 404 is kept for a few minutes (see Negative caching above) and
+    // nothing else is cached at all.
     const search = canonicalSearch(url.pathname, url.searchParams);
     const originResponse = await fetch(`${ORIGIN}${url.pathname}${search}`, {
-      cf: {
-        cacheEverything: true,
-        cacheTtlByStatus: { '200-299': 31536000, '300-399': 0, '400-599': 0 },
-      },
+      cf: { cacheEverything: true, cacheTtlByStatus: CACHE_TTL_BY_STATUS },
     });
 
     const headers = new Headers(originResponse.headers);
@@ -307,6 +342,11 @@ export default {
     headers.set('Access-Control-Allow-Origin', '*');
     if (originResponse.ok) {
       headers.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (originResponse.status === 404) {
+      // Tell the browser too, so a grid doesn't re-ask for the same missing
+      // thumbnail on every render; and remember it ahead of the R2 read.
+      headers.set('Cache-Control', `public, max-age=${NEGATIVE_TTL_SECONDS}`);
+      if (isObject && request.method === 'GET') rememberMissing(url, ctx);
     }
     hardenIfSvg(headers);
 
