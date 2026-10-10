@@ -1,18 +1,26 @@
-# Homepage performance (PageSpeed Insights)
+# Page-load performance (PageSpeed Insights)
 
-How the homepage is built to load fast, and the reasoning behind the parts that
+How the site is built to load fast, and the reasoning behind the parts that
 look odd. Measured with Lighthouse / PageSpeed Insights on `https://cardpop.com.au/`;
 the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
 
-## How "/" paints
+## How a page paints
 
-1. **Static shell.** `tools/home-shell.html` is injected into `index.html` at build
-   (`homeShellPlugin` in `vite.config.js`) so the hero `<h1>` — the LCP element —
-   the header, the announcement bar and the cookie banner all paint from HTML
-   with the inlined critical CSS, before any JavaScript. React renders the same
-   markup on its first commit (`HeroSection`, `Header`, `AnnouncementBar`,
-   `CookieConsentBanner`), so the takeover moves nothing. Every other route is
-   served the shell-less `app.html`.
+1. **Static shell, on every route.** `tools/home-shell.html` is injected into
+   `index.html` at build (`homeShellPlugin` in `vite.config.js`) so the hero
+   `<h1>` — the LCP element — the header, the announcement bar and the cookie
+   banner all paint from HTML with the inlined critical CSS, before any
+   JavaScript. React renders the same markup on its first commit (`HeroSection`,
+   `Header`, `AnnouncementBar`, `CookieConsentBanner`), so the takeover moves
+   nothing. Every other route is served `app.html`, which carries the **same
+   chrome** with the route loader (`PageLoader`) in place of the hero:
+   `tools/appShell.mjs` derives it from the homepage shell at build time, so
+   there is one copy of the header markup to keep in sync with `Header.jsx`.
+   Before this, `app.html` was the bare Vite document behind a parser-blocking
+   stylesheet and nothing painted until React mounted — mobile FCP 2.0–2.8 s and
+   lab LCP 4–6 s on `/marketplace`, `/shop` and `/events` against 0.9 s / 1.4 s
+   on `/`. Both documents go through the same critical-CSS inlining
+   (`inlineCriticalCss`), each computed from its own shell.
 2. **Paint first, then fetch.** The CSP bootstrap (`CSP_BOOTSTRAP`) injects the
    full stylesheet, the module preloads and the entry script *one frame after the
    first paint* (`requestAnimationFrame` → `setTimeout 0`; immediately in a hidden
@@ -23,7 +31,18 @@ the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
    during HTML parse, simulated mobile FCP/LCP were 1.5 s / 2.7 s for a paint that
    needs only the 12 KB document. Real cost to visitors: one frame of JS boot.
    The bootstrap also removes the shell's announcement bar / cookie banner before
-   first paint for visitors who already dismissed or decided them.
+   first paint for visitors who already dismissed or decided them (on both
+   documents — the ids are the same).
+   **Route chunks are preloaded too.** `index.html` carries the homepage's lazy
+   chunk graph in `data-preload-low`; `app.html` carries `data-route-preload`, a
+   per-release map from route path to that route's chunk graph for the public
+   entry points (`ROUTE_PRELOADS` in `vite.config.js`), and the bootstrap
+   preloads the entry matching `location.pathname` at low priority. Without it
+   a route's chunk is only discovered after the entry has downloaded and React
+   has mounted — a second full round-trip. The remaining gap on `/shop` and
+   `/events` is chunk *count* (67 and 38 files for one page, lucide icons
+   split one per file); Lighthouse's simulation charges each request, so
+   grouping those is the next lever.
 3. **Fonts.** Syne is self-hosted, preloaded (also via an Early Hints `Link`
    header in `vercel.json`) and declared `font-display: swap` with the
    metric-matched `Syne Fallback` face, so text is never invisible and the swap
