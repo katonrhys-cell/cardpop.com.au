@@ -9,6 +9,27 @@ const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
+// How long a loaded profile is trusted before a refocus re-reads it.
+export const PROFILE_REFRESH_MIN_MS = 5 * 60_000;
+
+// Does the user object a new auth event carries differ from the one in state
+// in any way a consumer could observe? Everything else about it (a fresh
+// object for the same record) is noise from supabase-js re-announcing the
+// session on refocus.
+const sameJson = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+export function userChanged(prev, next) {
+  if (prev === next) return false;
+  if (!prev || !next) return true;
+  return prev.id !== next.id
+    || prev.email !== next.email
+    || prev.phone !== next.phone
+    || prev.updated_at !== next.updated_at
+    || prev.email_confirmed_at !== next.email_confirmed_at
+    || prev.last_sign_in_at !== next.last_sign_in_at
+    || !sameJson(prev.app_metadata, next.app_metadata)
+    || !sameJson(prev.user_metadata, next.user_metadata);
+}
+
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [profile, setProfile]         = useState(null);
@@ -31,13 +52,31 @@ export const AuthProvider = ({ children }) => {
   const [checkedUserId, setCheckedUserId] = useState(null);
   const isMounted = useRef(true);
   // Which user's profile is currently loaded. Lets repeat auth events for the
-  // same user (token refresh on tab refocus) re-fetch the profile silently in
-  // the background instead of flipping profileLoading true — which would also
-  // unmount every guarded route.
+  // same user (token refresh on tab refocus) leave profileLoading alone —
+  // flipping it would unmount every guarded route.
   const loadedProfileUserRef = useRef(null);
+  // When the profile was last read, so a refocus only re-reads it after
+  // PROFILE_REFRESH_MIN_MS (the realtime channel below keeps it fresh in
+  // between; the periodic re-read covers events that channel may have missed
+  // while the tab was hidden).
+  const lastProfileFetchAtRef = useRef(0);
+  // The user object currently in state. supabase-js re-announces the session
+  // (`SIGNED_IN` / `TOKEN_REFRESHED`) every time the tab regains focus, each
+  // time with a freshly deserialised user object. Handing that new object to
+  // setCurrentUser re-ran every effect keyed on `currentUser` across the app —
+  // a dozen pages refetched their data on every alt-tab. Keep the identity
+  // unless something a consumer can see has actually changed.
+  const lastUserRef = useRef(null);
+
+  const applyUser = (user) => {
+    if (!userChanged(lastUserRef.current, user)) return;
+    lastUserRef.current = user;
+    setCurrentUser(user);
+  };
 
   const fetchProfile = async (userId) => {
     if (!userId) return null;
+    lastProfileFetchAtRef.current = Date.now();
     const { data, error } = await supabase
       .from('profiles')
       .select(PUBLIC_PROFILE_COLUMNS)
@@ -58,20 +97,30 @@ export const AuthProvider = ({ children }) => {
     // Using getSession() concurrently caused a race where a stale null result
     // would prematurely set profileLoading=false, making isAdmin appear false.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
+      async (event, newSession) => {
         if (!isMounted.current) return;
 
-        setSession(newSession);
-        setCurrentUser(newSession?.user ?? null);
+        // Keep the session object's identity when neither the token nor the
+        // user changed (a refocus re-announcing the same session), so the
+        // context value — and every consumer — doesn't churn for nothing.
+        setSession((prev) => (
+          prev && newSession && prev.access_token === newSession.access_token && prev.user?.id === newSession.user?.id
+            ? prev
+            : newSession
+        ));
+        applyUser(newSession?.user ?? null);
         clearTimeout(authTimeout);
         if (isMounted.current) setLoading(false);
 
         if (newSession?.user) {
           // Only gate the UI behind profileLoading the first time we load this
-          // user's profile. Subsequent events (TOKEN_REFRESHED / SIGNED_IN on
-          // tab refocus) refresh it in the background without unmounting
-          // guarded routes.
+          // user's profile. Later events for the same user (TOKEN_REFRESHED /
+          // SIGNED_IN on tab refocus) don't re-read it at all unless the user
+          // record changed (USER_UPDATED) or the last read is old; when they
+          // do, it is a background refresh that never unmounts guarded routes.
           const isNewUser = loadedProfileUserRef.current !== newSession.user.id;
+          const stale = Date.now() - lastProfileFetchAtRef.current >= PROFILE_REFRESH_MIN_MS;
+          if (!isNewUser && event !== 'USER_UPDATED' && !stale) return;
           if (isMounted.current && isNewUser) setProfileLoading(true);
           try {
             const p = await fetchProfile(newSession.user.id);
@@ -288,7 +337,7 @@ export const AuthProvider = ({ children }) => {
       setMfaRequired(true);
       if (data.session) {
         setSession(data.session);
-        setCurrentUser(data.session.user);
+        applyUser(data.session.user);
       }
       return { requiresMfa: true, factorId: totpFactor.id };
     }
@@ -297,7 +346,7 @@ export const AuthProvider = ({ children }) => {
     // before onAuthStateChange fires asynchronously.
     if (data.session) {
       setSession(data.session);
-      setCurrentUser(data.session.user);
+      applyUser(data.session.user);
     }
     return data;
   };
@@ -310,11 +359,12 @@ export const AuthProvider = ({ children }) => {
         .filter(k => k.startsWith('sb-'))
         .forEach(k => localStorage.removeItem(k));
     } catch (_) { /* storage unavailable in some envs */ }
-    setCurrentUser(null);
+    applyUser(null);
     setProfile(null);
     setSession(null);
     setMfaRequired(false);
     loadedProfileUserRef.current = null;
+    lastProfileFetchAtRef.current = 0;
     setCheckedUserId(null);
     // Fire signOut in background — don't await so a hanging request
     // doesn't block the user from being logged out locally.
@@ -372,7 +422,7 @@ export const AuthProvider = ({ children }) => {
         : null);
     if (upgraded?.access_token) {
       setSession(upgraded);
-      if (upgraded.user) setCurrentUser(upgraded.user);
+      if (upgraded.user) applyUser(upgraded.user);
     }
     setMfaRequired(false);
   };

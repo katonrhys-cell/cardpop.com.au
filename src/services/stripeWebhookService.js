@@ -11,6 +11,7 @@ import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
 import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
 import { isCardCountryAllowed, allowedCardCountries } from '../utils/cardCountryPolicy.js';
+import { getPlatformSetting } from '../utils/platformSettings.js';
 
 /**
  * Informational cross-check: does the name the buyer typed at Stripe Checkout
@@ -68,14 +69,9 @@ async function resolvePaymentMethod(stripe, paymentIntentId) {
   }
 }
 
-async function getPlatformSetting(key, defaultValue) {
-  const { data } = await supabase
-    .from('platform_settings')
-    .select('value')
-    .eq('key', key)
-    .maybeSingle();
-  return data?.value !== undefined ? data.value : defaultValue;
-}
+// getPlatformSetting now lives in src/utils/platformSettings.js (cached per
+// instance for a short window) and is re-exported below so the many callers
+// that import it from here keep working.
 
 // Email every admin account about a confirmed order, and drop an in-app
 // notification in each admin's bell so a new order shows up without anyone
