@@ -10,9 +10,10 @@ import { buildCardSearchOr } from '../utils/cardSearchFilter.js';
 import { PURCHASABLE_SHOP_STATUSES } from '../../utils/shopStock.js';
 import { shopProductPath } from '../../utils/shopProductUrl.js';
 
-// The daily retention sweep (.github/workflows/cron-retention-sweep.yml →
+// The daily retention sweep (.github/workflows/cron-daily.yml →
 // GET /api/retention/sweep). Six small jobs, each bounded and independent, so
-// one failing never blocks the rest:
+// one failing never blocks the rest, run under one wall-clock budget (the
+// endpoint lives on the 40 s api/index.js function):
 //
 //   1. abandonedCheckouts   — one email, an hour or more after an unpaid
 //                             checkout, only to signed-in buyers or guests who
@@ -31,6 +32,12 @@ import { shopProductPath } from '../../utils/shopProductUrl.js';
 const HOUR_MS = 3600 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 const APP_URL = () => (process.env.APP_URL || 'https://cardpop.com.au').replace(/\/$/, '');
+
+// The whole sweep has to answer inside the function's 40 s; stop starting new
+// work with enough left to finish the email in flight and reply. Every send is
+// stamped as it happens, so whatever a run leaves is simply picked up tomorrow.
+const DEFAULT_BUDGET_MS = 28_000;
+const outOfTime = (deadline) => deadline != null && Date.now() >= deadline;
 
 const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 const lines = (order) => (Array.isArray(order?.order_items) ? order.order_items : []);
@@ -95,7 +102,7 @@ async function profileContact(userId) {
 
 // ── 1. Abandoned checkouts ──────────────────────────────────────────────────
 
-export async function abandonedCheckouts({ limit = 40, now = new Date() } = {}) {
+export async function abandonedCheckouts({ limit = 40, now = new Date(), deadline = null } = {}) {
   const out = { candidates: 0, emailed: 0, skipped: 0, errors: 0 };
   const since = new Date(now.getTime() - 3 * DAY_MS).toISOString();
   const { data: orders, error } = await supabase
@@ -108,6 +115,7 @@ export async function abandonedCheckouts({ limit = 40, now = new Date() } = {}) 
     .limit(limit);
   if (error) throw error;
   for (const order of orders || []) {
+    if (outOfTime(deadline)) { out.outOfTime = true; break; }
     out.candidates += 1;
     try {
       const decision = shouldEmailAbandoned(order, now);
@@ -136,15 +144,23 @@ export async function abandonedCheckouts({ limit = 40, now = new Date() } = {}) 
 
 // ── 2. Watchlist alerts ─────────────────────────────────────────────────────
 
-export async function watchlistAlerts({ limit = 300, now = new Date() } = {}) {
+export async function watchlistAlerts({ limit = 300, now = new Date(), deadline = null } = {}) {
   const out = { rows: 0, priceDrops: 0, sold: 0, errors: 0 };
+  // Only a listing that is still for sale or has sold can earn an email, so
+  // `!inner` + the status filter leave the rows for ended/withdrawn listings in
+  // the database instead of pulling them (with their nested joins) every day
+  // just to skip them. Ordered so the page is stable rather than whatever the
+  // planner returns first.
   const { data: rows, error } = await supabase
     .from('watchlist')
-    .select('id, user_id, listing_id, price_at_add_aud, last_alert_price_aud, sold_alerted_at, listing:listings(id, status, price_aud, shipping_cost_aud, vault_item:vault_items(card_name, set_name))')
+    .select('id, user_id, listing_id, price_at_add_aud, last_alert_price_aud, sold_alerted_at, listing:listings!inner(id, status, price_aud, shipping_cost_aud, vault_item:vault_items(card_name, set_name))')
     .not('price_at_add_aud', 'is', null)
+    .in('listing.status', ['active', 'sold'])
+    .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
   for (const row of rows || []) {
+    if (outOfTime(deadline)) { out.outOfTime = true; break; }
     out.rows += 1;
     try {
       const alert = watchlistAlertFor(row, row.listing);
@@ -174,15 +190,19 @@ export async function watchlistAlerts({ limit = 300, now = new Date() } = {}) {
 
 // ── 3. Saved-search alerts ──────────────────────────────────────────────────
 
-export async function savedSearchAlerts({ limit = 200, now = new Date() } = {}) {
+export async function savedSearchAlerts({ limit = 200, now = new Date(), deadline = null } = {}) {
   const out = { searches: 0, emailed: 0, errors: 0 };
+  // Least-recently alerted first, so if a run is cut short the searches it
+  // skipped are at the front of tomorrow's page rather than starved.
   const { data: searches, error } = await supabase
     .from('saved_searches')
     .select('id, user_id, name, params, created_at, last_alerted_at, alerts_enabled')
     .eq('alerts_enabled', true)
+    .order('last_alerted_at', { ascending: true, nullsFirst: true })
     .limit(limit);
   if (error) throw error;
   for (const s of searches || []) {
+    if (outOfTime(deadline)) { out.outOfTime = true; break; }
     out.searches += 1;
     try {
       const f = parseSavedSearch(s.params);
@@ -227,19 +247,30 @@ export async function savedSearchAlerts({ limit = 200, now = new Date() } = {}) 
 
 // ── 4. Back in stock ────────────────────────────────────────────────────────
 
-export async function restockAlerts({ limit = 200, now = new Date() } = {}) {
+export async function restockAlerts({ limit = 200, now = new Date(), deadline = null } = {}) {
   const out = { requests: 0, emailed: 0, errors: 0 };
+  // A request only becomes an email once its product is purchasable and in
+  // stock, so ask for exactly those: `!inner` plus the same three conditions
+  // `inStock` checks below, applied in the database. Requests for products
+  // still sold out — the normal state of a restock request — never leave it.
   const { data: requests, error } = await supabase
     .from('shop_restock_requests')
-    .select('id, email, user_id, product_id, product:shop_products(id, title, slug, category, colour, family_sku, stock_quantity, status, price_aud)')
+    .select('id, email, user_id, product_id, product:shop_products!inner(id, title, slug, category, colour, family_sku, stock_quantity, status, price_aud)')
     .is('notified_at', null)
+    .in('product.status', PURCHASABLE_SHOP_STATUSES)
+    .gt('product.price_aud', 0)
+    .or('stock_quantity.is.null,stock_quantity.gt.0', { referencedTable: 'product' })
+    .order('created_at', { ascending: true })
     .limit(limit);
   if (error) throw error;
   for (const r of requests || []) {
+    if (outOfTime(deadline)) { out.outOfTime = true; break; }
     out.requests += 1;
     try {
       const p = r.product;
       if (!p) { await supabase.from('shop_restock_requests').update({ notified_at: now.toISOString() }).eq('id', r.id); continue; }
+      // The query already narrowed to in-stock products; this is the belt to
+      // that brace, and the one place the rule is spelled out.
       const inStock = PURCHASABLE_SHOP_STATUSES.includes(p.status) && (p.stock_quantity == null || Number(p.stock_quantity) > 0) && Number(p.price_aud) > 0;
       if (!inStock) continue;
       const sent = await sendBackInStock({ to: r.email, productTitle: p.title, priceAud: round2(p.price_aud), url: `${APP_URL()}${shopProductPath(p)}` });
@@ -283,7 +314,7 @@ export async function welcomeOffersForNewAccounts({ limit = 100, now = new Date(
 
 // ── 6. Welcome-offer expiry reminders ───────────────────────────────────────
 
-export async function welcomeOfferReminders({ limit = 200, now = new Date(), daysBefore = 7 } = {}) {
+export async function welcomeOfferReminders({ limit = 200, now = new Date(), daysBefore = 7, deadline = null } = {}) {
   const out = { candidates: 0, emailed: 0, errors: 0 };
   const windowEnd = new Date(now.getTime() + daysBefore * DAY_MS).toISOString();
   const { data: offers, error } = await supabase
@@ -293,9 +324,11 @@ export async function welcomeOfferReminders({ limit = 200, now = new Date(), day
     .is('reminder_sent_at', null)
     .gt('expires_at', now.toISOString())
     .lte('expires_at', windowEnd)
+    .order('expires_at', { ascending: true })
     .limit(limit);
   if (error) throw error;
   for (const o of offers || []) {
+    if (outOfTime(deadline)) { out.outOfTime = true; break; }
     out.candidates += 1;
     try {
       const contact = await profileContact(o.user_id);
@@ -311,8 +344,9 @@ export async function welcomeOfferReminders({ limit = 200, now = new Date(), day
   return out;
 }
 
-export async function runRetentionSweep({ now = new Date() } = {}) {
+export async function runRetentionSweep({ now = new Date(), budgetMs = DEFAULT_BUDGET_MS } = {}) {
   const summary = {};
+  const deadline = Date.now() + budgetMs;
   const jobs = [
     ['abandonedCheckouts', abandonedCheckouts],
     ['watchlistAlerts', watchlistAlerts],
@@ -322,8 +356,15 @@ export async function runRetentionSweep({ now = new Date() } = {}) {
     ['welcomeOfferReminders', welcomeOfferReminders],
   ];
   for (const [name, job] of jobs) {
+    if (outOfTime(deadline)) {
+      // Better a job that waits a day than a 504 that loses the summary (and
+      // the stamps already written are what keep tomorrow's run from repeating).
+      summary[name] = { skipped: 'out of time' };
+      logger.warn(`[RETENTION] ${name} skipped: sweep out of time`);
+      continue;
+    }
     try {
-      summary[name] = await job({ now });
+      summary[name] = await job({ now, deadline });
     } catch (err) {
       summary[name] = { error: err.message };
       logger.error(`[RETENTION] ${name} failed: ${err.message}`);

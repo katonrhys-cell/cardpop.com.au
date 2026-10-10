@@ -26,11 +26,12 @@ import logger from '../utils/logger.js';
 // fulfilment path moves money), so this deliberately does not self-heal — it
 // tells you which session to resend.
 //
-// Runs once a day (vercel.json). Hourly would be better — a stuck payment is
-// then found within the hour rather than within the day — but Vercel's Hobby
-// plan rejects any cron that fires more than once daily, and the whole
-// deployment fails to build with one. Restore `15 * * * *` if the account moves
-// to Pro; nothing else here depends on the cadence.
+// Runs every two hours from GitHub Actions (.github/workflows/
+// cron-reconcile-pending.yml). It used to be a daily Vercel cron — the Hobby
+// plan rejects anything more frequent — which is why the schedules moved; see
+// docs/scheduled-jobs.md. Nothing here depends on the cadence, but each run
+// bills a metered Actions minute, so the scan below is kept to orders that can
+// still be news (see MAX_AGE_MS).
 // ─────────────────────────────────────────────────────────────────────────────
 
 // How long an order may legitimately sit 'pending' before it's suspicious.
@@ -45,12 +46,20 @@ const STALE_AFTER_MS = 15 * 60 * 1000;
 // ever stops being true.
 const MAX_ORDERS_PER_RUN = 200;
 
+// How far back a run looks. This job runs every two hours, so an order is
+// re-checked a dozen times a day while it is young; one that has sat 'pending'
+// for a week either expired unpaid (Stripe sessions live 24 h) or was reported
+// long ago. Without a floor the same stale rows were sent to Stripe on every
+// run, forever — the bulk of the ~360 metered runs a month did only that.
+const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 const NOTIFICATION_TYPE = 'order_payment_unfulfilled';
 
 // Find orders that Stripe considers paid but that never got fulfilled.
 // `now` is injectable so tests don't depend on wall-clock time.
 export async function findUnfulfilledPaidOrders(stripe, { now = Date.now() } = {}) {
   const cutoff = new Date(now - STALE_AFTER_MS).toISOString();
+  const floor = new Date(now - MAX_AGE_MS).toISOString();
 
   const { data: pending, error } = await supabase
     .from('orders')
@@ -58,14 +67,21 @@ export async function findUnfulfilledPaidOrders(stripe, { now = Date.now() } = {
     .eq('status', 'pending')
     .not('stripe_session_id', 'is', null)
     .lt('created_at', cutoff)
+    .gte('created_at', floor)
     .order('created_at', { ascending: true })
     .limit(MAX_ORDERS_PER_RUN);
 
   if (error) throw new Error(`could not read pending orders: ${error.message}`);
   if (!pending?.length) return { checked: 0, stuck: [], truncated: false };
 
+  // An order already reported stays 'pending' until an admin replays its
+  // webhook, so it would be sent to Stripe again on every run. Skip those
+  // before spending a Stripe call on them; alertStuckOrders de-dupes again.
+  const reported = await alreadyAlerted(pending.map(o => o.id));
+  const unreported = pending.filter(o => !reported.has(o.id));
+
   const stuck = [];
-  for (const order of pending) {
+  for (const order of unreported) {
     try {
       const session = await stripe.checkout.sessions.retrieve(order.stripe_session_id);
       // 'paid' is the only status that means money actually moved. 'unpaid'
@@ -91,7 +107,12 @@ export async function findUnfulfilledPaidOrders(stripe, { now = Date.now() } = {
     }
   }
 
-  return { checked: pending.length, stuck, truncated: pending.length === MAX_ORDERS_PER_RUN };
+  return {
+    checked: unreported.length,
+    stuck,
+    truncated: pending.length === MAX_ORDERS_PER_RUN,
+    alreadyReported: pending.length - unreported.length,
+  };
 }
 
 // Which of these orders have already been reported, so a repeat run doesn't
@@ -182,7 +203,7 @@ const isAuthorisedCronCall = (req) => {
   return timingSafeEqualStr(req.headers.authorization || '', `Bearer ${secret}`);
 };
 
-// GET /stripe/reconcile-pending — Vercel Cron entrypoint.
+// GET /stripe/reconcile-pending — scheduled-job entrypoint.
 export function reconcilePendingOrders(stripe) {
   return async (req, res) => {
     if (!isAuthorisedCronCall(req)) {

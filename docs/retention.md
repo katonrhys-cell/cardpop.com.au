@@ -1,9 +1,12 @@
 # Retention emails
 
 The daily **retention sweep** is the one scheduled job that brings shoppers
-back. It runs at 07:47 AEST (`.github/workflows/cron-retention-sweep.yml` →
-`GET /api/retention/sweep`, `CRON_SECRET` bearer, fail-closed) and does six
-small, independent jobs — one failing never blocks the rest. Engine:
+back. It runs as the last step of the daily maintenance run (~05:25 AEST,
+`.github/workflows/cron-daily.yml` → `GET /api/retention/sweep`, `CRON_SECRET`
+bearer, fail-closed — see `docs/scheduled-jobs.md`) and does six small,
+independent jobs — one failing never blocks the rest, and the whole sweep stops
+starting new emails after ~28 s so it always answers inside the function's 40 s
+(anything left is picked up the next day; every send is stamped first). Engine:
 `src/services/retentionSweepService.js`; templates at the bottom of
 `src/emails/templates.js`; senders in `src/utils/emailService.js`.
 

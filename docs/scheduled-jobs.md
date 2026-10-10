@@ -1,24 +1,38 @@
 # Scheduled jobs
 
-CardPop's five recurring backend jobs are driven by **GitHub Actions**, not
-Vercel Cron. `vercel.json` has no `crons` block.
+CardPop's recurring backend jobs are driven by **GitHub Actions**, not Vercel
+Cron. `vercel.json` has no `crons` block.
 
-| Job | Endpoint | Schedule (UTC) | Local | Workflow |
-|---|---|---|---|---|
-| Price refresh | `/api/prices/refresh` | `30 19 * * *` | 05:30 AEST daily | `cron-prices-refresh.yml` |
-| Reconcile pending payments | `/api/stripe/reconcile-pending` | `15 */2 * * *` | every 2 hours | `cron-reconcile-pending.yml` |
-| Blog article generation | `/cron/blog-generate` | `7 21 * * *` | 07:07 AEST daily | `cron-blog-generate.yml` |
-| Event scan | `/cron/event-scan` | `7 17 * * 0` | 03:07 AEST Monday | `cron-event-scan.yml` |
-| Event website re-scan | `/cron/event-scan?mode=watches` | `43 16 * * *` | 02:43 AEST daily | `cron-event-watch.yml` |
-| Supplier price watch | `/api/shop-supplier-watch/run` | `17 20 * * *` | 06:17 AEST daily (each product weekly) | `cron-supplier-price-watch.yml` |
-| Delivery sweep | `/api/orders/delivery-sweep` | `37 20 * * *` | 06:37 AEST daily | `cron-delivery-sweep.yml` |
-| Retention sweep | `/api/retention/sweep` | `47 21 * * *` | 07:47 AEST daily | `cron-retention-sweep.yml` |
-| Site traffic sync (GA4 visitors) | `/api/site-traffic/sync` | `23 19 * * *` | 05:23 AEST daily | `cron-site-traffic.yml` |
-| Merchant listings check (live Product markup has brand/gtin/mpn) | *(none — fetches public pages, `scripts/check-merchant-listings.mjs`)* | `33 20 * * 1` | 06:33 AEST Tuesday weekly | `merchant-listings-check.yml` (files a tracking issue on failure, like `migration-drift.yml`) |
+Four workflows carry nine endpoints:
 
-Each caller workflow is a dozen lines that delegate to the reusable runner
-`.github/workflows/cron-job.yml`, which makes one authenticated `GET` and fails
-the run on any non-2xx.
+| Workflow | Schedule (UTC) | Local | What it calls |
+|---|---|---|---|
+| `cron-daily.yml` — **Daily maintenance** | `23 19 * * *` | 05:23 AEST daily | The six daily endpoints below, back to back in one run |
+| `cron-reconcile-pending.yml` | `15 */2 * * *` | every 2 hours | `/api/stripe/reconcile-pending` |
+| `cron-blog-generate.yml` | `7 21 * * *` | 07:07 AEST daily | `/cron/blog-generate` |
+| `cron-event-scan.yml` | `7 17 * * 0` | 03:07 AEST Monday | `/cron/event-scan` |
+
+The daily run's steps, in order (each `continue-on-error`, so one failing never
+blocks the rest; the run itself goes red at the end if any step failed):
+
+| Step | Endpoint | Function budget | Runbook |
+|---|---|---|---|
+| Site traffic sync (GA4 visitors) | `/api/site-traffic/sync` | 40 s | `docs/site-traffic.md` |
+| Price refresh | `/api/prices/refresh` | 40 s | — |
+| Event website re-scan (each watch weekly) | `/cron/event-scan?mode=watches` | 300 s | `docs/event-scanning.md` |
+| Supplier price watch (each product weekly) | `/api/shop-supplier-watch/run` | 40 s | `docs/supplier-price-watch.md` |
+| Delivery sweep | `/api/orders/delivery-sweep` | 40 s | `docs/order-delivery.md` |
+| Retention sweep | `/api/retention/sweep` | 40 s | `docs/retention.md` |
+
+Also on a schedule, but not a backend job: `merchant-listings-check.yml`
+(`33 20 * * 1`, 06:33 AEST Tuesday) fetches public pages with
+`scripts/check-merchant-listings.mjs` to check the live Product markup, and
+files a tracking issue on failure, like `migration-drift.yml`.
+
+Every endpoint call is the composite action `.github/actions/cron-call`: one
+authenticated `GET`, failing on any non-2xx, with 401/403 never retried. The
+three single-endpoint workflows are a dozen lines each that delegate to the
+reusable runner `.github/workflows/cron-job.yml`, which wraps that action.
 
 ## Why not Vercel Cron
 
@@ -38,6 +52,17 @@ of up to 24.
 Moving the schedules here also means the cadences are no longer coupled to the
 hosting plan at all.
 
+## Why the daily jobs share one run
+
+This repository is private, so Actions minutes are metered and **every run is
+billed rounded up to a whole minute**, however briefly it runs (see below). The
+six daily endpoints each take a few seconds, so as six workflows they cost six
+minutes a day for well under a minute of work. As one run they cost one to
+three. Nothing depended on their old spacing: every job is idempotent or
+self-deduplicating (each send, snapshot or check is stamped in the database),
+so running them back to back changes nothing but the bill. The reconciler,
+blog draft and event scan keep their own runs because their cadences differ.
+
 ## Setup
 
 One repository secret is required:
@@ -52,15 +77,17 @@ Optionally, a repository *variable* `CRON_BASE_URL` points the jobs somewhere
 other than production (e.g. a preview deployment). Unset means
 `https://cardpop.com.au`.
 
-All four endpoints **fail closed**: with no `CRON_SECRET` configured on the
-server they refuse to run rather than being publicly triggerable. So the
-workflows are not a privilege boundary — a fork or a PR cannot trigger them,
-and without the secret nothing happens.
+Every endpoint **fails closed**: with no `CRON_SECRET` configured on the server
+it refuses to run rather than being publicly triggerable. So the workflows are
+not a privilege boundary — a fork or a PR cannot trigger them, and without the
+secret nothing happens.
 
 ## Running one by hand
 
 Every workflow has `workflow_dispatch`: **Actions → pick the job → Run
-workflow**. That is also how you re-run a job after fixing a failure.
+workflow**. That is also how you re-run a job after fixing a failure. Running
+**Daily maintenance** by hand re-runs all six steps; a step whose work is
+already done for the day is a no-op.
 
 The event scan additionally has an in-app trigger — Admin → Event Management →
 "Run scan now" — which calls `/cron/event-scan` with the signed-in admin's
@@ -85,27 +112,37 @@ Supabase token instead of the secret.
 
 This repository is private, so Actions minutes are metered — 2,000/month on the
 GitHub Free plan — and **every run is billed rounded up to a whole minute**,
-however briefly it actually runs. That is why the runner checks out nothing and
-installs no toolchain: the work is one `curl`, so each run costs the 1-minute
-minimum.
+however briefly it actually runs. That is why the runner checks out only the
+composite action's folder and installs no toolchain: the work is one `curl` per
+endpoint, so a single-endpoint run costs the 1-minute minimum.
 
 Current cost, approximately:
 
-| Job | Runs/month | Minutes/month |
+| Workflow | Runs/month | Minutes/month |
 |---|---|---|
 | Reconcile pending | ~360 | ~360 |
-| Price refresh | ~30 | ~30 |
+| Daily maintenance (six endpoints) | ~30 | ~30–90 |
 | Blog generation | ~30 | ~30 |
 | Event scan | ~4 | ~4 |
-| Delivery sweep | ~30 | ~30 |
-| Retention sweep | ~30 | ~30 |
-| Site traffic sync | ~30 | ~30 |
-| **Total** | | **~455** |
+| **Total** | | **~425–485** |
 
-That leaves roughly 1,575 minutes for CI (`ci.yml`, `main-ci.yml`, `e2e.yml`,
+Before the daily jobs were merged into one run this was ~635 minutes a month,
+and the reconciler is the one worth watching: it is ~80% of the scheduled bill
+and most of its runs find nothing. Raising it to hourly (`15 * * * *`) would
+add another ~360 minutes.
+
+That leaves roughly 1,500 minutes for CI (`ci.yml`, `main-ci.yml`, `e2e.yml`,
 `lighthouse.yml`, `snyk-security.yml`, …), which is the far larger consumer.
-Watch the total under **Settings → Billing**. Raising the reconciler to hourly
-(`15 * * * *`) would roughly double the scheduled-job share to ~790 minutes.
+Watch the total under **Settings → Billing**.
+
+## Database-side schedules
+
+Not every schedule is in Actions. pg_cron inside the Supabase project runs:
+
+| Job | Schedule | Owner |
+|---|---|---|
+| `expire-stale-offers` | every 15 min | `20260928071648_binding_offers_lifecycle.sql` |
+| `stripe-sync-worker` | every 5 min | Created by the Stripe Sync Engine integration (`docs/stripe-sync.md`); cadence set by `20261010022330_stripe_sync_worker_cadence.sql` |
 
 ## Troubleshooting
 
@@ -121,6 +158,10 @@ match the request paths, in the Cloudflare dashboard. See `docs/ddos-protection.
 
 **A run fails with HTTP 000.** curl never got a response — the function exceeded
 `max_seconds`, or the site was unreachable. Check the Vercel function logs.
+
+**Daily maintenance is red.** Open the run: the final step names which steps
+failed, and each failed step's log has the response body. The other steps still
+ran. Re-run the workflow after fixing; completed steps are no-ops.
 
 **A job stops firing entirely.** Check whether the 60-day inactivity disable
 kicked in (Actions tab shows a banner), and that the schedule is on `main`.
