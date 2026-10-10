@@ -303,4 +303,8 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   );
 };
 
-export default ProductCard;
+// Memoised for the same reason as MarketplaceListingCard: the shop grids
+// re-render as a whole on every state change while each `product` row is
+// stable. Pages that pass an inline `onAddToCart` arrow still re-render their
+// cards (a new function each time); the ones that hoist it benefit fully.
+export default React.memo(ProductCard);

@@ -97,6 +97,13 @@ const Header = () => {
   // the component unmounts mid-animation and leaves stale body styles behind.
   // This causes the next page's scroll to be locked at the previous page's position,
   // making the new page appear blank even though it rendered correctly.
+  //
+  // Every stale style is a *mutation* of body's style attribute, so the
+  // observer below sees each one; with the route-change sweep further down it
+  // covers every way a lock can be left behind. A 500 ms setInterval used to
+  // run beside them "as a last resort" — a timer on every page for the life of
+  // the tab, waking the main thread twice a second to read a style it had
+  // already been told about. Removed; the observer is the mechanism.
   useEffect(() => {
     // Watch for any style change on body and fix it after animations settle.
     // Debounce into a single tracked timeout so rapid mutations don't pile up
@@ -109,12 +116,8 @@ const Header = () => {
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
 
-    // Periodic sweep as a last resort (500ms is imperceptible to users)
-    const interval = setInterval(clearStaleBodyStyles, 500);
-
     return () => {
       observer.disconnect();
-      clearInterval(interval);
       clearTimeout(settleTimeout);
     };
   }, []);

@@ -62,9 +62,11 @@ AdSense never loads on the homepage (`NO_AD_PREFIXES` in `lib/adsense.js`).
 - The desktop hero showcase shows its first card already settled; the shelf →
   stand flight runs from the second card on (it was keeping above-the-fold pixels
   changing for ~4 s after the hero painted — Speed Index).
-- `tools/check-bundle-size.js` budgets the initial JS; the entry's largest pieces
-  are `supabase-js` (~50 KB gzip, mostly unused at first paint but needed by
-  every provider) and React itself.
+- `tools/check-bundle-size.js` budgets the initial JS of **both** documents
+  Vite emits — `index.html` ("/") and `app.html` (what Vercel serves for every
+  other route) — each held to the same 320 KB gzip budget; the entry's largest
+  pieces are `supabase-js` (~50 KB gzip, mostly unused at first paint but
+  needed by every provider) and React itself.
 
 ## Images
 
