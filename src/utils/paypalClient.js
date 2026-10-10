@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import logger from './logger.js';
 import { ENV, normalizePaidTier } from '../../config/subscription.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 /**
  * Minimal PayPal REST client for subscription billing.
@@ -20,16 +21,31 @@ const BASE_URL = PAYPAL_ENV === 'live'
   ? 'https://api-m.paypal.com'
   : 'https://api-m.sandbox.paypal.com';
 
+const signal = () => AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.paypal);
+
 export function isPaypalConfigured() {
   return Boolean(process.env.PAYPAL_CLIENT_ID && process.env.PAYPAL_CLIENT_SECRET);
 }
+
+// PayPal client-credential tokens live for hours (expires_in ≈ 32400), but
+// every call used to fetch a fresh one — two round trips per subscription
+// operation and per webhook. Cache it for its lifetime (minus a minute), keyed
+// to the credentials so a rotated secret can't reuse the old token. A token
+// response with no usable expires_in is not cached.
+let cachedToken = null; // { token, expiresAt, credentials }
 
 async function getAccessToken() {
   const id = process.env.PAYPAL_CLIENT_ID;
   const secret = process.env.PAYPAL_CLIENT_SECRET;
   if (!id || !secret) throw new Error('PayPal credentials are not configured');
 
-  const auth = Buffer.from(`${id}:${secret}`).toString('base64');
+  const credentials = `${id}:${secret}`;
+  const now = Date.now();
+  if (cachedToken && cachedToken.credentials === credentials && now < cachedToken.expiresAt) {
+    return cachedToken.token;
+  }
+
+  const auth = Buffer.from(credentials).toString('base64');
   const res = await fetch(`${BASE_URL}/v1/oauth2/token`, {
     method: 'POST',
     headers: {
@@ -37,6 +53,7 @@ async function getAccessToken() {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: 'grant_type=client_credentials',
+    signal: signal(),
   });
 
   if (!res.ok) {
@@ -44,7 +61,16 @@ async function getAccessToken() {
     throw new Error(`PayPal token request failed (${res.status}): ${text}`);
   }
   const json = await res.json();
+  const ttlSeconds = Number(json.expires_in);
+  if (Number.isFinite(ttlSeconds) && ttlSeconds > 60) {
+    cachedToken = { token: json.access_token, expiresAt: now + (ttlSeconds - 60) * 1000, credentials };
+  }
   return json.access_token;
+}
+
+/** For tests. */
+export function _resetPaypalTokenCache() {
+  cachedToken = null;
 }
 
 /**
@@ -77,6 +103,7 @@ export async function createPaypalSubscription({ userId, email, returnUrl, cance
         cancel_url: cancelUrl,
       },
     }),
+    signal: signal(),
   });
 
   if (!res.ok) {
@@ -94,6 +121,7 @@ export async function getPaypalSubscription(subscriptionId) {
   const token = await getAccessToken();
   const res = await fetch(`${BASE_URL}/v1/billing/subscriptions/${subscriptionId}`, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: signal(),
   });
   if (!res.ok) {
     const text = await res.text();
@@ -125,6 +153,7 @@ export async function verifyPaypalWebhook({ headers, body }) {
       webhook_id:        webhookId,
       webhook_event:     body,
     }),
+    signal: signal(),
   });
   if (!res.ok) return false;
   const json = await res.json();

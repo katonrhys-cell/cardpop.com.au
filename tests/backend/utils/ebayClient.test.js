@@ -47,6 +47,37 @@ describe('getAccessToken', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  // Regression: a cold /ebay/popular-cards fans out sixteen searches at once,
+  // and each one saw an empty cache and requested its own token.
+  it('shares one in-flight token request between concurrent callers', async () => {
+    let release;
+    global.fetch.mockReturnValue(new Promise((r) => { release = () => r(tokenRes()); }));
+    const { getAccessToken } = await load();
+
+    const pending = Promise.all([getAccessToken(), getAccessToken(), getAccessToken()]);
+    release();
+    const tokens = await pending;
+
+    expect(tokens).toEqual(['tok-123', 'tok-123', 'tok-123']);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('lets the next caller retry after a failed token request', async () => {
+    global.fetch
+      .mockRejectedValueOnce(new Error('ECONNRESET'))
+      .mockResolvedValueOnce(tokenRes());
+    const { getAccessToken } = await load();
+    await expect(getAccessToken()).rejects.toThrow('ECONNRESET');
+    await expect(getAccessToken()).resolves.toBe('tok-123');
+  });
+
+  it('bounds the token request with a timeout signal', async () => {
+    global.fetch.mockResolvedValue(tokenRes());
+    const { getAccessToken } = await load();
+    await getAccessToken();
+    expect(global.fetch.mock.calls[0][1].signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('throws when the OAuth2 request fails', async () => {
     global.fetch.mockResolvedValue(res({ ok: false, status: 401, statusText: 'Unauthorized', text: 'bad creds' }));
     const { getAccessToken } = await load();
@@ -76,6 +107,25 @@ describe('callEbayApi', () => {
     expect(url).toContain('/buy/browse/v1/item_summary/search');
     expect(options.headers.Authorization).toBe('Bearer tok-123');
     expect(options.headers['X-EBAY-C-MARKETPLACE-ID']).toBe('EBAY_AU');
+  });
+
+  it('bounds every API call with a timeout signal, combined with a caller signal when given', async () => {
+    global.fetch
+      .mockResolvedValueOnce(tokenRes())
+      .mockResolvedValueOnce(res({ json: {} }))
+      .mockResolvedValueOnce(res({ json: {} }));
+
+    const { callEbayApi } = await load();
+    await callEbayApi('/x');
+    expect(global.fetch.mock.calls[1][1].signal).toBeInstanceOf(AbortSignal);
+
+    const controller = new AbortController();
+    await callEbayApi('/y', { signal: controller.signal });
+    const combined = global.fetch.mock.calls[2][1].signal;
+    expect(combined).toBeInstanceOf(AbortSignal);
+    expect(combined.aborted).toBe(false);
+    controller.abort();
+    expect(combined.aborted).toBe(true);
   });
 
   it('surfaces the first eBay error message from a JSON error body', async () => {

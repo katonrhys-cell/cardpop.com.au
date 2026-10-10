@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
 import { buildPriceContext, quotableFigures } from './blogPriceContext.js';
@@ -26,11 +26,23 @@ const MAX_ATTEMPTS = 2;
 const CANDIDATE_WINDOW = 5;
 
 let cachedClient = null;
-function anthropic() {
+// The SDK is imported here, on first use, rather than at module load: this
+// file sits in the routes graph (routes/blog.js) and the SDK is dead weight on
+// every cold start that isn't the nightly draft. The timeout caps the stream
+// under the 300 s function so a stall fails inside the budget instead of as a
+// 504; one retry, not the SDK's default two, for the same reason.
+async function anthropic() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set — blog generation is disabled.');
   }
-  cachedClient ||= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  if (!cachedClient) {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    cachedClient = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: OUTBOUND_TIMEOUT_MS.anthropicDraft,
+      maxRetries: 1,
+    });
+  }
   return cachedClient;
 }
 
@@ -146,7 +158,8 @@ ${violations.map((v, i) => `${i + 1}. ${v}`).join('\n')}`);
 }
 
 async function requestDraft(topic, priceContext, violations) {
-  const stream = anthropic().beta.messages.stream({
+  const client = await anthropic();
+  const stream = client.beta.messages.stream({
     model: MODEL,
     max_tokens: 32000,
     // Blog copy will not trip the safety classifiers, but a refusal returns a

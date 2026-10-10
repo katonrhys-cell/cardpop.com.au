@@ -1,3 +1,4 @@
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 const KIT_API_BASE = 'https://api.kit.com/v4';
 
 /**
@@ -33,6 +34,7 @@ export async function subscribeToNewsletter(email, firstName, { list } = {}) {
       email_address: email.trim().toLowerCase(),
       ...(firstName?.trim() && { first_name: firstName.trim() }),
     }),
+    signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.newsletter),
   });
 
   if (!response.ok) {

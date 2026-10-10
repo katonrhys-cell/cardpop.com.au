@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 const SITEVERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
 
@@ -43,6 +44,7 @@ export async function verifyTurnstileToken(token, remoteip) {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params.toString(),
+      signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.verify),
     });
     const data = await response.json().catch(() => ({}));
     return {

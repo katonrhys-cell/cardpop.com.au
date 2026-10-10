@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
 import { fetchWebpageContent, extractTextFromHtml, isFetchableHttpUrl } from './safeFetch.js';
@@ -91,11 +91,22 @@ const TRACKING_PARAMS = [
 ];
 
 let cachedClient = null;
-function anthropic() {
+// Imported on first use, not at module load: routes/event-scan.js reaches this
+// file (via eventSourceWatcher) for two constants, which put the whole SDK on
+// every cold start. The timeout keeps a stalled call inside the 300 s function
+// budget; one retry rather than the SDK's default two.
+async function anthropic() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set — event scanning is disabled.');
   }
-  cachedClient ||= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  if (!cachedClient) {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    cachedClient = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: OUTBOUND_TIMEOUT_MS.anthropicScan,
+      maxRetries: 1,
+    });
+  }
   return cachedClient;
 }
 
@@ -230,7 +241,7 @@ async function markSourcesScanned(sourceIds) {
 export async function discoverCandidates(queries) {
   if (!queries.length) return [];
 
-  const message = await anthropic().beta.messages.create({
+  const message = await (await anthropic()).beta.messages.create({
     model: MODEL,
     max_tokens: 8000,
     // Event listings are unremarkable content, but a refusal returns 200 with
@@ -351,7 +362,7 @@ async function updateCandidate(candidateId, patch) {
 
 /** Stage 2. Page text in, validated event draft out (or null if it isn't one). */
 export async function extractEventFromPage(pageText, sourceUrl) {
-  const message = await anthropic().beta.messages.create({
+  const message = await (await anthropic()).beta.messages.create({
     model: MODEL,
     max_tokens: 8000,
     betas: ['server-side-fallback-2026-07-01'],

@@ -112,6 +112,52 @@ describe('createPaypalSubscription', () => {
   });
 });
 
+describe('access token caching', () => {
+  // The tests above use token responses with no expires_in, which are never
+  // cached — so they stay independent of each other. This one exercises the
+  // cache on a fresh module instance.
+  it('reuses a token for its lifetime and refetches once it expires', async () => {
+    vi.resetModules();
+    const mod = await import('../../../src/utils/paypalClient.js');
+    mod._resetPaypalTokenCache();
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1_000_000);
+
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'tok_A', expires_in: 32400 }) })
+      .mockResolvedValueOnce(jsonResponse({ id: 'I-1', status: 'ACTIVE' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'I-2', status: 'ACTIVE' }));
+
+    await mod.getPaypalSubscription('I-1');
+    await mod.getPaypalSubscription('I-2');
+    // One token request served both calls.
+    expect(fetch).toHaveBeenCalledTimes(3);
+    expect(fetch.mock.calls[2][1].headers.Authorization).toBe('Bearer tok_A');
+
+    // Past the (lifetime − 60 s) mark a new token is fetched.
+    now.mockReturnValue(1_000_000 + 32400 * 1000);
+    fetch
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ access_token: 'tok_B', expires_in: 32400 }) })
+      .mockResolvedValueOnce(jsonResponse({ id: 'I-3', status: 'ACTIVE' }));
+    await mod.getPaypalSubscription('I-3');
+    expect(fetch).toHaveBeenCalledTimes(5);
+    expect(fetch.mock.calls[4][1].headers.Authorization).toBe('Bearer tok_B');
+
+    now.mockRestore();
+    mod._resetPaypalTokenCache();
+  });
+
+  it('every PayPal request carries a timeout signal', async () => {
+    fetch
+      .mockResolvedValueOnce(tokenResponse())
+      .mockResolvedValueOnce(jsonResponse({ id: 'I-1', status: 'ACTIVE' }));
+    await getPaypalSubscription('I-1');
+    for (const [, options] of fetch.mock.calls) {
+      expect(options.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+});
+
 describe('getPaypalSubscription', () => {
   it('returns the subscription JSON', async () => {
     fetch

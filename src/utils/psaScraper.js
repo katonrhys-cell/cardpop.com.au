@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import { convertUsdToAud, getExchangeRateInfo } from './exchangeRates.js';
 
 const PSA_BASE_URL = 'https://www.psacard.com/cert';
@@ -24,6 +25,7 @@ async function fetchPSACertification(certNumber) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
+      signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.psa),
     });
 
     if (!response.ok) {
