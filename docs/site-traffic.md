@@ -19,7 +19,7 @@ only), so expect GA4's figure to be higher.
 ## How it flows
 
 ```
-GitHub Actions  cron-site-traffic.yml   05:23 AEST daily
+GitHub Actions  cron-daily.yml (step 1)  05:23 AEST daily
    └─ GET /api/site-traffic/sync        (CRON_SECRET bearer, fail-closed)
         └─ src/services/siteTrafficService.js
              ├─ GA4 Data API runReport ×2  (src/utils/ga4Client.js, service account)

@@ -4,7 +4,7 @@ import { lookupTracking, trackableCarriers } from '../utils/carrierTracking.js';
 import { markOrderDelivered } from './shipmentService.js';
 import { MARKETPLACE_PROTECTION } from '../../utils/buyerProtectionPolicy.js';
 
-// Daily cron (.github/workflows/cron-delivery-sweep.yml → GET /api/orders/delivery-sweep).
+// Daily cron (.github/workflows/cron-daily.yml → GET /api/orders/delivery-sweep).
 //
 // For every shipped order with no delivery recorded:
 //   1. ask the carrier (Australia Post / StarTrack / Sendle, when credentials

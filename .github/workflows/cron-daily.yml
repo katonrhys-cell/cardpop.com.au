@@ -1,0 +1,136 @@
+name: Cron · Daily maintenance
+
+# The six daily backend jobs in ONE run. Each used to be its own workflow
+# firing at its own minute (16:43–21:47 UTC), and on a private repo every run
+# bills a whole minute however briefly it executes — six runs a day was ~180
+# metered minutes a month for about forty seconds of actual work. Run back to
+# back on one runner they bill ~1–3 minutes a day. The jobs are independent and
+# idempotent, so nothing depends on their old spacing; each step continues on
+# error and the final step fails the run if any of them did, so a failure is
+# still visible in the Actions tab. Runbooks: docs/scheduled-jobs.md and the
+# per-job docs each endpoint names.
+#
+# Not here: the every-two-hours payment reconciler, the nightly blog draft and
+# the weekly event scan, which keep their own workflows (cron-job.yml).
+
+on:
+  schedule:
+    # 19:23 UTC = 05:23 AEST (06:23 AEDT): after GA4 has closed out the previous
+    # AEST day, before the morning inboxes the retention sweep writes to, and off
+    # the top of the hour where GitHub's scheduler is most congested.
+    - cron: '23 19 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: cron-daily
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  daily:
+    name: Daily maintenance
+    runs-on: ubuntu-latest
+    # Worst case: five 40 s functions plus one 300 s function with their retries.
+    timeout-minutes: 25
+    env:
+      BASE_URL: ${{ vars.CRON_BASE_URL || 'https://cardpop.com.au' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/actions
+          sparse-checkout-cone-mode: false
+
+      # GA4 visitor counts → site_traffic_daily / site_traffic_summary
+      # (docs/site-traffic.md). Idempotent upserts.
+      - id: site_traffic
+        continue-on-error: true
+        uses: ./.github/actions/cron-call
+        with:
+          endpoint: /api/site-traffic/sync
+          max_seconds: 50
+          attempts: 2
+          base_url: ${{ env.BASE_URL }}
+          cron_secret: ${{ secrets.CRON_SECRET }}
+
+      # Daily card price snapshots. Keyed per card per day, so a re-run is a no-op.
+      - id: prices
+        continue-on-error: true
+        uses: ./.github/actions/cron-call
+        with:
+          endpoint: /api/prices/refresh
+          max_seconds: 50
+          attempts: 2
+          base_url: ${{ env.BASE_URL }}
+          cron_secret: ${{ secrets.CRON_SECRET }}
+
+      # Weekly re-scan of each event's "Website to scrape" (docs/event-scanning.md).
+      # Its own 300 s function; may spend on a model call, so never retried — a
+      # due watch left over is simply picked up tomorrow.
+      - id: event_watch
+        continue-on-error: true
+        uses: ./.github/actions/cron-call
+        with:
+          endpoint: /cron/event-scan?mode=watches
+          max_seconds: 330
+          attempts: 1
+          base_url: ${{ env.BASE_URL }}
+          cron_secret: ${{ secrets.CRON_SECRET }}
+
+      # Supplier price watch (docs/supplier-price-watch.md). A product checked
+      # once isn't due again for a week, so a retry only picks up the rest.
+      - id: supplier_watch
+        continue-on-error: true
+        uses: ./.github/actions/cron-call
+        with:
+          endpoint: /api/shop-supplier-watch/run
+          max_seconds: 50
+          attempts: 2
+          base_url: ${{ env.BASE_URL }}
+          cron_secret: ${{ secrets.CRON_SECRET }}
+
+      # Delivery sweep: carrier tracking or 10 days after posting → delivered
+      # (docs/order-delivery.md). A delivered order is skipped on a retry.
+      - id: delivery_sweep
+        continue-on-error: true
+        uses: ./.github/actions/cron-call
+        with:
+          endpoint: /api/orders/delivery-sweep
+          max_seconds: 50
+          attempts: 2
+          base_url: ${{ env.BASE_URL }}
+          cron_secret: ${{ secrets.CRON_SECRET }}
+
+      # Retention emails (docs/retention.md). Every send is stamped in the DB,
+      # so a retry can't repeat one.
+      - id: retention_sweep
+        continue-on-error: true
+        uses: ./.github/actions/cron-call
+        with:
+          endpoint: /api/retention/sweep
+          max_seconds: 50
+          attempts: 2
+          base_url: ${{ env.BASE_URL }}
+          cron_secret: ${{ secrets.CRON_SECRET }}
+
+      - name: Fail the run if any job failed
+        env:
+          OUTCOMES: >-
+            site_traffic=${{ steps.site_traffic.outcome }}
+            prices=${{ steps.prices.outcome }}
+            event_watch=${{ steps.event_watch.outcome }}
+            supplier_watch=${{ steps.supplier_watch.outcome }}
+            delivery_sweep=${{ steps.delivery_sweep.outcome }}
+            retention_sweep=${{ steps.retention_sweep.outcome }}
+        run: |
+          echo "${OUTCOMES}"
+          failed=""
+          for pair in ${OUTCOMES}; do
+            case "${pair}" in *=failure) failed="${failed} ${pair%%=*}";; esac
+          done
+          if [ -n "${failed}" ]; then
+            echo "::error::Daily maintenance: failed step(s):${failed}. Each step's log above has the response body."
+            exit 1
+          fi
+          echo "::notice::All six daily jobs succeeded."
