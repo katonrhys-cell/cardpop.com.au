@@ -11,7 +11,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { slugify } from '@/lib/slugify.js';
 import { toast } from 'sonner';
 import GradeBadge from '@/components/GradeBadge.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
 // ── Auction countdown ─────────────────────────────────────────────────────────
@@ -74,9 +74,8 @@ const WatchlistRow = ({ entry, onRemove }) => {
     || vi?.vault_images?.find(i => i.is_primary)?.storage_path
     || vi?.vault_images?.[0]?.storage_path
     || null;
-  const imgSrc = imgPath
-    ? (publicImageUrl(imgPath))
-    : null;
+  // 64 px row thumbnail: the 480 px companion, never the full upload.
+  const imgSrc = cardThumbUrl(imgPath);
   const detailPath = `/marketplace/${listing.id}/${slugify(vi?.card_name || 'card')}`;
   const statusCfg = getStatusCfg(listing);
   const isAuction = listing.listing_type === 'auction';

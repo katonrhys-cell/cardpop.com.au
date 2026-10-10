@@ -13,8 +13,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
 import { VAULT_ITEM_CARD_SELECT, LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import { vaultItemListing } from '@/lib/vaultItemListing.js';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
@@ -27,7 +28,7 @@ import { CARD_VARIANTS, getCardVariants, FOIL_VARIANT } from '@/lib/cardVariants
 import { genericVariantChips, getAutographLabel } from '@/lib/cardAttributeLabels.js';
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -98,9 +99,8 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
   const rowListing = vaultItemListing(listing);
   const isSold = listing.status === 'sold' || rowListing?.status === 'sold';
   const imgPath = listing.card_image || listing.vault_images?.[0]?.storage_path || null;
-  const imgSrc = imgPath
-    ? (publicImageUrl(imgPath))
-    : null;
+  // 176–192 px tile: the 480 px companion thumbnail, not the full upload.
+  const imgSrc = cardThumbUrl(imgPath);
   const price = listing.estimated_value_aud ?? listing.price_aud ?? listing.price ?? 0;
   const title = listing.card_name ?? listing.title ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
@@ -172,9 +172,7 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
 // ─── Holy grail card (featured picks) ───────────────────────────────────────
 const HolyGrailCard = ({ card, accentHex }) => {
   const imgPath = card.card_image || card.vault_images?.[0]?.storage_path || null;
-  const imgSrc = imgPath
-    ? (publicImageUrl(imgPath))
-    : null;
+  const imgSrc = cardThumbUrl(imgPath);
   const price = card.estimated_value_aud ?? 0;
   const title = card.card_name ?? 'Featured Card';
   const { eyebrow, detailBits } = cardDetails(card);
@@ -523,14 +521,14 @@ const CollectionPage = () => {
     const loadHolyGrail = async () => {
       try {
         let query = supabase.from('vault_items')
-          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
+          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PROFILE_CARD_COLUMNS})`)
           .eq('is_public', true)
           .gt('estimated_value_aud', 0)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
         if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
-          fetchPinnedSectionItems(slug, 'holy_grail', `${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`),
+          fetchPinnedSectionItems(slug, 'holy_grail', `${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PROFILE_CARD_COLUMNS})`),
           query,
         ]);
         if (cancelled) return;
@@ -574,7 +572,7 @@ const CollectionPage = () => {
 
       let q = supabase.from('listings')
         .select(
-          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug)`,
+          `${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`,
           { count: 'estimated' }
         )
         // Sold listings stay in the grid, badged "Sold" (not purchasable).

@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { VerificationBadge } from '@/components/VerificationBadge.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import { toast } from 'sonner';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 
@@ -404,7 +404,8 @@ const VaultProfilePage = () => {
                 >
                   {card.card_image ? (
                     <img
-                      src={publicImageUrl(card.card_image)}
+                      src={cardThumbUrl(card.card_image)}
+                      loading="lazy"
                       alt={card.card_name}
                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                     />

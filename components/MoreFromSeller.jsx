@@ -3,13 +3,13 @@ import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 
 // "More from this seller" — the cheapest cross-sell on a marketplace: the
 // buyer already trusts this seller enough to be here, and combining cards
 // saves them postage. Renders nothing when the seller has no other live cards.
-const SELLER_EMBED = 'seller:profiles!seller_id(id, display_name, username, avatar_url, profile_photo_or_character, is_verified, is_admin, is_sole_trader, business_name, business_logo_url, store_slug, seller_tier, rating, reviews_count)';
 
 const MoreFromSeller = ({ sellerId, excludeListingId, sellerName, storePath, limit = 4, className = '' }) => {
   const [listings, setListings] = useState([]);
@@ -19,7 +19,7 @@ const MoreFromSeller = ({ sellerId, excludeListingId, sellerName, storePath, lim
     let cancelled = false;
     supabase
       .from('listings')
-      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, ${SELLER_EMBED}`)
+      .select(`${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`)
       .eq('seller_id', sellerId)
       .eq('status', 'active')
       .neq('listing_type', 'vault')

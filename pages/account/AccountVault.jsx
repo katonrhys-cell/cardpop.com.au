@@ -18,7 +18,7 @@ import VaultListingModal from '@/components/VaultListingModal.jsx';
 import DisplayStyleDialog from '@/components/vault/DisplayStyleDialog.jsx';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
 import PSAPopPanel from '@/components/PSAPopPanel.jsx';
-import { publicImageUrl, getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import { cardThumbUrl, getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
@@ -129,7 +129,8 @@ const AccountVault = () => {
     const psaRaw = card.cardsight_card_id ? psaMap[card.cardsight_card_id] ?? null : null;
     let imageUrl = null;
     if (card.card_image) {
-      imageUrl = publicImageUrl(card.card_image);
+      // Grid tile: the 480 px companion thumbnail where the upload has one.
+      imageUrl = cardThumbUrl(card.card_image);
     }
     // The card's chosen display style (holographic, slab, glass…) renders
     // through the Card Showcase Engine here too, so the vault matches how the

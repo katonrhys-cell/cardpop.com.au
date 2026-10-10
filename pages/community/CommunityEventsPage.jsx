@@ -21,6 +21,39 @@ const EVENT_TYPES = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({
 const todayStr = toLocalDateStr(new Date());
 const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
 
+// Everything the card, the detail modal and the JSON-LD read from an event —
+// the public view minus its SEO-only columns.
+export const EVENT_CARD_COLUMNS = [
+  'id', 'slug', 'event_type', 'status', 'title', 'description', 'short_description', 'image_url',
+  'venue_name', 'address', 'suburb', 'state', 'postcode',
+  'start_date', 'end_date', 'start_time', 'end_time',
+  'entry_fee_aud', 'presale_fee_aud', 'is_free', 'website_url', 'ticket_url',
+  'is_cardpop_verified', 'is_featured', 'registration_required', 'capacity',
+  'tags', 'featured_card_games', 'organizer_name',
+  'instagram_url', 'facebook_url', 'youtube_url', 'facebook_video_url',
+  'accessibility_info', 'age_restrictions', 'created_at', 'updated_at',
+].join(',');
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_EVENTS = 500;
+
+/**
+ * Build the public-events query for a date window. Only events inside the
+ * window (plus undated ones, which the page groups under "Date TBA") are
+ * fetched: the page used to pull every public event ever — most of them past —
+ * and filter in the browser, and the filter defaults to "today → next year"
+ * anyway. Dates are validated before they reach the filter string.
+ */
+export function buildEventsQuery(client, { startDate, endDate } = {}) {
+  let q = client.from('events_public').select(EVENT_CARD_COLUMNS);
+  const start = ISO_DATE_RE.test(startDate || '') ? startDate : null;
+  const end = ISO_DATE_RE.test(endDate || '') ? endDate : null;
+  if (start && end) q = q.or(`start_date.is.null,and(start_date.gte.${start},start_date.lte.${end})`);
+  else if (start) q = q.or(`start_date.is.null,start_date.gte.${start}`);
+  else if (end) q = q.or(`start_date.is.null,start_date.lte.${end}`);
+  return q.order('start_date', { ascending: true }).limit(MAX_EVENTS);
+}
+
 const TYPE_SEO = {
   card_show: {
     path: '/events/card-shows',
@@ -87,30 +120,34 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const isMounted = useRef(true);
+  const fetchRef = useRef(null);
 
-  const fetchEvents = async () => {
-    if (!isMounted.current) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('events_public')
-        .select('*')
-        .order('start_date', { ascending: true });
-      if (fetchError) throw fetchError;
-      if (isMounted.current) setEvents(data || []);
-    } catch (err) {
-      if (isMounted.current) setError('Failed to load events. Please try again.');
-    } finally {
-      if (isMounted.current) setIsLoading(false);
-    }
-  };
-
+  // Fetch the events for the selected date window (see buildEventsQuery).
+  // Re-runs when the window changes, debounced so typing a date doesn't fire
+  // a query per keystroke.
   useEffect(() => {
     isMounted.current = true;
-    fetchEvents();
-    return () => { isMounted.current = false; };
-  }, []);
+    let cancelled = false;
+    const run = async () => {
+      if (!isMounted.current) return;
+      setIsLoading(true);
+      setError(null);
+      try {
+        const { data, error: fetchError } = await buildEventsQuery(supabase, { startDate, endDate });
+        if (fetchError) throw fetchError;
+        if (!cancelled && isMounted.current) setEvents(data || []);
+      } catch (err) {
+        if (!cancelled && isMounted.current) setError('Failed to load events. Please try again.');
+      } finally {
+        if (!cancelled && isMounted.current) setIsLoading(false);
+      }
+    };
+    fetchRef.current = run;
+    const timer = setTimeout(run, fetchRef.current && events.length ? 300 : 0);
+    return () => { cancelled = true; clearTimeout(timer); isMounted.current = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- events.length only picks the debounce
+  }, [startDate, endDate]);
+  const fetchEvents = () => fetchRef.current?.();
 
   // Batch-load RSVP data for every loaded event at once. Re-runs when the signed-in
   // user resolves so their own RSVP roles fill in. Each helper issues a single

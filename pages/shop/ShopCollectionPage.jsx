@@ -14,7 +14,8 @@ import { supabase } from '@/lib/supabaseClient.js';
 import ProductGrid from '@/components/ProductGrid.jsx';
 import { resolveShopCollection } from '@/data/shopCollectionConfigs.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { isSoldOut, isComingSoon, isPreorder, PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
@@ -48,7 +49,8 @@ const CardSkeleton = () => (
 // ─── Compact product card for the horizontal "New Arrivals" strip ────────────
 const MiniProductCard = ({ product, accentHex }) => {
   const imgPath = product.images?.[0] || product.image_url || product.card_image || null;
-  const imgSrc = imgPath ? publicImageUrl(imgPath) : null;
+  // Strip tile: the `.opt.thumb.webp` companion where the photo has one.
+  const imgSrc = cardThumbUrl(imgPath);
   const price = Number(product.price_aud ?? product.price ?? 0);
   const title = product.title || 'Product';
   const detailPath = shopProductPath(product);
@@ -185,7 +187,7 @@ const ShopCollectionPage = () => {
       try {
         const { data, error } = await supabase
           .from('shop_products')
-          .select('*')
+          .select(SHOP_CARD_COLUMNS)
           .in('status', PUBLIC_SHOP_STATUSES)
           .or(buildGroupOr())
           .order('created_at', { ascending: false })
@@ -245,7 +247,7 @@ const ShopCollectionPage = () => {
 
       let q = supabase
         .from('shop_products')
-        .select('*', { count: 'estimated' })
+        .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
         .in('status', PUBLIC_SHOP_STATUSES);
 
       // A selected pill narrows to one leaf category; otherwise match the group.

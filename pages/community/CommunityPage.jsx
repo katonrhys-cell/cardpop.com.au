@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { isVerified } from '@/utils/verification.js';
 import { MessageSquare, Users, Store, ExternalLink, ShieldCheck, ChevronLeft, ChevronRight, Instagram, Rocket, ArrowRight } from 'lucide-react';
 
@@ -64,7 +64,7 @@ const CommunityPage = () => {
 
     supabase
       .from('profiles')
-      .select(PUBLIC_PROFILE_COLUMNS)
+      .select(PROFILE_CARD_COLUMNS)
       .order('created_at', { ascending: false })
       .limit(50)
       .then(({ data, error }) => {

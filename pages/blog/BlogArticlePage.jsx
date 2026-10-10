@@ -244,7 +244,9 @@ const BlogArticlePage = () => {
         const [relatedRes, cardsRes] = await Promise.all([
           supabase
             .from('blog_articles')
-            .select('id, slug, title, featured_image_url, excerpt, content')
+            // No `content`: every published article has an excerpt, and the
+            // three related-article cards were pulling three full bodies.
+            .select('id, slug, title, featured_image_url, excerpt')
             .eq('is_published', true)
             .neq('id', res.id)
             .order('created_at', { ascending: false })
