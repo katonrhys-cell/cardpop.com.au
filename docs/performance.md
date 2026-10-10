@@ -77,6 +77,39 @@ AdSense never loads on the homepage (`NO_AD_PREFIXES` in `lib/adsense.js`).
 - Built-in hero cards (`HeroCardImage`) declare their real rendered width in
   `sizes` so 2× screens don't fetch the 720 w files for a 160 px slot.
 
+## Realtime discipline
+
+Supabase Realtime polls the database's WAL for as long as *any* client holds a
+`postgres_changes` subscription, and every event is RLS-checked against every
+subscriber. In October 2026 that poller was the single largest consumer of
+database time on the project (1.08 M polling calls, more than every application
+query combined), kept alive by channels opened for anonymous visitors. The
+rules that came out of it:
+
+1. **No realtime for anonymous visitors.** Public grids (`MarketplacePage`,
+   `/shop`, singles, sealed, `ShopCategoryPage`), `ProductDetailPage` for a
+   logged-out reader and `LiveActivityTicker` hold no channel. They refetch
+   through `hooks/useRefreshOnReturn.js` when the tab becomes visible again
+   after a minute away — a page view is a snapshot, not a feed.
+2. **Shared state has one provider.** Notifications live in
+   `contexts/NotificationsContext.jsx` (mounted once in `App.jsx`); the header
+   bell and Account → Notifications both read it through `useNotifications()`.
+   Two components opening the same topic is a bug, not a convenience:
+   `supabase.channel(topic)` returns the *existing* channel for a registered
+   topic, so the second `.on()` throws ("cannot add callbacks after
+   subscribe()") and either unmount tears down the other's subscription.
+3. **Per-mount topics are unique.** Use `uniqueTopic(base)` from
+   `lib/realtimeTopic.js` for any subscription an effect may re-create
+   (`ProductDetailPage`, `AccountWatchlist`, `AccountDashboard`, the header
+   badges). A channel stays registered until its leave round-trip completes,
+   so an effect that tears down and re-opens the same topic in one render gets
+   the dying channel back and its new bindings never fire.
+4. **Filter to the viewer's rows, then coalesce.** Every binding carries a
+   `filter` (`user_id=eq.`, `id=in.(…)`); a burst of events (mark-all-read,
+   a bulk vault edit) is debounced into one refetch, and payloads are applied
+   in place where the row is already on screen (notifications, the watchlist's
+   listing rows).
+
 ## Checking a change
 
 ```bash

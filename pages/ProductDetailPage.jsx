@@ -5,6 +5,8 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { uniqueTopic } from '@/lib/realtimeTopic.js';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { canViewVaultProduct } from '@/utils/vaultSecurityUtils.js';
 import { slugify } from '@/lib/slugify.js';
 import { isVerified } from '@/utils/verification.js';
@@ -358,36 +360,49 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     return () => { cancelled = true; };
   }, [familySku]);
 
+  // Live updates for a SIGNED-IN viewer once the product has loaded: a sale
+  // (webhook) or admin action flips listings.status without touching
+  // vault_items, so an open page updates to "Sold" rather than letting the
+  // buyer tap Buy on a card that just went.
+  //
+  // Anonymous visitors get no channel — a page view is a snapshot, and the
+  // open subscriptions of every logged-out reader were what kept Supabase's
+  // WAL poller running around the clock. They refetch on return to the tab
+  // instead (below). The subscription also waits for the product so the
+  // vault_items filter is known up front; the old version subscribed, then
+  // tore down and re-opened a channel with the SAME topic once the vault id
+  // arrived — and `supabase.channel()` hands back the still-leaving channel
+  // for a repeated topic, so the second set of bindings was attached to a
+  // dying channel and the "Sold" flip almost never arrived. uniqueTopic()
+  // makes every (re)subscription its own channel.
+  const viewerId = currentUser?.id ?? null;
+  const loadedProductId = product?.id ?? null;
+  const vaultItemId = product?.vault_item?.id ?? null;
   useEffect(() => {
-    // For a marketplace listing, `id` is the listings.id — the vault_item's
-    // own id (needed to filter that table) is only known once the listing
-    // fetch above resolves. Don't listen to vault_items at all until then:
-    // the initial fetch is already in flight during that window, and an
-    // unfiltered listener would make every open product page refetch on
-    // every vault_items UPDATE anywhere on the site. This effect re-runs
-    // (vault_item.id dep) and subscribes filtered once the product loads.
-    const vaultItemId = product?.vault_item?.id;
-    let channel = supabase.channel(`product-detail-${id}`);
-    if (vaultItemId) {
+    if (!viewerId || !loadedProductId || !id) return undefined;
+    // Private vault views have no live state worth a channel.
+    if (source !== 'marketplace' && source !== 'shop') return undefined;
+    const refetch = () => fetchRef.current?.();
+    let channel = supabase.channel(uniqueTopic(`product-detail-${id}`));
+    if (source === 'marketplace') {
       channel = channel.on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'vault_items', filter: `id=eq.${vaultItemId}` },
-        () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
-      );
-    }
-    channel = channel
-      // A sale (webhook) or admin action flips listings.status without touching
-      // vault_items — listen here so an open page updates to "Sold" live.
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'listings', filter: `id=eq.${id}` },
-        () => { if (source === 'marketplace' && fetchRef.current) fetchRef.current(); }
-      )
+        { event: 'UPDATE', schema: 'public', table: 'listings', filter: `id=eq.${id}` }, refetch);
+      if (vaultItemId) {
+        channel = channel.on('postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'vault_items', filter: `id=eq.${vaultItemId}` }, refetch);
+      }
+    } else {
       // `id` is shop_products.id directly for a shop-sourced product.
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: `id=eq.${id}` },
-        () => { if (source === 'shop' && fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
-
+      channel = channel.on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: `id=eq.${id}` }, refetch);
+    }
+    channel.subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [id, source, product?.vault_item?.id]);
+  }, [id, source, viewerId, loadedProductId, vaultItemId]);
+
+  // Everyone else (and signed-in viewers too, as a belt-and-braces) refetches
+  // when they come back to the tab after a while.
+  useRefreshOnReturn(() => fetchRef.current?.(), { enabled: Boolean(loadedProductId) });
 
   // Shared by "Buy Now" (adds, then straight to checkout) and "Add to cart"
   // (adds, toast with a View Cart action). Resolves to true once the line is in

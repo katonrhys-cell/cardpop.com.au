@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
@@ -147,16 +148,9 @@ const ShopCategoryPage = () => {
     // selection is tracked by value via selectionKey for the same reason.
   }, [categoryName, page, sort, debouncedSearch, contextLoading, selectionKey, filterRows, facets.waiting]);
 
-  useEffect(() => {
-    const channel = supabase
-      .channel('shop-category-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products' },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
-
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  // Stock and price changes reach a returning visitor on the next look at the
+  // tab; no realtime channel is held open for the grid (see useRefreshOnReturn).
+  useRefreshOnReturn(() => fetchRef.current?.());
 
   const handleAddToCart = (product) => {
     // Build the cart product/variant from the real shop_products columns

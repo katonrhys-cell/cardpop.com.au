@@ -10,6 +10,7 @@ import { AdminProvider } from '@/contexts/AdminContext.jsx';
 import { CartProvider } from '@/hooks/useCart.jsx';
 import { CategoryHierarchyProvider } from '@/contexts/CategoryContext.jsx';
 import { WatchlistProvider } from '@/contexts/WatchlistContext.jsx';
+import { NotificationsProvider } from '@/contexts/NotificationsContext.jsx';
 import { PlatformSettingsProvider } from '@/contexts/PlatformSettingsContext.jsx';
 
 // Layouts & Core Components
@@ -278,6 +279,7 @@ const App = () => {
           <CartProvider>
             <CategoryHierarchyProvider>
             <WatchlistProvider>
+            <NotificationsProvider>
               <Router>
                 <ScrollToTop />
                 <AnalyticsPageViews />
@@ -576,6 +578,7 @@ const App = () => {
                   <Toaster position="bottom-right" richColors closeButton />
                 </div>
               </Router>
+            </NotificationsProvider>
             </WatchlistProvider>
             </CategoryHierarchyProvider>
           </CartProvider>
