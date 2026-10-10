@@ -782,13 +782,13 @@ const HomePage = () => {
                   <Button asChild variant="secondary" size="lg" className="rounded-xl font-bold text-primary hover:bg-background">
                     <Link to="/marketplace">Shop cards</Link>
                   </Button>
-                  <Button asChild variant="outline" size="lg" className="rounded-xl font-bold border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">
+                  <Button asChild variant="outline" size="lg" className="rounded-xl font-bold bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary active:bg-primary-foreground active:text-primary">
                     <Link to="/signup?next=%2Fvault%2Fadd">Sell for free</Link>
                   </Button>
                 </div>
               </div>
-              <div className="relative z-10 w-24 h-24 sm:w-48 sm:h-48 bg-primary-foreground/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
-                <Users className="w-12 h-12 sm:w-24 sm:h-24 text-primary-foreground/80" />
+              <div className="relative z-10 hidden sm:flex w-48 h-48 bg-primary-foreground/10 rounded-full items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
+                <Users className="w-24 h-24 text-primary-foreground/80" />
               </div>
             </div>
           </div>
@@ -830,7 +830,7 @@ const HomePage = () => {
 
           <div className="mt-8 md:mt-14 text-center">
             <Button asChild size="lg" className="h-14 px-10 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
-              <Link to="/marketplace">Start browsing <ArrowRight className="ml-2 w-5 h-5" /></Link>
+              <Link to="/marketplace">Start Browsing <ArrowRight className="ml-2 w-5 h-5" /></Link>
             </Button>
           </div>
         </div>
