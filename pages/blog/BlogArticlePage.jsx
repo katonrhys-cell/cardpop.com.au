@@ -11,6 +11,11 @@ import { publicImageUrl, toCdnUrl, cdnifyStorageUrlsInHtml, ensureImgAltInHtml }
 import { resolveConviction, CONVICTION_METHODOLOGY_PATH } from '@/utils/convictionRating.js';
 import { BLOG_CATEGORY_MAP } from '@/data/blogCategories.js';
 import { parseVideoUrl } from '@/utils/videoEmbed.js';
+import EventReviewScorecard from '@/components/reviews/EventReviewScorecard.jsx';
+import EventReviewQuickFacts from '@/components/reviews/EventReviewQuickFacts.jsx';
+import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
+import EventReviewPickups from '@/components/reviews/EventReviewPickups.jsx';
+import { buildEventReviewJsonLd, hasScorecard, hasQuickFacts } from '@/utils/eventReview.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -206,6 +211,10 @@ const BlogArticlePage = () => {
   const [error, setError] = useState(null);
   const [relatedArticles, setRelatedArticles] = useState([]);
   const [marketplaceCards, setMarketplaceCards] = useState([]);
+  // Event reviews carry a structured half (scorecard, quick facts, gallery,
+  // pickups) in event_reviews, plus the event they cover — see docs/event-reviews.md.
+  const [eventReview, setEventReview] = useState(null);
+  const [reviewedEvent, setReviewedEvent] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -240,6 +249,26 @@ const BlogArticlePage = () => {
           cdnifyStorageUrlsInHtml(res.content_html || res.content || ''),
           res.title || '',
         ));
+
+        // Structured review data, only for articles that have it. RLS returns
+        // the row for a published article (or to an admin previewing a draft).
+        const { data: reviewRow } = await supabase
+          .from('event_reviews')
+          .select('*')
+          .eq('article_id', res.id)
+          .maybeSingle();
+        if (cancelled) return;
+        setEventReview(reviewRow || null);
+        if (reviewRow?.event_id) {
+          const { data: ev } = await supabase
+            .from('events_public')
+            .select('id, slug, title, start_date, end_date, venue_name, address, suburb, state, postcode, image_url')
+            .eq('id', reviewRow.event_id)
+            .maybeSingle();
+          if (!cancelled) setReviewedEvent(ev || null);
+        } else {
+          setReviewedEvent(null);
+        }
 
         const [relatedRes, cardsRes] = await Promise.all([
           supabase
@@ -388,7 +417,10 @@ const BlogArticlePage = () => {
     embedUrl: videoInfo.embedUrl,
   } : null;
 
-  const structuredDataArray = [blogStructuredData, videoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
+  // Review rich-result markup for event reviews (null when there's no rating).
+  const eventReviewStructuredData = buildEventReviewJsonLd({ article, review: eventReview, event: reviewedEvent });
+
+  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, videoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -505,6 +537,13 @@ const BlogArticlePage = () => {
         </div>
       )}
 
+      {eventReview && (hasScorecard(eventReview) || hasQuickFacts(eventReview) || reviewedEvent) && (
+        <div className="container-default max-w-4xl mx-auto mt-8 grid gap-5 lg:grid-cols-[3fr_2fr] items-start">
+          <EventReviewScorecard review={eventReview} />
+          <EventReviewQuickFacts review={eventReview} event={reviewedEvent} />
+        </div>
+      )}
+
       <div className="w-full mt-10 mb-24">
         {htmlContent ? (
           <div className="w-full container-default">
@@ -549,6 +588,13 @@ const BlogArticlePage = () => {
           </div>
         )}
       </div>
+
+      {eventReview && (eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
+        <div className="container-default max-w-4xl mx-auto -mt-10 mb-16 space-y-12">
+          <EventReviewGallery gallery={eventReview.gallery} />
+          <EventReviewPickups pickups={eventReview.pickups} />
+        </div>
+      )}
 
       {Array.isArray(article.tags) && article.tags.length > 0 && (
         <div className="w-full container-default mb-16">

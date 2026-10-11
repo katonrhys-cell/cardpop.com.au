@@ -235,6 +235,8 @@ const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/Business
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const PromoCodesAdminPage = lazy(() => import('@/pages/admin/PromoCodesAdminPage.jsx'));
 const ProductReviewsAdminPage = lazy(() => import('@/pages/admin/ProductReviewsAdminPage.jsx'));
+const EventReviewsAdminPage = lazy(() => import('@/pages/admin/EventReviewsAdminPage.jsx'));
+const EventReviewEditorPage = lazy(() => import('@/pages/admin/EventReviewEditorPage.jsx'));
 const BusinessAffiliateLinksAdminPage = lazy(() => import('@/pages/admin/BusinessAffiliateLinksAdminPage.jsx'));
 const ShopAffiliateProductsAdminPage = lazy(() => import('@/pages/admin/ShopAffiliateProductsAdminPage.jsx'));
 const CardArtManagementPage = lazy(() => import('@/pages/admin/CardArtManagementPage.jsx'));
@@ -558,6 +560,9 @@ const App = () => {
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
                           <Route path="product-reviews" element={<ProductReviewsAdminPage />} />
+                          <Route path="event-reviews" element={<EventReviewsAdminPage />} />
+                          <Route path="event-reviews/new" element={<EventReviewEditorPage />} />
+                          <Route path="event-reviews/:reviewId" element={<EventReviewEditorPage />} />
                           <Route path="building-your-business" element={<BusinessAffiliateLinksAdminPage />} />
                           <Route path="shop-affiliate-products" element={<ShopAffiliateProductsAdminPage />} />
                           <Route path="card-art" element={<CardArtManagementPage />} />
