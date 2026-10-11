@@ -290,4 +290,8 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
   );
 };
 
-export default MarketplaceListingCard;
+// Memoised: a grid of 24–60 of these re-renders whenever the page's state
+// moves (filter typing, the auth context settling, a realtime refresh) even
+// though each card's `listing` row is the same object. Shallow prop equality
+// skips all of that work for unchanged rows.
+export default React.memo(MarketplaceListingCard);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { integratedAiClient } from '@/lib/integratedAiClient';
 import { supabase } from '@/lib/supabaseClient.js';
 
@@ -212,11 +212,7 @@ function useIntegratedAi() {
 
 				setMessages(chatMessages);
 			} catch (err) {
-				toast({
-					variant: 'destructive',
-					title: 'Error',
-					description: err.message,
-				});
+				toast.error('Error', { description: err.message });
 			} finally {
 				setIsLoadingHistory(false);
 			}
@@ -342,11 +338,7 @@ function useIntegratedAi() {
 				}
 			}
 		} catch (err) {
-			toast({
-				variant: 'destructive',
-				title: 'Error',
-				description: err.message,
-			});
+			toast.error('Error', { description: err.message });
 
 			setMessages(prev => {
 				const last = prev.at(-1);
