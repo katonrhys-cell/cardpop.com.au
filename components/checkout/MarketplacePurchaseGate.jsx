@@ -45,7 +45,8 @@ const MarketplacePurchaseGate = ({ level = 'account', thresholdAud, returnPath, 
             <>
               Marketplace orders {threshold ? `of ${threshold} or more` : ''} need a one-time ID + selfie check,
               handled securely by Stripe. It protects sellers from fraud on high-value cards and takes about
-              two minutes — you only ever do it once.
+              two minutes — you only ever do it once. CardPop Shop items and Official CardPop Store
+              cards don&apos;t need it.
             </>
           ) : (
             <>

@@ -23,6 +23,16 @@ import {
 // It does NOT require a card on file: a buyer pays at checkout, so there is no
 // deferred fee to collect (that requirement is sell/trade-only).
 //
+// Listings sold by the Official CardPop Store (seller `is_admin`, see
+// lib/sellerIdentity.js) are platform stock too, so they get the same open
+// checkout as the Shop: anyone, guests included, can buy them at the Buy Now
+// price. The exemption is decided here from the DB — never from the client —
+// and only when EVERY listing in the order is official; one peer-to-peer
+// listing gates the whole order exactly as below. If the seller lookup fails,
+// the order falls through to the normal gate (fail closed for the exemption).
+// Exempt orders are marked `req.officialStoreOrder` so the checkout handlers
+// also skip the new-buyer purchase limits for them.
+//
 // Must run AFTER optionalAuthMiddleware (needs req.user when present). Detects a
 // marketplace purchase from either request shape:
 //   - /create-cart-checkout → req.body.items[] with an item of type 'listing'
@@ -32,6 +42,7 @@ import {
 //   - no account                          → 401 IDENTITY_REQUIRED (sign in to buy)
 //   - account, under threshold            → pass
 //   - account, at/over threshold, no ID   → 403 IDENTITY_NOT_VERIFIED
+//   - only official-store listings        → pass, signed in or not
 // Fails OPEN on an unexpected error so a transient DB blip never blocks an
 // otherwise-legitimate, authenticated buyer at the till.
 
@@ -54,6 +65,13 @@ export async function requireIdentityForMarketplacePurchase(req, res, next) {
 
     // Shop-only (or empty) order — no marketplace listing to gate.
     if (!hasMarketplaceItem) return next();
+
+    if (await onlyOfficialStoreListings(req.body, items)) {
+      // Downstream handlers skip the new-buyer purchase limits for these
+      // orders (checkPurchaseVelocity) — CardPop's own cards are open to all.
+      req.officialStoreOrder = true;
+      return next();
+    }
 
     if (!req.user) {
       return res.status(401).json({
@@ -99,5 +117,28 @@ export async function requireIdentityForMarketplacePurchase(req, res, next) {
   } catch (err) {
     logger.error(`[IDENTITY_GATE] failed open: ${err.message}`);
     return next();
+  }
+}
+
+// True when every listing in the order is sold by the platform's own storefront
+// account (seller `is_admin`). Any lookup problem, an unknown id or a single
+// community seller returns false, so the normal identity gate applies.
+async function onlyOfficialStoreListings(body, items) {
+  try {
+    const ids = [...new Set([
+      ...items.filter((it) => it && it.type === 'listing').map((it) => it.id),
+      ...(typeof body?.listingId === 'string' && body.listingId ? [body.listingId] : []),
+    ])];
+    if (ids.length === 0 || ids.some((id) => typeof id !== 'string' || !id)) return false;
+
+    const { data, error } = await supabase
+      .from('listings')
+      .select('id, seller:profiles!seller_id(is_admin)')
+      .in('id', ids);
+    if (error || !Array.isArray(data) || data.length !== ids.length) return false;
+    return data.every((l) => l.seller?.is_admin === true);
+  } catch (err) {
+    logger.warn(`[IDENTITY_GATE] official-store check failed, applying the normal gate: ${err.message}`);
+    return false;
   }
 }

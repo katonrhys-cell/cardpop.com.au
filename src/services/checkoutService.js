@@ -263,7 +263,11 @@ export async function createSingleItemCheckout(req, res) {
     if (bidId) metadata.bidId = bidId;
 
     const buyerTotal = breakdown.itemPrice + (breakdown.commissionAud || 0) + shippingAud + processingAud;
-    const velocity = await checkPurchaseVelocity({ userId, orderValueAud: buyerTotal });
+    // Official CardPop Store listings skip the new-buyer limits (flag set by
+    // requireIdentityForMarketplacePurchase).
+    const velocity = req.officialStoreOrder
+      ? { allowed: true }
+      : await checkPurchaseVelocity({ userId, orderValueAud: buyerTotal });
     if (!velocity.allowed) {
       logger.warn(`[VELOCITY] Blocked checkout for ${userId} (${velocity.reason})`);
       return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });

@@ -5,6 +5,11 @@
 // same decision from the same rule:
 //
 //   - CardPop Shop items: guest checkout, nothing to prove.
+//   - Official CardPop Store listings (`officialStore: true` on the product,
+//     set from the seller's `is_admin`): platform stock like the Shop, so the
+//     same open checkout. The server decides this independently from the DB
+//     (requireIdentityForPurchase.js `onlyOfficialStoreListings`) and only when
+//     EVERY listing in the order is official.
 //   - Any marketplace listing in the order: a signed-in account with a confirmed
 //     email (sellers are real, verified people; buyers must be reachable too).
 //   - Marketplace items totalling AT OR ABOVE the threshold: Stripe Identity
@@ -30,17 +35,22 @@ export function normaliseIdentityThreshold(value) {
 export function marketplaceSubtotalAud(lines = []) {
   let total = 0;
   for (const line of lines) {
-    if (!line) continue;
+    if (!isGatedMarketplaceLine(line)) continue;
     const p = line.product || line;
-    const type = p.type || 'listing';
-    if (type !== 'listing') continue;
     total += Number(p.price ?? p.price_aud ?? 0) || 0;
   }
   return Math.round(total * 100) / 100;
 }
 
+/** A peer-to-peer listing line — i.e. one the identity rule applies to. */
+function isGatedMarketplaceLine(line) {
+  if (!line) return false;
+  const p = line.product || line;
+  return (p.type || 'listing') === 'listing' && p.officialStore !== true;
+}
+
 export function hasMarketplaceLine(lines = []) {
-  return lines.some((line) => line && ((line.product || line).type || 'listing') === 'listing');
+  return lines.some(isGatedMarketplaceLine);
 }
 
 /** True when an order of this marketplace value needs Stripe Identity. */

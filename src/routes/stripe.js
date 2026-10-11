@@ -365,7 +365,11 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       await priceCart(items, userId);
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers.
-    const velocity = await checkPurchaseVelocity({ userId, guestEmail: userId ? null : email, orderValueAud: grandCents / 100 });
+    // Not applied to orders of Official CardPop Store listings, which anyone may
+    // buy (set by requireIdentityForMarketplacePurchase).
+    const velocity = req.officialStoreOrder
+      ? { allowed: true }
+      : await checkPurchaseVelocity({ userId, guestEmail: userId ? null : email, orderValueAud: grandCents / 100 });
     if (!velocity.allowed) {
       logger.warn(`[VELOCITY] Blocked cart checkout for ${userId} (${velocity.reason})`);
       return res.status(429).json({ error: velocity.message, code: 'velocity_limit' });
