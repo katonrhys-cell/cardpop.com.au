@@ -15,6 +15,16 @@ import { resolveConviction } from '@/utils/convictionRating.js';
 
 const CATEGORY_MAP = Object.fromEntries(CATEGORIES.map(c => [c.slug, c]));
 
+// What an article CARD renders. The index used to select `*`, which shipped
+// every article's full `content` and `content_html` — the whole blog, twice —
+// to build 90-character excerpts. Every published article carries an
+// `excerpt`, so the body never has to travel to the listing page.
+export const BLOG_CARD_COLUMNS = [
+  'id', 'slug', 'title', 'excerpt', 'featured_image_url', 'featured_video_url',
+  'category', 'tags', 'featured', 'author', 'read_time_minutes',
+  'conviction_rating', 'conviction_type', 'created_at', 'published_at',
+].join(',');
+
 const formatDate = (dateStr) =>
   new Date(dateStr).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -236,7 +246,7 @@ const BlogPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fetchError } = await supabase.from('blog_articles').select('*').eq('is_published', true).order('created_at', { ascending: false }).limit(100);
+      const { data, error: fetchError } = await supabase.from('blog_articles').select(BLOG_CARD_COLUMNS).eq('is_published', true).order('created_at', { ascending: false }).limit(100);
       if (fetchError) throw fetchError;
       setArticles(data ?? []);
     } catch (err) {

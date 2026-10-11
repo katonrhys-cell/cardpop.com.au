@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { CheckCircle, Loader2, Send } from 'lucide-react';
+import { Bell, CheckCircle, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -62,6 +62,9 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const [sent, setSent] = useState(false);
+  // 'notify' = the one-field "email me when it's back" (sold-out only);
+  // 'enquiry' = the full name/email/message form.
+  const [mode, setMode] = useState(reason === 'sold_out' ? 'notify' : 'enquiry');
   const [turnstileToken, setTurnstileToken] = useState('');
   const turnstileRef = useRef(null);
 
@@ -81,6 +84,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
 
   const reset = () => {
     setSent(false);
+    setMode(reason === 'sold_out' ? 'notify' : 'enquiry');
     setErrors({});
     setSendError('');
     setMessage('');
@@ -94,7 +98,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
 
   const validate = () => {
     const errs = {};
-    if (name.trim().length < 2) errs.name = 'Please enter your name';
+    if (mode === 'enquiry' && name.trim().length < 2) errs.name = 'Please enter your name';
     if (!EMAIL_RE.test(email.trim())) errs.email = 'Please enter a valid email address';
     if (message.length > MAX_MESSAGE) errs.message = `Keep your message under ${MAX_MESSAGE} characters`;
     return errs;
@@ -112,6 +116,18 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
     setSending(true);
     setSendError('');
     try {
+      if (mode === 'notify') {
+        const res = await apiServerClient.fetch('/shop-enquiry/notify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: product.id, email: email.trim(), company, turnstileToken }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) { setSendError(data.error || 'We could not save your request. Please try again.'); return; }
+        setSent(true);
+        toast.success('We’ll email you when it’s back in stock.');
+        return;
+      }
       const res = await apiServerClient.fetch('/shop-enquiry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -151,10 +167,14 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
               <div className="w-14 h-14 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-2">
                 <CheckCircle className="w-7 h-7 text-green-600 dark:text-green-400" />
               </div>
-              <DialogTitle>Enquiry sent</DialogTitle>
+              <DialogTitle>{mode === 'notify' ? 'You’re on the list' : 'Enquiry sent'}</DialogTitle>
               <DialogDescription>
-                Thanks — we&apos;ve passed your enquiry about <strong>{title}</strong> to the CardPop team
-                and will reply to {email.trim()} as soon as we know more.
+                {mode === 'notify' ? (
+                  <>We&apos;ll email {email.trim()} the moment <strong>{title}</strong> is back in stock — one email, nothing else.</>
+                ) : (
+                  <>Thanks — we&apos;ve passed your enquiry about <strong>{title}</strong> to the CardPop team
+                  and will reply to {email.trim()} as soon as we know more.</>
+                )}
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -164,10 +184,15 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
         ) : (
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
             <DialogHeader>
-              <DialogTitle>{copy.title}</DialogTitle>
-              <DialogDescription>{copy.intro(title)}</DialogDescription>
+              <DialogTitle>{mode === 'notify' ? 'Email me when it’s back' : copy.title}</DialogTitle>
+              <DialogDescription>
+                {mode === 'notify'
+                  ? <><strong>{title}</strong> is sold out right now. Leave your email and we&apos;ll send one message when it&apos;s back in stock.</>
+                  : copy.intro(title)}
+              </DialogDescription>
             </DialogHeader>
 
+            {mode === 'enquiry' && (
             <div className="space-y-1.5">
               <Label htmlFor="shop-enquiry-name">Name</Label>
               <Input
@@ -181,6 +206,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
               />
               {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
             </div>
+            )}
 
             <div className="space-y-1.5">
               <Label htmlFor="shop-enquiry-email">Email</Label>
@@ -197,6 +223,7 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
               {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
             </div>
 
+            {mode === 'enquiry' && (
             <div className="space-y-1.5">
               <Label htmlFor="shop-enquiry-message">Message <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Textarea
@@ -211,6 +238,15 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
               />
               {errors.message && <p className="text-xs text-destructive">{errors.message}</p>}
             </div>
+            )}
+            {mode === 'notify' && (
+              <p className="text-xs text-muted-foreground">
+                Have a question instead?{' '}
+                <button type="button" className="underline font-semibold" onClick={() => setMode('enquiry')} disabled={sending}>
+                  Send an enquiry
+                </button>
+              </p>
+            )}
 
             {/* Honeypot: visually hidden, ignored by real users, filled by bots. */}
             <div className="absolute -left-[9999px] top-auto w-px h-px overflow-hidden" aria-hidden="true">
@@ -248,6 +284,8 @@ const ShopEnquiryDialog = ({ open, onOpenChange, product, reason = 'sold_out' })
               <Button type="submit" disabled={sending || (TURNSTILE_ENABLED && !turnstileToken)}>
                 {sending ? (
                   <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Sending…</>
+                ) : mode === 'notify' ? (
+                  <><Bell className="w-4 h-4 mr-2" />Notify me</>
                 ) : (
                   <><Send className="w-4 h-4 mr-2" />Send enquiry</>
                 )}

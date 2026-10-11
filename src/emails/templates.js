@@ -79,6 +79,63 @@ function summaryTable(rows) {
 </div>`;
 }
 
+// ─── Hero badge + stat tiles (every customer-facing email) ───────────────────
+//
+// Styled like a Google Search Console digest: a centred headline, one big
+// circular icon badge, a row of stat tiles (coloured circle · big figure ·
+// small caption), then the detail and the button. Built from tables,
+// border-radius and unicode glyphs only — Gmail strips <svg> and blocks remote
+// images by default, so there is nothing to block and nothing to break.
+// Colours are the brand palette (red / charcoal / greys) plus one green for
+// good-news tiles — no blue.
+
+const linkStyle = 'color:#E63946;text-decoration:none;';
+const money = (n) => `$${Number(n || 0).toFixed(2)}`;
+const TILE = { red: '#E63946', green: '#16A34A', charcoal: '#1C1C1E', grey: '#6B7280' };
+
+/** The big centred icon badge under the headline (a glyph in a coloured ring). */
+function heroBadge(glyph, colour = TILE.red) {
+  return `<table cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto 20px;"><tr>
+<td align="center" valign="middle" style="width:96px;height:96px;border-radius:48px;background:${colour}20;">
+<table cellpadding="0" cellspacing="0" border="0"><tr>
+<td align="center" valign="middle" style="width:64px;height:64px;border-radius:32px;background:${colour};color:#FFFFFF;font-size:30px;font-weight:900;line-height:64px;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">${glyph}</td>
+</tr></table></td></tr></table>`;
+}
+
+/** Centred headline + optional sub-line (the product / card / search name). */
+function heroHeading(title, subtitle) {
+  return `<h1 style="margin:0 0 6px;font-size:28px;line-height:1.25;font-weight:400;color:#1C1C1E;text-align:center;letter-spacing:-0.3px;">${title}</h1>
+${subtitle ? `<p style="margin:0 0 28px;font-size:16px;color:#4B5563;text-align:center;">${subtitle}</p>` : '<div style="height:20px;"></div>'}`;
+}
+
+/** One stat tile: coloured circle with a glyph, a big figure, a small caption. */
+function statTile({ glyph, colour = TILE.red, value, caption, small = false }) {
+  return `<td align="center" valign="top" style="padding:8px 6px;">
+<table cellpadding="0" cellspacing="0" border="0" align="center"><tr>
+<td align="center" valign="middle" style="width:56px;height:56px;border-radius:28px;background:${colour};color:#FFFFFF;font-size:24px;font-weight:900;line-height:56px;">${glyph}</td>
+</tr></table>
+<p style="margin:12px 0 2px;font-size:${small ? '20px' : '30px'};font-weight:400;color:#1C1C1E;line-height:1.2;letter-spacing:-0.5px;word-break:break-word;">${value}</p>
+<p style="margin:0;font-size:13px;color:#6B7280;line-height:1.4;">${caption}</p>
+</td>`;
+}
+
+/** A row of 1–3 tiles, in a bordered card like the Search Console summary. */
+function statRow(tiles) {
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:12px;margin:0 0 28px;">
+<tr><td style="padding:20px 10px;"><table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>${tiles.map(statTile).join('')}</tr></table></td></tr>
+</table>`;
+}
+
+/** A list of items (cart lines, matches) in the same bordered-card style. */
+function itemCard(rows) {
+  const html = rows.map(([left, right]) =>
+    `<tr><td style="padding:10px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${left}</td><td align="right" style="padding:10px 0;font-size:14px;font-weight:700;color:#1C1C1E;border-bottom:1px solid #F3F4F6;white-space:nowrap;">${right}</td></tr>`).join('');
+  return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:12px;margin:0 0 24px;"><tr><td style="padding:8px 20px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">${html}</table></td></tr></table>`;
+}
+
+const centred = (text) => `<p style="margin:0 0 20px;font-size:15px;line-height:1.7;color:#374151;text-align:center;">${text}</p>`;
+const plural = (n, one, many) => (n === 1 ? one : many);
+
 // ─── Pre-launch welcome (landing-page early-access registration) ──────────────
 
 export function launchWelcomeEmail({ name, hasGuide = false } = {}) {
@@ -115,24 +172,30 @@ export function welcomeOfferEmail({ name, code, trialDays, discountPct, expiresA
   const expiryStr = new Date(expiresAt).toLocaleDateString('en-AU', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney',
   });
-  const codeBlock = `<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:24px;text-align:center;margin:28px 0;">
+  const codeBlock = `<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px;">
 <p style="margin:0 0 8px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
-<p style="margin:0;font-size:28px;font-weight:900;letter-spacing:3px;color:#111827;">${code}</p>
+<p style="margin:0;font-size:28px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
 </div>`;
 
-  const body = `<p>Welcome to CardPop — Australia's trading card marketplace. As a thank-you for joining, here's a one-time welcome gift just for you:</p>
+  const body = `${heroBadge('🎁')}
+${heroHeading('Your welcome gift', `Welcome aboard, ${esc(name)} — a one-time thank-you for joining CardPop.`)}
+${statRow([
+  { glyph: '%', colour: TILE.red, value: `${Number(discountPct)}%`, caption: 'Off your first order' },
+  { glyph: '★', colour: TILE.green, value: String(Number(trialDays)), caption: 'Days of selling, free' },
+  { glyph: '⏱', colour: TILE.charcoal, value: esc(expiryStr), caption: 'Code expires', small: true },
+])}
 ${codeBlock}
 <p style="margin:0 0 8px;"><strong>Your code unlocks both of these:</strong></p>
 <ul style="margin:0 0 20px;padding-left:20px;">
-<li style="margin-bottom:8px;"><strong>${trialDays} days of selling, free.</strong> Redeem your code on the Membership page, add a card or PayPal to activate, and pay nothing until the trial ends — cancel anytime.</li>
-<li><strong>${discountPct}% off your first order.</strong> Enter the same code at checkout and we'll take ${discountPct}% off the cards in your first purchase.</li>
+<li style="margin-bottom:8px;"><strong>${Number(trialDays)} days of selling, free.</strong> Redeem your code on the Membership page, add a card or PayPal to activate, and pay nothing until the trial ends — cancel anytime.</li>
+<li><strong>${Number(discountPct)}% off your first order.</strong> It’s applied automatically at checkout when you’re signed in.</li>
 </ul>
-<p>Your code expires on <strong>${expiryStr}</strong>, so don't sit on it like a sealed booster box.</p>`;
+${centred(`Your code expires on <strong>${esc(expiryStr)}</strong>, so don’t sit on it like a sealed booster box.`)}`;
 
   return cpEmail(
-    `Your CardPop welcome gift: ${trialDays} days of selling free + ${discountPct}% off your first order.`,
-    'Your Welcome Gift Inside 🎁',
-    `Welcome aboard, ${esc(name)}!`,
+    `Your CardPop welcome gift: ${Number(trialDays)} days of selling free + ${Number(discountPct)}% off your first order.`,
+    '',
+    '',
     body,
     'https://cardpop.com.au/account/membership',
     'Redeem My Code',
@@ -142,7 +205,6 @@ ${codeBlock}
 
 // ─── Order confirmed (buyer) ──────────────────────────────────────────────────
 
-const money = (n) => `$${Number(n || 0).toFixed(2)}`;
 
 // Itemised invoice block. GST is already included in the total (Australian
 // prices are GST-inclusive), so it's shown as an "includes GST" line rather
@@ -215,39 +277,49 @@ export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, ord
   // most mail clients block remote/inline images by default, so a logo here
   // would often just be a broken box.
   const walletLabel = WALLET_LABELS[paymentWalletType];
-  const paidWithLine = walletLabel ? `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;">Paid with <strong style="color:#111827;">${esc(walletLabel)}</strong>.</p>` : '';
+  const paidWithLine = walletLabel ? `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;text-align:center;">Paid with <strong style="color:#111827;">${esc(walletLabel)}</strong>.</p>` : '';
+  const ref = `#${String(orderId).slice(0, 8).toUpperCase()}`;
+  const hasInvoice = Boolean(invoice?.items?.length);
+  const orderDate = hasInvoice && invoice.orderDate
+    ? new Date(invoice.orderDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
+    : null;
+  const itemCount = hasInvoice ? invoice.items.reduce((n, i) => n + (Number(i.quantity) || 1), 0) : 1;
+  const paid = hasInvoice ? Number(invoice.total ?? total) : Number(total);
+
+  const hero = `${heroBadge('✓', TILE.green)}
+${heroHeading(isTaxInvoice ? 'Tax invoice' : 'Purchase confirmed', `You did it, ${esc(buyerName)}! Order <strong>${esc(ref)}</strong>${orderDate ? ` · ${esc(orderDate)}` : ''}`)}
+${statRow([
+  { glyph: '$', colour: TILE.red, value: money(paid), caption: 'Total paid (AUD)' },
+  { glyph: '#', colour: TILE.charcoal, value: String(itemCount), caption: itemCount === 1 ? 'Item' : 'Items' },
+  { glyph: '✓', colour: TILE.green, value: 'Full', caption: 'Buyer Protection' },
+])}
+${paidWithLine}`;
 
   // Rich itemised invoice when the checkout captured full pricing; otherwise
   // fall back to the original single-line summary (single-item purchases).
   let body;
-  if (invoice?.items?.length) {
-    const orderDate = invoice.orderDate
-      ? new Date(invoice.orderDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
-      : null;
-    const meta = `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;">Invoice <strong style="color:#111827;">#${String(orderId).slice(0, 8).toUpperCase()}</strong>${orderDate ? ` &middot; ${orderDate}` : ''}</p>`;
-    body = `<p>Your purchase has been confirmed. Here's your ${isTaxInvoice ? 'tax invoice' : 'receipt'}:</p>
-${meta}
-${paidWithLine}
+  if (hasInvoice) {
+    body = `${hero}
+<p style="margin:0 0 12px;">Here's your ${isTaxInvoice ? 'tax invoice' : 'receipt'}:</p>
 ${businessBlock(invoice)}
 ${invoiceBlock(invoice, orderId)}
 ${preorderNote(invoice)}
 ${isTaxInvoice ? (() => { const gstTotal = Number(invoice.gst || 0) + Number(invoice.gstIncluded || 0); return `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${gstTotal > 0 ? ` Total includes GST of ${money(gstTotal)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>`; })() : ''}
-<p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
+${centred('We’ll email you the tracking number as soon as it’s posted. Enjoy the new addition to your collection!')}`;
   } else {
-    body = `<p>Your purchase has been confirmed. Here's a summary of what you've secured:</p>
-${paidWithLine}
+    body = `${hero}
 ${summaryTable([
   ['Item', esc(cardName)],
   ['Item price', `$${Number(itemPrice).toFixed(2)} AUD`],
   ['Total charged', `$${Number(total).toFixed(2)} AUD`, true],
 ])}
-<p>Check your order details to coordinate delivery with the seller. Enjoy the new addition to your collection!</p>`;
+${centred('We’ll email you the tracking number as soon as it’s posted. Enjoy the new addition to your collection!')}`;
   }
 
   return cpEmail(
     isTaxInvoice ? 'Your CardPop tax invoice — check the details inside.' : 'Your CardPop purchase is confirmed — check the details inside.',
-    isTaxInvoice ? 'Tax Invoice' : 'Purchase Confirmed!',
-    `You did it, ${esc(buyerName)}!`,
+    '',
+    '',
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
@@ -301,18 +373,24 @@ export function itemSoldEmail({ sellerName, cardName, itemPrice, commissionAud, 
   if (Number(gstAud) > 0) rows.push(['GST remitted for you', `−$${Number(gstAud).toFixed(2)} AUD`]);
   rows.push(['Net proceeds', `$${Number(sellerProceeds).toFixed(2)} AUD`, true]);
 
-  const body = `<p>Congratulations — your listing sold on CardPop! Here's a breakdown of your sale:</p>
+  const body = `${heroBadge('$', TILE.green)}
+${heroHeading('You made a sale!', `Well done, ${esc(sellerName)} — <strong>${esc(cardName)}</strong> has sold.`)}
+${statRow([
+  { glyph: '$', colour: TILE.red, value: money(itemPrice), caption: 'Sale price' },
+  { glyph: '✓', colour: TILE.green, value: money(sellerProceeds), caption: 'Your net proceeds' },
+  { glyph: '→', colour: TILE.charcoal, value: '7', caption: 'Days to post it (tracked)' },
+])}
 ${summaryTable(rows)}
 ${Number(gstAud) > 0 ? '<p style="font-size:13px;color:#6b7280;">Your listing price included GST. CardPop withholds the GST on your sale and postage and remits it to the ATO on your behalf.</p>' : ''}
-<p>Head to your order details to arrange delivery with the buyer and finalise the sale.</p>`;
+<p><strong>Next step:</strong> post the card within 7 days using a tracked service, then open <a href="https://cardpop.com.au/account/sales" style="color:#E63946;text-decoration:none;">Account → Sales</a> to see the buyer's delivery address and mark it as shipped with the tracking number — the buyer is emailed the tracking link and your Buyer Protection cover begins.</p>`;
 
   return cpEmail(
     'You made a sale on CardPop — great work!',
-    'You Made a Sale!',
-    `Well done, ${esc(sellerName)}!`,
+    '',
+    '',
     body,
-    `https://cardpop.com.au/orders/${orderId}`,
-    'View Order',
+    'https://cardpop.com.au/account/sales',
+    'Ship This Order',
     'This receipt was sent to confirm your sale on CardPop. Keep it for your records.',
   );
 }
@@ -320,16 +398,18 @@ ${Number(gstAud) > 0 ? '<p style="font-size:13px;color:#6b7280;">Your listing pr
 // ─── Refund processed (buyer) ─────────────────────────────────────────────────
 
 export function refundProcessedEmail({ buyerName, refundAmount, orderId }) {
-  const body = `<p>Your refund has been processed. Here's a summary:</p>
-${summaryTable([
-  ['Refund amount', `$${Number(refundAmount).toFixed(2)} AUD`, true],
+  const body = `${heroBadge('↩')}
+${heroHeading('Refund processed', `Hi ${esc(buyerName)} — your money is on its way back.`)}
+${statRow([
+  { glyph: '$', colour: TILE.red, value: money(refundAmount), caption: 'Refunded (AUD)' },
+  { glyph: '⏱', colour: TILE.charcoal, value: '5–10', caption: 'Business days to appear' },
 ])}
-<p>Please allow 5–10 business days for the funds to appear on your original payment method.</p>`;
+${centred('The refund goes back to your original payment method. Banks and card issuers can take 5–10 business days to show it.')}`;
 
   return cpEmail(
     `Your CardPop refund of $${Number(refundAmount).toFixed(2)} AUD is on its way.`,
-    'Refund Processed',
-    `Hi ${esc(buyerName)},`,
+    '',
+    '',
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
@@ -457,17 +537,18 @@ ${message
 // ─── Refund issued (seller) ───────────────────────────────────────────────────
 
 export function refundIssuedEmail({ sellerName, refundAmount, retainedFee, orderId }) {
-  const body = `<p>A refund was issued to the buyer on one of your sales.</p>
-${summaryTable([
-  ['Refund to buyer', `$${Number(refundAmount).toFixed(2)} AUD`],
-  ['Platform fee retained', `$${Number(retainedFee).toFixed(2)} AUD`, true],
+  const body = `${heroBadge('↩', TILE.charcoal)}
+${heroHeading('Refund issued on your sale', `Hi ${esc(sellerName)} — a refund was issued to the buyer on one of your orders.`)}
+${statRow([
+  { glyph: '$', colour: TILE.red, value: money(refundAmount), caption: 'Refunded to buyer' },
+  { glyph: '%', colour: TILE.charcoal, value: money(retainedFee), caption: 'Platform fee retained' },
 ])}
-<p>If you have any questions about this refund, please contact our support team.</p>`;
+${centred('If you have any questions about this refund, reply to this email or contact our support team.')}`;
 
   return cpEmail(
     'A refund was issued on one of your CardPop sales.',
-    'Refund Issued on Your Sale',
-    `Hi ${esc(sellerName)},`,
+    '',
+    '',
     body,
     `https://cardpop.com.au/orders/${orderId}`,
     'View Order',
@@ -679,31 +760,215 @@ export function offerAdminNoticeEmail({ offerId, cardName, amountAud, askingPric
  * buyers have no account to log into); with no carrier link it falls back to
  * the order list. Item titles are seller-supplied, so they go through `esc`.
  */
-export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, trackingNumber }) {
+export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, trackingNumber, invitesReview = false }) {
   const url = trackingUrl(carrier, trackingNumber);
   const number = normalizeTrackingNumber(trackingNumber);
-  const rows = [['Order', esc(orderRef)]];
-  if (items.length) rows.push(['Items', items.map(esc).join(', ')]);
-  rows.push(['Carrier', esc(carrierLabel(carrier))]);
-  rows.push([
-    'Tracking number',
-    url ? `<a href="${esc(url)}" style="color:#E63946;text-decoration:none;font-family:monospace;">${esc(number)}</a>` : `<span style="font-family:monospace;">${esc(number)}</span>`,
-    true,
-  ]);
+  const trackingCell = url
+    ? `<a href="${esc(url)}" style="color:#E63946;text-decoration:none;font-family:monospace;">${esc(number)}</a>`
+    : `<span style="font-family:monospace;">${esc(number)}</span>`;
 
-  const body = `<p>Good news — your order is on its way.</p>
-${summaryTable(rows)}
-<p>${url
-    ? `Tracking can take up to 24 hours to show the first scan. You can follow your parcel any time with the button below${carrier === 'auspost' ? ' or in the Australia Post app' : ''}.`
-    : `Use the tracking number above on ${esc(carrierLabel(carrier))}'s website to follow your parcel.`}</p>`;
+  const body = `${heroBadge('→')}
+${heroHeading('Your order has shipped', `Hi ${esc(buyerName || 'there')} — order <strong>${esc(orderRef)}</strong> is on its way.`)}
+${statRow([
+  { glyph: '→', colour: TILE.red, value: esc(carrierLabel(carrier)), caption: 'Carrier', small: true },
+  { glyph: '#', colour: TILE.charcoal, value: trackingCell, caption: 'Tracking number', small: true },
+])}
+${items.length ? itemCard(items.map((i) => [esc(i), ''])) : ''}
+${centred(url
+    ? `Tracking can take up to 24 hours to show the first scan. Follow your parcel any time with the button below${carrier === 'auspost' ? ' or in the Australia Post app' : ''}.`
+    : `Use the tracking number above on ${esc(carrierLabel(carrier))}'s website to follow your parcel.`)}${invitesReview
+    ? `
+<p style="text-align:center;">Once it arrives, we'd love to hear what you think. You can review the products from your order in <a href="https://cardpop.com.au/account/orders" style="color:#E63946;text-decoration:none;">Account → Orders</a> — it helps other collectors choose.</p>`
+    : ''}`;
 
   return cpEmail(
     `Your CardPop order has shipped — tracking ${esc(number)}.`,
-    'Your Order Has Shipped',
-    `Hi ${esc(buyerName || 'there')},`,
+    '',
+    '',
     body,
     url ? esc(url) : 'https://cardpop.com.au/account/orders',
     url ? 'Track Your Parcel' : 'View Your Orders',
     'You are receiving this because you placed an order on CardPop.',
+  );
+}
+
+// ─── Order delivered (buyer) ──────────────────────────────────────────────────
+
+/**
+ * The parcel arrived (a carrier scan, the buyer's own confirmation, or the
+ * 10-day auto rule). Starts the Buyer Protection clock in writing and asks
+ * for the review that sellers earn.
+ */
+export function orderDeliveredEmail({ buyerName, orderRef, items = [], source = 'carrier', sellerName = null, marketplace = true, claimDays = 7 }) {
+  const how = source === 'carrier'
+    ? 'The carrier has recorded your parcel as delivered.'
+    : source === 'buyer'
+      ? 'Thanks for confirming your parcel arrived.'
+      : 'Your parcel was posted over a week ago, so we’ve recorded it as delivered.';
+  const tiles = marketplace
+    ? [
+      { glyph: '⏱', colour: TILE.red, value: String(Number(claimDays)), caption: 'Days to report a problem' },
+      { glyph: '✓', colour: TILE.green, value: 'Full', caption: 'Refund if it’s not as described' },
+      { glyph: '★', colour: TILE.charcoal, value: 'Rate', caption: sellerName ? esc(sellerName) : 'Your seller' },
+    ]
+    : [
+      { glyph: '⏱', colour: TILE.red, value: '14', caption: 'Days to return, any reason' },
+      { glyph: '★', colour: TILE.charcoal, value: 'Review', caption: 'Help other collectors choose' },
+    ];
+  const body = `${heroBadge('✓', TILE.green)}
+${heroHeading('Your order was delivered', `Hi ${esc(buyerName || 'there')} — ${how} Order <strong>${esc(orderRef)}</strong>${sellerName ? ` from ${esc(sellerName)}` : ''}.`)}
+${statRow(tiles)}
+${items.length ? itemCard(items.map((i) => [esc(i), ''])) : ''}
+${marketplace
+    ? `<p><strong>Check the card today.</strong> If it isn’t as described, arrived damaged or hasn’t actually turned up, report it from <a href="https://cardpop.com.au/account/orders" style="color:#E63946;text-decoration:none;">Account → Orders</a> within <strong>${Number(claimDays)} days</strong> — CardPop Buyer Protection refunds you in full, fees included.</p>
+${centred(`All good? A quick rating helps ${sellerName ? esc(sellerName) : 'your seller'} and tells other collectors who to trust.`)}`
+    : centred('We hope you love it. If anything isn’t right you have 14 days from delivery to return it for any reason, and a product review from your order page helps other collectors choose.')}`;
+
+  return cpEmail(
+    marketplace ? `Your CardPop order ${esc(orderRef)} was delivered — check it within ${Number(claimDays)} days.` : `Your CardPop order ${esc(orderRef)} was delivered.`,
+    '',
+    '',
+    body,
+    'https://cardpop.com.au/account/orders',
+    marketplace ? 'Rate Your Seller' : 'Review Your Order',
+    'You are receiving this because you placed an order on CardPop.',
+  );
+}
+
+// ─── Retention emails (src/services/retentionSweepService.js) ─────────────────
+
+/** The one reminder after an unfinished checkout, with a cart-restore link. */
+export function abandonedCheckoutEmail({ name, items = [], restoreUrl }) {
+  const count = items.reduce((n, i) => n + (Number(i.quantity) || 1), 0);
+  const total = items.reduce((n, i) => n + Number(i.price || 0) * (Number(i.quantity) || 1), 0);
+  const rows = items.slice(0, 6).map((i) => [
+    `<a href="${esc(i.url)}" style="${linkStyle}">${esc(i.title)}</a>${i.quantity > 1 ? ` × ${Number(i.quantity)}` : ''}`,
+    money(i.price * (i.quantity || 1)),
+  ]);
+  const body = `${heroBadge('🛒')}
+${heroHeading('Your cart is waiting', `Hi ${esc(name || 'there')} — you left ${plural(count, 'something', 'a few things')} behind.`)}
+${statRow([
+  { glyph: '#', colour: TILE.red, value: String(count), caption: plural(count, 'Item saved', 'Items saved') },
+  { glyph: '$', colour: TILE.charcoal, value: money(total), caption: 'Cart total' },
+  { glyph: '✓', colour: TILE.green, value: 'Full', caption: 'Buyer Protection' },
+])}
+${itemCard(rows)}
+${centred('Cards on CardPop are one of a kind — once another collector buys one it’s gone. Every fee is shown before you pay.')}`;
+  return cpEmail(
+    'Your CardPop cart is waiting.',
+    '',
+    '',
+    body,
+    esc(restoreUrl),
+    'Return to Checkout',
+    'You’re receiving this because you started a checkout on CardPop and agreed to hear from us. One reminder only.',
+  );
+}
+
+export function watchlistPriceDropEmail({ name, cardName, setName, from, to, pct, url }) {
+  const body = `${heroBadge('↓', TILE.green)}
+${heroHeading('Price drop on your watchlist', `<a href="${esc(url)}" style="${linkStyle}font-weight:700;">${esc(cardName)}</a>${setName ? ` · ${esc(setName)}` : ''}`)}
+${statRow([
+  { glyph: '↓', colour: TILE.green, value: `${Number(pct)}%`, caption: 'Price drop' },
+  { glyph: '$', colour: TILE.red, value: money(to), caption: 'Now' },
+  { glyph: '$', colour: TILE.grey, value: `<s style="color:#9CA3AF;">${money(from)}</s>`, caption: 'When you saved it' },
+])}
+${centred(`Hi ${esc(name || 'there')} — marketplace cards are one of a kind. If you want it at this price, now’s the moment.`)}`;
+  return cpEmail(
+    `${esc(cardName)} is now ${money(to)} — ${Number(pct)}% below when you saved it.`,
+    '',
+    '',
+    body,
+    esc(url),
+    'View the Card',
+    'Watchlist alerts can be switched off in Account → Notification settings.',
+  );
+}
+
+export function watchlistSoldEmail({ name, cardName, setName, searchUrl }) {
+  const body = `${heroBadge('✕', TILE.charcoal)}
+${heroHeading('One got away', `<strong>${esc(cardName)}</strong>${setName ? ` · ${esc(setName)}` : ''} has sold to another collector.`)}
+${centred(`Hi ${esc(name || 'there')} — similar cards are listed every day. Here’s a live search for it, and you can save the search to be emailed the moment a new one appears.`)}`;
+  return cpEmail(
+    `${esc(cardName)} on your watchlist has sold.`,
+    '',
+    '',
+    body,
+    esc(searchUrl),
+    'Find Another',
+    'Watchlist alerts can be switched off in Account → Notification settings.',
+  );
+}
+
+export function savedSearchMatchesEmail({ name, searchName, searchUrl, matches = [] }) {
+  const n = matches.length;
+  const prices = matches.map((m) => Number(m.price) || 0).filter((p) => p > 0);
+  const low = prices.length ? Math.min(...prices) : 0;
+  const rows = matches.slice(0, 5).map((m) => [
+    `<a href="${esc(m.url)}" style="${linkStyle}">${esc(m.title)}</a>${m.set ? ` <span style="color:#6b7280;">· ${esc(m.set)}</span>` : ''}`,
+    money(m.price),
+  ]);
+  const body = `${heroBadge('★')}
+${heroHeading(`${n} new ${plural(n, 'card matches', 'cards match')} your search`, `“${esc(searchName)}”`)}
+${statRow([
+  { glyph: '+', colour: TILE.red, value: String(n), caption: plural(n, 'New listing', 'New listings') },
+  { glyph: '$', colour: TILE.green, value: money(low), caption: 'From' },
+])}
+${itemCard(rows)}
+${centred(`Hi ${esc(name || 'there')} — saved-search alerts go out once a day with whatever’s new since the last one.`)}`;
+  return cpEmail(
+    `New on CardPop for “${esc(searchName)}”.`,
+    '',
+    '',
+    body,
+    esc(searchUrl),
+    'See All Matches',
+    'Manage saved searches in Account → Watchlist.',
+  );
+}
+
+export function backInStockEmail({ productTitle, priceAud, url }) {
+  const body = `${heroBadge('✓', TILE.green)}
+${heroHeading('It’s back in stock', `<a href="${esc(url)}" style="${linkStyle}font-weight:700;">${esc(productTitle)}</a>`)}
+${statRow([
+  { glyph: '$', colour: TILE.red, value: money(priceAud), caption: 'Price' },
+  { glyph: '✓', colour: TILE.green, value: '14 days', caption: 'Returns' },
+  { glyph: '→', colour: TILE.charcoal, value: 'Tracked', caption: 'Shipping' },
+])}
+${centred('You asked us to let you know — stock on popular lines doesn’t last, so grab it while it’s here.')}`;
+  return cpEmail(
+    `${esc(productTitle)} is back in stock.`,
+    '',
+    'Hi there,',
+    body,
+    esc(url),
+    'Buy It Now',
+    'You asked us to email you when this product came back. This is that one email.',
+  );
+}
+
+export function welcomeOfferReminderEmail({ name, code, discountPct, expiresAt }) {
+  const expiry = new Date(expiresAt);
+  const expiryStr = expiry.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const daysLeft = Math.max(1, Math.ceil((expiry.getTime() - Date.now()) / 86400000));
+  const body = `${heroBadge('%')}
+${heroHeading('Your welcome code expires soon', `Hi ${esc(name || 'there')} — it’s still unused.`)}
+${statRow([
+  { glyph: '%', colour: TILE.red, value: `${Number(discountPct)}%`, caption: 'Off the cards in your first order' },
+  { glyph: '⏱', colour: TILE.charcoal, value: String(daysLeft), caption: `${plural(daysLeft, 'Day', 'Days')} left · ${esc(expiryStr)}` },
+])}
+<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px;">
+<p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
+<p style="margin:0;font-size:26px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
+</div>
+${centred('It’s applied automatically at checkout when you’re signed in.')}`;
+  return cpEmail(
+    `Your ${Number(discountPct)}% welcome code expires ${esc(expiryStr)}.`,
+    '',
+    '',
+    body,
+    'https://cardpop.com.au/marketplace',
+    'Find Your First Card',
+    'This one-time offer was generated for your CardPop account and can’t be transferred.',
   );
 }

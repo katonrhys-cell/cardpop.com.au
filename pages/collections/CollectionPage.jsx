@@ -13,19 +13,22 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
 import { VAULT_ITEM_CARD_SELECT, LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import { vaultItemListing } from '@/lib/vaultItemListing.js';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { COLLECTION_CONFIGS, resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { useCollectionEras } from '@/hooks/useCollectionEras.js';
 import { slugify } from '@/lib/slugify.js';
-import { CARD_VARIANTS, getCardVariants } from '@/lib/cardVariants.js';
+import { CARD_VARIANTS, getCardVariants, FOIL_VARIANT } from '@/lib/cardVariants.js';
+import { genericVariantChips, getAutographLabel } from '@/lib/cardAttributeLabels.js';
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -48,6 +51,46 @@ const CardSkeleton = () => (
   </div>
 );
 
+// ─── Shared card details (rail + holy grail cards) ───────────────────────────
+// Eyebrow line: the set the card belongs to (what the card is), falling back to
+// the collection. Marketplace-sourced rows carry `category` instead.
+const cardDetails = (item) => ({
+  eyebrow: item.set_name || item.category || item.collectionType || item.collection || '—',
+  detailBits: [item.year, item.card_number ? `#${item.card_number}` : null].filter(Boolean),
+});
+
+const HOLO_RE = /holo|foil/i;
+const chipBase = 'inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none';
+
+// Finish chips — a selected Foil / Holo must be visible on the tile. `variant`
+// is a comma-separated string on vault rows.
+const CardDetailChips = ({ item }) => {
+  const variantList = item.variant
+    ? String(item.variant).split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+  const finishChips = genericVariantChips(variantList)
+    .filter(v => v !== FOIL_VARIANT)
+    .slice(0, 2);
+  const isFoil = !!item.is_foil || variantList.some(v => HOLO_RE.test(v));
+  const hasAuto = !!getAutographLabel(item);
+  if (!isFoil && finishChips.length === 0 && !hasAuto && !item.is_rookie) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1">
+      {isFoil && (
+        <span className={`${chipBase} gap-0.5 border border-yellow-400/50 bg-yellow-400/10 text-yellow-800 dark:text-yellow-300`}>
+          <Sparkles className="w-2.5 h-2.5" /> {finishChips.find(v => HOLO_RE.test(v)) ?? 'Holo'}
+        </span>
+      )}
+      {finishChips.filter(v => !HOLO_RE.test(v)).map(v => (
+        <span key={v} className={`${chipBase} border border-primary/30 bg-primary/5 text-primary`}>{v}</span>
+      ))}
+      {hasAuto && <span className={`${chipBase} border border-border bg-muted/50 text-foreground`}>Auto</span>}
+      {item.is_rookie && <span className={`${chipBase} bg-amber-100 text-amber-900`}>RC</span>}
+    </div>
+  );
+};
+
 // ─── Mini listing card for horizontal scroll sections ────────────────────────
 const MiniListingCard = ({ listing, accentHex, badge }) => {
   // Vault-sourced rails carry the card's listing in `listings`; marketplace
@@ -56,9 +99,8 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
   const rowListing = vaultItemListing(listing);
   const isSold = listing.status === 'sold' || rowListing?.status === 'sold';
   const imgPath = listing.card_image || listing.vault_images?.[0]?.storage_path || null;
-  const imgSrc = imgPath
-    ? (publicImageUrl(imgPath))
-    : null;
+  // 176–192 px tile: the 480 px companion thumbnail, not the full upload.
+  const imgSrc = cardThumbUrl(imgPath);
   const price = listing.estimated_value_aud ?? listing.price_aud ?? listing.price ?? 0;
   const title = listing.card_name ?? listing.title ?? listing.name ?? 'Untitled';
   const source = listing.source ?? 'vault';
@@ -69,6 +111,8 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
         : `/product/${source}/${listing.id}/${slugify(title)}`);
   const grade = listing.grade;
   const gradingCompany = listing.grading_company;
+
+  const { eyebrow, detailBits } = cardDetails(listing);
 
   return (
     <Link
@@ -105,11 +149,15 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
       </div>
       <div className="p-3 flex flex-col gap-1">
         <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground line-clamp-1">
-          {listing.category || listing.collectionType || '—'}
+          {eyebrow}
         </p>
         <p className="text-sm font-bold leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
           {title}
         </p>
+        {detailBits.length > 0 && (
+          <p className="text-[11px] text-muted-foreground line-clamp-1">{detailBits.join(' · ')}</p>
+        )}
+        <CardDetailChips item={listing} />
         <p
           className={`text-base font-extrabold tabular-nums mt-auto ${isSold ? 'line-through opacity-60' : ''}`}
           style={{ color: isSold ? undefined : accentHex }}
@@ -124,14 +172,12 @@ const MiniListingCard = ({ listing, accentHex, badge }) => {
 // ─── Holy grail card (featured picks) ───────────────────────────────────────
 const HolyGrailCard = ({ card, accentHex }) => {
   const imgPath = card.card_image || card.vault_images?.[0]?.storage_path || null;
-  const imgSrc = imgPath
-    ? (publicImageUrl(imgPath))
-    : null;
+  const imgSrc = cardThumbUrl(imgPath);
   const price = card.estimated_value_aud ?? 0;
   const title = card.card_name ?? 'Featured Card';
+  const { eyebrow, detailBits } = cardDetails(card);
   const sellerName = card.owner?.display_name || card.owner?.username || 'Seller';
   const sellerId = card.owner_id;
-  const avatarSrc = card.owner?.avatar_url || null;
   const source = card.source ?? 'vault';
   // Same rule as MiniListingCard: the vault row's embedded listing is the only
   // place "sold" lives, and it's also the right page to link to.
@@ -177,15 +223,24 @@ const HolyGrailCard = ({ card, accentHex }) => {
         )}
       </Link>
 
-      <div className="p-4 flex flex-col gap-2">
-        <Link to={detailPath}>
-          <h3 className="font-bold text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
+      <div className="p-3 sm:p-4 flex flex-col gap-2 flex-1">
+        <Link to={detailPath} className="flex flex-col gap-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+            {eyebrow}
+          </p>
+          <h3 className="font-bold text-sm sm:text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
             {title}
           </h3>
+          {detailBits.length > 0 && (
+            <p className="text-xs text-muted-foreground truncate">{detailBits.join(' · ')}</p>
+          )}
         </Link>
-        <div className="flex items-center justify-between mt-auto pt-2 border-t border-border">
+        <CardDetailChips item={card} />
+        {/* Price on its own line, seller beneath it at full card width, so a
+            long seller name is never squeezed out of a narrow 2-up mobile tile. */}
+        <div className="flex flex-col gap-2 mt-auto pt-2.5 border-t border-border">
           <span
-            className={`text-xl font-extrabold tabular-nums ${isSold ? 'line-through opacity-60' : ''}`}
+            className={`text-lg sm:text-xl font-extrabold tabular-nums leading-none ${isSold ? 'line-through opacity-60' : ''}`}
             style={{ color: isSold ? undefined : accentHex }}
           >
             ${price.toFixed(2)}
@@ -193,17 +248,11 @@ const HolyGrailCard = ({ card, accentHex }) => {
           {sellerId && (
             <Link
               to={`/seller/${sellerId}`}
-              className="flex items-center gap-1.5 group/seller"
+              className="flex items-center gap-1.5 min-w-0 group/seller"
               onClick={e => e.stopPropagation()}
             >
-              {avatarSrc ? (
-                <img src={avatarSrc} alt={sellerName} className="w-6 h-6 rounded-full object-cover border border-border" />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground">
-                  {sellerName?.[0]?.toUpperCase() ?? '?'}
-                </div>
-              )}
-              <span className="text-xs text-muted-foreground group-hover/seller:text-foreground transition-colors line-clamp-1 max-w-[80px]">
+              <ProfileAvatar profile={card.owner} size="xs" name={sellerName} />
+              <span className="min-w-0 truncate text-xs text-muted-foreground group-hover/seller:text-foreground transition-colors">
                 {sellerName}
               </span>
             </Link>
@@ -472,14 +521,14 @@ const CollectionPage = () => {
     const loadHolyGrail = async () => {
       try {
         let query = supabase.from('vault_items')
-          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`)
+          .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PROFILE_CARD_COLUMNS})`)
           .eq('is_public', true)
           .gt('estimated_value_aud', 0)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
         if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
-          fetchPinnedSectionItems(slug, 'holy_grail', `${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PUBLIC_PROFILE_COLUMNS})`),
+          fetchPinnedSectionItems(slug, 'holy_grail', `${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PROFILE_CARD_COLUMNS})`),
           query,
         ]);
         if (cancelled) return;
@@ -523,7 +572,7 @@ const CollectionPage = () => {
 
       let q = supabase.from('listings')
         .select(
-          `*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(display_name, username, avatar_url, is_verified)`,
+          `${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`,
           { count: 'estimated' }
         )
         // Sold listings stay in the grid, badged "Sold" (not purchasable).
@@ -810,8 +859,8 @@ const CollectionPage = () => {
         )}
 
         {/* ── HOLY GRAIL ───────────────────────────────────────────────────── */}
-        <section className="rounded-3xl overflow-hidden border-2 p-6 sm:p-8" style={{ borderColor: `${accentHex}30`, background: `linear-gradient(135deg, ${accentHex}08 0%, transparent 60%)` }}>
-          <div className="flex items-start justify-between mb-6">
+        <section className="rounded-3xl overflow-hidden border-2 p-3 sm:p-8" style={{ borderColor: `${accentHex}30`, background: `linear-gradient(135deg, ${accentHex}08 0%, transparent 60%)` }}>
+          <div className="flex items-start justify-between mb-5 px-1 sm:px-0 sm:mb-6">
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Star className="w-5 h-5 fill-current" style={{ color: accentHex }} />
@@ -841,7 +890,7 @@ const CollectionPage = () => {
               <p>Holy Grail picks coming soon for {name}.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               {holyGrail.map(card => (
                 <HolyGrailCard key={card.id} card={card} accentHex={accentHex} />
               ))}

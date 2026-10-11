@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import {
-  typeLabel, typeKey, pocketCount, priceBand, availability, onSale,
+  typeLabel, typeKey, pocketCount, capacitySlots, priceBand, availability, onSale,
   buildFacetOptions, readSelection, filterFacetRows, facetCounts, sortFacetRows, matchesSearch,
   fetchShopProductsByIds,
 } from '@/utils/shopFacets.js';
@@ -44,6 +44,14 @@ describe('shopFacets values', () => {
     expect(pocketCount(ROWS[5])).toBeNull();
   });
 
+  it('reads Palms Off binder capacity from the line SKU', () => {
+    expect(capacitySlots(ROWS[0])).toBe('160');
+    expect(capacitySlots({ brand: BRAND, sku: 'TOP-09-RED' })).toBe('216');
+    expect(capacitySlots({ brand: BRAND, family_sku: 'TOP-04', sku: 'TOP-04-BLK' })).toBe('128');
+    expect(capacitySlots(ROWS[4])).toBeNull(); // another brand's ZB-09
+    expect(capacitySlots(ROWS[5])).toBeNull(); // ring binder: pages sold separately
+  });
+
   it('bands prices, availability and sale', () => {
     expect(priceBand({ price_aud: 19.95 })).toBe('under-20');
     expect(priceBand({ price_aud: 50 })).toBe('50-100');
@@ -60,7 +68,8 @@ describe('buildFacetOptions', () => {
   const opts = buildFacetOptions(ROWS);
 
   it('offers every facet the products vary on', () => {
-    expect(Object.keys(opts)).toEqual(['type', 'pockets', 'colour', 'price', 'availability', 'brand', 'sale']);
+    expect(Object.keys(opts)).toEqual(['type', 'pockets', 'capacity', 'colour', 'price', 'availability', 'brand', 'sale']);
+    expect(opts.capacity.map((o) => o.label)).toEqual(['160 slots', '480 slots']); // Ultra Pro ZB-09 excluded
     expect(opts.type.map((o) => o.value)).toEqual(['ZB-09', 'ZB-04', 'ZB-12', 'RB-BLK']); // '9-Pocket…' (Ultra Pro) sorts first
     expect(opts.pockets.map((o) => o.label)).toEqual(['4-pocket', '9-pocket', '12-pocket']);
     expect(opts.colour.map((o) => o.value)).toEqual(['black', 'blue', 'pink']);

@@ -18,6 +18,8 @@
  */
 import { sortFamily } from '@/utils/shopFamily.js';
 import { isSoldOut, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
+import { binderCapacity } from '@/utils/binderCapacity.js';
 
 /** Columns needed to build, filter and sort by the facets. */
 export const FACET_SELECT =
@@ -49,6 +51,17 @@ export function typeLabel(p) {
 export function pocketCount(p) {
   const m = String(p?.title || '').match(/\b(\d{1,2})\s*-?\s*pocket\b/i);
   return m ? String(Number(m[1])) : null;
+}
+
+/**
+ * Binder capacity in slots ('216') for a Palms Off Gaming binder, from
+ * utils/binderCapacity.js, else null. Brand-gated: the table is keyed by that
+ * brand's SKUs, which another brand could reuse.
+ */
+export function capacitySlots(p) {
+  if (!/palms off/i.test(String(p?.brand || ''))) return null;
+  const c = binderCapacity(p?.family_sku) || binderCapacity(p?.sku);
+  return c ? String(c.slots) : null;
 }
 
 export const PRICE_BANDS = [
@@ -117,6 +130,12 @@ export const FACETS = {
     optionLabel: (p, v) => `${v}-pocket`,
     order: (o) => o.sort((a, b) => Number(a.value) - Number(b.value)),
   },
+  capacity: {
+    label: 'Binder capacity',
+    value: capacitySlots,
+    optionLabel: (p, v) => `${v} slots`,
+    order: (o) => o.sort((a, b) => Number(a.value) - Number(b.value)),
+  },
   colour: {
     label: 'Colour',
     swatch: true,
@@ -153,7 +172,7 @@ export const FACETS = {
 };
 
 /** Facets category / collection pages offer, in display order. */
-export const DEFAULT_FACET_KEYS = ['type', 'pockets', 'colour', 'price', 'availability', 'brand', 'sale'];
+export const DEFAULT_FACET_KEYS = ['type', 'pockets', 'capacity', 'colour', 'price', 'availability', 'brand', 'sale'];
 
 /**
  * { facetKey: options[] } for the facets worth showing over `rows`.
@@ -238,7 +257,7 @@ export function sortFacetRows(rows, sort) {
 /** Full rows for `ids`, returned in the same order. */
 export async function fetchShopProductsByIds(supabase, ids) {
   if (!ids?.length) return [];
-  const { data, error } = await supabase.from('shop_products').select('*').in('id', ids).in('status', PUBLIC_SHOP_STATUSES);
+  const { data, error } = await supabase.from('shop_products').select(SHOP_CARD_COLUMNS).in('id', ids).in('status', PUBLIC_SHOP_STATUSES);
   if (error) throw error;
   const byId = new Map((data || []).map((r) => [r.id, r]));
   return ids.map((id) => byId.get(id)).filter(Boolean);

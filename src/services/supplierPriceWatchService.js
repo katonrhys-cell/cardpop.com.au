@@ -37,8 +37,13 @@ const fmt = (n) => `$${Number(n).toFixed(2)}`;
 async function loadWatches({ productIds, force, now }) {
   let query = supabase
     .from('shop_product_costs')
-    .select('product_id, supplier, supplier_url, supplier_price_aud, supplier_price_currency, supplier_price_status, supplier_price_checked_at, shop_products(title, sku, status)')
+    // `!inner` so the archived filter below applies in the database: an archived
+    // product used to be fetched and then dropped here, and because the query is
+    // ordered oldest-check-first, archived rows (never re-checked, so forever
+    // the oldest) would crowd live products out of the 200-row page.
+    .select('product_id, supplier, supplier_url, supplier_price_aud, supplier_price_currency, supplier_price_status, supplier_price_checked_at, shop_products!inner(title, sku, status)')
     .not('supplier_url', 'is', null)
+    .neq('shop_products.status', 'archived')
     .order('supplier_price_checked_at', { ascending: true, nullsFirst: true })
     .limit(MAX_PRODUCTS_PER_RUN);
   if (productIds?.length) query = query.in('product_id', productIds);
@@ -48,7 +53,8 @@ async function loadWatches({ productIds, force, now }) {
   }
   const { data, error } = await query;
   if (error) throw new Error(`Could not load supplier links: ${error.message}`);
-  // Archived products aren't sold any more; don't spend checks on them.
+  // Archived products aren't sold any more; the query excludes them, this is
+  // the belt to that brace.
   return (data || []).filter((row) => row.shop_products?.status !== 'archived');
 }
 

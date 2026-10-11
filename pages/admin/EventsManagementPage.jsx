@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -39,6 +40,12 @@ const FILTERS = {
   discovered: (ev) => ev.auto_discovered && ev.status === 'pending_review',
 };
 
+// How long a row the admin has just published stays in the "Found by scan"
+// list before it leaves. Without this the row vanishes on the same render
+// that flips its toggle, so the next event slides up under the cursor with
+// its own grey toggle and Pending badge, and it looks as if nothing happened.
+export const PUBLISHED_ROW_LINGER_MS = 1200;
+
 const EventsManagementPage = () => {
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -49,6 +56,15 @@ const EventsManagementPage = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [scrapedData, setScrapedData] = useState(null);
   const [rsvpEvent, setRsvpEvent] = useState(null);
+  // Ids of rows published from the "Found by scan" view that are still shown
+  // there (toggle on, fading) until their linger timer removes them.
+  const [lingeringIds, setLingeringIds] = useState(() => new Set());
+  const lingerTimers = useRef(new Map());
+
+  useEffect(() => {
+    const timers = lingerTimers.current;
+    return () => { timers.forEach(clearTimeout); timers.clear(); };
+  }, []);
 
   useEffect(() => {
     fetchEvents();
@@ -94,15 +110,39 @@ const EventsManagementPage = () => {
     setIsModalOpen(true);
   };
 
+  const lingerRow = useCallback((id) => {
+    setLingeringIds(prev => new Set(prev).add(id));
+    clearTimeout(lingerTimers.current.get(id));
+    lingerTimers.current.set(id, setTimeout(() => {
+      lingerTimers.current.delete(id);
+      setLingeringIds(prev => {
+        if (!prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }, PUBLISHED_ROW_LINGER_MS));
+  }, []);
+
   const handleQuickTogglePublished = async (event) => {
     const newStatus = event.status === 'approved' ? 'cancelled' : 'approved';
     try {
-      const { error } = await supabase.from('events').update({ status: newStatus }).eq('id', event.id);
+      const { data, error } = await supabase
+        .from('events')
+        .update({ status: newStatus })
+        .eq('id', event.id)
+        .select('id');
       if (error) throw error;
+      // RLS answers a forbidden update with zero rows and no error — don't
+      // claim success (or hide the row) when nothing actually changed.
+      if (!data || data.length === 0) throw new Error('No rows updated');
       // Optimistically update locally so the row reflects the change even if the
       // realtime subscription isn't delivering events. Idempotent with the
       // realtime UPDATE handler (both key by id).
       setEvents(prev => prev.map(ev => ev.id === event.id ? { ...ev, status: newStatus } : ev));
+      // In the scan queue the row would otherwise leave on this same render:
+      // keep it for a beat so the admin sees the toggle go green first.
+      if (filter === 'discovered' && newStatus === 'approved') lingerRow(event.id);
       toast.success(`Event ${newStatus === 'approved' ? 'published' : 'unpublished'}.`);
     } catch (err) {
       toast.error('Failed to update event status.');
@@ -125,7 +165,11 @@ const EventsManagementPage = () => {
   };
 
   const discoveredCount = events.filter(FILTERS.discovered).length;
-  const visibleEvents = events.filter(FILTERS[filter]);
+  const visibleEvents = events.filter(
+    filter === 'discovered'
+      ? (ev) => FILTERS.discovered(ev) || lingeringIds.has(ev.id)
+      : FILTERS[filter]
+  );
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -208,7 +252,11 @@ const EventsManagementPage = () => {
               </thead>
               <tbody className="divide-y divide-border">
                 {visibleEvents.map((event) => (
-                  <tr key={event.id} className="hover:bg-muted/30 transition-colors">
+                  <tr
+                    key={event.id}
+                    data-lingering={lingeringIds.has(event.id) ? 'true' : undefined}
+                    className={`hover:bg-muted/30 transition-opacity duration-700 ${lingeringIds.has(event.id) ? 'opacity-40' : ''}`}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
                         <div className="w-16 h-12 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
@@ -281,6 +329,17 @@ const EventsManagementPage = () => {
                           aria-label={`Attendees and vendors for ${event.title}`}
                         >
                           <Users className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="rounded-lg shadow-sm"
+                          title="Write a review of this event"
+                        >
+                          <Link to={`/admin/event-reviews/new?eventId=${event.id}`} aria-label={`Write a review of ${event.title}`}>
+                            <ClipboardPen className="w-4 h-4" />
+                          </Link>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleOpenModal(event)} className="rounded-lg shadow-sm">
                           <Pencil className="w-4 h-4" />

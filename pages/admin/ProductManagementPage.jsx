@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree } from 'lucide-react';
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
 import ShopCategoryManager from '@/components/admin/ShopCategoryManager.jsx';
+import BulkProductImport from '@/components/admin/BulkProductImport.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import {
@@ -96,6 +97,7 @@ const ProductManagementPage = () => {
   const view = param('view');
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [isCategoriesOpen, setIsCategoriesOpen] = useState(false);
   // Built-in + admin-added categories, minus removed ones.
@@ -264,6 +266,9 @@ const ProductManagementPage = () => {
       >
         <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setIsCategoriesOpen(true)}>
           <FolderTree className="w-4 h-4" /> Categories
+        </Button>
+        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setIsBulkImportOpen(true)}>
+          <Upload className="w-4 h-4" /> Bulk Import
         </Button>
         <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => { setEditingProduct(null); setIsAddModalOpen(true); }}>
           <Plus className="w-4 h-4" /> New Product
@@ -456,6 +461,18 @@ const ProductManagementPage = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Mounted only while open: the importer reads auth and the category
+          overlay in its body, and there's no reason for every admin page load
+          to pay for that (or to require an AuthProvider) just to render a
+          closed dialog. Radix treats the other dialogs here the same way. */}
+      {isBulkImportOpen && (
+        <BulkProductImport
+          open={isBulkImportOpen}
+          onOpenChange={setIsBulkImportOpen}
+          onComplete={fetchProducts}
+        />
+      )}
     </div>
   );
 };

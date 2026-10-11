@@ -4,10 +4,8 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabaseClient.js';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
-import { VAULT_ITEM_CARD_COLUMNS, VAULT_IMAGE_CARD_COLUMNS, VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
-import { cachedQuery } from '@/lib/queryCache.js';
+import { getFeaturedCards, getFeaturedSellers, getPlatformStats, getTrafficSummary } from '@/lib/homepageData.js';
+import { useMediaQuery } from '@/hooks/useMediaQuery.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
@@ -15,7 +13,11 @@ import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
+import { publicTrafficStat } from '@/utils/siteTraffic.js';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
+import { HeroSearchForm } from '@/components/HeroSection.jsx';
+import { MARKETPLACE_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
+import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 
 // NOTE: this page intentionally imports NOTHING from framer-motion. The library
 // costs ~110 kB of JS and ~1.5 s of main-thread execution on a mid-range phone
@@ -99,8 +101,8 @@ const TRUST_SIGNALS = [
   },
   {
     icon: Package,
-    title: 'Buyer Protection',
-    body: 'A full refund within 14 days if your item never arrives or isn\'t as described.',
+    title: MARKETPLACE_PROTECTION.name,
+    body: `${PROTECTION_COPY.marketplaceOneLine} Report it within ${MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days of delivery.`,
   },
 ];
 
@@ -108,19 +110,19 @@ const CATEGORIES = HOMEPAGE_CATEGORIES;
 
 const HOW_IT_WORKS = [
   {
-    step: '01', icon: Package,
-    title: 'List Your Cards',
-    desc: 'Add cards to your vault in seconds. Set prices, conditions, and trade preferences with ease.',
+    step: '01', icon: Search,
+    title: 'Find Your Card',
+    desc: 'Search by name, set or number across every Australian seller, filter by grade and condition, and compare against live market prices.',
   },
   {
-    step: '02', icon: Search,
-    title: 'Find or Get Found',
-    desc: 'Smart search connects you with buyers and sellers across Australia in real time.',
+    step: '02', icon: ShieldCheck,
+    title: 'Pay Securely',
+    desc: 'Checkout in AUD through Stripe — card, PayPal, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
   },
   {
-    step: '03', icon: ShieldCheck,
-    title: 'Trade Safely',
-    desc: 'Pay securely through Stripe and shop with our 14-day Buyer Protection — a full refund if your item never arrives or isn\'t as described.',
+    step: '03', icon: Package,
+    title: 'Get It Delivered, Protected',
+    desc: `Sellers post tracked within a week. If a card isn't as described or doesn't arrive, ${MARKETPLACE_PROTECTION.name} refunds you in full.`,
   },
 ];
 
@@ -184,14 +186,15 @@ const HERO_CARDS = [
 ];
 
 // ─── Stat counter item ────────────────────────────────────────────────────────
-const StatItem = ({ value, suffix, label, isDecimal, inView }) => {
+const StatItem = ({ value, suffix, label, sub, isDecimal, inView }) => {
   const count = useCountUp(value, inView, isDecimal);
   return (
     <div className="text-center">
       <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums">
-        {count}{suffix}
+        {isDecimal ? count : count.toLocaleString('en-AU')}{suffix}
       </div>
       <div className="text-sm text-muted-foreground mt-1 font-medium">{label}</div>
+      {sub && <div className="text-xs text-muted-foreground/80 mt-0.5 tabular-nums">{sub}</div>}
     </div>
   );
 };
@@ -205,6 +208,9 @@ const HomePage = () => {
   // Real platform counts — null until loaded; the strip renders nothing rather
   // than invented numbers if the query fails or the counts are still small.
   const [platformStats, setPlatformStats]     = useState(null);
+  // Visitor counts (GA4 → site_traffic_summary, docs/site-traffic.md). Loaded
+  // separately so a missing/stale traffic row never hides the other counts.
+  const [trafficStat, setTrafficStat]         = useState(null);
 
   const DESK_VISIBLE = 8;
   const total = CATEGORIES.length;
@@ -259,6 +265,7 @@ const HomePage = () => {
         { value: platformStats.events,     label: 'Events Listed' },
       ].filter((s) => s.value > 0)
     : [];
+  if (statItems.length && trafficStat) statItems.push(trafficStat);
 
   const [statsRef, statsInView] = useRevealOnce('-80px');
   const [categoriesRef, categoriesInView] = useRevealOnce('0px');
@@ -268,113 +275,37 @@ const HomePage = () => {
 
   // The animated hero showcase is hidden below lg (CSS `hidden lg:block`), so
   // only desktop viewports pay for its chunk (and framer-motion inside it).
-  const [isDesktop, setIsDesktop] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 1024px)');
-    const onChange = (e) => setIsDesktop(e.matches);
-    mq.addEventListener('change', onChange);
-    return () => mq.removeEventListener('change', onChange);
-  }, []);
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  // The category browser has two layouts — a swipe strip on phones and an
+  // arrow carousel from `sm` up. Both used to be in the DOM with one hidden
+  // by CSS, so every visitor built 64 tiles (each with an SVG icon) for a row
+  // that shows 24 or 8 — a visible slice of the first-render long task on a
+  // mid-range phone. Only the layout for the current viewport is rendered.
+  const isSmUp = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchHomeData = async () => {
       try {
-        // Use 5-minute cache for homepage data (user sees fresh content on repeat visits)
+        // The queries themselves live in lib/homepageData.js, where main.jsx
+        // STARTS them before React mounts; these reads join the in-flight
+        // promise (or hit the 5-minute cache) rather than fetching again.
         const [listingsRes, sellersRes] = await Promise.all([
-          cachedQuery('homepage_featured_cards', async () => {
-            // vault_items has more than one FK to profiles, so the embed must use
-            // the explicit constraint-name hint (!vault_items_owner_id_fkey) —
-            // the bare !owner_id hint returns a PostgREST 400.
-            // The listing embed is what lets a featured card that has sold say
-            // so — the vault row keeps its "For Sale" listing_type after a sale.
-            const SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count), vault_images(${VAULT_IMAGE_CARD_COLUMNS}), ${VAULT_ITEM_LISTING_EMBED}`;
-            const LIMIT = 4;
-            // Fresh builder per call — a Supabase query builder is single-use.
-            // Backfill uses genuinely-public recent cards.
-            const publicBase = () => supabase.from('vault_items').select(SELECT).eq('is_public', true).neq('listing_type', 'Private');
-
-            // Admin-curated picks (Marketplace Management → Featured) come first.
-            // `is_featured` is admin-only, so it means "show this on the home
-            // page" — surface it regardless of the per-card is_public flag. A
-            // card can be live in the marketplace (active listing) yet have
-            // is_public = false, in which case requiring is_public here made
-            // featuring it save successfully but never appear. Still exclude
-            // Private listings. (Anon visibility is granted by the matching
-            // vault_items_public_featured_select RLS policy.)
-            const featuredRes = await supabase.from('vault_items').select(SELECT)
-              .eq('is_featured', true).neq('listing_type', 'Private')
-              .order('created_at', { ascending: false }).limit(LIMIT);
-            if (featuredRes.error) return featuredRes;
-            const featured = featuredRes.data ?? [];
-            if (featured.length >= LIMIT) return { data: featured.slice(0, LIMIT), error: null };
-
-            const seen = new Set(featured.map(c => c.id));
-            const merged = [...featured];
-
-            // Membership perk: Premium-and-up sellers' newest public cards
-            // fill the remaining Featured Cards slots ahead of everyone
-            // else's. The !inner join makes the owner-tier filter drop
-            // non-matching rows instead of null-ing the embed. Best-effort —
-            // any error just falls through to the generic backfill.
-            const PREMIUM_SELECT = `${VAULT_ITEM_CARD_COLUMNS}, owner:profiles!vault_items_owner_id_fkey!inner(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count, subscription_tier), vault_images(${VAULT_IMAGE_CARD_COLUMNS}), ${VAULT_ITEM_LISTING_EMBED}`;
-            const premiumRes = await supabase.from('vault_items').select(PREMIUM_SELECT)
-              .eq('is_public', true).neq('listing_type', 'Private')
-              .in('owner.subscription_tier', ['premium', 'elite', 'ultimate'])
-              .order('created_at', { ascending: false }).limit(LIMIT);
-            for (const card of premiumRes.data ?? []) {
-              if (!seen.has(card.id)) { seen.add(card.id); merged.push(card); }
-            }
-            if (merged.length >= LIMIT) return { data: merged.slice(0, LIMIT), error: null };
-
-            // Backfill with the most recent cards so the grid is never emptier
-            // than before curation existed (empty selection = previous behaviour).
-            const fillRes = await publicBase().order('created_at', { ascending: false }).limit(LIMIT + merged.length);
-            if (fillRes.error) return { data: merged, error: null };
-            const backfill = (fillRes.data ?? []).filter(c => !seen.has(c.id));
-            return { data: [...merged, ...backfill].slice(0, LIMIT), error: null };
-          },
-            5 * 60 * 1000
-          ),
-          // Featured Sellers = admin-flagged accounts plus every Ultimate
-          // member (homepage placement is an Ultimate membership perk).
-          cachedQuery('homepage_featured_sellers', () =>
-            supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS)
-              .or('is_featured_seller.eq.true,subscription_tier.eq.ultimate')
-              .eq('is_active', true)
-              .order('rating', { ascending: false, nullsFirst: false })
-              .limit(4),
-            5 * 60 * 1000
-          ),
+          getFeaturedCards(),
+          getFeaturedSellers(),
         ]);
 
-        // Real platform counts for the stats strip (cheap head-count queries,
-        // RLS-scoped so anon sees only what's public anyway). Best-effort: a
-        // failure just leaves the strip hidden.
-        cachedQuery('homepage_stats', async () => {
-          const [listings, sellers, vaultCards, events] = await Promise.all([
-            supabase.from('listings').select('id', { count: 'exact', head: true }).eq('status', 'active'),
-            supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_active', true),
-            supabase.from('vault_items').select('id', { count: 'exact', head: true }),
-            supabase.from('events_public').select('id', { count: 'exact', head: true }),
-          ]);
-          const error = listings.error || sellers.error || vaultCards.error || events.error;
-          if (error) return { data: null, error };
-          return {
-            data: {
-              listings: listings.count || 0,
-              sellers: sellers.count || 0,
-              vaultCards: vaultCards.count || 0,
-              events: events.count || 0,
-            },
-            error: null,
-          };
-        }, 5 * 60 * 1000)
+        // Stats strip — best-effort: a failure just leaves the strip hidden.
+        getPlatformStats()
           .then((res) => { if (isMounted && res?.data) setPlatformStats(res.data); })
           .catch(() => { /* strip stays hidden */ });
+
+        // Visitors tile. publicTrafficStat() returns null (tile hidden) when
+        // the row is missing, stale, or the count is too small to show.
+        getTrafficSummary()
+          .then((res) => { if (isMounted && res?.data) setTrafficStat(publicTrafficStat(res.data)); })
+          .catch(() => { /* tile stays hidden */ });
 
         // Supabase resolves with { data, error } instead of throwing — an
         // unlogged error here renders the empty state with no trace, which
@@ -507,25 +438,29 @@ const HomePage = () => {
               }}
             >
               <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              CardPop™ Live
+              CardPop™
               <span className="text-white/30 font-normal">·</span>
-              <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Card Show</span>
+              <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
             </div>
 
             <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
-              Sell Your Trading Cards to{' '}
+              Buy and Sell Trading Cards{' '}
               <br className="hidden sm:block" />
               <span
                 className="text-transparent bg-clip-text"
                 style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
               >
-                Buyers Across Australia
+                with Collectors Across Australia
               </span>
             </h1>
 
-            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-10 leading-relaxed text-balance mx-auto lg:mx-0">
-              CardPop is Australia's marketplace for Pokémon, MTG, sports cards and more. List your collection in minutes, reach thousands of verified collectors, and get paid securely in AUD — with buyer protection on every order.
+            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
+              Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.
             </p>
+
+            <div className="mb-6 flex justify-center lg:justify-start">
+              <HeroSearchForm />
+            </div>
 
             <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
               <Button
@@ -539,8 +474,8 @@ const HomePage = () => {
                   border: 'none',
                 }}
               >
-                <Link to="/signup">
-                  Start Selling — It's Free <ArrowRight className="ml-2 w-5 h-5" />
+                <Link to="/marketplace">
+                  Shop Cards <ArrowRight className="ml-2 w-5 h-5" />
                 </Link>
               </Button>
               <Button
@@ -554,8 +489,8 @@ const HomePage = () => {
                   color: '#e4e4e7',
                 }}
               >
-                <Link to="/marketplace">
-                  Browse the Marketplace
+                <Link to="/signup?next=%2Fvault%2Fadd">
+                  Sell for Free
                 </Link>
               </Button>
             </div>
@@ -566,9 +501,9 @@ const HomePage = () => {
               style={{ animationDelay: '0.5s' }}
             >
               {[
-                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protected' },
-                { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD Pricing' },
-                { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live Market Data' },
+                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protection on every order' },
+                { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD prices, Australian sellers' },
+                { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live market data' },
               ].map(({ icon, label }) => (
                 <span
                   key={label}
@@ -584,13 +519,84 @@ const HomePage = () => {
 
       </section>
 
+      {/* ── Featured cards ────────────────────────────────────────────────── */}
+      <section className="py-12 md:py-24 bg-muted/30 border-t border-border">
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
+          <div className="flex items-end justify-between mb-6 md:mb-12">
+            <div>
+              <h2 className="text-3xl font-bold font-serif mb-1 md:mb-2">Just Listed</h2>
+              <p className="text-muted-foreground">Fresh cards from Australian collectors — buy now or make an offer.</p>
+            </div>
+            <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
+              <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
+            </Button>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="space-y-4">
+                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
+                  <Skeleton className="h-5 w-2/3" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : featuredCards.length > 0 ? (
+            <div
+              ref={cardsRef}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+            >
+              {featuredCards.map((card, i) => (
+                <div
+                  key={card.id}
+                  className={cardsInView ? 'anim-reveal-up' : 'opacity-0'}
+                  style={cardsInView ? { animationDelay: `${i * 0.1}s` } : undefined}
+                >
+                  {/* Isolate each card: a single malformed record throwing
+                      during render must not blank the whole grid (and, via the
+                      route-level boundary, the whole homepage). */}
+                  <ErrorBoundary fallback={null}>
+                    <VaultListingCard vaultItem={card} />
+                  </ErrorBoundary>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-background rounded-3xl border border-border">
+              <p className="text-muted-foreground font-medium">New cards land here as collectors list them.</p>
+              <Button asChild variant="outline" className="mt-4 rounded-xl font-bold">
+                <Link to="/marketplace">Browse the marketplace</Link>
+              </Button>
+            </div>
+          )}
+
+          <div className="mt-6 text-center sm:hidden">
+            <Button asChild variant="outline" className="w-full rounded-xl font-bold">
+              <Link to="/marketplace">Browse all cards</Link>
+            </Button>
+          </div>
+
+          {/* Ways to pay — shown where the buying starts, not only at the till. */}
+          <ul className="mt-8 flex flex-wrap items-center justify-center gap-3" aria-label="Accepted payment methods">
+            {PAYMENT_MARKS.map(({ label, Mark }) => (
+              <li key={label} className="flex h-8 w-12 items-center justify-center rounded-md border border-border bg-white px-1.5" title={label}>
+                <Mark />
+                <span className="sr-only">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+
       {/* ── Stats strip — real counts only ───────────────────────────────────
           Renders nothing until the counts load, and skips any metric that is
           still zero: honest numbers or no numbers. */}
       {statItems.length >= 2 && (
         <section ref={statsRef} className="py-8 md:py-12 border-y border-border bg-card">
           <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-            <div className={`grid grid-cols-2 gap-6 md:gap-4 ${statItems.length >= 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
+            <div className={`grid grid-cols-2 gap-6 md:gap-4 ${statItems.length >= 5 ? 'md:grid-cols-3 lg:grid-cols-5' : statItems.length === 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
               {statItems.map((stat) => (
                 <StatItem key={stat.label} {...stat} inView={statsInView} />
               ))}
@@ -603,7 +609,7 @@ const HomePage = () => {
       <LiveActivityTicker framed />
 
       {/* ── Trust strip ──────────────────────────────────────────────────── */}
-      <section className="py-8 md:py-10 bg-background border-b border-border">
+      <section className="cv-auto py-8 md:py-10 bg-background border-b border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {TRUST_SIGNALS.map(({ icon: Icon, title, body }) => (
@@ -631,7 +637,7 @@ const HomePage = () => {
       </section>
 
       {/* ── Category browse ───────────────────────────────────────────────── */}
-      <section className="py-10 md:py-16 bg-background">
+      <section className="cv-auto py-10 md:py-16 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="flex items-end justify-between mb-6 md:mb-8">
             <div>
@@ -644,6 +650,7 @@ const HomePage = () => {
           </div>
 
           {/* Mobile: touch swipe through all 24 */}
+          {!isSmUp && (
           <div ref={categoriesRef} className="sm:hidden flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scroll-px-4 scrollbar-hide -mx-4 px-4">
             {CATEGORIES.map((cat, i) => (
               <div
@@ -661,8 +668,10 @@ const HomePage = () => {
               </div>
             ))}
           </div>
+          )}
 
           {/* Desktop: single-row arrow carousel */}
+          {isSmUp && (
           <div className="hidden sm:flex items-center gap-3">
             <button
               onClick={goDeskPrev}
@@ -709,11 +718,12 @@ const HomePage = () => {
               <ChevronRight className="w-5 h-5" />
             </button>
           </div>
+          )}
         </div>
       </section>
 
       {/* ── Bento features ───────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-card border-y border-border relative">
+      <section className="cv-auto py-12 md:py-24 bg-card border-y border-border relative">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
             <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">Built for Serious Collectors</h2>
@@ -729,7 +739,7 @@ const HomePage = () => {
                 </div>
                 <h3 className="text-2xl font-bold mb-3 text-secondary-foreground">Bank-Grade Security</h3>
                 <p className="text-secondary-foreground/80 leading-relaxed">
-                  Payments are processed securely through Stripe, and every order is covered by our 14-day Buyer Protection Guarantee — a full refund if an item doesn't arrive or isn't as described.
+                  Payments are processed securely through Stripe, and every order is covered by {MARKETPLACE_PROTECTION.name} — a full refund, fees included, if a card doesn't arrive or isn't as described.
                 </p>
               </div>
               <div className="absolute right-0 bottom-0 w-2/3 h-2/3 bg-gradient-to-tl from-primary/10 to-transparent rounded-tl-full transition-transform duration-500 group-hover:scale-110" />
@@ -764,16 +774,21 @@ const HomePage = () => {
             {/* CTA feature */}
             <div className="md:col-span-2 bg-primary text-primary-foreground rounded-3xl p-6 md:p-12 flex flex-col sm:flex-row items-center justify-between gap-6 md:gap-8 relative overflow-hidden">
               <div className="relative z-10 max-w-md">
-                <h3 className="text-2xl md:text-3xl font-bold mb-3 md:mb-4">Ready to start trading?</h3>
+                <h3 className="text-2xl md:text-3xl font-bold mb-3 md:mb-4">Ready to find your next card?</h3>
                 <p className="text-primary-foreground/90 mb-6 md:mb-8">
-                  Join our community of verified collectors and start building your dream vault today.
+                  Browse what Australian collectors are selling right now — and when you're ready, list your own for free.
                 </p>
-                <Button asChild variant="secondary" size="lg" className="rounded-xl font-bold text-primary hover:bg-background">
-                  <Link to="/signup">Get Started Now</Link>
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Button asChild variant="secondary" size="lg" className="rounded-xl font-bold text-primary hover:bg-background">
+                    <Link to="/marketplace">Shop cards</Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg" className="rounded-xl font-bold bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground hover:text-primary active:bg-primary-foreground active:text-primary">
+                    <Link to="/signup?next=%2Fvault%2Fadd">Sell for free</Link>
+                  </Button>
+                </div>
               </div>
-              <div className="relative z-10 w-24 h-24 sm:w-48 sm:h-48 bg-primary-foreground/10 rounded-full flex items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
-                <Users className="w-12 h-12 sm:w-24 sm:h-24 text-primary-foreground/80" />
+              <div className="relative z-10 hidden sm:flex w-48 h-48 bg-primary-foreground/10 rounded-full items-center justify-center backdrop-blur-sm border border-primary-foreground/20">
+                <Users className="w-24 h-24 text-primary-foreground/80" />
               </div>
             </div>
           </div>
@@ -781,12 +796,12 @@ const HomePage = () => {
       </section>
 
       {/* ── How it works ─────────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-background">
+      <section className="cv-auto py-12 md:py-24 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">How CardPop Works</h2>
+            <h2 className="text-3xl md:text-4xl font-bold font-serif mb-3 md:mb-4">How Buying Works</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
-              Three simple steps to start trading with confidence across Australia.
+              Three steps from search to a card in your hands — protected the whole way.
             </p>
           </div>
 
@@ -815,71 +830,14 @@ const HomePage = () => {
 
           <div className="mt-8 md:mt-14 text-center">
             <Button asChild size="lg" className="h-14 px-10 rounded-2xl font-bold text-lg shadow-lg hover:shadow-primary/25 transition-all hover:-translate-y-0.5">
-              <Link to="/signup">Start for Free <ArrowRight className="ml-2 w-5 h-5" /></Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Featured cards ────────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-muted/30 border-t border-border">
-        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-          <div className="flex items-end justify-between mb-6 md:mb-12">
-            <div>
-              <h2 className="text-3xl font-bold font-serif mb-1 md:mb-2">Featured Cards</h2>
-              <p className="text-muted-foreground">Handpicked listings from Australian collectors.</p>
-            </div>
-            <Button asChild variant="ghost" className="hidden sm:flex font-bold hover:bg-muted">
-              <Link to="/marketplace">View All <ArrowRight className="ml-2 w-4 h-4" /></Link>
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="space-y-4">
-                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                  <Skeleton className="h-5 w-2/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              ))}
-            </div>
-          ) : featuredCards.length > 0 ? (
-            <div
-              ref={cardsRef}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-            >
-              {featuredCards.map((card, i) => (
-                <div
-                  key={card.id}
-                  className={cardsInView ? 'anim-reveal-up' : 'opacity-0'}
-                  style={cardsInView ? { animationDelay: `${i * 0.1}s` } : undefined}
-                >
-                  {/* Isolate each card: a single malformed record throwing
-                      during render must not blank the whole grid (and, via the
-                      route-level boundary, the whole homepage). */}
-                  <ErrorBoundary fallback={null}>
-                    <VaultListingCard vaultItem={card} />
-                  </ErrorBoundary>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-background rounded-3xl border border-border">
-              <p className="text-muted-foreground font-medium">No recent cards available at the moment.</p>
-            </div>
-          )}
-
-          <div className="mt-6 text-center sm:hidden">
-            <Button asChild variant="outline" className="w-full rounded-xl font-bold">
-              <Link to="/marketplace">View All Listings</Link>
+              <Link to="/marketplace">Start Browsing <ArrowRight className="ml-2 w-5 h-5" /></Link>
             </Button>
           </div>
         </div>
       </section>
 
       {/* ── Featured sellers ──────────────────────────────────────────────── */}
-      <section className="py-12 md:py-24 bg-background border-t border-border">
+      <section className="cv-auto py-12 md:py-24 bg-background border-t border-border">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <div className="text-center mb-8 md:mb-16">
             <h2 className="text-3xl font-bold font-serif mb-3 md:mb-4">Trusted Australian Sellers</h2>
@@ -911,14 +869,17 @@ const HomePage = () => {
             </div>
           ) : (
             <div className="text-center py-12 bg-muted rounded-3xl border border-border shadow-sm">
-              <p className="text-muted-foreground font-medium">Seller profiles are currently being updated.</p>
+              <p className="text-muted-foreground font-medium">Featured sellers appear here as they're verified.</p>
+              <Button asChild variant="outline" className="mt-4 rounded-xl font-bold">
+                <Link to="/signup?next=%2Fvault%2Fadd">Become a CardPop seller</Link>
+              </Button>
             </div>
           )}
         </div>
       </section>
 
       {/* ── Recently viewed (renders nothing until the visitor has viewed cards) ── */}
-      <section className="py-6 md:py-10 bg-background">
+      <section className="cv-auto py-6 md:py-10 bg-background">
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
           <RecentlyViewed />
         </div>

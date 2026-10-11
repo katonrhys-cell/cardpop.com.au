@@ -18,6 +18,12 @@
 //   SUPABASE_URL=https://<ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<key> \
 //   node scripts/optimize-shop-images.mjs [--apply] [--bucket "palms off gaming products"]
 //
+// The homepage hero showcase (Admin → Hero Showcase, table hero_showcase_cards,
+// column image_url, bucket media) is converted the same way — its cards show
+// at 68 px / 160 px but rows created before the admin page wrote thumbnails
+// point at the full upload:
+//   node scripts/optimize-shop-images.mjs --table hero_showcase_cards --bucket media [--apply]
+//
 // Default is a dry run that only lists what it would convert. Idempotent:
 // files already converted are reused, and rows already on .opt.webp are skipped.
 
@@ -38,6 +44,19 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
 const APPLY = process.argv.includes('--apply');
 const bucketArg = process.argv.indexOf('--bucket');
 const BUCKET = bucketArg !== -1 ? process.argv[bucketArg + 1] : 'palms off gaming products';
+// Which rows to convert. shop_products carries image_url + images[];
+// hero_showcase_cards carries image_url only.
+const TABLES = {
+  shop_products: { select: 'id, sku, image_url, images', label: (r) => r.sku, noun: 'products' },
+  hero_showcase_cards: { select: 'id, name, image_url', label: (r) => r.name, noun: 'showcase cards' },
+};
+const tableArg = process.argv.indexOf('--table');
+const TABLE = tableArg !== -1 ? process.argv[tableArg + 1] : 'shop_products';
+if (!TABLES[TABLE]) {
+  console.error(`Unknown --table "${TABLE}". Use one of: ${Object.keys(TABLES).join(', ')}.`);
+  process.exit(1);
+}
+const { select: SELECT, label: rowLabel, noun: ROW_NOUN } = TABLES[TABLE];
 const CACHE_CONTROL = '31536000';
 const CONCURRENCY = 4;
 
@@ -86,8 +105,8 @@ async function pool(items, worker) {
 }
 
 const { data: rows, error: rowsError } = await supabase
-  .from('shop_products')
-  .select('id, sku, image_url, images');
+  .from(TABLE)
+  .select(SELECT);
 if (rowsError) throw rowsError;
 
 // Every distinct convertible source URL in this bucket, across all products.
@@ -100,11 +119,11 @@ for (const row of rows) {
   }
 }
 
-console.log(`${APPLY ? 'APPLY' : 'DRY RUN'} — bucket "${BUCKET}": ${sources.size} source photos across ${rows.length} products.`);
+console.log(`${APPLY ? 'APPLY' : 'DRY RUN'} — ${TABLE}, bucket "${BUCKET}": ${sources.size} source photos across ${rows.length} ${ROW_NOUN}.`);
 if (!APPLY) {
   for (const { path } of [...sources.values()].slice(0, 20)) console.log(`  ${path}  →  ${optimizedPath(path)}`);
   if (sources.size > 20) console.log(`  … and ${sources.size - 20} more`);
-  console.log('Re-run with --apply to convert and repoint the products.');
+  console.log(`Re-run with --apply to convert and repoint the ${ROW_NOUN}.`);
   process.exit(0);
 }
 
@@ -130,18 +149,20 @@ let updated = 0;
 for (const row of rows) {
   const next = rewriteRowImages(row, done);
   if (!next) continue;
-  const { error } = await supabase.from('shop_products').update(next).eq('id', row.id);
+  // Only write columns the table actually has.
+  const payload = 'images' in row ? next : { image_url: next.image_url };
+  const { error } = await supabase.from(TABLE).update(payload).eq('id', row.id);
   if (error) {
-    failures.push({ path: `row ${row.sku}`, message: error.message });
-    console.error(`  FAILED to update ${row.sku}: ${error.message}`);
+    failures.push({ path: `row ${rowLabel(row)}`, message: error.message });
+    console.error(`  FAILED to update ${rowLabel(row)}: ${error.message}`);
   } else updated += 1;
 }
 
 console.log('\nSummary');
 console.log(`  converted: ${n}, already converted: ${reused}, failed: ${failures.length}`);
 if (n) console.log(`  size: ${mb(before)} → ${mb(afterFull)} full (+ ${mb(afterThumb)} thumbnails)`);
-console.log(`  products repointed: ${updated}`);
+console.log(`  ${ROW_NOUN} repointed: ${updated}`);
 if (failures.length) {
-  console.error('Some photos failed — their products keep the original URLs. Re-run to retry.');
+  console.error(`Some photos failed — their ${ROW_NOUN} keep the original URLs. Re-run to retry.`);
   process.exit(1);
 }

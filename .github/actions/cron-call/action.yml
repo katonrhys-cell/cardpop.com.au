@@ -1,0 +1,98 @@
+name: Call a CardPop cron endpoint
+description: >
+  One authenticated GET against the production API, failing on any non-2xx.
+  Shared by the reusable cron-job workflow (one endpoint per run) and the
+  daily workflow (several endpoints in one run, one billed job instead of six).
+
+inputs:
+  endpoint:
+    description: Site-absolute path to call, e.g. /api/prices/refresh
+    required: true
+  max_seconds:
+    description: Per-attempt timeout. Match the function's maxDuration in vercel.json.
+    required: false
+    default: '60'
+  attempts:
+    description: >
+      How many times to try before failing. Keep at 1 for jobs that spend
+      money on a model call — a retry can double-spend on a run that
+      actually succeeded but answered slowly.
+    required: false
+    default: '1'
+  base_url:
+    description: Origin to call. Unset means production.
+    required: false
+    default: 'https://cardpop.com.au'
+  cron_secret:
+    description: The CRON_SECRET bearer (pass secrets.CRON_SECRET).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Call ${{ inputs.endpoint }}
+      shell: bash
+      env:
+        BASE_URL: ${{ inputs.base_url }}
+        ENDPOINT: ${{ inputs.endpoint }}
+        MAX_SECONDS: ${{ inputs.max_seconds }}
+        ATTEMPTS: ${{ inputs.attempts }}
+        CRON_SECRET: ${{ inputs.cron_secret }}
+      run: |
+        set -uo pipefail
+
+        if [ -z "${CRON_SECRET}" ]; then
+          echo "::error::CRON_SECRET is empty. Add it under Settings → Secrets and variables → Actions → Secrets, using the same value as the CRON_SECRET environment variable in Vercel."
+          exit 1
+        fi
+
+        url="${BASE_URL%/}${ENDPOINT}"
+        status=000
+        body="$(mktemp)"
+
+        for attempt in $(seq 1 "${ATTEMPTS}"); do
+          echo "Attempt ${attempt}/${ATTEMPTS}: GET ${url}"
+
+          # Clear the previous attempt's body, or a request that never gets a
+          # response prints the last one and reads like a success.
+          : > "${body}"
+
+          status="$(curl --silent --show-error \
+            --max-time "${MAX_SECONDS}" \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            --header 'Accept: application/json' \
+            --user-agent 'CardPop-Scheduler/1.0 (+https://github.com/katonrhys-cell/cardpop.com.au)' \
+            --output "${body}" \
+            --write-out '%{http_code}' \
+            "${url}" || true)"
+          status="${status:-000}"
+
+          echo "HTTP ${status}"
+          echo '--- response body (first 4KB) ---'
+          head -c 4096 "${body}" 2>/dev/null || true
+          echo
+          echo '---------------------------------'
+
+          case "${status}" in
+            2??)
+              echo "::notice::${ENDPOINT} succeeded (HTTP ${status})"
+              exit 0
+              ;;
+            401|403)
+              # Retrying a rejected credential just burns minutes. Note that
+              # Cloudflare sits in front of production, so a 403 with an HTML
+              # body is the WAF/Bot Fight Mode blocking the runner rather than
+              # the endpoint rejecting the token — see docs/scheduled-jobs.md.
+              echo "::error::${ENDPOINT} was rejected (HTTP ${status}). Check that the CRON_SECRET secret matches Vercel's, and that Cloudflare isn't challenging the runner."
+              exit 1
+              ;;
+          esac
+
+          if [ "${attempt}" -lt "${ATTEMPTS}" ]; then
+            echo 'Retrying in 30s...'
+            sleep 30
+          fi
+        done
+
+        echo "::error::${ENDPOINT} failed after ${ATTEMPTS} attempt(s) — last status HTTP ${status}"
+        exit 1

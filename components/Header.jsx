@@ -11,6 +11,7 @@ import { useIsDesktop } from '@/hooks/useIsDesktop.js';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { uniqueTopic } from '@/lib/realtimeTopic.js';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetClose, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -97,6 +98,13 @@ const Header = () => {
   // the component unmounts mid-animation and leaves stale body styles behind.
   // This causes the next page's scroll to be locked at the previous page's position,
   // making the new page appear blank even though it rendered correctly.
+  //
+  // Every stale style is a *mutation* of body's style attribute, so the
+  // observer below sees each one; with the route-change sweep further down it
+  // covers every way a lock can be left behind. A 500 ms setInterval used to
+  // run beside them "as a last resort" — a timer on every page for the life of
+  // the tab, waking the main thread twice a second to read a style it had
+  // already been told about. Removed; the observer is the mechanism.
   useEffect(() => {
     // Watch for any style change on body and fix it after animations settle.
     // Debounce into a single tracked timeout so rapid mutations don't pile up
@@ -109,12 +117,8 @@ const Header = () => {
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
 
-    // Periodic sweep as a last resort (500ms is imperceptible to users)
-    const interval = setInterval(clearStaleBodyStyles, 500);
-
     return () => {
       observer.disconnect();
-      clearInterval(interval);
       clearTimeout(settleTimeout);
     };
   }, []);
@@ -127,12 +131,28 @@ const Header = () => {
     return () => clearTimeout(timer);
   }, [location.pathname, mobileMenuOpen]);
 
+  // Header "scrolled" state with hysteresis: it turns on once the page is
+  // clearly scrolled (> 24px) and only turns off again when the page is back
+  // at the very top. A single threshold flickered on iOS Safari — rubber-band
+  // overscroll and the collapsing toolbar make scrollY jitter around any fixed
+  // pixel value, which toggled the header's classes several times per gesture.
+  // Updates are also coalesced to one per animation frame.
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 10);
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const y = window.scrollY;
+      setIsScrolled((prev) => (prev ? y > 0 : y > 24));
     };
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
   }, []);
 
   useEffect(() => {
@@ -144,49 +164,53 @@ const Header = () => {
     if (!isAuthenticated || !currentUser) return;
 
     let isMounted = true;
+    const uid = currentUser.id;
 
-    const fetchData = async () => {
-      try {
-        const [{ count: msgCount }, { count: tradeCount }] = await Promise.all([
-          supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('recipient_id', currentUser.id)
-            .is('read_at', null),
-          supabase
-            .from('trades')
-            .select('*', { count: 'exact', head: true })
-            .eq('responder_id', currentUser.id)
-            .eq('status', 'proposed')
-        ]);
-        if (isMounted) {
-          setUnreadCount(msgCount || 0);
-          setTradeCount(tradeCount || 0);
-        }
-      } catch (err) {
-        console.error("Failed to fetch notification counts:", err);
-      }
+    const countUnreadMessages = async () => {
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('recipient_id', uid)
+        .is('read_at', null);
+      if (isMounted) setUnreadCount(count || 0);
+    };
+    const countPendingTrades = async () => {
+      const { count } = await supabase
+        .from('trades')
+        .select('*', { count: 'exact', head: true })
+        .eq('responder_id', uid)
+        .eq('status', 'proposed');
+      if (isMounted) setTradeCount(count || 0);
     };
 
-    fetchData();
+    Promise.all([countUnreadMessages(), countPendingTrades()])
+      .catch((err) => console.error('Failed to fetch notification counts:', err));
 
-    // Scope realtime to THIS user's rows (and use per-user channel names).
-    // Previously these subscribed to every row of messages/trades, so any
-    // write anywhere on the platform woke every connected client into a double
-    // count refetch — load that scaled with users × global write rate.
-    const msgChannel = supabase
-      .channel(`header-messages-${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `recipient_id=eq.${currentUser.id}` }, () => fetchData())
-      .subscribe();
-    const tradeChannel = supabase
-      .channel(`header-trades-${currentUser.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${currentUser.id}` }, () => fetchData())
+    // One channel, scoped to THIS user's rows, and one refetch per burst.
+    // Opening a thread marks N messages read in one go, which arrives as N
+    // UPDATE events — refetching both counts on each turned a click into 2N
+    // count queries. Coalesce each table's events into a single recount, and
+    // only recount the table that changed.
+    const timers = { messages: null, trades: null };
+    const recount = (table, fn) => {
+      if (timers[table]) return;
+      timers[table] = setTimeout(() => {
+        timers[table] = null;
+        if (isMounted) fn().catch((err) => console.error(`Failed to recount ${table}:`, err));
+      }, 400);
+    };
+    const channel = supabase
+      .channel(uniqueTopic(`header-badges-${uid}`))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `recipient_id=eq.${uid}` },
+        () => recount('messages', countUnreadMessages))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${uid}` },
+        () => recount('trades', countPendingTrades))
       .subscribe();
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(msgChannel);
-      supabase.removeChannel(tradeChannel);
+      for (const t of Object.values(timers)) if (t) clearTimeout(t);
+      supabase.removeChannel(channel);
     };
   }, [isAuthenticated, currentUser?.id]);
 
@@ -209,9 +233,13 @@ const Header = () => {
 
   return (
     <header
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+      // backdrop-blur stays on in both states so the compositing layer it
+      // creates is never torn down mid-scroll (that tear-down is what iOS
+      // Safari renders as a flicker on a sticky header), and only colour,
+      // shadow and border are transitioned — never backdrop-filter itself.
+      className={`sticky top-0 z-50 w-full backdrop-blur-md transform-gpu transition-[background-color,box-shadow,border-color] duration-300 ${
         isScrolled
-          ? 'bg-background/90 backdrop-blur-md shadow-sm border-b border-border'
+          ? 'bg-background/90 shadow-sm border-b border-border'
           : 'bg-background border-b border-border/50'
       }`}
     >
@@ -235,12 +263,17 @@ const Header = () => {
             <CardPopLogo variant="full" iconClassName="w-9 h-[44px]" />
           </Link>
 
-          {/* Search — absolutely centred so it always sits at the true visual midpoint */}
-          <div className="absolute inset-x-0 hidden lg:flex justify-center pointer-events-none">
-            <div className="w-full max-w-xl pointer-events-auto px-4">
-              <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
+          {/* Search — absolutely centred so it always sits at the true visual
+              midpoint. Only mounted on lg+ (it's display:none below that, and
+              the mobile row below renders its own), so phones build one search
+              bar instead of two. */}
+          {isDesktop && (
+            <div className="absolute inset-x-0 hidden lg:flex justify-center pointer-events-none">
+              <div className="w-full max-w-xl pointer-events-auto px-4">
+                <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Spacer pushes all action icons to the right edge */}
           <div className="flex-1" />
@@ -291,10 +324,10 @@ const Header = () => {
             {/* Sell CTA — the primary marketplace action (list a card). Routes to
                 the add-card flow; ProtectedRoute prompts login for signed-out
                 users. Shown from sm up; on phones it lives in the mobile menu. */}
-            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex font-bold rounded-xl gap-1.5 shrink-0">
-              <Link to="/vault/add">
+            <Button asChild variant="outline" size="sm" className="inline-flex font-bold rounded-xl gap-1.5 shrink-0 px-2.5 sm:px-3">
+              <Link to="/vault/add" aria-label="Sell a card">
                 <Tag className="h-4 w-4" aria-hidden="true" />
-                Sell
+                <span className="hidden sm:inline">Sell</span>
               </Link>
             </Button>
 
@@ -416,9 +449,11 @@ const Header = () => {
             below lg the only way to search was to open the hamburger. Search is
             the primary discovery path for a marketplace, so surface it inline
             here on every screen under lg. */}
-        <div className="lg:hidden py-2.5 border-b border-border/40">
-          <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." className="max-w-full" />
-        </div>
+        {!isDesktop && (
+          <div className="lg:hidden py-2.5 border-b border-border/40">
+            <SearchBar onSearchChange={handleGlobalSearch} placeholder="Search cards, sets, sellers..." className="max-w-full" />
+          </div>
+        )}
 
         {/* ── Row 2: Nav links (desktop only) ── */}
         {isDesktop && (

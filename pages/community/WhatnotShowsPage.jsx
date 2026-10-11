@@ -7,10 +7,10 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { toast } from 'sonner';
 import { CalendarDays, ExternalLink, Plus, Tv2, Trash2, Pencil, Clock, Star, ListChecks, Sparkles } from 'lucide-react';
-import { publicImageUrl, toCdnUrl } from '@/utils/imageUrl.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { canListWhatnotShows, PLANS, WHATNOT_SHOWS_MIN_TIER } from '@/config/plans.js';
 import WhatnotShowFormModal from '@/components/WhatnotShowFormModal.jsx';
 
@@ -95,12 +95,6 @@ const WhatnotShowsPage = () => {
   };
 
   const isUpcoming = (iso) => new Date(iso) > new Date();
-
-  const resolveAvatarUrl = (profile) => {
-    const raw = profile?.avatar_url || profile?.profile_photo_or_character;
-    if (!raw) return null;
-    return publicImageUrl(raw);
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -194,7 +188,6 @@ const WhatnotShowsPage = () => {
               const upcoming = isUpcoming(show.show_date);
               const isOwner = currentUser?.id === show.user_id;
               const profile = show.profiles;
-              const avatarUrl = resolveAvatarUrl(profile);
               const sellerName = show.seller_name || profile?.display_name || profile?.username || 'Seller';
               const profileLink = profile?.id ? `/seller/${profile.id}` : null;
 
@@ -310,12 +303,7 @@ const WhatnotShowsPage = () => {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-border mt-auto">
                         {/* Seller identity */}
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <Avatar className="h-9 w-9 flex-shrink-0 ring-2 ring-border">
-                            <AvatarImage src={avatarUrl} />
-                            <AvatarFallback className="text-xs font-bold">
-                              {sellerName.charAt(0).toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
+                          <ProfileAvatar profile={profile} size="sm" name={sellerName} />
                           <div className="min-w-0">
                             {profileLink ? (
                               <Link

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { safeInternalPath } from '@/lib/safeInternalPath.js';
 import { Helmet } from 'react-helmet-async';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import OAuthButtons from '@/components/OAuthButtons.jsx';
@@ -12,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { BadgeCheck, CheckCircle2, Circle, KeyRound, Loader2, MailCheck, ScrollText, ShieldCheck, Smartphone, Vault } from 'lucide-react';
+import { BadgeCheck, CheckCircle2, Circle, KeyRound, Loader2, MailCheck, ShieldCheck, Smartphone, Vault } from 'lucide-react';
 
 // Security copy is deliberately accurate to what we actually run (see
 // TrustSafetyPage): Stripe PCI-DSS checkout, Stripe Identity ID checks,
@@ -42,49 +43,42 @@ const SECURITY_FEATURES = [
 ];
 
 const SignupPage = () => {
-  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
-  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
+  const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '' });
+  // Unticked by default: a pre-ticked box isn't consent under the Spam Act.
+  const [newsletterOptIn, setNewsletterOptIn] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
   const turnstileRef = useRef(null);
 
-  const [passwordValidation, setPasswordValidation] = useState({
-    length: false,
-    uppercase: false,
-    lowercase: false,
-    number: false,
-    special: false,
-  });
+  // One rule the user can see (8+ characters) plus the breach check at submit
+  // (HaveIBeenPwned, k-anonymity). The old upper/lower/number/symbol checklist
+  // mostly produced typos and abandoned sign-ups; the breach check is the
+  // control that actually keeps weak passwords out.
+  const [passwordValidation, setPasswordValidation] = useState({ length: false });
 
   const { signup } = useAuth();
   const navigate = useNavigate();
+  // Where to land once the account exists — e.g. /checkout when the buyer was
+  // sent here by the marketplace gate. Travels inside the confirmation link
+  // (/welcome?next=…) so even the email round-trip ends back at the cart.
+  const [searchParams] = useSearchParams();
+  const nextPath = safeInternalPath(searchParams.get('next'));
 
   useEffect(() => {
-    const p = formData.password;
-    setPasswordValidation({
-      length: p.length >= 8,
-      uppercase: /[A-Z]/.test(p),
-      lowercase: /[a-z]/.test(p),
-      number: /[0-9]/.test(p),
-      special: /[^A-Za-z0-9]/.test(p),
-    });
+    setPasswordValidation({ length: formData.password.length >= 8 });
   }, [formData.password]);
 
-  const score = Object.values(passwordValidation).filter(Boolean).length;
-  const isPasswordValid = score === 5;
-  const passwordsMatch = formData.confirmPassword !== '' && formData.password === formData.confirmPassword;
-  const isFormValid = formData.firstName.trim() !== '' && formData.lastName.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && passwordsMatch && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
+  // Strength meter: length-based, so it still rewards a longer passphrase.
+  const score = Math.min(5, Math.floor(formData.password.length / 3));
+  const isPasswordValid = passwordValidation.length;
+  const isFormValid = formData.firstName.trim() !== '' && formData.lastName.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
 
   const handleAccountSubmit = async (e) => {
     e.preventDefault();
     if (!isPasswordValid) {
-      toast.error('Please meet all password requirements to continue.');
-      return;
-    }
-    if (!passwordsMatch) {
-      toast.error('Passwords do not match. Please re-enter them.');
+      toast.error('Your password needs at least 8 characters.');
       return;
     }
 
@@ -99,7 +93,7 @@ const SignupPage = () => {
 
       // Turnstile token (when enabled) is verified server-side by Supabase Auth.
       const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
-      const result = await signup(formData.email, formData.password, fullName, captchaToken);
+      const result = await signup(formData.email, formData.password, fullName, captchaToken, { next: nextPath });
       const user = result?.user;
       const session = result?.session;
 
@@ -145,7 +139,7 @@ const SignupPage = () => {
       // Otherwise they must verify their email first; ID verification and the
       // card are collected on their first sign-in.
       if (session?.access_token) {
-        navigate('/verify-identity?welcome=1');
+        navigate(nextPath || '/verify-identity?welcome=1');
       } else {
         setSuccess(true);
       }
@@ -184,8 +178,9 @@ const SignupPage = () => {
             <h2 className="font-serif text-2xl font-bold mb-4">Check Your Email</h2>
             <p className="text-muted-foreground mb-4 leading-relaxed">
               We've sent a verification link to <span className="text-foreground font-bold">{formData.email}</span>.
-              Clicking it confirms your email and walks you through the next steps — verifying your ID and
-              adding a card — so you're ready to buy, sell and trade.
+              {nextPath === '/checkout'
+                ? ' Click it and you\'ll land straight back at your checkout, with your cart and details kept.'
+                : ' Clicking it confirms your email and walks you through the next steps — verifying your ID and adding a card — so you\'re ready to buy, sell and trade.'}
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
               Your account is <span className="text-foreground font-bold">free, forever</span> — buy straight away.
@@ -299,6 +294,8 @@ const SignupPage = () => {
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   className="bg-background h-12"
                   placeholder="you@example.com"
+                  autoComplete="email"
+                  inputMode="email"
                   disabled={loading}
                 />
               </div>
@@ -311,7 +308,8 @@ const SignupPage = () => {
                   value={formData.password}
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
                   className="bg-background h-12"
-                  placeholder="Create a strong password"
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
                   disabled={loading}
                 />
 
@@ -324,36 +322,9 @@ const SignupPage = () => {
                   ))}
                 </div>
 
-                <ul className="space-y-2 mt-4 bg-muted/30 p-4 rounded-xl border border-border/50">
-                  <ValidationItem met={passwordValidation.length} text="At least 8 characters" />
-                  <ValidationItem met={passwordValidation.uppercase} text="One uppercase letter" />
-                  <ValidationItem met={passwordValidation.lowercase} text="One lowercase letter" />
-                  <ValidationItem met={passwordValidation.number} text="One number" />
-                  <ValidationItem met={passwordValidation.special} text="One special character" />
+                <ul className="space-y-2 mt-3">
+                  <ValidationItem met={passwordValidation.length} text="At least 8 characters — a longer passphrase is stronger. We also check it against known data breaches." />
                 </ul>
-              </div>
-              <div className="space-y-2 pb-2">
-                <Label htmlFor="confirmPassword" className="font-bold text-xs uppercase tracking-wide">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  required
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                  className="bg-background h-12"
-                  placeholder="Re-enter your password"
-                  autoComplete="new-password"
-                  disabled={loading}
-                />
-                {formData.confirmPassword !== '' && (
-                  passwordsMatch ? (
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-green-600 dark:text-green-500">
-                      <CheckCircle2 className="w-4 h-4 shrink-0" /> Passwords match
-                    </p>
-                  ) : (
-                    <p className="text-sm font-medium text-destructive">Passwords do not match</p>
-                  )
-                )}
               </div>
 
               <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -369,36 +340,26 @@ const SignupPage = () => {
                 </span>
               </label>
 
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <ScrollText className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <Label className="font-bold text-xs uppercase tracking-wide">Terms &amp; Conditions</Label>
-                </div>
-                <div className="h-40 overflow-y-auto rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground space-y-3 leading-relaxed">
-                  <p className="text-xs text-muted-foreground/70">Last Updated: May 10, 2026</p>
-                  <p><strong className="text-foreground">1. Acceptance of Terms</strong><br />By accessing or using CardPop, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform.</p>
-                  <p><strong className="text-foreground">2. User Accounts</strong><br />You must be at least 18 years old to create an account. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
-                  <p><strong className="text-foreground">3. Marketplace Rules</strong><br />Users agree to provide accurate descriptions and images of items listed for sale. CardPop reserves the right to remove listings that violate our policies or appear fraudulent.</p>
-                  <p><strong className="text-foreground">4. Fees and Payments</strong><br />CardPop charges fees for certain services, including sales commissions. All fees are clearly displayed before you commit to a transaction. You agree to pay all applicable fees.</p>
-                  <p><strong className="text-foreground">5. Limitation of Liability</strong><br />CardPop is a marketplace facilitator. We are not responsible for the actions of individual users, though we provide protection programs as outlined in our Trust &amp; Safety policy.</p>
-                </div>
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    required
-                    checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
-                    disabled={loading}
-                    className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
-                  />
-                  <span className="text-sm text-muted-foreground leading-snug">
-                    I have read and agree to the{' '}
-                    <Link to="/terms" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
-                      Terms &amp; Conditions
-                    </Link>
-                  </span>
-                </label>
-              </div>
+              <label className="flex items-start gap-3 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  required
+                  checked={termsAccepted}
+                  onChange={(e) => setTermsAccepted(e.target.checked)}
+                  disabled={loading}
+                  className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm text-muted-foreground leading-snug">
+                  I&apos;m 18 or over and agree to the{' '}
+                  <Link to="/terms" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link to="/privacy" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
+                    Privacy Policy
+                  </Link>.
+                </span>
+              </label>
 
               <Turnstile
                 ref={turnstileRef}
@@ -418,7 +379,7 @@ const SignupPage = () => {
             </form>
 
             <div className="mt-6">
-              <OAuthButtons redirectTo={`${window.location.origin}/account`} disabled={loading} />
+              <OAuthButtons redirectTo={`${window.location.origin}${nextPath || '/account'}`} disabled={loading} />
             </div>
 
             <div className="mt-8 text-center text-sm text-muted-foreground pt-6 border-t border-border">

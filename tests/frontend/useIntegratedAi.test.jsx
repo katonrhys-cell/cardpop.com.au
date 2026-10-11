@@ -6,7 +6,8 @@ vi.mock('@/lib/integratedAiClient', () => ({ integratedAiClient: { stream: mockS
 const mockGetSession = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabaseClient.js', () => ({ supabase: { auth: { getSession: mockGetSession } } }));
 const mockToast = vi.hoisted(() => vi.fn());
-vi.mock('@/hooks/use-toast', () => ({ toast: mockToast }));
+// The hook reports errors through sonner (the app's one toast system).
+vi.mock('sonner', () => ({ toast: Object.assign(vi.fn(), { error: mockToast }) }));
 
 import { useIntegratedAi } from '@/hooks/use-integrated-ai.jsx';
 
@@ -85,7 +86,7 @@ describe('useIntegratedAi', () => {
     await waitFor(() => expect(result.current.isLoadingHistory).toBe(false));
 
     await act(async () => { await result.current.sendMessage('Hi'); });
-    expect(mockToast).toHaveBeenCalledWith(expect.objectContaining({ description: 'model error' }));
+    expect(mockToast).toHaveBeenCalledWith('Error', expect.objectContaining({ description: 'model error' }));
     // The empty assistant placeholder is removed, leaving just the user message.
     expect(result.current.messages).toHaveLength(1);
     expect(result.current.messages[0].role).toBe('user');

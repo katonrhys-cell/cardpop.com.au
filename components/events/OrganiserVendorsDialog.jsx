@@ -9,9 +9,9 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
-import { Store, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import apiServerClient from '@/lib/apiServerClient';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 
 // A verified organiser's view of who has RSVP'd as a vendor to their event.
 // Served by GET /events/:id/vendors, which checks the caller organises the
@@ -66,13 +66,7 @@ const OrganiserVendorsDialog = ({ event, onClose }) => {
             <ul className="divide-y divide-border rounded-lg border border-border">
               {vendors.map((v) => (
                 <li key={v.user_id} className="flex items-center gap-3 p-3">
-                  <div className="w-9 h-9 rounded-full bg-muted flex items-center justify-center shrink-0 overflow-hidden">
-                    {v.avatar_url ? (
-                      <img src={toCdnUrl(v.avatar_url)} alt="" loading="lazy" className="w-full h-full object-cover" />
-                    ) : (
-                      <Store className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
+                  <ProfileAvatar profile={v} size="sm" />
                   <div className="min-w-0 flex-1">
                     <Link to={`/seller/${v.user_id}`} className="font-semibold text-sm text-foreground hover:underline truncate block">
                       {v.display_name || v.username || 'CardPop member'}

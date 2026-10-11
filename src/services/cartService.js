@@ -151,7 +151,11 @@ export async function priceCart(items, userId) {
           .maybeSingle());
       }
       if (error) throw error;
-      if (!listing) throw httpError(404, 'A listing in your cart is no longer available');
+      if (!listing) {
+        // Carry the id so the checkout page can point at the exact line and
+        // offer a one-click "remove and continue" instead of a dead "try again".
+        throw Object.assign(httpError(404, 'A listing in your cart is no longer available'), { listingId: id });
+      }
       if (listing.seller_id === userId) throw httpError(403, 'You cannot purchase your own listing');
       // Only buy-now ('fixed') listings with a real price can be bought from
       // the cart. Trade-only and Expression of Interest listings stay 'active'
@@ -255,7 +259,7 @@ export async function priceCart(items, userId) {
   shippingCents += sellerShippingCents;
 
   if (commissionCents > 0) {
-    lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Platform Fee' }, unit_amount: commissionCents }, quantity: 1 });
+    lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Service fee' }, unit_amount: commissionCents }, quantity: 1 });
   }
   if (shippingCents > 0) {
     lineItems.push({ price_data: { currency: 'aud', product_data: { name: 'Shipping' }, unit_amount: shippingCents }, quantity: 1 });

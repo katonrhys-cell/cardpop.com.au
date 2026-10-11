@@ -148,6 +148,29 @@ describe('POST /offers — validation', () => {
     expect(mockInsert).not.toHaveBeenCalled();
   });
 
+  it('rejects an offer on an expression of interest outside its offer window', async () => {
+    const eoi = { id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'expression_of_interest' };
+    const day = 24 * 60 * 60 * 1000;
+    mockListing.mockResolvedValueOnce({ data: { ...eoi, offers_open_at: new Date(Date.now() + day).toISOString() } });
+    let res = await post(VALID);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/not taking offers yet/);
+    mockListing.mockResolvedValueOnce({ data: { ...eoi, offers_close_at: new Date(Date.now() - day).toISOString() } });
+    res = await post(VALID);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/closed/);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+
+  it('accepts an offer on an expression of interest inside its offer window', async () => {
+    const day = 24 * 60 * 60 * 1000;
+    mockListing.mockResolvedValue({ data: {
+      id: LISTING, seller_id: SELLER, status: 'active', listing_type: 'expression_of_interest',
+      offers_open_at: new Date(Date.now() - day).toISOString(), offers_close_at: new Date(Date.now() + day).toISOString(),
+    } });
+    expect((await post(VALID)).status).toBe(201);
+  });
+
   it('rejects an offer on an inactive or unknown listing', async () => {
     mockListing.mockResolvedValueOnce({ data: { id: LISTING, seller_id: SELLER, status: 'sold' } });
     expect((await post(VALID)).status).toBe(404);

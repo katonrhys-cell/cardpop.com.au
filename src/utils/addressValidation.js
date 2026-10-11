@@ -1,4 +1,5 @@
 import logger from './logger.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 // Amazon Location Service (Places API v2) — the authoritative "is this a real,
 // deliverable address" check. Runs server-side before a checkout session is
@@ -121,6 +122,7 @@ export async function validateShippingAddress(addr = {}) {
         Filter: { IncludeCountries: ['AUS'] },
         MaxResults: 1,
       }),
+      signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.geocode),
     });
 
     if (!res.ok) {

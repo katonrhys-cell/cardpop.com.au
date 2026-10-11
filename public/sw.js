@@ -1,7 +1,10 @@
 // Service Worker for offline support and intelligent caching strategies
 // - Network First for API requests (try network, fallback to cache)
 // - Network First for navigations / HTML (see navigationNetworkFirst below)
-// - Cache First for static assets (serve from cache, update in background)
+// - Cache First for static assets (serve from cache; unhashed files update in
+//   the background, content-hashed /assets/ chunks never re-fetch)
+// - Cache First for storage images; storage video and Range requests are
+//   never intercepted (see isStorageVideo)
 
 const CACHE_NAMES = {
   // v5: navigations/HTML moved from stale-while-revalidate to network-first.
@@ -81,7 +84,7 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    }).then(() => self.clients.claim())
+    }).then(purgeCachedVideos).then(() => self.clients.claim())
   );
 });
 
@@ -173,17 +176,27 @@ const cacheStatic = async (request, response) => {
   }
 };
 
+// Vite's build output: every file under /assets/ carries a content hash in its
+// name and is served `immutable` (vercel.json), so a cached copy can never be
+// stale. A new build means new filenames, never new bytes at an old one.
+const isContentHashedAsset = (request) => new URL(request.url).pathname.startsWith('/assets/');
+
 // Helper: Cache First strategy
 const cacheFirst = async (request) => {
   const cached = await caches.match(request);
   if (cached) {
-    // Update cache in background
-    fetch(request)
-      .then((response) => {
-        if (response.ok) return cacheStatic(request, response);
-        return undefined;
-      })
-      .catch(() => {});
+    // Revalidate unhashed files (/images/*, icons, fonts) in the background so
+    // a replaced file reaches returning visitors. Content-hashed chunks are
+    // skipped: re-downloading them on every hit doubled the JS transferred per
+    // visit for a file that cannot have changed.
+    if (!isContentHashedAsset(request)) {
+      fetch(request)
+        .then((response) => {
+          if (response.ok) return cacheStatic(request, response);
+          return undefined;
+        })
+        .catch(() => {});
+    }
     return cached;
   }
 
@@ -205,8 +218,44 @@ const cacheFirst = async (request) => {
 // photos on every visit is what blows the free tier's egress limit. Uploaded
 // images are immutable (timestamped filenames), so once fetched they can be
 // served from the local cache indefinitely.
+const STORAGE_PUBLIC_PATH = /\/storage\/v1\/(object|render\/image)\/public\//;
+
+// Card clips live in the same public bucket as the photos but are not images:
+// a <video> streams them with Range requests (Safari refuses to play without
+// byte ranges), and a clip can be 20 MB — forty photos' worth of the image
+// cache. Until this matched them too, each clip was re-fetched whole with its
+// Range header dropped, rewritten onto the image CDN (which publicVideoUrl
+// deliberately avoids), copied into R2 and stored in the image cache, evicting
+// real photos. Video is left to the browser entirely.
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v|ogv|ogg)$/i;
+
+const isStorageVideo = (url) =>
+  STORAGE_PUBLIC_PATH.test(url.pathname) && VIDEO_EXT.test(url.pathname);
+
 const isStorageImage = (url) =>
-  /\/storage\/v1\/(object|render\/image)\/public\//.test(url.pathname);
+  STORAGE_PUBLIC_PATH.test(url.pathname) && !VIDEO_EXT.test(url.pathname);
+
+// A Range request is a media element (or a resumed download) asking for part
+// of a file. The Cache API can't store a 206 and a full-body answer to a range
+// request breaks playback, so these are never intercepted — whatever the URL.
+const isRangeRequest = (request) => request.headers.has('range');
+
+// Drop any clips an earlier version stored in the image cache, without
+// evicting the photos beside them (a version bump would refetch every image —
+// exactly the egress this cache exists to avoid).
+const purgeCachedVideos = async () => {
+  try {
+    const cache = await caches.open(CACHE_NAMES.IMAGES);
+    const keys = await cache.keys();
+    await Promise.all(
+      keys
+        .filter((req) => VIDEO_EXT.test(new URL(req.url).pathname))
+        .map((req) => cache.delete(req)),
+    );
+  } catch {
+    // Best-effort housekeeping.
+  }
+};
 
 // Canonical Supabase Storage origin — the source of truth every storage object
 // is always readable from. Hardcoded like the project URL elsewhere
@@ -353,7 +402,11 @@ self.addEventListener('fetch', (event) => {
   // violation (cache.put throws) and there is nothing useful to cache.
   if (request.method !== 'GET') return;
 
-  // Cache First for storage-hosted images (card photos, avatars, media).
+  // Media streams and partial downloads go straight to the browser: a 206 can't
+  // be cached and a whole-file answer breaks <video> playback.
+  if (isRangeRequest(request) || isStorageVideo(url)) return;
+
+  // Cache First for storage-hosted images (card photos, avatars, posters).
   // These previously fell through to Network First, which re-downloaded every
   // image on every page view and burned through the Supabase egress quota.
   if (isStorageImage(url)) {

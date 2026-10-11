@@ -30,6 +30,21 @@ import { getReferralCode } from '@/lib/referral.js';
 import { AMAZON_LOCATION_ENABLED } from '@/lib/amazonLocation.js';
 import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
 import { fetchSavedAddresses, addressRowToShipping, formatAddressLabel } from '@/lib/savedAddresses.js';
+import { trackBeginCheckout, trackAddPaymentInfo } from '@/lib/analytics.js';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
+import { marketplaceGate, hasMarketplaceLine } from '@/utils/marketplaceIdentity.js';
+import { Link } from 'react-router-dom';
+
+// The typed-in details survive a reload or a detour through sign-in. Per-tab
+// (sessionStorage), cleared once the order is paid (CheckoutSuccessPage).
+export const CHECKOUT_FORM_STORAGE_KEY = 'cardpop_checkout_form';
+const readSavedForm = () => {
+  try {
+    const raw = window.sessionStorage.getItem(CHECKOUT_FORM_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch { return null; }
+};
 
 // Small numbered section wrapper so the single page reads as an ordered flow
 // without a click-through wizard.
@@ -54,18 +69,25 @@ const Section = ({ step, icon: Icon, title, subtitle, children }) => (
 const CheckoutPage = () => {
   const navigate = useNavigate();
   const { cardId } = useParams();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const source = searchParams.get('source');
 
-  const { cartItems, setIsCartOpen } = useCart();
+  const { cartItems, setIsCartOpen, removeFromCart, addToCart } = useCart();
   const { currentUser, isIdentityVerified, profileLoading } = useAuth();
+  const { settings } = usePlatformSettings();
   const [initializing, setInitializing] = useState(true);
 
   const [directItem, setDirectItem] = useState(null);
 
-  const [shippingData, setShippingData] = useState({ email: currentUser?.email || '' });
-  const [billingData, setBillingData] = useState({});
-  const [sameAsShipping, setSameAsShipping] = useState(true);
+  const savedForm = useRef(readSavedForm()).current;
+  const [shippingData, setShippingData] = useState(() => ({ ...(savedForm?.shippingData || {}), email: savedForm?.shippingData?.email || currentUser?.email || '' }));
+  const [billingData, setBillingData] = useState(() => savedForm?.billingData || {});
+  const [sameAsShipping, setSameAsShipping] = useState(() => savedForm?.sameAsShipping ?? true);
+  useEffect(() => {
+    try {
+      window.sessionStorage.setItem(CHECKOUT_FORM_STORAGE_KEY, JSON.stringify({ shippingData, billingData, sameAsShipping }));
+    } catch { /* storage unavailable */ }
+  }, [shippingData, billingData, sameAsShipping]);
   // Guest opt-in: email me order updates & CardPop news. Defaults off (explicit
   // consent). Only surfaced to logged-out shoppers — members already have an
   // account and manage email preferences in their settings.
@@ -90,6 +112,47 @@ const CheckoutPage = () => {
   const [paymentBody, setPaymentBody] = useState(null);
   const readyToPay = paymentBody !== null;
   const paymentRef = useRef(null);
+
+  // ?restore=<orderId>&t=<token> from the abandoned-checkout email: pull the
+  // saved lines back into the cart on whatever device the email was opened on,
+  // then drop the params so a refresh doesn't add them twice.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    const restoreId = searchParams.get('restore');
+    const token = searchParams.get('t');
+    if (!restoreId || !token || restoredRef.current) return;
+    restoredRef.current = true;
+    let cancelled = false;
+    apiServerClient.fetch(`/orders/${encodeURIComponent(restoreId)}/abandoned-cart?t=${encodeURIComponent(token)}`)
+      .then(async (res) => ({ ok: res.ok, body: await res.json().catch(() => ({})) }))
+      .then(async ({ ok, body }) => {
+        if (cancelled) return;
+        if (!ok) { toast.error(body.error || 'That cart link has expired.'); return; }
+        let added = 0;
+        for (const line of body.items || []) {
+          const already = cartItems.some((i) => (i.variant?.variant_id || i.product?.id) === (line.variantId || line.id));
+          if (already) continue;
+          try {
+            await addToCart(
+              { id: line.id, type: line.type, source: line.type === 'shop' ? 'shop' : 'marketplace', title: line.title, price: line.unitPriceAud },
+              { id: line.variantId ? `${line.id}:${line.variantId}` : line.id, price_in_cents: Math.round(line.unitPriceAud * 100), manage_inventory: false, ...(line.variantId ? { variant_id: line.variantId } : {}) },
+              line.quantity,
+            );
+            added += 1;
+          } catch { /* a line that can't be re-added is skipped */ }
+        }
+        if (added > 0) toast.success(`Welcome back — ${added} item${added !== 1 ? 's' : ''} restored to your cart.`);
+      })
+      .catch(() => { if (!cancelled) toast.error('Could not restore your cart.'); })
+      .finally(() => {
+        if (cancelled) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete('restore'); next.delete('t');
+        setSearchParams(next, { replace: true });
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per restore link
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -176,18 +239,29 @@ const CheckoutPage = () => {
     if (row) setShippingData(addressRowToShipping(row, currentUser?.email || shippingData.email || ''));
   };
 
-  const checkoutItems = directItem ? [directItem] : cartItems;
+  // A mixed cart whose marketplace cards are gated can still pay for its shop
+  // lines now ("Check out shop items now" on the gate) — the cards stay in the
+  // cart for after sign-in / verification.
+  const [shopOnly, setShopOnly] = useState(false);
+  const allCheckoutItems = directItem ? [directItem] : cartItems;
+  const checkoutItems = shopOnly
+    ? allCheckoutItems.filter((i) => (i.product?.type || 'listing') === 'shop')
+    : allCheckoutItems;
 
-  // Marketplace (peer-to-peer 'listing') items require an identity-verified
-  // buyer; CardPop Shop items and Official CardPop Store listings don't. Items
-  // default to 'listing' when untyped. When the order contains a gated item and
-  // the buyer isn't a verified account, we gate the whole checkout up front —
-  // the server enforces the same rule (requireIdentityForMarketplacePurchase),
-  // so this is UX, not the guard.
-  const hasMarketplaceItem = checkoutItems.some(
-    (i) => (i.product?.type || 'listing') === 'listing' && !i.product?.officialStore,
-  );
-  const marketplaceBlocked = hasMarketplaceItem && !profileLoading && !(currentUser && isIdentityVerified);
+  // Marketplace (peer-to-peer 'listing') items need a signed-in buyer, and a
+  // Stripe-Identity-verified one once they reach the admin threshold; CardPop
+  // Shop items don't. The rule lives in utils/marketplaceIdentity.js and the
+  // server enforces the same one (requireIdentityForMarketplacePurchase), so
+  // this is UX, not the guard. Items default to 'listing' when untyped.
+  const hasMarketplaceItem = hasMarketplaceLine(checkoutItems);
+  const gateLevel = profileLoading ? 'open' : marketplaceGate({
+    lines: checkoutItems,
+    thresholdAud: settings.marketplace_identity_threshold_aud,
+    isAuthenticated: !!currentUser,
+    isIdentityVerified,
+  });
+  const marketplaceBlocked = hasMarketplaceItem && gateLevel !== 'open';
+  const shopItemCount = allCheckoutItems.filter((i) => (i.product?.type || 'listing') === 'shop').length;
 
   // Flatten cart items into a display-friendly shape for child components
   const flatItems = checkoutItems.map(item => {
@@ -225,6 +299,31 @@ const CheckoutPage = () => {
   // it's stale or invalid.
   const [promoInput, setPromoInput] = useState(() => getReferralCode());
   const [promoCode, setPromoCode] = useState(() => getReferralCode());
+  // The welcome code (10% off a first order) used to live only in an email the
+  // buyer had to find and paste. For a signed-in buyer with no code in hand it
+  // is fetched and applied automatically; if the server says it's already been
+  // used (or expired), it is dropped quietly rather than toasting an error at
+  // a returning customer.
+  const autoAppliedCodeRef = useRef('');
+  useEffect(() => {
+    if (!currentUser || promoCode || promoInput) return;
+    let cancelled = false;
+    apiServerClient.fetch('/welcome-offer/mine')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        const offer = data?.offer;
+        if (cancelled || !offer?.code) return;
+        const expiresAt = offer.expires_at || offer.expiresAt;
+        if (expiresAt && new Date(expiresAt).getTime() < Date.now()) return;
+        if (offer.discount_redeemed_at || offer.discountRedeemedAt) return;
+        autoAppliedCodeRef.current = offer.code;
+        setPromoInput(offer.code);
+        setPromoCode(offer.code);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per signed-in checkout
+  }, [currentUser?.id]);
 
   // Wallet balance (Stripe Customer Balance — CardPop holds no ledger of its
   // own). Mutually exclusive with a promo code; toggling one clears the other.
@@ -264,9 +363,14 @@ const CheckoutPage = () => {
   // Authoritative totals come from the server so the displayed amount always
   // matches what Stripe charges (no fabricated tax).
   const [pricing, setPricing] = useState(null);
+  // 'loading' until the server answers; 'error' when it refused (an item sold
+  // out, a stale listing) — the Review & Pay button is disabled in both states
+  // so a fee-less client subtotal is never presented as the amount to pay.
+  const [pricingState, setPricingState] = useState('idle');
   useEffect(() => {
-    if (serverItems.length === 0) { setPricing(null); return; }
+    if (serverItems.length === 0) { setPricing(null); setPricingState('idle'); return; }
     let cancelled = false;
+    setPricingState('loading');
     apiServerClient.fetch('/stripe/calculate-cart', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -281,29 +385,47 @@ const CheckoutPage = () => {
         // listing, 404 no longer available) instead of silently falling back to
         // a fee-less client subtotal with no explanation.
         let error = '';
-        try { const body = await res.json(); error = body?.error || body?.message || ''; } catch { /* non-JSON error body */ }
-        return { ok: false, error };
+        let listingId = null;
+        try { const body = await res.json(); error = body?.error || body?.message || ''; listingId = body?.listingId || null; } catch { /* non-JSON error body */ }
+        return { ok: false, error, listingId };
       })
       .then(result => {
         if (cancelled) return;
         if (!result.ok) {
           setPricing(null);
-          if (result.error) toast.error(result.error);
+          setPricingState('error');
+          if (result.error) {
+            // A sold / withdrawn listing names itself: one tap removes it and
+            // repricing continues with what's left.
+            const soldLine = result.listingId ? cartItems.find((i) => i.product?.id === result.listingId) : null;
+            toast.error(result.error, soldLine ? {
+              duration: 10000,
+              action: { label: 'Remove it', onClick: () => removeFromCart(soldLine.variant?.id || soldLine.product.id) },
+            } : undefined);
+          }
           return;
         }
         const data = result.data;
         setPricing(data);
+        setPricingState('ready');
         if (data?.promoError) {
-          toast.error(data.promoError);
+          if (autoAppliedCodeRef.current && autoAppliedCodeRef.current === promoCode) {
+            // Auto-applied welcome code that no longer applies — drop it silently.
+            autoAppliedCodeRef.current = '';
+            setPromoInput('');
+          } else {
+            toast.error(data.promoError);
+          }
           setPromoCode('');
         } else if (promoCode && !useWallet && data?.discountAud > 0) {
           toast.success(`Code applied — $${Number(data.discountAud).toFixed(2)} off.`);
         }
       })
-      .catch(() => { if (!cancelled) setPricing(null); });
+      .catch(() => { if (!cancelled) { setPricing(null); setPricingState('error'); } });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cartItems, directItem, promoCode, useWallet]);
+  }, [cartItems, directItem, promoCode, useWallet, shopOnly]);
+  const pricingReady = pricingState === 'ready' && pricing != null;
 
   // Pre-order labels come from the server's priced lines (authoritative status
   // and estimate at this moment), falling back to what the cart remembered.
@@ -378,8 +500,15 @@ const CheckoutPage = () => {
 
   const handleReviewAndPay = () => {
     if (flatItems.length === 0) { toast.error('Your cart is empty!'); return; }
+    if (!pricingReady) {
+      toast.error(pricingState === 'error'
+        ? 'Something in your cart can\'t be priced right now — remove the unavailable item and try again.'
+        : 'Still working out your total — one moment.');
+      return;
+    }
     if (!validateShipping()) return;
     if (!validateBilling()) return;
+    trackAddPaymentInfo(checkoutItems);
     // Freeze exactly what the buyer reviewed; later renders can't change it.
     setPaymentBody(checkoutRequestBody);
     // Scroll the newly-revealed payment form into view (guarded — happy-dom in
@@ -395,6 +524,15 @@ const CheckoutPage = () => {
   // serverItems is a fresh array each render; track it by its serialised key so
   // the memo (and the Stripe session it seeds) only changes when the order does.
   const serverItemsKey = JSON.stringify(serverItems);
+  // GA4 begin_checkout: once per distinct cart on this page (not on every
+  // re-render, and not again when the shopper edits their address).
+  const beginCheckoutKeyRef = useRef('');
+  useEffect(() => {
+    if (!serverItems.length || beginCheckoutKeyRef.current === serverItemsKey) return;
+    beginCheckoutKeyRef.current = serverItemsKey;
+    trackBeginCheckout(checkoutItems);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the serialised cart
+  }, [serverItemsKey]);
   // Only forward business details when a valid ABN was supplied — this is what
   // switches the server onto the tax-invoice path.
   const billingAbn = billingData.isBusiness && isValidAbn(billingData.abn) ? normalizeAbn(billingData.abn) : '';
@@ -474,6 +612,7 @@ const CheckoutPage = () => {
       shipping={shipping}
       discount={discount}
       total={total}
+      pricingState={pricingState}
       // "Edit Cart" opens the cart drawer (remove items / change quantities)
       // rather than bouncing to the marketplace. Hidden for the direct Vault
       // "buy now" flow, which isn't backed by the cart — there's nothing to edit.
@@ -482,13 +621,21 @@ const CheckoutPage = () => {
     />
   );
 
-  const promoCard = currentUser && flatItems.length > 0 && (
+  // Guests see the box too — so a code in hand is a reason to sign in rather
+  // than a surprise they only learn about after creating an account.
+  const promoCard = flatItems.length > 0 && (
     <Card className="border-border shadow-sm">
       <CardContent className="pt-6">
         <div className="flex items-center gap-2 text-sm font-semibold text-foreground mb-3">
           <Tag className="h-4 w-4 text-primary" /> Promo Code
         </div>
-        {appliedPromoCode ? (
+        {!currentUser ? (
+          <p className="text-sm text-muted-foreground">
+            Have a welcome, promo or partner code?{' '}
+            <Link to="/login" state={{ from: { pathname: '/checkout' } }} className="font-semibold text-primary hover:underline">Sign in</Link>
+            {' '}to apply it — codes are tied to an account. Your cart and details are kept.
+          </p>
+        ) : appliedPromoCode ? (
           <div className="flex items-center justify-between text-sm">
             <span className="font-mono tracking-widest">{appliedPromoCode}</span>
             <span className="text-green-600 font-semibold">
@@ -568,7 +715,13 @@ const CheckoutPage = () => {
 
         {marketplaceBlocked ? (
           <div className="mx-auto max-w-2xl">
-            <MarketplacePurchaseGate returnPath="/checkout" />
+            <MarketplacePurchaseGate
+              level={gateLevel}
+              thresholdAud={settings.marketplace_identity_threshold_aud}
+              returnPath="/checkout"
+              shopItemCount={directItem ? 0 : shopItemCount}
+              onCheckoutShopOnly={() => setShopOnly(true)}
+            />
           </div>
         ) : flatItems.length === 0 ? (
           <Card className="mx-auto max-w-lg border-border shadow-sm">
@@ -589,6 +742,12 @@ const CheckoutPage = () => {
           <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
             {/* ── Left: details ─────────────────────────────────────────── */}
             <div className="space-y-6">
+              {shopOnly && allCheckoutItems.length > checkoutItems.length && (
+                <p className="rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                  Paying for your shop items only. The marketplace card{allCheckoutItems.length - checkoutItems.length === 1 ? ' stays' : 's stay'} in your cart for after you sign in.{' '}
+                  <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setShopOnly(false)}>Include them</button>
+                </p>
+              )}
               {/* Details are locked while the payment form is up (see
                   paymentBody) — a disabled fieldset disables every input,
                   checkbox and select trigger inside it. */}
@@ -688,8 +847,12 @@ const CheckoutPage = () => {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <Button size="lg" className="w-full font-semibold" onClick={handleReviewAndPay}>
-                        Review &amp; Pay ${Number(total).toFixed(2)}
+                      <Button size="lg" className="w-full font-semibold" onClick={handleReviewAndPay} disabled={!pricingReady}>
+                        {pricingState === 'loading'
+                          ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Calculating your total…</>
+                          : pricingState === 'error'
+                            ? 'Fix your cart to continue'
+                            : <>Review &amp; Pay ${Number(total).toFixed(2)}</>}
                       </Button>
                       <p className="text-center text-xs text-muted-foreground">
                         You'll review your order before payment is taken. No charge until you confirm.

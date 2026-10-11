@@ -1,9 +1,9 @@
 # Social login (OAuth)
 
-CardPop lets people sign in / sign up with **Google**, **GitHub** and
+CardPop lets people sign in / sign up with **Google**, **Apple** and
 **Facebook** in addition to email + password. This doc explains how the flow
 works in the code and — the part that needs manual work — how to switch a
-provider on. It walks through **Facebook** end to end; Google and GitHub follow
+provider on. It walks through **Facebook** end to end; Google and Apple follow
 the identical Supabase pattern with a different developer console.
 
 ## How it works in the app (already built)
@@ -11,7 +11,7 @@ the identical Supabase pattern with a different developer console.
 There is no code to write to add a provider button — it's all wired already:
 
 - **`components/OAuthButtons.jsx`** renders one button per entry in its
-  `OAUTH_PROVIDERS` list (Google, GitHub, Facebook). A click calls
+  `OAUTH_PROVIDERS` list (Google, Apple, Facebook — GitHub was dropped: collectors don't have GitHub accounts, iPhone owners do have Apple IDs). A click calls
   `supabase.auth.signInWithOAuth({ provider, options: { redirectTo } })`, which
   redirects the browser to the provider.
 - The provider sends the user back to Supabase's callback
@@ -151,7 +151,7 @@ While the app is in **Development** mode, only people with a role on the app
 
 ---
 
-## Google / GitHub
+## Google / Apple
 
 Same Supabase steps (4–5), different console for steps 1–3:
 
@@ -159,9 +159,19 @@ Same Supabase steps (4–5), different console for steps 1–3:
   client ID (Web application). Authorised redirect URI is the same Supabase
   `/auth/v1/callback`. Paste client ID/secret into Supabase → Providers →
   Google.
-- **GitHub**: GitHub → Settings → Developer settings → OAuth Apps → New OAuth
-  App. "Authorization callback URL" is the same Supabase callback. Paste client
-  ID/secret into Supabase → Providers → GitHub.
+- **Apple** (needs a paid Apple Developer account, ~A$149/yr): Apple Developer
+  → Certificates, Identifiers & Profiles → Identifiers → **App ID** (enable
+  *Sign in with Apple*), then a **Services ID** (this is the OAuth client id;
+  enable Sign in with Apple, set the domain `vrfsaazuqjxotnieqlkd.supabase.co`
+  and the return URL to the same Supabase `/auth/v1/callback`), then a **Key**
+  with Sign in with Apple enabled (download the `.p8` once). In Supabase →
+  Providers → Apple paste the Services ID as the client id and generate the
+  **secret key (JWT)** from the Team ID, Key ID and `.p8` — Supabase's Apple
+  provider page has the generator. The Apple secret **expires every 6 months**
+  and must be regenerated, or the button starts failing with
+  `invalid_client`. Apple may return a private relay address
+  (`…@privaterelay.appleid.com`) — it works as an email, and the hardened
+  `handle_new_user()` copes with a missing name.
 
 ## Troubleshooting
 

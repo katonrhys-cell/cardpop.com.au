@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Star, ShieldCheck, UserCircle2 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/lib/supabaseClient.js';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 
 const FeaturedSellersCarousel = () => {
@@ -56,7 +56,7 @@ const FeaturedSellersCarousel = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-4 md:px-0">
         {[...Array(4)].map((_, i) => (
           <div key={i} className="bg-background rounded-2xl p-6 border border-border shadow-sm flex flex-col items-center">
-            <Skeleton className="w-24 h-24 rounded-2xl mb-5" />
+            <Skeleton className="w-16 h-16 rounded-full mb-5" />
             <Skeleton className="h-6 w-32 mb-3" />
             <Skeleton className="h-4 w-24 mb-6" />
             <Skeleton className="h-10 w-full rounded-xl" />
@@ -84,21 +84,7 @@ const FeaturedSellersCarousel = () => {
           className="group bg-background rounded-2xl p-6 border border-border shadow-sm flex flex-col items-center transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30"
         >
           <div className="relative mb-5">
-            <div className="w-24 h-24 rounded-2xl bg-muted overflow-hidden flex items-center justify-center border-2 border-background shadow-sm group-hover:border-primary/20 transition-colors">
-              {seller.avatar_url ? (
-                <img
-                  src={toCdnUrl(seller.avatar_url)}
-                  alt={seller.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                  width="96"
-                  height="96"
-                />
-              ) : (
-                <span className="text-3xl font-bold text-muted-foreground font-serif">
-                  {seller.name ? seller.name.charAt(0).toUpperCase() : 'U'}
-                </span>
-              )}
-            </div>
+            <ProfileAvatar profile={seller} size="lg" name={seller.name} className="shadow-sm" />
             {seller.verified && (
               <div className="absolute -bottom-2 -right-2 bg-background rounded-xl p-1 shadow-sm border border-border">
                 <ShieldCheck className="w-5 h-5 text-primary" />

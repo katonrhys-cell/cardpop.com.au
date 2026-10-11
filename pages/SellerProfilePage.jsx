@@ -12,7 +12,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import ProductCard from '@/components/ProductCard';
 import { Badge } from '@/components/ui/badge';
 import BackButton from '@/components/BackButton.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
 
 const SellerProfilePage = () => {
@@ -48,9 +48,7 @@ const SellerProfilePage = () => {
         if (cancelled) return;
         const mappedProducts = (items ?? []).map(c => {
           const imgPath = c.card_image || c.vault_images?.[0]?.storage_path || null;
-          const imgSrc = imgPath
-            ? (publicImageUrl(imgPath))
-            : null;
+          const imgSrc = cardThumbUrl(imgPath);
           return {
           id: c.id,
           source: 'vault',

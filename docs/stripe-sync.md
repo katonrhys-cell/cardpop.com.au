@@ -25,3 +25,16 @@ This is purely for read-only reporting/reconciliation against live Stripe data. 
 - `profiles.stripe_customer_id` — still the link between a CardPop user and their Stripe Customer.
 
 There is no application code reading from the `stripe` schema yet.
+
+## Worker cadence
+
+The integration schedules a pg_cron job, `stripe-sync-worker`, to drain its
+queue into the `stripe.*` tables. It ships at **every minute** — 1,440 wake-ups
+a day, the most frequent recurring query on the database by count — for a
+mirror nothing in the app reads. `20261010022330_stripe_sync_worker_cadence.sql`
+sets it to **every 5 minutes**, which is fresh enough for reporting. That
+migration touches only the job's schedule, never the schema (which stays the
+integration's); it is a no-op on a project without pg_cron or without the job.
+If the integration is re-enabled or upgraded and recreates the job at one
+minute, re-run that migration's `cron.alter_job` (through a new repo
+migration, never the SQL editor) rather than editing the job by hand.

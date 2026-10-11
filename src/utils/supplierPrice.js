@@ -7,8 +7,8 @@
 // Temu, for one, renders prices client-side — does the page text go to Claude,
 // and only if ANTHROPIC_API_KEY is set. A page that yields nothing is reported
 // as unreadable rather than guessed at.
-import Anthropic from '@anthropic-ai/sdk';
 import { extractTextFromHtml } from './safeFetch.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import { normaliseSupplierUrl } from '../../utils/supplierUrl.js';
 
 const MODEL = 'claude-opus-5-5';
@@ -128,8 +128,19 @@ const PRICE_SCHEMA = {
 };
 
 let cachedClient = null;
-function anthropic() {
-  cachedClient ||= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Imported on first use: routes/admin.js and routes/shop-supplier-watch.js
+// reach this file on every cold start, and most pages never read a supplier
+// price. The call runs inside the 40 s api/index.js function under the watch's
+// 25 s budget, so it gets 20 s and one retry.
+async function anthropic() {
+  if (!cachedClient) {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    cachedClient = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: OUTBOUND_TIMEOUT_MS.anthropicShort,
+      maxRetries: 1,
+    });
+  }
   return cachedClient;
 }
 
@@ -138,7 +149,7 @@ export async function extractPriceWithModel(html, pageUrl) {
   const text = extractTextFromHtml(html, { maxLength: MAX_MODEL_TEXT });
   if (!text.trim()) return { price: null, currency: null, reason: 'The page has no readable text (it may need a browser to load).' };
 
-  const message = await anthropic().beta.messages.create({
+  const message = await (await anthropic()).beta.messages.create({
     model: MODEL,
     max_tokens: 2000,
     betas: ['server-side-fallback-2026-07-01'],

@@ -16,13 +16,16 @@ them with the shipped anon key. So they are granted service-side.
 | Admin panel access | `is_admin` | `ProtectedAdminRoute` + `isAdminUser` (backend). `trg_sync_admin_app_metadata` mirrors it into the JWT |
 | ID verified | `is_verified`, `verification_status` | `private.can_sell()`, plus the verified badge in the UI |
 | Can list | `has_saved_card` | `private.can_sell()` → RESTRICTIVE policy `listings_require_selling_entitlement` on `listings` |
-| Premium membership | `subscription_tier='premium'`, `subscription_status='grandfathered'` | `config/plans.js` (`hasStorefront`, `canListWhatnotShows`), `enforce_monthly_listing_quota` trigger |
+| Ultimate membership | `subscription_tier='ultimate'`, `subscription_status='grandfathered'` | `config/plans.js` (`hasStorefront`, `canListWhatnotShows`), `enforce_monthly_listing_quota` trigger |
 | Dealer store renders | `is_sole_trader`, `store_slug`, `is_public` | `SoleTraderStorePage` refuses to render without all three |
 | Email confirmed | `auth.users.email_confirmed_at` | `email_verification_ok()` → RESTRICTIVE policy `listings_require_email_verified` |
 
-Why **Premium** and not Pro: the branded storefront starts at Pro, but Whatnot
-show listings, the homepage Featured Cards spots and priority placement in the
-Local Traders directory all start at Premium (`config/plans.js`).
+Why **Ultimate**: it was first provisioned at Premium (the tier where Whatnot
+show listings, the homepage Featured Cards spots and priority Local Traders
+placement start), and later raised to the top tier by
+`20261004064733_grant_admin_accounts_ultimate_membership.sql` so the
+platform's own accounts hold every perk (unlimited listings, every display
+style) at no cost.
 
 Why `subscription_status = 'grandfathered'`: it is the status
 `config/subscription.js` treats as entitled with no Stripe/PayPal subscription
@@ -84,11 +87,12 @@ fine, but proceeds accumulate in the seller wallet instead of paying out — see
   address (`docs/email.md`). Password resets, Supabase Auth mail and buyer
   replies all land there. The script pre-confirms the email so provisioning
   doesn't depend on the mailbox, but recovery does.
-- **Don't subscribe from this account.** If it ever completes a real
-  subscription checkout, `applyStripeSubscription` / `applyPaypalSubscription`
-  overwrite `subscription_tier` and `subscription_status` with the purchased
-  subscription's state, dropping the complimentary Premium grant. (The migration
-  restores it on the next `db push`.)
+- **Don't subscribe from this account.** There is nothing to buy — it already
+  holds the top tier. `applyStripeSubscription` / `applyPaypalSubscription`
+  skip any profile whose `subscription_status` is `grandfathered`
+  (`COMPLIMENTARY_STATUS` in `src/services/subscriptionService.js`), so a stray
+  provider event can't downgrade the grant; a real checkout would just bill a
+  subscription the profile ignores.
 - **It is a shared admin credential.** It has the full admin panel: user data,
   refunds, listings moderation. Prefer a long random password in a password
   manager over a memorable one, and turn on MFA (Account → Security) once you're

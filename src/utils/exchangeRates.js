@@ -1,5 +1,6 @@
 import logger from './logger.js';
 import { sharedCacheGet, sharedCacheSet } from './sharedCache.js';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 const FX_CACHE_KEY = 'fx:usd_aud';
 
@@ -47,6 +48,7 @@ async function getUsdToAudRate() {
       headers: {
         'User-Agent': 'CardPopBot/1.0',
       },
+      signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.exchangeRate),
     });
 
     if (!response.ok) {

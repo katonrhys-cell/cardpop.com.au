@@ -1,0 +1,90 @@
+name: Merchant listings check
+
+# Weekly live check that every schema.org Product on the public site carries a
+# global identifier (brand / gtin / mpn).
+#
+# Why this exists: on 2026-10-05 Search Console emailed "No global identifier
+# provided (e.g., gtin, brand)" for the site's Merchant listings. The brand and
+# barcode columns existed in the database the whole time — the markup simply
+# never read them, and nothing noticed until Google did. The unit-test guard
+# (tests/backend/productMarkupIdentifiers.test.js) now stops a Product node
+# being written without the identifier helper; this catches what a unit test
+# can't — live data: a card listed with no franchise or card number, a shop
+# row saved with a malformed barcode, a prerender embed that stopped returning
+# its brand. It samples the sitemap the way Googlebot sees it and files one
+# tracking issue when a page comes back identifier-less, so the next signal is
+# an issue in this repo rather than another Search Console email.
+#
+# Dependency-free script: no npm ci, so a run costs about a metered minute.
+
+on:
+  schedule:
+    # 20:33 UTC Monday (06:33 AEST Tuesday) — after the weekend's listings.
+    - cron: '33 20 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: merchant-listings-check
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+
+      - name: Check live Product markup for identifiers
+        id: check
+        run: node scripts/check-merchant-listings.mjs --sample 10
+
+      - name: File a tracking issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILURES: ${{ steps.check.outputs.failures }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Product pages are missing Merchant listings identifiers"
+
+          # One open issue is the signal — don't comment on every weekly re-run.
+          existing=$(gh issue list --state open --search "\"$title\" in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing is already open — leaving it alone."
+            exit 0
+          fi
+
+          {
+            echo 'The weekly live check found schema.org Product markup with no global'
+            echo 'identifier (brand / gtin / mpn), which Google Search Console reports as'
+            echo '"No global identifier provided (e.g., gtin, brand)" under Merchant listings.'
+            echo
+            if [ -n "$FAILURES" ]; then
+              echo 'Pages with problems:'
+              echo
+              printf '%s\n' "$FAILURES"
+            else
+              echo 'The check could not report which pages — see the run log.'
+            fi
+            echo
+            echo "Failing run: $RUN_URL"
+            echo
+            echo 'How identifiers are built: `utils/productIdentifiers.js` (see'
+            echo '`docs/seo-analytics.md` → Merchant listings identifiers). Shop products'
+            echo 'need a SKU (always present) and ideally a brand + barcode in Admin →'
+            echo 'Products; single cards need a franchise/collection and a card number on'
+            echo 'the vault item. Fix the data or the page, re-run **Merchant listings'
+            echo 'check**, and close this issue once it passes.'
+          } > issue-body.md
+
+          gh issue create --title "$title" --body-file issue-body.md

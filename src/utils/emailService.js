@@ -20,6 +20,13 @@ import {
   offerUpdateEmail,
   shopEnquiryEmail,
   orderShippedEmail,
+  orderDeliveredEmail,
+  abandonedCheckoutEmail,
+  watchlistPriceDropEmail,
+  watchlistSoldEmail,
+  savedSearchMatchesEmail,
+  backInStockEmail,
+  welcomeOfferReminderEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -154,11 +161,11 @@ export async function sendRefundProcessed({ buyerEmail, buyerName, refundAmount,
  *
  * @returns {Promise<boolean>} whether the email was actually sent
  */
-export async function sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber }) {
+export async function sendOrderShipped({ buyerEmail, buyerName, orderRef, items, carrier, trackingNumber, invitesReview = false }) {
   return send({
     to: buyerEmail,
     subject: `Your CardPop order ${orderRef} has shipped`,
-    html: orderShippedEmail({ buyerName, orderRef, items, carrier, trackingNumber }),
+    html: orderShippedEmail({ buyerName, orderRef, items, carrier, trackingNumber, invitesReview }),
   });
 }
 
@@ -278,4 +285,45 @@ export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail
     subject: `Identity verification needs review: ${userName || 'A user'}`,
     html: identityReviewNeededEmail({ userId, userName, userEmail }),
   });
+}
+
+/**
+ * Tells the buyer their parcel arrived, starts the Buyer Protection clock in
+ * writing and asks for a seller rating.
+ *
+ * @returns {Promise<boolean>} whether the email was actually sent
+ */
+export async function sendOrderDelivered({ buyerEmail, buyerName, orderRef, items, source, sellerName, marketplace = true, claimDays }) {
+  return send({
+    to: buyerEmail,
+    subject: `Your CardPop order ${orderRef} was delivered`,
+    html: orderDeliveredEmail({ buyerName, orderRef, items, source, sellerName, marketplace, claimDays }),
+  });
+}
+
+// ─── Retention (src/services/retentionSweepService.js) ───────────────────────
+// Each returns whether the provider accepted the message.
+
+export async function sendAbandonedCheckout({ to, name, items, restoreUrl }) {
+  return send({ to, subject: 'Your CardPop cart is waiting', html: abandonedCheckoutEmail({ name, items, restoreUrl }) });
+}
+
+export async function sendWatchlistPriceDrop({ to, name, cardName, setName, from, to: toPrice, pct, url }) {
+  return send({ to, subject: `Price drop: ${cardName} is now $${Number(toPrice).toFixed(2)}`, html: watchlistPriceDropEmail({ name, cardName, setName, from, to: toPrice, pct, url }) });
+}
+
+export async function sendWatchlistSold({ to, name, cardName, setName, searchUrl }) {
+  return send({ to, subject: `${cardName} on your watchlist has sold`, html: watchlistSoldEmail({ name, cardName, setName, searchUrl }) });
+}
+
+export async function sendSavedSearchMatches({ to, name, searchName, searchUrl, matches }) {
+  return send({ to, subject: `New cards match “${searchName}”`, html: savedSearchMatchesEmail({ name, searchName, searchUrl, matches }) });
+}
+
+export async function sendBackInStock({ to, productTitle, priceAud, url }) {
+  return send({ to, subject: `${productTitle} is back in stock`, html: backInStockEmail({ productTitle, priceAud, url }) });
+}
+
+export async function sendWelcomeOfferReminder({ to, name, code, discountPct, expiresAt }) {
+  return send({ to, subject: `Your ${Number(discountPct)}% welcome code expires soon`, html: welcomeOfferReminderEmail({ name, code, discountPct, expiresAt }) });
 }

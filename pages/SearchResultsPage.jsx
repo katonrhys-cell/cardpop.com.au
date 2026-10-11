@@ -1,9 +1,12 @@
+import { Button } from '@/components/ui/button';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, ImageOff } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { sanitizeSearch, tokenizeSearch, rankItems } from '@/utils/searchRanking.js';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
@@ -58,7 +61,7 @@ async function searchListings(tokens) {
   const { data, error } = await applyTokens(
     supabase
       .from('listings')
-      .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+      .select(`${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`)
       // Sold cards stay in the results, badged "Sold" by MarketplaceListingCard
       // — a card that sold is still the card someone searched for. Only
       // 'archived' is genuinely off the site.
@@ -78,7 +81,7 @@ async function searchListings(tokens) {
 
 async function searchShop(tokens) {
   const { data, error } = await applyTokens(
-    supabase.from('shop_products').select('*').in('status', PUBLIC_SHOP_STATUSES),
+    supabase.from('shop_products').select(SHOP_CARD_COLUMNS).in('status', PUBLIC_SHOP_STATUSES),
     tokens, ['title'],
   ).limit(OVER_FETCH);
   if (error) throw error;
@@ -96,7 +99,7 @@ async function searchShop(tokens) {
 
 async function searchSellers(tokens) {
   const { data, error } = await applyTokens(
-    supabase.from('profiles').select(PUBLIC_PROFILE_COLUMNS),
+    supabase.from('profiles').select(PROFILE_CARD_COLUMNS),
     tokens, ['display_name', 'username', 'business_name'],
   ).limit(OVER_FETCH);
   if (error) throw error;
@@ -323,6 +326,29 @@ const SearchResultsPage = () => {
               Did you mean “{didYouMean}”?
             </button>
           )}
+          {/* Never a dead end: the two buying surfaces, plus the searches that
+              usually land. */}
+          <div className="mt-8 flex flex-col sm:flex-row gap-3">
+            <Button asChild className="rounded-xl font-bold">
+              <Link to={query ? `/marketplace?q=${encodeURIComponent(query)}` : '/marketplace'}>Browse all cards</Link>
+            </Button>
+            <Button asChild variant="outline" className="rounded-xl font-bold">
+              <Link to="/shop">Shop supplies</Link>
+            </Button>
+          </div>
+          <div className="mt-6 flex flex-wrap justify-center gap-2">
+            <span className="w-full text-xs font-semibold uppercase tracking-wider text-muted-foreground">Popular right now</span>
+            {['Charizard', 'Pikachu', 'Umbreon', 'Black Lotus', 'Luka Dončić', 'Prizm'].map((term) => (
+              <button
+                key={term}
+                type="button"
+                onClick={() => setSearchParams({ q: term })}
+                className="rounded-full border border-border bg-background px-3 py-1.5 text-sm font-medium hover:border-primary/50 hover:text-primary"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <>

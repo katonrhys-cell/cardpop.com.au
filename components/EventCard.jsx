@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData }) => {
   const eventTitle = event.title || event.name;
@@ -13,7 +14,9 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData }) => {
   const formattedTime = formatEventTime(event);
   const formattedLocation = formatEventLocation(event);
 
-  const rawImageUrl = event.image_url || event.image || null;
+  // Posters are stored as canonical Supabase URLs; route them through the
+  // image CDN like every other stored image instead of billing Supabase egress.
+  const rawImageUrl = publicImageUrl(event.image_url || event.image || null);
   const [imgError, setImgError] = useState(false);
 
   return (

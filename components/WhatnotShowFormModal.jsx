@@ -5,12 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { Loader2, ImageIcon, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import { publicImageUrl, toCdnUrl } from '@/utils/imageUrl.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { toast } from 'sonner';
 
 const EMPTY_FORM = {
@@ -183,11 +183,6 @@ const WhatnotShowFormModal = ({ isOpen, onClose, show = null, onSaved }) => {
     }
   }, [form, imageFile, existingImage, isEditing, show?.id, ownerId, onSaved, onClose]);
 
-  const avatarSrc = (() => {
-    const raw = userProfile?.avatar_url || userProfile?.profile_photo_or_character;
-    return raw ? publicImageUrl(raw) : null;
-  })();
-
   const previewSrc = imagePreview || (existingImage ? toCdnUrl(existingImage) : null);
 
   return (
@@ -207,12 +202,11 @@ const WhatnotShowFormModal = ({ isOpen, onClose, show = null, onSaved }) => {
           {/* Listing-as profile card */}
           {userProfile && (
             <div className="bg-muted/40 border border-border rounded-xl p-4 flex items-center gap-3">
-              <Avatar className="h-10 w-10 flex-shrink-0">
-                <AvatarImage src={avatarSrc} />
-                <AvatarFallback className="text-sm font-bold">
-                  {(userProfile.display_name || userProfile.username || 'S').charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <ProfileAvatar
+                profile={userProfile}
+                size="sm"
+                name={userProfile.display_name || userProfile.username || 'S'}
+              />
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground mb-0.5">Listing as</p>
                 <p className="font-bold text-sm leading-tight truncate">

@@ -26,9 +26,9 @@ never reported as a "change" from the old page's price.
 
 ## The weekly check
 
-`.github/workflows/cron-supplier-price-watch.yml` runs daily at 20:17 UTC
-(06:17 AEST) and calls `GET /api/shop-supplier-watch/run` with the
-`CRON_SECRET` bearer (fail-closed). Each run checks only products whose last
+The daily maintenance run (`.github/workflows/cron-daily.yml`, 19:23 UTC =
+05:23 AEST, see `docs/scheduled-jobs.md`) calls `GET /api/shop-supplier-watch/run`
+with the `CRON_SECRET` bearer (fail-closed). Each run checks only products whose last
 check is **7 or more days** old, so each product is checked once a week, a week
 after its own last check. Products that share one page (the colours of one
 Temu listing) are fetched once per run. Archived products are skipped. A run

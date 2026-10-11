@@ -39,7 +39,7 @@ const AdminPageHeader = ({
             {subtitle && <p className="text-white/60 text-sm">{subtitle}</p>}
           </div>
           {children && (
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap min-w-0 max-w-full">
               {children}
             </div>
           )}

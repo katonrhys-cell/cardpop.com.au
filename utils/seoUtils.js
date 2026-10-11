@@ -1,3 +1,6 @@
+import { isGtin } from './productReviews.js';
+import { cardIdentifiersLd, cardMpn, shopProductIdentifiersLd } from './productIdentifiers.js';
+
 export const generateMetaTitle = (category, subcategory = null, productType = null, itemName = null) => {
   const baseName = "CardPop";
   if (itemName) {
@@ -27,6 +30,9 @@ export const generateMetaDescription = (category, itemCount = 0, priceRange = nu
   return desc;
 };
 
+// Google rejects a Product unless it has offers, review or aggregateRating.
+export const isEligibleProductLd = (ld) => Boolean(ld && (ld.offers || ld.aggregateRating || ld.review));
+
 export const generateStructuredData = (product, categoryPath = null) => {
   if (!product) return null;
 
@@ -36,7 +42,8 @@ export const generateStructuredData = (product, categoryPath = null) => {
     "name": product.title || product.cardName || product.name,
     "image": product.images ? product.images.map(i => i.url) : [],
     "description": product.description || `Buy ${product.title || product.cardName} securely.`,
-    "sku": product.sku || product.id,
+    // brand / sku / mpn / gtin — utils/productIdentifiers.js.
+    ...shopProductIdentifiersLd({ brand: product.brand, sku: product.sku || product.id, barcode: product.barcode || product.gtin }),
     "offers": {
       "@type": "Offer",
       "url": typeof window !== 'undefined' ? window.location.href : '',
@@ -163,18 +170,21 @@ export const mapItemCondition = (c) => {
   return 'https://schema.org/UsedCondition';
 };
 
-// Build a schema.org Product (with a nested Offer when a price is known).
+// Build a schema.org Product with a nested Offer. Returns null when there is
+// no price: Google rejects a Product with no offers/review/aggregateRating.
 export const generateProductSchema = ({
   name, image, description, url, price, currency = 'AUD',
   condition, availability = 'InStock', sellerName, brand, category,
   cardNumber, setName, sku, identifier,
 } = {}) => {
-  if (!name) return null;
+  if (!name || !(price > 0)) return null;
 
   const images = (Array.isArray(image) ? image : [image]).filter(Boolean);
 
-  // Build identifier: prefer explicit identifier, fall back to card number or set+card combo
-  const gtin = identifier || (cardNumber && setName ? `${setName}-${cardNumber}` : cardNumber) || undefined;
+  // Google only accepts a real GTIN (8/12/13/14 digits) under `gtin`; a
+  // set + card number is the card's manufacturer part number instead.
+  const gtin = isGtin(identifier) ? String(identifier).trim() : undefined;
+  const mpn = cardMpn({ setName, cardNumber }) || (identifier && !gtin ? String(identifier).trim() : undefined);
 
   const data = {
     '@context': 'https://schema.org',
@@ -183,8 +193,9 @@ export const generateProductSchema = ({
     ...(images.length ? { image: images } : {}),
     ...(description ? { description } : {}),
     ...(category ? { category } : {}),
-    ...(brand ? { brand: { '@type': 'Brand', name: brand } } : {}),
+    ...cardIdentifiersLd({ brand, setName, cardNumber }),
     ...(gtin ? { gtin } : {}),
+    ...(mpn ? { mpn } : {}),
     ...(sku ? { sku } : {}),
   };
 

@@ -1,27 +1,37 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { getPlatformSetting } from '../services/commissionService.js';
+import {
+  DEFAULT_MARKETPLACE_IDENTITY_THRESHOLD_AUD,
+  identityRequiredForAmount,
+} from '../../utils/marketplaceIdentity.js';
 
 // Buy-side identity gate for the MARKETPLACE (peer-to-peer `listing` items).
 //
-// Buying a marketplace listing requires the buyer to have completed Stripe
-// Identity verification (`profiles.is_verified`). CardPop Shop (`shop`) items
-// are platform retail and stay open to guest checkout, so a cart with no
-// listing items — a shop-only order — passes straight through untouched.
+// Buying a marketplace listing requires a signed-in buyer, and — once the
+// marketplace items in the order reach the `marketplace_identity_threshold_aud`
+// platform setting (default $500; 0 = every order) — Stripe Identity
+// verification (`profiles.is_verified`). CardPop Shop (`shop`) items are
+// platform retail and stay open to guest checkout, so a cart with no listing
+// items — a shop-only order — passes straight through untouched.
+//
+// The threshold keeps the ID + selfie step for the orders where a fraudulent
+// buyer or chargeback actually hurts, instead of putting it in front of every
+// $20 card. The same rule drives the checkout UI (utils/marketplaceIdentity.js)
+// so the buyer is told before they reach the till, not by this 403.
+//
+// It does NOT require a card on file: a buyer pays at checkout, so there is no
+// deferred fee to collect (that requirement is sell/trade-only).
 //
 // Listings sold by the Official CardPop Store (seller `is_admin`, see
 // lib/sellerIdentity.js) are platform stock too, so they get the same open
 // checkout as the Shop: anyone, guests included, can buy them at the Buy Now
 // price. The exemption is decided here from the DB — never from the client —
 // and only when EVERY listing in the order is official; one peer-to-peer
-// listing gates the whole order exactly as before. If the seller lookup
-// fails, the order falls through to the normal identity gate (fail closed
-// for the exemption). Exempt orders are marked `req.officialStoreOrder` so the
-// checkout handlers also skip the new-buyer purchase limits for them.
-//
-// This mirrors, on the buy side, the identity requirement the trade/sell paths
-// already enforce (verifyTradeAccess / DB can_sell()). It does NOT require a
-// card on file: a buyer pays at checkout, so there is no deferred fee to
-// collect (that requirement is sell/trade-only).
+// listing gates the whole order exactly as below. If the seller lookup fails,
+// the order falls through to the normal gate (fail closed for the exemption).
+// Exempt orders are marked `req.officialStoreOrder` so the checkout handlers
+// also skip the new-buyer purchase limits for them.
 //
 // Must run AFTER optionalAuthMiddleware (needs req.user when present). Detects a
 // marketplace purchase from either request shape:
@@ -29,17 +39,29 @@ import logger from '../utils/logger.js';
 //   - /create-checkout      → req.body.listingId (single listing, always P2P)
 //
 // Outcomes for a marketplace purchase:
-//   - no account             → 401 IDENTITY_REQUIRED (sign in + verify to buy)
-//   - account, unverified ID → 403 IDENTITY_NOT_VERIFIED
-//   - only official-store listings → passes, signed in or not
+//   - no account                          → 401 IDENTITY_REQUIRED (sign in to buy)
+//   - account, under threshold            → pass
+//   - account, at/over threshold, no ID   → 403 IDENTITY_NOT_VERIFIED
+//   - only official-store listings        → pass, signed in or not
 // Fails OPEN on an unexpected error so a transient DB blip never blocks an
 // otherwise-legitimate, authenticated buyer at the till.
+
+/** AUD value of the marketplace listings in the request, priced from the DB. */
+async function marketplaceValueAud(items, listingId) {
+  const ids = new Set();
+  for (const it of items) if (it && it.type === 'listing' && typeof it.id === 'string') ids.add(it.id);
+  if (typeof listingId === 'string' && listingId) ids.add(listingId);
+  if (ids.size === 0) return 0;
+  const { data, error } = await supabase.from('listings').select('id, price_aud').in('id', [...ids]);
+  if (error) throw error;
+  return (data || []).reduce((sum, row) => sum + (Number(row.price_aud) || 0), 0);
+}
+
 export async function requireIdentityForMarketplacePurchase(req, res, next) {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
-    const hasMarketplaceItem =
-      items.some((it) => it && it.type === 'listing') ||
-      (typeof req.body?.listingId === 'string' && req.body.listingId.length > 0);
+    const listingId = typeof req.body?.listingId === 'string' && req.body.listingId.length > 0 ? req.body.listingId : null;
+    const hasMarketplaceItem = items.some((it) => it && it.type === 'listing') || !!listingId;
 
     // Shop-only (or empty) order — no marketplace listing to gate.
     if (!hasMarketplaceItem) return next();
@@ -53,10 +75,22 @@ export async function requireIdentityForMarketplacePurchase(req, res, next) {
 
     if (!req.user) {
       return res.status(401).json({
-        error: 'Sign in and verify your identity to buy marketplace items.',
+        error: 'Sign in to buy marketplace items — a free account takes a minute.',
         code: 'IDENTITY_REQUIRED',
       });
     }
+
+    // Under the threshold a signed-in, email-verified buyer is enough. A
+    // pricing read error falls through to the ID check (never cheaper than
+    // the old rule), and the ID check itself fails open below.
+    let value = null;
+    try {
+      value = await marketplaceValueAud(items, listingId);
+    } catch (priceErr) {
+      logger.error(`[IDENTITY_GATE] listing price read failed for ${req.user.id}: ${priceErr.message}`);
+    }
+    const threshold = await getPlatformSetting('marketplace_identity_threshold_aud', DEFAULT_MARKETPLACE_IDENTITY_THRESHOLD_AUD);
+    if (value !== null && !identityRequiredForAmount(value, threshold)) return next();
 
     const { data: profile, error } = await supabase
       .from('profiles')
@@ -73,11 +107,12 @@ export async function requireIdentityForMarketplacePurchase(req, res, next) {
 
     if (profile?.is_verified === true) return next();
 
-    logger.warn(`[IDENTITY_GATE] ID-unverified user ${req.user.id} blocked from a marketplace purchase`);
+    logger.warn(`[IDENTITY_GATE] ID-unverified user ${req.user.id} blocked from a $${value ?? '?'} marketplace purchase (threshold $${threshold})`);
     return res.status(403).json({
-      error: 'Verify your identity before buying marketplace items.',
+      error: 'Verify your identity before buying marketplace items of this value.',
       code: 'IDENTITY_NOT_VERIFIED',
-      message: 'A quick ID + selfie check via Stripe is required before buying on the marketplace.',
+      message: 'A quick ID + selfie check via Stripe is required for marketplace orders at or above the identity threshold.',
+      thresholdAud: Number(threshold),
     });
   } catch (err) {
     logger.error(`[IDENTITY_GATE] failed open: ${err.message}`);

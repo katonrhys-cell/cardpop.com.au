@@ -9,6 +9,7 @@
 import { validateListingForm } from '../../utils/listingValidation.js';
 import { canUseStyle, normalizeStyle, normalizeTier } from '../../lib/displayStyles.js';
 import { FOIL_VARIANT, ROOKIE_VARIANT } from '../../lib/cardVariants.js';
+import { hasVideoExtension } from '../../utils/cardVideo.js';
 
 // Listing types a buyer can see. Anything else (the form's 'private', legacy
 // casings, garbage) is stored as the canonical 'Private'.
@@ -87,6 +88,10 @@ const WRITABLE = {
   cardsight_set_id: str,
   card_image: str,
   card_images: (v) => (Array.isArray(v) ? v.map(str).filter(Boolean) : null),
+  // One optional <=10s video. Omitted on an edit = keep the stored one; an
+  // explicit null removes it. (Duration is enforced in the form — storage
+  // can't inspect it — and size/type by the bucket's limits.)
+  card_video: str,
 };
 
 // Storage object paths the form writes are `<ownerId>/<timestamped name>`.
@@ -117,6 +122,11 @@ export const buildVaultItemRow = (raw, { userId, tier, isEdit }) => {
   const pathErrors = [];
   if (row.card_image != null && !ownsStoragePath(row.card_image, userId)) {
     pathErrors.push('card_image must be a storage path inside your own folder');
+  }
+  if (row.card_video != null &&
+      (!ownsStoragePath(row.card_video, userId) || !hasVideoExtension(row.card_video))) {
+    pathErrors.push('card_video must be a video storage path inside your own folder');
+    delete row.card_video;
   }
   if (row.card_images != null) {
     row.card_images = row.card_images.filter((p) => {
@@ -226,5 +236,16 @@ export const validateVaultItemRow = (row, { pricing = {}, isEdit = false, existi
     hasImage: !!(row.card_image || existing?.card_image),
     requireImage: true,
   };
-  return validateListingForm(formShape, ctx);
+  const errors = validateListingForm(formShape, ctx);
+  // The EOI offer window arrives as timestamps (the browser converts the
+  // seller's local dates), so it is checked here rather than by the form
+  // rules, which work on the date inputs.
+  if (row.listing_type === 'Expression of Interest') {
+    const open = pricing.offersOpenAt ? new Date(pricing.offersOpenAt) : null;
+    const close = pricing.offersCloseAt ? new Date(pricing.offersCloseAt) : null;
+    if (open && Number.isNaN(open.getTime())) errors.offerOpenDate = 'Enter a valid opening date';
+    if (close && Number.isNaN(close.getTime())) errors.offerCloseDate = 'Enter a valid closing date';
+    else if (open && close && close <= open) errors.offerCloseDate = 'The closing date must be on or after the opening date';
+  }
+  return errors;
 };

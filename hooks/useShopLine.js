@@ -41,7 +41,7 @@ export default function useShopLine({ slug, sku, enabled = true }) {
       (async () => {
         const run = (extra) => supabase
           .from('shop_products')
-          .select(`id, title, price_aud, retail_price_aud, stock_quantity, status${extra}, ${VARIANTS_SELECT}`)
+          .select(`id, title, barcode, price_aud, retail_price_aud, stock_quantity, status${extra}, ${VARIANTS_SELECT}`)
           .eq('slug', slug)
           .maybeSingle();
         let { data, error } = await run(', preorder_eta');

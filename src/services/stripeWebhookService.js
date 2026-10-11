@@ -1,6 +1,6 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { sendOrderConfirmed, sendItemSold, sendOrderAdminNotice } from '../utils/emailService.js';
+import { sendOrderConfirmed, sendItemSold, sendOrderAdminNotice, sendRefundProcessed } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import { payoutSeller } from './payoutService.js';
 import { markWelcomeDiscountRedeemed, releaseWelcomeDiscount } from './welcomeOfferService.js';
@@ -11,6 +11,7 @@ import { subscribeToNewsletter } from '../utils/newsletter.js';
 import { namesMatch } from './identityService.js';
 import { insertWithOptionalColumns } from '../utils/insertWithOptionalColumns.js';
 import { isCardCountryAllowed, allowedCardCountries } from '../utils/cardCountryPolicy.js';
+import { getPlatformSetting } from '../utils/platformSettings.js';
 
 /**
  * Informational cross-check: does the name the buyer typed at Stripe Checkout
@@ -68,14 +69,9 @@ async function resolvePaymentMethod(stripe, paymentIntentId) {
   }
 }
 
-async function getPlatformSetting(key, defaultValue) {
-  const { data } = await supabase
-    .from('platform_settings')
-    .select('value')
-    .eq('key', key)
-    .maybeSingle();
-  return data?.value !== undefined ? data.value : defaultValue;
-}
+// getPlatformSetting now lives in src/utils/platformSettings.js (cached per
+// instance for a short window) and is re-exported below so the many callers
+// that import it from here keep working.
 
 // Email every admin account about a confirmed order, and drop an in-app
 // notification in each admin's bell so a new order shows up without anyone
@@ -192,6 +188,18 @@ async function flagForeignCard({ stripe, session, orderId, buyerId, cardCountry 
         type: 'order_refund_pending',
         title: 'Refund on the way',
         body: 'CardPop currently sells to buyers in Australia only, so your payment is being refunded in full — no action needed.',
+      });
+    }
+    // Guests have no notification bell, and a signed-in buyer may not open
+    // theirs — the email is the only certain way they learn the order was
+    // refused rather than shipped. Stripe already has the payer's address.
+    const buyerEmail = session.customer_details?.email;
+    if (buyerEmail) {
+      await sendRefundProcessed({
+        buyerEmail,
+        buyerName: session.customer_details?.name || 'there',
+        refundAmount: (session.amount_total || 0) / 100,
+        orderId: orderId || session.id,
       });
     }
   } catch (e) {
@@ -952,10 +960,10 @@ async function handleSingleItemOrder(session, stripe) {
   if (!cardName && listingId) {
     const { data: listing } = await supabase
       .from('listings')
-      .select('title, vault_item:vault_items!vault_item_id(card_name)')
+      .select('vault_item:vault_items!vault_item_id(card_name)')
       .eq('id', listingId)
       .maybeSingle();
-    cardName = listing?.vault_item?.card_name || listing?.title || 'Trading Card';
+    cardName = listing?.vault_item?.card_name || 'Trading Card';
   }
 
   const { data: newOrder } = await supabase

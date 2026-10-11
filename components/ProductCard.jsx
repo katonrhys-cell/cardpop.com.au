@@ -11,7 +11,8 @@ import CardMicroscope from '@/components/CardMicroscope.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
-import { getCardImage, CARD_GRID_SIZES, toCdnUrl } from '@/utils/imageUrl.js';
+import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
@@ -278,13 +279,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
               to={`/seller/${sellerId}`} 
               className="flex items-center gap-2 group/seller p-2 -mx-2 rounded-xl hover:bg-muted/50 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0 overflow-hidden">
-                {sellerObj?.profile_photo_or_character ? (
-                  <img src={toCdnUrl(sellerObj.profile_photo_or_character)} alt={sellerObj.display_name || 'Seller'} className="w-full h-full object-cover" width="32" height="32" decoding="async" />
-                ) : (
-                  (sellerObj?.display_name || sellerObj?.name || 'S')[0].toUpperCase()
-                )}
-              </div>
+              <ProfileAvatar profile={sellerObj} name="Seller" />
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-foreground truncate group-hover/seller:text-primary transition-colors">
@@ -308,4 +303,8 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   );
 };
 
-export default ProductCard;
+// Memoised for the same reason as MarketplaceListingCard: the shop grids
+// re-render as a whole on every state change while each `product` row is
+// stable. Pages that pass an inline `onAddToCart` arrow still re-render their
+// cards (a new function each time); the ones that hoist it benefit fully.
+export default React.memo(ProductCard);

@@ -4,7 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ArrowLeft, Save, Upload, Image as ImageIcon, ChevronRight, ChevronDown, Sparkles, Loader2,
   Lock, Unlock, ShoppingCart, ArrowRightLeft, Layers, Award, Star, Shield, TrendingUp, Plus, X, Crop,
-  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera, ScanLine, Truck,
+  Frame, Wand2, SlidersHorizontal, HandCoins, History, Camera, ScanLine, Truck, Video,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { listingsPerMonthForTier } from '@/config/plans.js';
@@ -50,7 +50,11 @@ import CardScanOverlay from '@/components/CardScanOverlay.jsx';
 import { warpCardWithCorners } from '@/utils/detectCard.js';
 import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { normalizeTier } from '@/lib/displayStyles.js';
-import { publicImageUrl, thumbStoragePath } from '@/utils/imageUrl.js';
+import { publicImageUrl, publicVideoUrl, thumbStoragePath } from '@/utils/imageUrl.js';
+import {
+  CARD_VIDEO_ACCEPT, CARD_VIDEO_MAX_SECONDS, videoFileError, videoDurationError,
+  readVideoDuration, captureVideoPoster, videoPosterPath,
+} from '@/utils/cardVideo.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { loadListingDraft, saveListingDraft, clearListingDraft, hasMeaningfulContent } from '@/lib/listingDraft.js';
@@ -66,6 +70,7 @@ import { prepareAnalysisImages } from '@/utils/analysisImage.js';
 import { shouldPromptForBack, missingBackFields, backPhotoPromptText } from '@/utils/backPhotoPrompt.js';
 import { useCardScanLog, buildScanPayload } from '@/hooks/useCardScanLog.js';
 import { validateListingForm, validateListingField } from '@/utils/listingValidation.js';
+import { openDateToTimestamp, closeDateToTimestamp, timestampToOpenDate, timestampToCloseDate, todayDateInput } from '@/utils/offerWindowDates.js';
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
 import SellerPayoutEstimate from '@/components/SellerPayoutEstimate.jsx';
@@ -101,7 +106,7 @@ const WIZARD_STEPS = [
   { key: 'photos',  title: 'Photos',  fields: ['cardImage'] },
   { key: 'details', title: 'Details', fields: ['hierarchy', 'cardName', 'year'] },
   { key: 'value',   title: 'Value',   fields: ['estimatedValue'] },
-  { key: 'publish', title: 'List it', fields: ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'tradeValue'] },
+  { key: 'publish', title: 'List it', fields: ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'offerOpenDate', 'offerCloseDate', 'tradeValue'] },
 ];
 
 const FULL_FORM_PREF_KEY = 'cardpop.listingFormMode';
@@ -151,6 +156,13 @@ const AddEditCardPage = () => {
   const maxExtraSlots = Math.min(19, Math.max(0, (parseInt(platformSettings.max_images_per_listing, 10) || 10) - 1));
   const [extraFiles, setExtraFiles]     = useState(() => Array(maxExtraSlots).fill(null));
   const [extraPreviews, setExtraPreviews] = useState(() => Array(maxExtraSlots).fill(null));
+  // One optional short video. `videoPath` is the stored object on an edited
+  // card; `videoFile` a newly picked clip; `videoPreview` what the <video> plays.
+  const [videoFile, setVideoFile]       = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [videoPath, setVideoPath]       = useState(null);
+  const [videoCleared, setVideoCleared] = useState(false);
+  const [checkingVideo, setCheckingVideo] = useState(false);
 
   // Resize the slot arrays if the setting resolves after mount, never dropping a
   // photo the user already picked or an edited card already carries (grows to
@@ -310,6 +322,8 @@ const AddEditCardPage = () => {
     listingType:    'private',
     offerMin:       '',
     offerMax:       '',
+    offerOpenDate:  '',
+    offerCloseDate: '',
     displayStyle:   'classic',
   };
 
@@ -325,7 +339,7 @@ const AddEditCardPage = () => {
     // Editing a field clears its inline error (blur re-validates). Changing
     // the listing type also drops price errors that may no longer apply.
     setErrors(prev => {
-      const dependents = key === 'listingType' ? ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'tradeValue'] : [];
+      const dependents = key === 'listingType' ? ['askingPrice', 'shippingCost', 'offerMin', 'offerMax', 'offerOpenDate', 'offerCloseDate', 'tradeValue'] : [];
       const stale = [key, ...dependents].filter(k => k in prev);
       if (!stale.length) return prev;
       const next = { ...prev };
@@ -578,7 +592,7 @@ const AddEditCardPage = () => {
   useEffect(() => {
     const onBeforeUnload = (e) => {
       if (saving) return;
-      const hasUnsavedImages = !!imageFile || extraFiles.some(Boolean);
+      const hasUnsavedImages = !!imageFile || !!videoFile || extraFiles.some(Boolean);
       const editDirty = isEdit && formDirtyRef.current;
       if (hasUnsavedImages || editDirty) {
         e.preventDefault();
@@ -587,7 +601,7 @@ const AddEditCardPage = () => {
     };
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  }, [imageFile, extraFiles, isEdit, saving]);
+  }, [imageFile, videoFile, extraFiles, isEdit, saving]);
 
   // ─── Load existing card when editing ─────────────────────────────────────
   useEffect(() => {
@@ -703,7 +717,7 @@ const AddEditCardPage = () => {
         // separate from estimated_value_aud (a reference comp, not a floor).
         supabase
           .from('listings')
-          .select('price_min_aud, price_max_aud, price_aud, shipping_cost_aud')
+          .select('price_min_aud, price_max_aud, price_aud, shipping_cost_aud, offers_open_at, offers_close_at')
           .eq('vault_item_id', id)
           .neq('status', 'archived')
           .maybeSingle()
@@ -713,6 +727,8 @@ const AddEditCardPage = () => {
               ...f,
               offerMin: data.price_min_aud != null ? String(data.price_min_aud) : f.offerMin,
               offerMax: data.price_max_aud != null ? String(data.price_max_aud) : f.offerMax,
+              offerOpenDate: data.offers_open_at ? timestampToOpenDate(data.offers_open_at) : f.offerOpenDate,
+              offerCloseDate: data.offers_close_at ? timestampToCloseDate(data.offers_close_at) : f.offerCloseDate,
               askingPrice: data.price_aud != null ? String(data.price_aud) : f.askingPrice,
               // 0 (free shipping) renders as an empty field, matching how the
               // seller left it — the input's placeholder already reads "free".
@@ -722,6 +738,12 @@ const AddEditCardPage = () => {
         if (card.card_image) {
           const imgUrl = publicImageUrl(card.card_image);
           if (!cancelled) setImagePreview(imgUrl);
+        }
+        if (card.card_video) {
+          if (!cancelled) {
+            setVideoPath(card.card_video);
+            setVideoPreview(publicVideoUrl(card.card_video));
+          }
         }
         if (card.card_images?.length) {
           const urls = card.card_images.map(p =>
@@ -1398,6 +1420,33 @@ const AddEditCardPage = () => {
     }
   };
 
+  const handleVideoPicked = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const fileProblem = videoFileError(file);
+    if (fileProblem) { toast.error(fileProblem); return; }
+    setCheckingVideo(true);
+    try {
+      let seconds;
+      try { seconds = await readVideoDuration(file); } catch { seconds = NaN; }
+      const durationProblem = videoDurationError(seconds);
+      if (durationProblem) { toast.error(durationProblem); return; }
+      if (videoPreview && videoFile) URL.revokeObjectURL(videoPreview);
+      setVideoFile(file);
+      setVideoPreview(URL.createObjectURL(file));
+    } finally {
+      setCheckingVideo(false);
+    }
+  };
+
+  const removeVideo = () => {
+    if (videoPreview && videoFile) URL.revokeObjectURL(videoPreview);
+    setVideoFile(null);
+    setVideoPreview(null);
+    if (videoPath) { setVideoPath(null); setVideoCleared(true); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (isEdit && locked) {
@@ -1446,6 +1495,32 @@ const AddEditCardPage = () => {
         if (uploadError) throw uploadError;
         await uploadThumbnail(filePath, compressed);
         extraImagePaths.push(filePath);
+      }
+
+      // Optional video: the poster frame goes up first (best-effort, cosmetic),
+      // then the clip itself — whose path is what the card stores.
+      let cardVideoPath = null;
+      if (videoFile) {
+        const ext = (videoFile.name.split('.').pop() || 'mp4').toLowerCase();
+        const filePath = `${currentUser.id}/${Date.now()}-video.${ext}`;
+        const { error: videoError } = await supabase.storage
+          .from('vault-images')
+          .upload(filePath, videoFile, {
+            upsert: true,
+            contentType: videoFile.type || 'video/mp4',
+            cacheControl: '31536000',
+          });
+        if (videoError) throw videoError;
+        const poster = await captureVideoPoster(videoFile);
+        if (poster) {
+          const { error: posterError } = await supabase.storage
+            .from('vault-images')
+            .upload(videoPosterPath(filePath), poster, {
+              upsert: true, contentType: 'image/jpeg', cacheControl: '31536000',
+            });
+          if (posterError) console.warn('Video poster upload failed (player will use the first frame):', posterError);
+        }
+        cardVideoPath = filePath;
       }
 
       // The chips plus the finishes chosen in the Foil / Holo Details panel.
@@ -1524,6 +1599,10 @@ const AddEditCardPage = () => {
 
       if (cardImagePath) payload.card_image = cardImagePath;
       if (extraImagePaths.length) payload.card_images = extraImagePaths;
+      // New clip → its path; removed on an edit → explicit null; otherwise omit
+      // so the server keeps whatever is stored.
+      if (cardVideoPath) payload.card_video = cardVideoPath;
+      else if (isEdit && videoCleared) payload.card_video = null;
 
       // One call does the rest server-side (src/routes/vault-items.js): the
       // vault write and the marketplace listing sync together, validated with
@@ -1539,6 +1618,8 @@ const AddEditCardPage = () => {
             shippingCost: formData.shippingCost || null,
             offerMin: formData.offerMin || null,
             offerMax: formData.offerMax || null,
+            offersOpenAt: openDateToTimestamp(formData.offerOpenDate),
+            offersCloseAt: closeDateToTimestamp(formData.offerCloseDate),
           },
         }),
       });
@@ -1580,6 +1661,7 @@ const AddEditCardPage = () => {
               setImagePreview(null);
               setExtraFiles(Array(maxExtraSlots).fill(null));
               setExtraPreviews(Array(maxExtraSlots).fill(null));
+              removeVideo();
               setErrors({});
               clearCrop();
               setAdjusting(null);
@@ -1822,6 +1904,50 @@ const AddEditCardPage = () => {
                       onAdjust={() => openAdjuster(cropCandidate.key, extraFiles[cropCandidate.key], extraPreviews[cropCandidate.key], cropCandidate.corners)}
                       onDismiss={clearCrop}
                     />
+                  )}
+                </div>
+
+                {/* One optional short clip, shown beside the photos on the listing. */}
+                <div className="mt-4">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
+                    Video (optional, up to {CARD_VIDEO_MAX_SECONDS} seconds)
+                    {' '}<span className="font-normal">— show the card moving in the light, or its edges and surface</span>
+                  </p>
+                  {videoPreview ? (
+                    <div className="relative w-40 rounded-lg overflow-hidden border-2 border-primary/30 bg-black">
+                      <video
+                        src={videoPreview}
+                        controls
+                        playsInline
+                        muted
+                        preload="metadata"
+                        className="w-full max-h-52 object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={removeVideo}
+                        aria-label="Remove video"
+                        className="absolute top-0.5 right-0.5 bg-black/60 rounded-full p-0.5"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="flex w-40 h-24 flex-col rounded-lg border-2 border-dashed border-border bg-muted/30 items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors">
+                      {checkingVideo
+                        ? <Loader2 className="w-4 h-4 text-muted-foreground animate-spin" />
+                        : <Video className="w-4 h-4 text-muted-foreground" />}
+                      <span className="mt-1 text-[10px] font-bold uppercase tracking-wide text-muted-foreground">
+                        {checkingVideo ? 'Checking…' : 'Add video'}
+                      </span>
+                      <input
+                        type="file"
+                        accept={CARD_VIDEO_ACCEPT}
+                        className="sr-only"
+                        disabled={checkingVideo}
+                        onChange={handleVideoPicked}
+                      />
+                    </label>
                   )}
                 </div>
 
@@ -4059,7 +4185,8 @@ const AddEditCardPage = () => {
                           value={formData.offerMin}
                           onChange={e => set('offerMin', e.target.value)}
                           onBlur={() => validateFieldOnBlur('offerMin')}
-                          placeholder="Min"
+                          placeholder="Min *"
+                          aria-label="Minimum offer"
                           className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMin ? 'border-destructive' : 'border-input'}`}
                         />
                       </div>
@@ -4074,7 +4201,8 @@ const AddEditCardPage = () => {
                           value={formData.offerMax}
                           onChange={e => set('offerMax', e.target.value)}
                           onBlur={() => validateFieldOnBlur('offerMax')}
-                          placeholder="Max"
+                          placeholder="No max"
+                          aria-label="Maximum offer (optional)"
                           className={`flex h-11 w-full rounded-md border bg-background px-3 py-2 text-sm pl-8 tabular-nums focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerMax ? 'border-destructive' : 'border-input'}`}
                         />
                       </div>
@@ -4084,6 +4212,40 @@ const AddEditCardPage = () => {
                     )}
                     <p className="text-xs text-muted-foreground">
                       Buyers see this range and make offers — you can accept, decline or counter each one from your account.
+                      Leave the maximum blank to take offers from your minimum upwards.
+                    </p>
+
+                    <Label className="font-bold flex items-center gap-1.5 pt-2">
+                      Offer Dates <span className="font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="offerOpenDate"
+                        type="date"
+                        value={formData.offerOpenDate}
+                        max={formData.offerCloseDate || undefined}
+                        onChange={e => set('offerOpenDate', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('offerOpenDate')}
+                        aria-label="Offers open"
+                        className={`flex h-11 w-full flex-1 rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerOpenDate ? 'border-destructive' : 'border-input'}`}
+                      />
+                      <span className="text-muted-foreground font-bold">–</span>
+                      <input
+                        id="offerCloseDate"
+                        type="date"
+                        value={formData.offerCloseDate}
+                        min={formData.offerOpenDate && formData.offerOpenDate > todayDateInput() ? formData.offerOpenDate : todayDateInput()}
+                        onChange={e => set('offerCloseDate', e.target.value)}
+                        onBlur={() => validateFieldOnBlur('offerCloseDate')}
+                        aria-label="Offers close"
+                        className={`flex h-11 w-full flex-1 rounded-md border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${errors.offerCloseDate ? 'border-destructive' : 'border-input'}`}
+                      />
+                    </div>
+                    {(errors.offerOpenDate || errors.offerCloseDate) && (
+                      <p className="text-xs text-destructive">{errors.offerOpenDate || errors.offerCloseDate}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Only take offers between these dates. Leave the first blank to open now, and the second blank for no closing date.
                     </p>
                   </div>
                 )}

@@ -16,7 +16,7 @@ them a survey after delivery.
 | `email` | `customer_details.email` from the session |
 | `delivery_country` | the session's shipping country, falling back to `AU` (checkout is Australia-only) |
 | `estimated_delivery_date` | today + **5 business days**, matching the page's "3 – 5 Business Days" (`GCR_DELIVERY_BUSINESS_DAYS`) |
-| `products` (optional) | not sent — marketplace cards have no GTIN |
+| `products` (optional) | `[{ gtin }]` for the shop products on the order that have a valid barcode (`GET /stripe/session/:id` → `gtins`); omitted for marketplace cards (no GTIN) — see `docs/shop-product-reviews.md` |
 | `opt_in_style` (optional) | `CENTER_DIALOG` (Google's default, set explicitly — the corners hold toasts and the badge) |
 | language (`window.___gcfg.lang`) | `en-AU`, set before `platform.js` loads |
 
@@ -41,7 +41,10 @@ Google's checklist items, as they apply here:
 ## Badge (optional)
 
 `components/GoogleReviewsBadgeLoader.jsx` (mounted in `App.jsx`) loads
-`merchantwidget.js` on idle on the first eligible page of a visit, at
+`merchantwidget.js` on the first eligible page of a visit — on the visitor's
+first interaction (tap, key, scroll) or 8 s after `load` for someone who never
+interacts (`lib/deferredLoad.js`; the delay keeps the widget, its iframe and its
+Google-hosted font out of the window PageSpeed Insights measures) — at
 `LEFT_BOTTOM` (sonner toasts own bottom-right), region `AU`. It is never started
 from checkout, sign-in or admin (`isBadgeEligiblePath`). Until CardPop has
 enough ratings Google shows "no rating available" — expected.

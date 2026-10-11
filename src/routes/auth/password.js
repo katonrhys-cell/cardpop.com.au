@@ -7,6 +7,7 @@ import { authMiddleware } from '../../middleware/auth.js';
 import { requireAal2 } from '../../middleware/requireAal2.js';
 import { passwordChangeLimiter } from '../../middleware/endpoint-rate-limit.js';
 import logger from '../../utils/logger.js';
+import { OUTBOUND_TIMEOUT_MS } from '../../utils/outboundTimeouts.js';
 
 const router = express.Router();
 
@@ -51,6 +52,7 @@ router.get('/pwned-check', async (req, res) => {
     // response size can't hint at how many real matches the prefix has.
     const hibp = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
       headers: { 'Add-Padding': 'true', 'User-Agent': 'CardPop-PasswordCheck' },
+      signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.hibp),
     });
     if (!hibp.ok) {
       logger.warn(`[PWNED] range lookup returned ${hibp.status}`);

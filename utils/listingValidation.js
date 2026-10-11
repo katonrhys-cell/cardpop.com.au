@@ -7,6 +7,8 @@
 //
 // ctx: { isEdit, lockedBaseValue, selCategoryId, franchiseId, hasImage, requireImage }
 
+import { validateOfferWindowDates } from './offerWindowDates.js';
+
 const SALE_TYPES = ['For Sale', 'For Sale & Trade'];
 
 const FIELD_VALIDATORS = {
@@ -67,16 +69,30 @@ const FIELD_VALIDATORS = {
   offerMin: (f) => {
     if (f.listingType !== 'Expression of Interest') return null;
     const min = parseFloat(f.offerMin);
-    return !min || min <= 0 ? 'Enter the minimum of the price range you want offers in' : null;
+    return !min || min <= 0 ? 'Enter the minimum offer you want to receive' : null;
   },
 
+  // The top of an EOI range is optional — blank means "offers from $X" with
+  // no ceiling.
   offerMax: (f) => {
     if (f.listingType !== 'Expression of Interest') return null;
+    if (f.offerMax == null || !String(f.offerMax).trim()) return null;
     const min = parseFloat(f.offerMin);
     const max = parseFloat(f.offerMax);
-    if (!max || max <= 0) return 'Enter the maximum of the price range you want offers in';
+    if (!Number.isFinite(max) || max <= 0) return 'Enter a valid maximum, or leave it blank for no upper limit';
     if (min > 0 && max < min) return 'Must be at least the minimum of the range';
     return null;
+  },
+
+  // Optional offer window (dates the EOI takes offers between).
+  offerOpenDate: (f) => {
+    if (f.listingType !== 'Expression of Interest') return null;
+    return validateOfferWindowDates(f.offerOpenDate, f.offerCloseDate).offerOpenDate ?? null;
+  },
+
+  offerCloseDate: (f) => {
+    if (f.listingType !== 'Expression of Interest') return null;
+    return validateOfferWindowDates(f.offerOpenDate, f.offerCloseDate).offerCloseDate ?? null;
   },
 
   tradeValue: (f, ctx) => {

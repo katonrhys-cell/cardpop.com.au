@@ -10,6 +10,7 @@ import { AdminProvider } from '@/contexts/AdminContext.jsx';
 import { CartProvider } from '@/hooks/useCart.jsx';
 import { CategoryHierarchyProvider } from '@/contexts/CategoryContext.jsx';
 import { WatchlistProvider } from '@/contexts/WatchlistContext.jsx';
+import { NotificationsProvider } from '@/contexts/NotificationsContext.jsx';
 import { PlatformSettingsProvider } from '@/contexts/PlatformSettingsContext.jsx';
 
 // Layouts & Core Components
@@ -38,6 +39,8 @@ import LaunchHero from '@/components/LaunchHero.jsx';
 import ShoppingCart from '@/components/ShoppingCartLazy.jsx';
 import AdminLayout from '@/components/AdminLayout.jsx';
 import MarketplaceListingRedirect from '@/components/MarketplaceListingRedirect.jsx';
+import CookieConsentBanner from '@/components/CookieConsentBanner.jsx';
+import AnnouncementBar from '@/components/AnnouncementBar.jsx';
 import ReferralCapture from '@/components/ReferralCapture.jsx';
 import FeatureRoute from '@/components/FeatureRoute.jsx';
 import MaintenanceGate from '@/components/MaintenanceGate.jsx';
@@ -129,6 +132,7 @@ const AccountReviews = lazy(() => import('@/pages/account/AccountReviews.jsx'));
 const AccountSecurity = lazy(() => import('@/pages/account/AccountSecurity.jsx'));
 const AccountSellerTier = lazy(() => import('@/pages/account/AccountSellerTier.jsx'));
 const AccountOrders = lazy(() => import('@/pages/account/AccountOrders.jsx'));
+const AccountSales = lazy(() => import('@/pages/account/AccountSales.jsx'));
 const AccountEvents = lazy(() => import('@/pages/account/AccountEvents.jsx'));
 const AccountShows = lazy(() => import('@/pages/account/AccountShows.jsx'));
 const AccountSoleTrader = lazy(() => import('@/pages/account/AccountSoleTrader.jsx'));
@@ -230,6 +234,9 @@ const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryA
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const PromoCodesAdminPage = lazy(() => import('@/pages/admin/PromoCodesAdminPage.jsx'));
+const ProductReviewsAdminPage = lazy(() => import('@/pages/admin/ProductReviewsAdminPage.jsx'));
+const EventReviewsAdminPage = lazy(() => import('@/pages/admin/EventReviewsAdminPage.jsx'));
+const EventReviewEditorPage = lazy(() => import('@/pages/admin/EventReviewEditorPage.jsx'));
 const BusinessAffiliateLinksAdminPage = lazy(() => import('@/pages/admin/BusinessAffiliateLinksAdminPage.jsx'));
 const ShopAffiliateProductsAdminPage = lazy(() => import('@/pages/admin/ShopAffiliateProductsAdminPage.jsx'));
 const CardArtManagementPage = lazy(() => import('@/pages/admin/CardArtManagementPage.jsx'));
@@ -274,18 +281,21 @@ const App = () => {
           <CartProvider>
             <CategoryHierarchyProvider>
             <WatchlistProvider>
+            <NotificationsProvider>
               <Router>
                 <ScrollToTop />
                 <AnalyticsPageViews />
                 <AdsenseRouteLoader />
                 <GoogleReviewsBadgeLoader />
                 <ReferralCapture />
+                <CookieConsentBanner />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
                     <title>CardPop | Australia's Trading Card Marketplace</title>
                     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
                   </Helmet>
                   
+                  <AnnouncementBar />
                   <Header />
                   
                   <main className="flex-grow flex flex-col">
@@ -389,6 +399,7 @@ const App = () => {
                         <Route path="/account/verification" element={<Navigate to="/verify-identity" replace />} />
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
+                        <Route path="/account/sales" element={<ProtectedRoute><AccountSales /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
                         <Route path="/account/shows" element={<ProtectedRoute><AccountShows /></ProtectedRoute>} />
                         <Route path="/account/sole-trader" element={<ProtectedRoute><AccountSoleTrader /></ProtectedRoute>} />
@@ -549,6 +560,10 @@ const App = () => {
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
+                          <Route path="product-reviews" element={<ProductReviewsAdminPage />} />
+                          <Route path="event-reviews" element={<EventReviewsAdminPage />} />
+                          <Route path="event-reviews/new" element={<EventReviewEditorPage />} />
+                          <Route path="event-reviews/:reviewId" element={<EventReviewEditorPage />} />
                           <Route path="building-your-business" element={<BusinessAffiliateLinksAdminPage />} />
                           <Route path="shop-affiliate-products" element={<ShopAffiliateProductsAdminPage />} />
                           <Route path="card-art" element={<CardArtManagementPage />} />
@@ -569,6 +584,7 @@ const App = () => {
                   <Toaster position="bottom-right" richColors closeButton />
                 </div>
               </Router>
+            </NotificationsProvider>
             </WatchlistProvider>
             </CategoryHierarchyProvider>
           </CartProvider>

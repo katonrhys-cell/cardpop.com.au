@@ -3,6 +3,7 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { supabase } from '../utils/supabaseClient.js';
+import { gtinsForSession } from '../utils/orderGtins.js';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.js';
 import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
 import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
@@ -257,7 +258,10 @@ router.post('/calculate-cart', optionalAuthMiddleware, async (req, res) => {
   } catch (err) {
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] /calculate-cart error: ${err.message}`);
-    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
+    res.status(code).json({
+      error: code === 500 ? 'Something went wrong. Please try again.' : err.message,
+      ...(code !== 500 && err.listingId ? { listingId: err.listingId } : {}),
+    });
   }
 });
 
@@ -547,6 +551,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       // common path byte-identical to before, so it can't break in the window
       // before the buyer_email migration lands.
       ...(userId ? {} : { buyer_email: email }),
+      // Consent to hear from us, recorded with the order so an abandoned-
+      // checkout reminder is only ever sent to someone who ticked the box.
+      marketing_consent: wantsNewsletter,
       seller_id:         null,
       listing_id:        null,
       stripe_session_id: session.id,
@@ -626,7 +633,10 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     if (promoRedemptionHeld) await releasePromoRedemption(promoRedemptionHeld);
     const code = err.statusCode || 500;
     if (code === 500) logger.error(`[STRIPE] create-cart-checkout error: ${err.message}`);
-    res.status(code).json({ error: code === 500 ? 'Something went wrong. Please try again.' : err.message });
+    res.status(code).json({
+      error: code === 500 ? 'Something went wrong. Please try again.' : err.message,
+      ...(code !== 500 && err.listingId ? { listingId: err.listingId } : {}),
+    });
   }
 });
 
@@ -701,9 +711,32 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       || session.customer_details?.address
       || null;
     const hasPreorder = items.some((item) => /\(Pre-order — /.test(item.name));
+    // Barcodes of the shop products bought — lets Google attach product
+    // reviews to them. Empty for marketplace cards (no GTIN) or any failure.
+    const gtins = session.payment_status === 'paid' ? await gtinsForSession(supabase, sessionId) : [];
+
+    // The order's own status, so the success page can tell "paid and being
+    // fulfilled" from "paid but refused and refunded" (an overseas card, a
+    // double sale, an amount mismatch). Stripe's payment_status is 'paid' in
+    // both cases. Best-effort: a read failure just leaves it null.
+    let orderStatus = null;
+    let orderId = null;
+    try {
+      const { data: orderRow } = await supabase
+        .from('orders')
+        .select('id, status')
+        .eq('stripe_session_id', sessionId)
+        .maybeSingle();
+      orderStatus = orderRow?.status ?? null;
+      orderId = orderRow?.id ?? null;
+    } catch (orderErr) {
+      logger.warn(`[STRIPE] order status read failed for ${sessionId}: ${orderErr.message}`);
+    }
 
     res.json({
       id:            session.id,
+      orderId,
+      orderStatus,
       status:        session.payment_status,
       amountTotal:   session.amount_total,
       customerEmail: session.customer_details?.email,
@@ -712,6 +745,7 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
       items,
       deliveryCountry: shippingAddress?.country || null,
       hasPreorder,
+      gtins,
     });
   } catch (err) {
     // Stripe throws StripeInvalidRequestError for unknown/malformed ids —

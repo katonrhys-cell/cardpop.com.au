@@ -4,9 +4,10 @@ import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED, VAULT_ITEM_CARD_SELECT } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
 import { OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
-import CardPopLogo from '@/components/CardPopLogo.jsx';
+import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import {
   Star, ShieldCheck, MapPin, Calendar, ExternalLink, ShieldAlert,
   Package, MessageSquare, BadgeCheck, CheckCircle2, Truck, Heart, Zap, RotateCcw, Instagram,
@@ -38,6 +39,7 @@ import { publicImageUrl } from '@/utils/imageUrl.js';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { hasStorefront } from '@/config/plans.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
+import { cardIdentifiersLd } from '@/utils/productIdentifiers.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -93,12 +95,12 @@ const SoleTraderStorePage = () => {
         const resolvedId = profile.id;
         const [marketplaceRes, vaultRes] = await Promise.all([
           supabase.from('listings')
-            .select(`*, ${LISTING_CARD_VAULT_EMBED}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+            .select(`${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED}, ${LISTING_SELLER_EMBED}`)
             // Sold cards stay on the storefront, badged "Sold".
             .eq('seller_id', resolvedId).in('status', ['active', 'sold'])
             .order('created_at', { ascending: false }).limit(24),
           supabase.from('vault_items')
-            .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`)
+            .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(id, display_name, username, avatar_url, is_admin, profile_photo_or_character, is_verified, seller_tier, rating, reviews_count)`)
             .eq('owner_id', resolvedId).eq('is_public', true).neq('listing_type', 'Private')
             .order('created_at', { ascending: false }).limit(24),
         ]);
@@ -177,7 +179,8 @@ const SoleTraderStorePage = () => {
     return publicImageUrl(path);
   };
 
-  // Product + Offer JSON-LD for each item shown in the store.
+  // Product + Offer JSON-LD for each priced item shown in the store — Google
+  // rejects a Product with no offers/review/aggregateRating.
   const productListLd = listings.map((item) => {
     const isMkt = item._type === 'marketplace';
     const name = (isMkt ? item.vault_item?.card_name : item.card_name) || 'Trading Card';
@@ -186,27 +189,30 @@ const SoleTraderStorePage = () => {
     const url = isMkt
       ? `${SITE}/marketplace/${item.id}/${item.slug || 'listing'}`
       : `${SITE}/product/vault/${item.id}`;
+    if (!(price > 0)) return null;
     const image = resolveListingImage(item);
     return {
       '@type': 'Product',
       name,
       url,
       ...(image ? { image } : {}),
-      ...(price > 0
-        ? { offers: {
-            '@type': 'Offer',
-            price: Number(price).toFixed(2),
-            priceCurrency: 'AUD',
-            availability: (isMkt ? item.status === 'sold' : isSoldVaultItem(item))
-              ? 'https://schema.org/SoldOut'
-              : 'https://schema.org/InStock',
-            ...(condition ? { itemCondition: condition } : {}),
-            url,
-            seller: { '@type': 'Store', name: displayName },
-          } }
-        : {}),
+      // brand (franchise) + mpn (set and card number): utils/productIdentifiers.js.
+      ...cardIdentifiersLd(isMkt
+        ? { brand: item.vault_item?.collection, setName: item.vault_item?.set_name, cardNumber: item.vault_item?.card_number }
+        : { brand: item.collection, setName: item.set_name, cardNumber: item.card_number }),
+      offers: {
+        '@type': 'Offer',
+        price: Number(price).toFixed(2),
+        priceCurrency: 'AUD',
+        availability: (isMkt ? item.status === 'sold' : isSoldVaultItem(item))
+          ? 'https://schema.org/SoldOut'
+          : 'https://schema.org/InStock',
+        ...(condition ? { itemCondition: condition } : {}),
+        url,
+        seller: { '@type': 'Store', name: displayName },
+      },
     };
-  });
+  }).filter(Boolean);
 
   const structuredData = [
     {
@@ -259,18 +265,13 @@ const SoleTraderStorePage = () => {
 
             {/* Logo */}
             <div className="shrink-0 relative">
-              <div className="w-32 h-32 md:w-40 md:h-40 rounded-2xl bg-black border-4 border-card shadow-xl flex items-center justify-center overflow-hidden">
-                {logoUrl ? (
-                  <img src={logoUrl} alt={displayName} className="w-full h-full rounded-2xl object-cover" />
-                ) : dealer.is_admin ? (
-                  // The platform's own store gets the brand mark, not a letter.
-                  <CardPopLogo variant="icon" iconClassName="w-16 h-[78px]" />
-                ) : (
-                  <span className="text-5xl font-bold text-white">
-                    {displayName.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
+              <ProfileAvatar
+                profile={dealer}
+                size="xl"
+                preferBusinessLogo
+                name={displayName}
+                className="border-4 border-card shadow-xl"
+              />
               {isDealer && (
                 <div className="absolute -bottom-2 -right-2 text-white p-2 rounded-xl shadow-lg border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">
                   <BadgeCheck className="w-6 h-6" />

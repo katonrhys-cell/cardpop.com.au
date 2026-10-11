@@ -148,6 +148,18 @@ export function publicImageUrl(pathOrUrl, bucket = DEFAULT_BUCKET) {
   return toCdnUrl(supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl);
 }
 
+/**
+ * Public URL for a card video. Deliberately the canonical Supabase URL rather
+ * than the image CDN: the Worker is built around small cacheable images, and a
+ * <video> needs byte-range responses to start playing promptly. Clips are
+ * capped at 10 s / 20 MB (utils/cardVideo.js), so the egress is bounded.
+ */
+export function publicVideoUrl(path) {
+  if (!path || typeof path !== 'string') return null;
+  if (isHttp(path)) return canonicalStorageUrl(path);
+  return supabase.storage.from(DEFAULT_BUCKET).getPublicUrl(path).data.publicUrl;
+}
+
 // Session-scoped: set true the first time a transformed URL 404/errors. Also
 // starts true when VITE_IMAGE_TRANSFORMS='off', so the app never requests
 // Supabase image transforms (a paid Pro feature) at all — it serves the
@@ -312,6 +324,17 @@ export function getCardImage(pathOrUrl, opts = {}) {
   const src = at(sorted[Math.floor(sorted.length / 2)] ?? sorted[0]);
 
   return { src, srcSet, fallbackSrc, canonicalSrc, thumbSrc };
+}
+
+/**
+ * The URL a small card tile should load: the 480 px companion thumbnail when
+ * the upload has one, otherwise the full image. For strips, rails, avatars of
+ * cards, watchlist rows — anywhere the image renders well under 480 px wide.
+ * Grids that render larger go through <CardImage/>, which also falls back.
+ */
+export function cardThumbUrl(pathOrUrl, bucket = DEFAULT_BUCKET) {
+  const art = getCardImage(pathOrUrl, { bucket });
+  return art.thumbSrc || art.src || null;
 }
 
 // Sensible default `sizes` for the 1→2→3→4 column card grids used across the

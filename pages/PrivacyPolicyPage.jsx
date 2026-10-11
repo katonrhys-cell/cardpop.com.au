@@ -129,7 +129,9 @@ const PrivacyPolicyPage = () => {
           <p>We use cookies and similar tracking technologies to track activity on our platform and hold certain information.</p>
           <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
             <li><strong className="text-foreground">Essential Cookies:</strong> Required for the platform to function (e.g., maintaining your logged-in session).</li>
-            <li><strong className="text-foreground">Analytical Cookies:</strong> Help us understand how visitors interact with the site to improve performance.</li>
+            <li><strong className="text-foreground">Analytical Cookies:</strong> Google Analytics 4 records page views and shopping events (product views, items added to the cart, checkouts started and completed) so we can see what works and fix what doesn't. The data is aggregated and never used for advertising unless you accept marketing cookies.</li>
+            <li><strong className="text-foreground">Marketing Cookies (optional):</strong> With your consent we use Google Ads conversion tracking and the Meta (Facebook / Instagram) Pixel so we know which ads bring collectors to CardPop and can measure a purchase against the ad that led to it. These load only after you choose <em>Accept all</em> in the cookie bar. Choosing <em>Essentials only</em> keeps them off.</li>
+            <li><strong className="text-foreground">Changing your mind:</strong> Use <em>Cookie settings</em> in the site footer to see the choice again, or clear this site's data in your browser.</li>
             <li><strong className="text-foreground">Management:</strong> You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent. However, some portions of our service may be inaccessible if you decline essential cookies.</li>
           </ul>
         </div>

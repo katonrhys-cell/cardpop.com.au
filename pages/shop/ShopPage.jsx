@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import ShopCategoryBrowse from '@/components/ShopCategoryBrowse.jsx';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import ProductCard from '@/components/ProductCard.jsx';
 import ShopAffiliateSection from '@/components/shop/ShopAffiliateSection.jsx';
 import { useCart } from '@/hooks/useCart.jsx';
-import { PUBLIC_SHOP_STATUSES, PUBLIC_SHOP_STATUS_FILTER, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -27,6 +29,8 @@ const FACET_KEYS = ['category', 'price', 'availability', 'brand', 'colour', 'sal
 const ShopPage = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState(null);
   const [sort, setSort] = useState('created_at_desc');
   // Seed the search box from ?q so a whole-site search handoff (e.g. the
@@ -35,6 +39,7 @@ const ShopPage = () => {
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '');
   const { addToCart } = useCart();
   const fetchRef = useRef(null);
+  const pageRef = useRef(0);
   const facets = useShopFacets({ scopeKey: 'all', keys: FACET_KEYS });
   const selectionKey = JSON.stringify(facets.selection);
   // Only a filtered grid reads the facet rows — don't refetch the unfiltered
@@ -44,27 +49,37 @@ const ShopPage = () => {
   useEffect(() => {
     let cancelled = false;
 
-    const run = async () => {
-      setLoading(true);
+    const run = async (page = 0, { append = false } = {}) => {
+      if (append) setLoadingMore(true); else setLoading(true);
       setError(null);
+      const from = page * PAGE_LIMIT;
+      const stamp = (rows) => rows.map(p => ({ ...p, source: 'shop', type: 'shop' }));
+      const commit = (rows) => {
+        pageRef.current = page;
+        setProducts(prev => (append ? [...prev, ...rows] : rows));
+      };
       try {
         // Filtered: filter + sort the facet rows here, then fetch full rows
-        // for the first page of matches only.
+        // for the requested page of matches only.
         if (filterRows) {
           const matched = sortFacetRows(
             filterFacetRows(filterRows, JSON.parse(selectionKey)).filter((r) => matchesSearch(r, searchTerm)),
             sort === 'created_at_desc' ? 'newest' : sort,
           );
-          const rows = await fetchShopProductsByIds(supabase, matched.slice(0, PAGE_LIMIT).map((r) => r.id));
-          if (!cancelled) setProducts(rows.map(p => ({ ...p, source: 'shop', type: 'shop' })));
+          const pageIds = matched.slice(from, from + PAGE_LIMIT);
+          const rows = await fetchShopProductsByIds(supabase, pageIds.map((r) => r.id));
+          if (!cancelled) {
+            setHasMore(matched.length > from + PAGE_LIMIT);
+            commit(stamp(rows));
+          }
           return;
         }
 
         let query = supabase
           .from('shop_products')
-          .select('*')
+          .select(SHOP_CARD_COLUMNS)
           .in('status', PUBLIC_SHOP_STATUSES)
-          .limit(PAGE_LIMIT);
+          .range(from, from + PAGE_LIMIT - 1);
 
         if (searchTerm) {
           query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
@@ -73,41 +88,44 @@ const ShopPage = () => {
         if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
         else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
         else query = query.order('created_at', { ascending: false });
+        // Every sort needs a unique tie-breaker: without one, rows with equal
+        // prices or timestamps can come back in a different order per page, so
+        // the same product shows up twice across pages (or never at all).
+        query = query.order('id', { ascending: true });
 
         const { data, error: fetchError } = await query;
         if (fetchError) throw fetchError;
 
         if (!cancelled) {
-          setProducts((data || []).map(p => ({ ...p, source: 'shop', type: 'shop' })));
+          setHasMore((data || []).length === PAGE_LIMIT);
+          commit(stamp(data || []));
         }
       } catch (err) {
         if (!cancelled) {
           setError('Failed to load shop products.');
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
     };
 
     fetchRef.current = run;
     // Hold while a filter in the URL can't be resolved yet (no unfiltered flash).
-    if (!facets.waiting) run();
+    if (!facets.waiting) run(0, { append: false });
     return () => { cancelled = true; };
   }, [sort, searchTerm, selectionKey, filterRows, facets.waiting]);
 
-  useEffect(() => {
-    // Scoped to publicly visible products (active + coming soon) — this page
-    // only ever queries those, so a change to a draft/archived product
-    // shouldn't trigger every open shop page to refetch.
-    const channel = supabase
-      .channel('shop-products')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'shop_products', filter: PUBLIC_SHOP_STATUS_FILTER },
-        () => { if (fetchRef.current) fetchRef.current(); }
-      )
-      .subscribe();
+  // Stock and price changes reach a returning visitor on the next look at the
+  // tab; no realtime channel is held open for the grid (see useRefreshOnReturn).
+  useRefreshOnReturn(() => fetchRef.current?.(0, { append: false }));
 
-    return () => { supabase.removeChannel(channel); };
-  }, []);
+  const loadMore = () => {
+    if (loadingMore || !hasMore) return;
+    fetchRef.current?.(pageRef.current + 1, { append: true });
+  };
 
   const handleAddToCart = (product) => {
     // Build the cart product/variant the same way the product detail page does,
@@ -192,7 +210,7 @@ const ShopPage = () => {
         {error ? (
           <div className="text-center py-20 text-destructive bg-destructive/5 rounded-3xl border border-destructive/20">
             <p className="font-bold text-lg">{error}</p>
-            <Button variant="outline" className="mt-4" onClick={() => fetchRef.current?.()}>Retry</Button>
+            <Button variant="outline" className="mt-4" onClick={() => fetchRef.current?.(0, { append: false })}>Retry</Button>
           </div>
         ) : loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
@@ -205,16 +223,31 @@ const ShopPage = () => {
             ))}
           </div>
         ) : products.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-            {products.map((product, i) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onAddToCart={handleAddToCart}
-                priority={i < 2}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
+              {products.map((product, i) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                  priority={i < 2}
+                />
+              ))}
+            </div>
+            {hasMore && (
+              <div className="flex justify-center mt-10">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="rounded-xl font-bold px-8"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? 'Loading…' : 'Load more products'}
+                </Button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 bg-card rounded-[2rem] border border-border border-dashed">
             <PackageX className="w-16 h-16 text-muted-foreground opacity-50 mb-4" />

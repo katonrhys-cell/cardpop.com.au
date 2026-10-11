@@ -11,9 +11,10 @@ vi.mock('../../src/utils/emailService.js', () => ({
 // The route looks the product up with the service-role client so the email
 // carries the real title (and a made-up id can't be used to spam admin).
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
+const mockInsert = vi.hoisted(() => vi.fn(async () => ({ error: null })));
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   default: {
-    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mockMaybeSingle }) }) }),
+    from: () => ({ select: () => ({ eq: () => ({ maybeSingle: mockMaybeSingle }) }), insert: mockInsert }),
   },
 }));
 
@@ -155,5 +156,31 @@ describe('POST /shop-enquiry — delivery', () => {
     const res = await request(app).post('/').send(VALID);
     expect(res.status).toBe(500);
     expect(mockSendShopEnquiry).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /shop-enquiry/notify — "email me when it’s back"', () => {
+  it('stores a restock request (lower-cased email) for a real product', async () => {
+    const res = await request(app).post('/notify').send({ productId: PRODUCT_ID, email: 'Ash@Example.com', turnstileToken: 't' });
+    expect(res.status).toBe(200);
+    expect(mockInsert).toHaveBeenCalledWith({ product_id: PRODUCT_ID, email: 'ash@example.com', user_id: null });
+    expect(mockSendShopEnquiry).not.toHaveBeenCalled();
+  });
+  it('treats a duplicate open request as success', async () => {
+    mockInsert.mockResolvedValueOnce({ error: { code: '23505' } });
+    expect((await request(app).post('/notify').send({ productId: PRODUCT_ID, email: 'ash@example.com' })).status).toBe(200);
+  });
+  it('rejects a bad email, an unknown product and a failed captcha', async () => {
+    expect((await request(app).post('/notify').send({ productId: PRODUCT_ID, email: 'nope' })).status).toBe(400);
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+    expect((await request(app).post('/notify').send({ productId: PRODUCT_ID, email: 'a@b.co' })).status).toBe(404);
+    mockVerifyTurnstile.mockResolvedValueOnce({ success: false });
+    expect((await request(app).post('/notify').send({ productId: PRODUCT_ID, email: 'a@b.co' })).status).toBe(400);
+    expect(mockInsert).not.toHaveBeenCalled();
+  });
+  it('silently accepts a honeypot submission without storing it', async () => {
+    const res = await request(app).post('/notify').send({ productId: PRODUCT_ID, email: 'a@b.co', company: 'Bots Inc' });
+    expect(res.status).toBe(200);
+    expect(mockInsert).not.toHaveBeenCalled();
   });
 });

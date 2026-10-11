@@ -12,18 +12,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ShoppingBag, RotateCcw, Info, AlertCircle, CheckCircle2, XCircle, Clock, Star, Truck } from 'lucide-react';
 import { toast } from 'sonner';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import LeaveReviewModal from '@/components/LeaveReviewModal.jsx';
+import WriteProductReviewModal from '@/components/shop/WriteProductReviewModal.jsx';
+import { shopLinesOf } from '@/utils/productReviews.js';
 import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import { orderPreorderLines } from '@/utils/shopStock.js';
 import { computeRefundAmounts } from '@/utils/refundAmounts.js';
+import { refundWindow, daysLeftInWindow, MARKETPLACE_PROTECTION, SHOP_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
 
 // Order states in which the buyer has something real to review — the seller
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
 // src/routes/seller-ratings.js.
 const REVIEWABLE_STATUSES = ['shipped', 'completed', 'refunded'];
+
+// Shop-product reviews need the parcel to have shipped (enforced by the
+// shop_product_reviews insert trigger) — a refund alone isn't enough.
+const PRODUCT_REVIEWABLE_STATUSES = ['shipped', 'completed'];
+
+const PRODUCT_REVIEW_STATE_LABEL = { pending: 'awaiting approval', published: 'published', rejected: 'not published' };
 
 const REFUND_REASONS = [
   { value: 'item_not_received',      label: 'Item not received' },
@@ -34,7 +43,6 @@ const REFUND_REASONS = [
   { value: 'other',                  label: 'Other' },
 ];
 
-const REFUND_WINDOW_DAYS = 30;
 
 const STATUS_CONFIG = {
   payment_confirmed: { label: 'Confirmed',   color: 'bg-blue-500/10 text-blue-700 border-blue-200' },
@@ -172,18 +180,22 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
+const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewRequest, onReceived, reviewed, productReviews }) => {
   const refundQuote = computeRefundAmounts(order);
   const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
-  const daysSince   = differenceInDays(new Date(), new Date(order.created_at));
-  const canRefund   = !order.refund_status
+  // The claim window from utils/buyerProtectionPolicy.js — the same rule the
+  // server enforces on POST /refunds/request.
+  const window     = refundWindow(order);
+  const daysLeft   = daysLeftInWindow(window);
+  const refundable = !order.refund_status
     && !['refunded','cancelled','payment_failed'].includes(order.status)
-    && ['payment_confirmed','shipped','completed'].includes(order.status)
-    && daysSince <= REFUND_WINDOW_DAYS;
+    && ['payment_confirmed','shipped','completed'].includes(order.status);
+  const canRefund   = refundable && window.state === 'open';
   const canReview   = !reviewed
     && !!order.seller_id
     && REVIEWABLE_STATUSES.includes(order.status);
+  const reviewableProducts = PRODUCT_REVIEWABLE_STATUSES.includes(order.status) ? shopLinesOf(order) : [];
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
@@ -247,6 +259,34 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
         </div>
       )}
 
+      {/* Product reviews — shop items on a shipped order */}
+      {reviewableProducts.length > 0 && (
+        <div className="space-y-2">
+          {reviewableProducts.map((line) => {
+            const state = productReviews?.get(`${order.id}:${line.id}`);
+            return (
+              <div key={line.id} className="flex items-center justify-between gap-3 text-xs bg-muted/30 rounded-xl p-3">
+                <span className="font-medium text-foreground truncate">{line.title}</span>
+                {state ? (
+                  <span className="flex items-center gap-1 font-semibold text-emerald-600 shrink-0">
+                    <CheckCircle2 className="w-4 h-4" /> Reviewed — {PRODUCT_REVIEW_STATE_LABEL[state] || state}
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="rounded-xl font-bold gap-1.5 text-xs h-8 shrink-0"
+                    onClick={() => onProductReviewRequest({ orderId: order.id, productId: line.id, title: line.title })}
+                  >
+                    <Star className="w-3.5 h-3.5" /> Review product
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Seller */}
       {order.seller && (
         <p className="text-xs text-muted-foreground">
@@ -269,16 +309,44 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, reviewed }) => {
       )}
 
       {/* Refund eligibility note */}
-      {!order.refund_status && canRefund && (
+      {refundable && window.state !== 'closed' && (
         <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-xl p-3">
           <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-primary/70" />
           <span>
-            {refundQuote.shopOrder
-              ? 'CardPop Shop order — refunded in full if a refund is approved (no restocking fee). '
-              : `$${refundQuote.retainedFee.toFixed(2)} AUD in fees (50% of the platform fee, plus any payment processing fee) will be retained if a refund is approved. `}
-            Refunds available for {REFUND_WINDOW_DAYS - daysSince} more day{REFUND_WINDOW_DAYS - daysSince !== 1 ? 's' : ''}.
+            {window.state === 'open' ? (
+              <>
+                {refundQuote.retainedFee > 0
+                  ? `$${refundQuote.retainedFee.toFixed(2)} AUD in fees will be retained if a refund is approved. `
+                  : refundQuote.shopOrder
+                    ? 'Refunded in full if approved — no restocking fee. '
+                    : 'Refunded in full if approved — card, postage and fees. '}
+                {window.reason} {daysLeft > 0 && `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left.`}
+              </>
+            ) : (
+              window.reason
+            )}
           </span>
         </div>
+      )}
+
+      {order.delivered_at && (
+        <p className="flex items-center gap-2 text-xs text-emerald-700">
+          <CheckCircle2 className="w-4 h-4" /> Delivered {format(new Date(order.delivered_at), 'dd MMM yyyy')}
+          {order.delivery_source === 'auto' && <span className="text-muted-foreground">(assumed — posted over {MARKETPLACE_PROTECTION.autoDeliveredDaysAfterShipped} days ago)</span>}
+        </p>
+      )}
+
+      {/* The buyer says it arrived: starts the 7-day Buyer Protection window
+          and completes the order (POST /orders/:id/received). */}
+      {order.status === 'shipped' && !order.delivered_at && onReceived && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => onReceived(order)}
+          className="w-full rounded-xl font-bold gap-2 text-xs h-9"
+        >
+          <CheckCircle2 className="w-3.5 h-3.5" /> I've received it
+        </Button>
       )}
 
       {/* Actions */}
@@ -324,12 +392,28 @@ const AccountOrders = () => {
   const [refundTarget, setRefundTarget] = useState(null);
   const [reviewTarget, setReviewTarget] = useState(null);
   const [reviewedOrderIds, setReviewedOrderIds] = useState(() => new Set());
+  const [productReviewTarget, setProductReviewTarget] = useState(null);
+  // `${order_id}:${product_id}` → review status, for this buyer's product reviews.
+  const [productReviews, setProductReviews] = useState(() => new Map());
+
+  const handleReceived = useCallback(async (order) => {
+    try {
+      const res = await apiServerClient.fetch(`/orders/${order.id}/received`, { method: 'POST' });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Could not confirm delivery');
+      toast.success(`Thanks — delivery recorded. Not as described? You have ${MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days to report it.`);
+      fetchOrders();
+    } catch (err) {
+      toast.error(err.message);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchOrders is stable per user
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     if (!currentUser?.id) return;
     setLoading(true);
     try {
-      const [{ data, error }, givenRes] = await Promise.all([
+      const [{ data, error }, givenRes, { data: ownProductReviews }] = await Promise.all([
         supabase
           .from('orders')
           .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
@@ -340,9 +424,14 @@ const AccountOrders = () => {
         // Best-effort: if it fails, buttons still show and the server's
         // duplicate check remains the backstop.
         apiServerClient.fetch('/seller-ratings/mine/given').catch(() => null),
+        // This buyer's own product reviews (RLS: own rows only). Best-effort.
+        supabase.from('shop_product_reviews').select('order_id, product_id, status')
+          .eq('reviewer_id', currentUser.id)
+          .then((r) => r, () => ({ data: null })),
       ]);
       if (error) throw error;
       setOrders(data || []);
+      setProductReviews(new Map((ownProductReviews || []).map((r) => [`${r.order_id}:${r.product_id}`, r.status])));
       if (givenRes?.ok) {
         const { ratings } = await givenRes.json();
         setReviewedOrderIds(new Set((ratings || []).map(r => r.order_id).filter(Boolean)));
@@ -379,13 +468,14 @@ const AccountOrders = () => {
       <div className="bg-blue-500/5 border border-blue-400/20 rounded-2xl p-4 flex gap-3 text-sm">
         <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-600" />
         <div className="space-y-1">
-          <p className="font-semibold text-foreground">CardPop Refund Policy</p>
+          <p className="font-semibold text-foreground">{MARKETPLACE_PROTECTION.name}</p>
           <p className="text-muted-foreground">
-            Refunds can be requested within {REFUND_WINDOW_DAYS} days of purchase for items not received,
-            not as described, or damaged. On marketplace purchases, <strong>50% of the platform fee and any payment
-            processing fee are non-refundable</strong> — they're deducted from your refund automatically, and everything
-            else is returned to your original payment method within 5–10 business days.
-            CardPop Shop orders are refunded in full, with no restocking fee.
+            {PROTECTION_COPY.marketplaceOneLine} Report a marketplace order within{' '}
+            <strong>{MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days of delivery</strong> (or after{' '}
+            {MARKETPLACE_PROTECTION.notShippedClaimAfterDays} days if it was never posted) and, once approved, the
+            whole order comes back to your original payment method within {MARKETPLACE_PROTECTION.refundArrivalBusinessDays} business
+            days. {PROTECTION_COPY.marketplaceNoChangeOfMind} CardPop Shop products can be returned within{' '}
+            {SHOP_PROTECTION.windowDays} days of delivery for any reason.
           </p>
           <Link to="/returns" className="text-primary font-semibold text-xs hover:underline">View full returns policy →</Link>
         </div>
@@ -426,7 +516,10 @@ const AccountOrders = () => {
               order={order}
               onRefundRequest={setRefundTarget}
               onReviewRequest={setReviewTarget}
+              onReceived={handleReceived}
               reviewed={reviewedOrderIds.has(order.id)}
+              productReviews={productReviews}
+              onProductReviewRequest={setProductReviewTarget}
             />
           ))}
         </div>
@@ -437,6 +530,14 @@ const AccountOrders = () => {
           order={refundTarget}
           onClose={() => setRefundTarget(null)}
           onSuccess={fetchOrders}
+        />
+      )}
+
+      {productReviewTarget && (
+        <WriteProductReviewModal
+          target={productReviewTarget}
+          onClose={() => setProductReviewTarget(null)}
+          onSuccess={t => setProductReviews(prev => new Map(prev).set(`${t.orderId}:${t.productId}`, 'pending'))}
         />
       )}
 

@@ -16,7 +16,14 @@ export const BLOG_CATEGORIES = [
   { slug: 'grading-guides',   label: 'Grading Hub',       desc: 'Card grading standards and preparation guides',   gradient: 'from-purple-500 to-violet-600'  },
   { slug: 'investing-value',  label: 'Investing & Value', desc: 'Investment strategies and card valuation insights', gradient: 'from-rose-500 to-pink-600'    },
   { slug: 'news-releases',    label: 'News & Releases',   desc: 'Latest TCG releases and industry news',           gradient: 'from-cyan-500 to-sky-600'      },
+  // First-hand reviews of card shows and TCG events CardPop attended. Articles in
+  // this category carry an event_reviews row (scorecard, quick facts, gallery,
+  // pickups) and are linked from the reviewed event's page — see docs/event-reviews.md.
+  { slug: 'event-reviews',    label: 'Event Reviews',     desc: 'On-the-ground reviews of Australian card shows and events', gradient: 'from-red-500 to-rose-700' },
 ];
+
+// blog_articles.category value an event review is filed under.
+export const EVENT_REVIEWS_CATEGORY = 'event-reviews';
 
 export const BLOG_CATEGORY_MAP = Object.fromEntries(
   BLOG_CATEGORIES.map((c) => [c.slug, c])

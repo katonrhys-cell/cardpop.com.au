@@ -17,6 +17,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
     const q = {
       select: () => q,
       not: () => q,
+      neq: (col, val) => { db.filters.push(['neq', col, val]); return q; },
       order: () => q,
       limit: () => q,
       in: (col, vals) => { db.filters.push(['in', col, vals]); return q; },
@@ -91,7 +92,17 @@ describe('runSupplierPriceWatch', () => {
 
     db.filters = [];
     await runSupplierPriceWatch({ productIds: ['a'], force: true });
-    expect(db.filters).toEqual([['in', 'product_id', ['a']]]);
+    expect(db.filters).toEqual([
+      // Archived products are excluded in the query, not after the fetch.
+      ['neq', 'shop_products.status', 'archived'],
+      ['in', 'product_id', ['a']],
+    ]);
+  });
+
+  it('excludes archived products in the database, even when forced', async () => {
+    db.filters = [];
+    await runSupplierPriceWatch({ productIds: ['a'], force: true });
+    expect(db.filters).toContainEqual(['neq', 'shop_products.status', 'archived']);
   });
 
   it('keeps the last good price when a page fails, and bells only on the first failure', async () => {

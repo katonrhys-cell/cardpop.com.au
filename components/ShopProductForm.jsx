@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
-import { compressImage } from '@/utils/compressImage.js';
+import { uploadShopImages, MAX_IMAGE_BYTES } from '@/utils/uploadProductImages.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
-import { Loader2, X, ImagePlus, Plus, Trash2, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, X, ImagePlus, Plus, Trash2, ExternalLink, RefreshCw, GripVertical } from 'lucide-react';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
@@ -51,6 +52,9 @@ const CUSTOM_CATEGORY = '__custom__';
 const INITIAL_STATE = {
   title: '',
   sku: '',
+  // Maker of the product (Palms Off Gaming for its lines). Blank = CardPop's
+  // own product; it is the Brand in the page's Product markup for Google.
+  brand: '',
   description: '',
   price_aud: '',
   retail_price_aud: '',
@@ -75,11 +79,10 @@ const INITIAL_STATE = {
   preorder_eta: '',
 };
 
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20MB
-
 const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(null); // { done, total } while uploading
   const [formData, setFormData] = useState(INITIAL_STATE);
   // Each entry is either a File (new upload) or { isExisting: true, url } (kept).
   const [images, setImages] = useState([]);
@@ -133,6 +136,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       setFormData({
         title: product.title || '',
         sku: product.sku || '',
+        brand: product.brand || '',
         description: product.description || '',
         price_aud: product.price_aud != null ? String(product.price_aud) : '',
         retail_price_aud: product.retail_price_aud != null ? String(product.retail_price_aud) : '',
@@ -228,22 +232,34 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  const uploadNewImages = async () => {
-    const urls = [];
-    for (const entry of images) {
-      if (entry.isExisting) {
-        urls.push(entry.url);
-        continue;
-      }
-      const compressed = await compressImage(entry);
-      const ext = compressed.name?.split('.').pop() || 'jpg';
-      const path = `shop-products/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('media').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
-      if (upErr) throw new Error(`Image upload failed: ${upErr.message}`);
-      urls.push(supabase.storage.from('media').getPublicUrl(path).data.publicUrl);
-    }
-    return urls;
+  // Drag a photo onto another to move it there; the first photo is the cover.
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+  const moveImage = (from, to) => {
+    if (from == null || to == null || from === to) return;
+    const reorder = (arr) => {
+      const next = [...arr];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    };
+    setImages(reorder);
+    setPreviewUrls(reorder);
   };
+  const previewSrc = (url) => {
+    if (!url || url.startsWith('blob:') || url.startsWith('/') || url.startsWith('data:')) return url;
+    return publicImageUrl(url) || url;
+  };
+
+  // Uploads run through the shared shop pipeline (utils/uploadProductImages.js)
+  // so a single product gets exactly what a bulk import gets: a hi-res WebP
+  // plus the companion `.opt.thumb.webp` grid thumbnail, uploaded in parallel
+  // with retries. Writing the pair here is what lets shop grids serve a 480 px
+  // tile instead of the full product photo.
+  const uploadNewImages = () =>
+    uploadShopImages(images, {
+      onProgress: (done, total) => setUploadProgress({ done, total }),
+    });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -333,6 +349,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       const payload = {
         title: formData.title.trim(),
         sku,
+        brand: formData.brand.trim() || null,
         description: formData.description.trim() || null,
         price_aud: price,
         retail_price_aud: rrp,
@@ -471,6 +488,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       }
     } finally {
       setLoading(false);
+      setUploadProgress(null);
     }
   };
 
@@ -478,10 +496,24 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
     <form onSubmit={handleSubmit} className="space-y-8">
       <div className="space-y-4 bg-muted/20 p-6 rounded-2xl border border-border">
         <Label className="text-base font-bold text-foreground">Product Images</Label>
+        {previewUrls.length > 1 && <p className="text-xs text-muted-foreground -mt-2">Drag photos to reorder — the first one is the cover image.</p>}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {previewUrls.map((url, index) => (
-            <div key={index} className="relative aspect-[3/4] rounded-xl overflow-hidden border border-border bg-background shadow-sm group">
-              <img src={url} alt={`Preview ${index}`} className="w-full h-full object-cover" />
+            <div
+              key={`${url}-${index}`}
+              draggable
+              onDragStart={(e) => { setDragIndex(index); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(index)); }}
+              onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overIndex !== index) setOverIndex(index); }}
+              onDrop={(e) => { e.preventDefault(); moveImage(dragIndex, index); setDragIndex(null); setOverIndex(null); }}
+              onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+              className={`relative aspect-[3/4] rounded-xl overflow-hidden border bg-background shadow-sm group cursor-grab active:cursor-grabbing transition-all ${
+                overIndex === index && dragIndex !== null && dragIndex !== index ? 'border-primary ring-2 ring-primary' : 'border-border'
+              } ${dragIndex === index ? 'opacity-40' : ''}`}
+            >
+              <img src={previewSrc(url)} alt={`Preview ${index}`} draggable={false} className="w-full h-full object-cover" />
+              <span className="absolute top-2 left-2 flex items-center gap-1 bg-black/60 text-white text-[10px] font-bold px-1.5 py-1 rounded-lg">
+                <GripVertical size={12} />{index === 0 ? 'Cover' : index + 1}
+              </span>
               <button
                 type="button"
                 onClick={() => removeImage(index)}
@@ -490,6 +522,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
               >
                 <X size={16} />
               </button>
+              <div className="absolute bottom-2 left-2 right-2 flex justify-between sm:hidden">
+                <button type="button" disabled={index === 0} onClick={() => moveImage(index, index - 1)} aria-label="Move earlier" className="bg-black/60 text-white px-2 py-0.5 rounded-lg text-xs disabled:opacity-30">←</button>
+                <button type="button" disabled={index === previewUrls.length - 1} onClick={() => moveImage(index, index + 1)} aria-label="Move later" className="bg-black/60 text-white px-2 py-0.5 rounded-lg text-xs disabled:opacity-30">→</button>
+              </div>
             </div>
           ))}
 
@@ -736,6 +772,18 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                 <Input id="shop-product-barcode" inputMode="numeric" placeholder="Printed on the packaging" value={formData.barcode}
                   onChange={(e) => handleInputChange('barcode', e.target.value)} className="bg-background font-mono" />
               </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="shop-product-brand" className="text-xs">Brand (maker)</Label>
+                <Input id="shop-product-brand" placeholder="e.g. Palms Off Gaming — blank for a CardPop house product" value={formData.brand}
+                  onChange={(e) => handleInputChange('brand', e.target.value)} className="bg-background" />
+                {!formData.brand.trim() && formData.sku.trim() && !/^CP-/i.test(formData.sku.trim()) ? (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400">
+                    This SKU doesn't look like a CardPop house SKU (CP-…). Without a brand Google will list it as a CardPop product — set the maker's name.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-muted-foreground">Google needs a brand plus the SKU or barcode on every product page — blank is treated as CardPop.</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -956,7 +1004,9 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel} disabled={loading} className="rounded-xl">Cancel</Button>}
         <Button type="submit" disabled={loading} className="font-bold rounded-xl active:scale-[0.98]">
           {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-          {product ? 'Update Product' : 'Create Product'}
+          {uploadProgress && uploadProgress.total > 0
+            ? `Uploading images ${uploadProgress.done}/${uploadProgress.total}…`
+            : product ? 'Update Product' : 'Create Product'}
         </Button>
       </div>
     </form>

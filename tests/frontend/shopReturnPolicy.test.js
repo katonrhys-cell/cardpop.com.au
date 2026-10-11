@@ -7,7 +7,7 @@ describe('shop return policy', () => {
   it('matches the Merchant Center settings', () => {
     expect(SHOP_RETURN_POLICY).toMatchObject({
       country: 'AU',
-      windowDays: 5,
+      windowDays: 14,
       refundProcessingDays: 7,
       acceptsChangeOfMind: true,
       acceptsExchanges: true,
@@ -20,7 +20,7 @@ describe('shop return policy', () => {
       '@type': 'MerchantReturnPolicy',
       applicableCountry: 'AU',
       returnPolicyCategory: 'https://schema.org/MerchantReturnFiniteReturnWindow',
-      merchantReturnDays: 5,
+      merchantReturnDays: 14,
       returnMethod: 'https://schema.org/ReturnByMail',
       returnFees: 'https://schema.org/ReturnFeesCustomerResponsibility',
       itemCondition: 'https://schema.org/NewCondition',

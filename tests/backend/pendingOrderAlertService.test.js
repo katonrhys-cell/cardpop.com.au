@@ -20,6 +20,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => {
       eq: (col, val) => { state.lastOrdersFilters[col] = val; return q; },
       not: () => q,
       lt: (col, val) => { state.lastOrdersFilters[col] = val; return q; },
+      gte: (col, val) => { state.lastOrdersFilters[`${col}_gte`] = val; return q; },
       order: () => q,
       in: () => q,
       limit: () => Promise.resolve({ data: state.pendingOrders, error: state.pendingError }),
@@ -100,11 +101,30 @@ describe('findUnfulfilledPaidOrders', () => {
     expect(result.stuck).toEqual([]);
   });
 
-  it('only looks at orders past the grace period', async () => {
+  it('only looks at orders past the grace period and younger than a week', async () => {
     await findUnfulfilledPaidOrders(mockStripe, { now: NOW });
     // 15-minute cutoff, so nothing newer than 11:45 is considered.
     expect(state.lastOrdersFilters.created_at).toBe('2026-07-31T11:45:00.000Z');
+    // …and nothing older than seven days: a stale row was re-sent to Stripe on
+    // every one of the ~360 runs a month otherwise.
+    expect(state.lastOrdersFilters.created_at_gte).toBe('2026-07-24T12:00:00.000Z');
     expect(state.lastOrdersFilters.status).toBe('pending');
+  });
+
+  it('skips orders already reported before spending a Stripe call on them', async () => {
+    state.pendingOrders = [
+      { id: 'ord-old', stripe_session_id: 'cs_old', total_aud: '1', created_at: longAgo },
+      { id: 'ord-new', stripe_session_id: 'cs_new', total_aud: '2', created_at: longAgo },
+    ];
+    state.priorAlerts = [{ related_id: 'ord-old' }];
+    mockStripe.checkout.sessions.retrieve.mockResolvedValue({ payment_status: 'paid' });
+
+    const result = await findUnfulfilledPaidOrders(mockStripe, { now: NOW });
+
+    expect(mockStripe.checkout.sessions.retrieve).toHaveBeenCalledTimes(1);
+    expect(mockStripe.checkout.sessions.retrieve).toHaveBeenCalledWith('cs_new');
+    expect(result).toMatchObject({ checked: 1, alreadyReported: 1 });
+    expect(result.stuck.map(s => s.orderId)).toEqual(['ord-new']);
   });
 
   it('keeps scanning when one session cannot be retrieved', async () => {

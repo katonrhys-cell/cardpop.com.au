@@ -6,8 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent
-} from 'lucide-react';
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +22,7 @@ import { toast } from 'sonner';
 import VaultListingModal from '@/components/VaultListingModal.jsx';
 import { PAID_ORDER_STATUSES, SETTLED_REFUND_STATUSES, summariseRevenue, formatAud } from '@/utils/revenue.js';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
+import SiteTrafficCard from '@/components/admin/SiteTrafficCard.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // `to` turns the whole card into a link through to the detail view behind the
@@ -254,6 +254,11 @@ const AdminDashboard = () => {
             )}
           </CardContent>
         </Card>
+        {/* Visitors from Google Analytics (docs/site-traffic.md) — spans the
+            row so the 30-day sparkline has room. */}
+        <div className="md:col-span-2 lg:col-span-4">
+          <SiteTrafficCard />
+        </div>
       </div>
 
       <div className="space-y-6">
@@ -279,6 +284,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
+          <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
         </div>
       </div>
 
@@ -292,6 +298,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Events Management" description="Create and manage events." icon={Calendar} link="/admin/events" />
           <ManagementBox title="Whatnot Shows" description="Moderate member-listed Whatnot live shows." icon={Tv2} link="/admin/whatnot-shows" />
           <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />
+          <ManagementBox title="Event Reviews" description="Write and publish reviews of the shows CardPop attends." icon={ClipboardPen} link="/admin/event-reviews" />
           <ManagementBox title="Hero Showcase" description="Manage cards in the homepage hero animation." icon={Sparkles} link="/admin/hero-showcase" />
           <ManagementBox title="Collection Sections" description="Pin cards to collection page strips." icon={LayoutList} link="/admin/collection-sections" />
           <ManagementBox title="Media Library" description="Upload and manage images." icon={Image} link="/admin/media" />

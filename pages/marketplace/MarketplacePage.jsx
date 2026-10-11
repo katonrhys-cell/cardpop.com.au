@@ -4,11 +4,13 @@ import { useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
+import { LISTING_CARD_COLUMNS, LISTING_SELLER_EMBED } from '@/lib/listingColumns.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
 import { buildCardSearchOr, buildVariantOr } from '@/src/utils/cardSearchFilter.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { FilterChip, CheckRow, RadioRow } from '@/components/FilterChip.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import {
@@ -88,6 +90,9 @@ const MarketplacePage = () => {
 
   const [sort, setSort] = useState(() => qp('sort', 'created_at_desc'));
   const [filterMode, setFilterMode] = useState(() => qp('mode', 'All'));
+  // Sold cards are hidden by default — a buyer browsing wants what they can
+  // buy; the ?sold=1 toggle brings them back (badged "Sold") for price research.
+  const [includeSold, setIncludeSold] = useState(() => qp('sold') === '1');
 
   // ── Attribute facets (the pill bar) ────────────────────────────────────────
   // Multi-selects are comma-joined in the URL. Vocabulary comes from
@@ -410,10 +415,10 @@ const MarketplacePage = () => {
       try {
         let query = supabase
           .from('listings')
-          .select(`*, ${LISTING_CARD_VAULT_EMBED_INNER}, seller:profiles!seller_id(id, display_name, username, avatar_url, is_verified, seller_tier, rating, reviews_count)`, { count: 'estimated' })
-          // Show sold items too (badged "Sold") — they stay on the marketplace
-          // until an admin archives them. Only 'archived' is hidden here.
-          .in('status', ['active', 'sold'])
+          .select(`${LISTING_CARD_COLUMNS}, ${LISTING_CARD_VAULT_EMBED_INNER}, ${LISTING_SELLER_EMBED}`, { count: 'estimated' })
+          // Available cards only unless the buyer opts into sold ones (badged
+          // "Sold" — useful as price history). 'archived' is never shown.
+          .in('status', includeSold ? ['active', 'sold'] : ['active'])
           .neq('listing_type', 'vault')
           .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
@@ -512,7 +517,7 @@ const MarketplacePage = () => {
     fetchRef.current = run;
     run();
     return () => { cancelled = true; };
-  }, [page, sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures]);
+  }, [page, sort, filterMode, includeSold, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures]);
 
   // Reset to the first page whenever the filters/sort change so the user never
   // lands on an out-of-range page (the stale-fetch is cancelled by the guard).
@@ -521,7 +526,7 @@ const MarketplacePage = () => {
   useEffect(() => {
     if (pageResetInit.current) { pageResetInit.current = false; return; }
     setPage(0);
-  }, [sort, filterMode, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures]);
+  }, [sort, filterMode, includeSold, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, debouncedSearch, debouncedMin, debouncedMax, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures]);
 
   // Mirror the full filter state into the URL (replace, no history spam) so
   // refresh and shared links reproduce the exact view. lastWrittenParamsRef
@@ -530,6 +535,7 @@ const MarketplacePage = () => {
     const params = {};
     if (debouncedSearch) params.q = debouncedSearch;
     if (filterMode !== 'All') params.mode = filterMode;
+    if (includeSold) params.sold = '1';
     if (sort !== 'created_at_desc') params.sort = sort;
     if (filterCat) params.cat = filterCat;
     if (filterFranchise) params.franchise = filterFranchise;
@@ -554,33 +560,17 @@ const MarketplacePage = () => {
       lastWrittenParamsRef.current = next;
       setSearchParams(params, { replace: true });
     }
-  }, [debouncedSearch, filterMode, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures, debouncedMin, debouncedMax, page, setSearchParams]);
+  }, [debouncedSearch, filterMode, includeSold, sort, filterCat, filterFranchise, filterMfr, filterTeam, filterSet, filterParallel, filterSubset, filterPlayer, filterGraded, filterGraders, filterGrades, filterConditions, filterLanguages, filterRarities, filterFeatures, debouncedMin, debouncedMax, page, setSearchParams]);
 
-  // Realtime subscription to vault_items changes to refresh listings.
-  // The subscription is unfiltered (any user's vault edit fires it), so
-  // coalesce bursts into at most one refetch per window — otherwise a seller
-  // bulk-editing their vault triggers a full list query per update on every
-  // connected viewer at once.
-  useEffect(() => {
-    let refreshTimer = null;
-    const channel = supabase
-      .channel('marketplace-vault-items')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'vault_items' },
-        () => {
-          if (refreshTimer) return;
-          refreshTimer = setTimeout(() => {
-            refreshTimer = null;
-            if (fetchRef.current) fetchRef.current();
-          }, 5000);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      if (refreshTimer) clearTimeout(refreshTimer);
-      supabase.removeChannel(channel);
-    };
-  }, []);
+  // Refresh the grid when the visitor comes back to the tab after a while.
+  // This page used to hold an UNFILTERED realtime subscription to every
+  // `vault_items` UPDATE for every visitor, signed in or not: any seller
+  // editing any private card re-ran the full listing query in every open
+  // marketplace tab, and the open subscriptions kept Supabase's WAL poller
+  // running around the clock (the largest consumer of DB time on the
+  // project). Nobody needs a push here — the grid is a snapshot, and the
+  // refresh button / return-to-tab cover staleness.
+  useRefreshOnReturn(() => fetchRef.current?.());
 
   const clearFilters = () => {
     setFilterCat(''); setFilterFranchise(''); setFilterMfr(''); setFilterTeam(''); setFilterSet('');
@@ -1042,6 +1032,16 @@ const MarketplacePage = () => {
           </div>
 
           <div className="hidden md:flex items-center gap-2 shrink-0">
+            <Button
+              type="button"
+              variant={includeSold ? 'default' : 'outline'}
+              size="sm"
+              aria-pressed={includeSold}
+              onClick={() => setIncludeSold((v) => !v)}
+              className="rounded-full h-10 font-medium"
+            >
+              {includeSold ? 'Showing sold' : 'Include sold'}
+            </Button>
             <Button variant="ghost" size="icon" aria-label="Refresh listings" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-10 w-10 bg-muted/50 hover:bg-muted">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>
@@ -1106,6 +1106,16 @@ const MarketplacePage = () => {
           </div>
 
           <div className="flex md:hidden items-center gap-2">
+            <Button
+              type="button"
+              variant={includeSold ? 'default' : 'outline'}
+              size="sm"
+              aria-pressed={includeSold}
+              onClick={() => setIncludeSold((v) => !v)}
+              className="rounded-full h-9 shrink-0 font-medium text-xs"
+            >
+              {includeSold ? 'Showing sold' : 'Include sold'}
+            </Button>
             <Button variant="ghost" size="icon" aria-label="Refresh listings" onClick={() => fetchRef.current?.(true)} disabled={loading} className="rounded-full h-9 w-9 shrink-0 bg-muted/50 hover:bg-muted">
               <RefreshCw className={`w-4 h-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
             </Button>

@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
 import { buildPriceContext, quotableFigures } from './blogPriceContext.js';
@@ -14,7 +14,11 @@ import { checkDraft, BANNED_PHRASE_LIST } from './blogStyleGuard.js';
 // a named author byline, so a human approves before it goes live. Set
 // BLOG_AUTOPUBLISH=true to publish on generation instead.
 
-const MODEL = 'claude-opus-5';
+// Claude Opus 5.5: the current Opus, $4 / $20 per MTok against Claude Opus 5's
+// $5 / $25, same context window and tokenizer. Thinking is always on and
+// effort is the control (set explicitly below — the default dropped to
+// medium); no forced tool_choice is used here, so nothing else changes.
+const MODEL = 'claude-opus-5-5';
 const MAX_ATTEMPTS = 2;
 // How far down the queue a single run will look for a topic whose data gate is
 // satisfied. Only ever produces one article — the window is for skipping past
@@ -22,11 +26,23 @@ const MAX_ATTEMPTS = 2;
 const CANDIDATE_WINDOW = 5;
 
 let cachedClient = null;
-function anthropic() {
+// The SDK is imported here, on first use, rather than at module load: this
+// file sits in the routes graph (routes/blog.js) and the SDK is dead weight on
+// every cold start that isn't the nightly draft. The timeout caps the stream
+// under the 300 s function so a stall fails inside the budget instead of as a
+// 504; one retry, not the SDK's default two, for the same reason.
+async function anthropic() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set — blog generation is disabled.');
   }
-  cachedClient ||= new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  if (!cachedClient) {
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    cachedClient = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: OUTBOUND_TIMEOUT_MS.anthropicDraft,
+      maxRetries: 1,
+    });
+  }
   return cachedClient;
 }
 
@@ -142,7 +158,8 @@ ${violations.map((v, i) => `${i + 1}. ${v}`).join('\n')}`);
 }
 
 async function requestDraft(topic, priceContext, violations) {
-  const stream = anthropic().beta.messages.stream({
+  const client = await anthropic();
+  const stream = client.beta.messages.stream({
     model: MODEL,
     max_tokens: 32000,
     // Blog copy will not trip the safety classifiers, but a refusal returns a
@@ -155,7 +172,10 @@ async function requestDraft(topic, priceContext, violations) {
       effort: 'high',
       format: { type: 'json_schema', schema: ARTICLE_SCHEMA },
     },
-    system: SYSTEM_PROMPT,
+    // The ~13 KB house-style prompt is identical on every call; cache it so the
+    // style-guard retry a few seconds later (and any other draft within the
+    // five-minute window) reads it at a tenth of the price.
+    system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: buildUserPrompt(topic, priceContext, violations) }],
   });
 

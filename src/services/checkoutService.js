@@ -102,7 +102,7 @@ export async function createSingleItemCheckout(req, res) {
 
     let { data: listing, error: listingErr } = await supabase
       .from('listings')
-      .select('id, price_aud, shipping_cost_aud, vault_item_id, seller_id, title, listing_type, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
+      .select('id, price_aud, shipping_cost_aud, vault_item_id, seller_id, listing_type, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
       .eq('id', listingId)
       .eq('status', 'active')
       .maybeSingle();
@@ -113,7 +113,7 @@ export async function createSingleItemCheckout(req, res) {
     if (listingErr && /shipping_cost_aud/.test(listingErr.message || '')) {
       ({ data: listing, error: listingErr } = await supabase
         .from('listings')
-        .select('id, price_aud, vault_item_id, seller_id, title, listing_type, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
+        .select('id, price_aud, vault_item_id, seller_id, listing_type, seller:profiles!seller_id(seller_tier, display_name), vault_item:vault_items!inner(card_name)')
         .eq('id', listingId)
         .eq('status', 'active')
         .maybeSingle());
@@ -166,7 +166,7 @@ export async function createSingleItemCheckout(req, res) {
     // ordinary fixed-price listing.
     const transactionType = offerId ? 'offer' : 'fixed';
 
-    const cardName = listing.vault_item?.card_name || listing.title || 'Trading Card';
+    const cardName = listing.vault_item?.card_name || 'Trading Card';
     const breakdown = await calculateBreakdown({ ...listing, price_aud: itemPrice }, transactionType);
 
     const lineItems = [
@@ -184,7 +184,7 @@ export async function createSingleItemCheckout(req, res) {
       lineItems.push({
         price_data: {
           currency: 'aud',
-          product_data: { name: `Platform Fee (${breakdown.commissionPct}%)` },
+          product_data: { name: `Service fee (${breakdown.commissionPct}%)` },
           unit_amount: Math.round(breakdown.commissionAud * 100),
         },
         quantity: 1,
