@@ -9,7 +9,7 @@
 export const TCG_COLLECTIONS = [
   'Pokemon', 'Magic: The Gathering', 'Yu-Gi-Oh', 'Digimon',
   'Riftbound', 'TMNT', 'Final Fantasy', 'Disney Lorcana', 'One Piece',
-  'Flesh and Blood', 'Dragon Ball Super', 'Star Wars Unlimited',
+  'Flesh and Blood', 'Dragon Ball', 'Star Wars Unlimited',
   'Weiss Schwarz', 'Cardfight!! Vanguard',
 ];
 
@@ -52,4 +52,9 @@ export const COLLECTION_ALIASES = {
   magic: 'Magic: The Gathering',
   yugioh: 'Yu-Gi-Oh',
   'yu-gi-oh!': 'Yu-Gi-Oh',
+  'dragon ball super': 'Dragon Ball',
+  'dragon ball z': 'Dragon Ball',
+  'dragon ball super card game': 'Dragon Ball',
+  dbs: 'Dragon Ball',
+  dbz: 'Dragon Ball',
 };

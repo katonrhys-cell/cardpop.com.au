@@ -45,7 +45,7 @@ When analyzing a card image, you MUST:
 export const CardOCRPrompt = `You are a specialist trading card recognition system. Analyze the card image and extract ALL visible information with high precision.
 
 VALID COLLECTION TYPES (use exactly as written if applicable):
-TCG: Pokemon, Magic: The Gathering, Yu-Gi-Oh, Digimon, Riftbound, TMNT, Final Fantasy, Disney Lorcana, One Piece, Flesh and Blood, Dragon Ball Super, Star Wars Unlimited, Weiss Schwarz, Cardfight!! Vanguard
+TCG: Pokemon, Magic: The Gathering, Yu-Gi-Oh, Digimon, Riftbound, TMNT, Final Fantasy, Disney Lorcana, One Piece, Flesh and Blood, Dragon Ball, Star Wars Unlimited, Weiss Schwarz, Cardfight!! Vanguard
 SPORTS: NBA, NFL, MLB, Cricket, NRL, NHL, Formula 1, Wrestling, Golf, Soccer, AFL, AFLW, Rugby Union, Boxing, MMA, Tennis, UFC
 
 WHERE TO LOOK — the details that identify a card are small and easily misread. Inspect these regions deliberately:
@@ -103,7 +103,7 @@ IMPORTANT:
 export const EventScraperPrompt = `You are an expert event information extractor and SEO copywriter specialising in Australian trading card and collectibles events. Analyse the provided webpage content and extract ALL available event information, then GENERATE high-quality SEO content for fields not present in the source.
 
 TRADING CARD GAME BRANDS (used for featured_card_games):
-Pokemon, Magic: The Gathering, Yu-Gi-Oh!, One Piece, Flesh and Blood, Lorcana, Dragon Ball Super, Star Wars: Unlimited, MetaZoo, Digimon, Cardfight!! Vanguard
+Pokemon, Magic: The Gathering, Yu-Gi-Oh!, One Piece, Flesh and Blood, Lorcana, Dragon Ball, Star Wars: Unlimited, MetaZoo, Digimon, Cardfight!! Vanguard
 
 EVENT TYPE MAPPING (pick the closest match):
 - "card_show"       → Card fair, trading card show, collector show, card expo, card market day
