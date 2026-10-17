@@ -166,7 +166,7 @@ describe('requireIdentityForMarketplacePurchase', () => {
   });
 
   describe('Official CardPop Store listings', () => {
-    it('lets a guest buy an official-store listing (cart shape) and marks the order', async () => {
+    it('lets a guest buy an official-store listing (cart shape)', async () => {
       state.listingsResult = { data: [official('l1')], error: null };
       const req = { body: { items: [{ type: 'listing', id: 'l1' }] }, user: null };
       const res = makeRes();
@@ -174,7 +174,6 @@ describe('requireIdentityForMarketplacePurchase', () => {
       await requireIdentityForMarketplacePurchase(req, res, next);
       expect(next).toHaveBeenCalledTimes(1);
       expect(res.statusCode).toBeNull();
-      expect(req.officialStoreOrder).toBe(true);
       expect(mockIn).toHaveBeenCalledWith('id', ['l1']);
       expect(mockMaybeSingle).not.toHaveBeenCalled();
     });
@@ -211,7 +210,6 @@ describe('requireIdentityForMarketplacePurchase', () => {
       await requireIdentityForMarketplacePurchase(req, res, next);
       expect(next).not.toHaveBeenCalled();
       expect(res.statusCode).toBe(401);
-      expect(req.officialStoreOrder).toBeUndefined();
     });
 
     it('still 403s an unverified account buying a community listing', async () => {
