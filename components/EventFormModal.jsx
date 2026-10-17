@@ -37,7 +37,7 @@ const STATUS_OPTIONS = [
 const CARD_GAMES = [
   'Pokémon', 'Magic: The Gathering', 'Yu-Gi-Oh!',
   'One Piece', 'Flesh and Blood', 'Lorcana',
-  'Dragon Ball Super', 'Star Wars: Unlimited', 'MetaZoo',
+  'Dragon Ball', 'Star Wars: Unlimited', 'MetaZoo',
 ];
 
 const INITIAL_STATE = {
