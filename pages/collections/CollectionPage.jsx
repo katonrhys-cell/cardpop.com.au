@@ -515,18 +515,24 @@ const CollectionPage = () => {
   }, [categoryId, config, slug]);
 
   // ─── Holy Grail (admin-pinned first, then highest-value picks) ────────────
+  // Like every other strip on the page, this waits for the collection's
+  // category id. It used to run without one, which dropped the collection
+  // filter entirely and put the site's priciest Pokémon and NBA cards under
+  // "Stanley Cup Rarities" whenever the config's aliases didn't match the
+  // franchise's DB name.
   useEffect(() => {
+    if (!categoryId) return;
     let cancelled = false;
     setHolyGrailLoading(true);
     const loadHolyGrail = async () => {
       try {
-        let query = supabase.from('vault_items')
+        const query = supabase.from('vault_items')
           .select(`${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PROFILE_CARD_COLUMNS})`)
           .eq('is_public', true)
           .gt('estimated_value_aud', 0)
+          .or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`)
           .order('estimated_value_aud', { ascending: false })
           .limit(6);
-        if (categoryId) query = query.or(`category_id.eq.${categoryId},franchise_id.eq.${categoryId}`);
         const [pinned, { data: featured }] = await Promise.all([
           fetchPinnedSectionItems(slug, 'holy_grail', `${VAULT_ITEM_CARD_SELECT}, owner:profiles!vault_items_owner_id_fkey(${PROFILE_CARD_COLUMNS})`),
           query,

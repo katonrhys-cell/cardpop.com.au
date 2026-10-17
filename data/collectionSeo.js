@@ -170,7 +170,7 @@ export const COLLECTION_SEO = {
   },
   "nhl": {
     name: "NHL Cards",
-    aliases: ["NHL","NHL Cards","Ice Hockey"],
+    aliases: ["NHL","NHL Cards","Ice Hockey","Hockey"],
     title: "NHL Ice Hockey Cards Australia | CardPop",
     description: "Buy and sell NHL ice hockey cards from verified Australian collectors. Browse Upper Deck Series, Parkhurst, and Connor McDavid autos.",
     intro: "Ice hockey card collecting has a devoted following in Australia. From vintage Parkhurst cards of Bobby Orr and Wayne Gretzky to modern Upper Deck Series One and Connor McDavid rookie patches, the NHL hobby is deep and passionate.",

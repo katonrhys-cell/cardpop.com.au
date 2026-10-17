@@ -582,7 +582,7 @@ export const COLLECTION_CONFIGS = {
   nhl: {
     slug: 'nhl',
     name: 'NHL Cards',
-    categoryAliases: ['NHL', 'NHL Cards', 'Ice Hockey'],
+    categoryAliases: ['NHL', 'NHL Cards', 'Ice Hockey', 'Hockey'],
     tagline: 'Ice Cold Cards — Fire Hot Pulls',
     seoTitle: 'NHL Ice Hockey Cards Australia | CardPop',
     seoDescription: 'Buy and sell NHL ice hockey cards from verified Australian collectors. Browse Upper Deck Series, Parkhurst, and Connor McDavid autos.',

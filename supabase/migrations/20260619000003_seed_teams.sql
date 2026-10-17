@@ -1,5 +1,6 @@
 -- Seed teams for the leagues we support out of the gate: NBA, AFL, NRL, NBL,
--- MLB (Baseball), NHL (Hockey) and NFL (Football). Franchises are looked up by
+-- MLB (Baseball), NHL (seeded under the franchise's old name "Hockey" — renamed to
+-- "NHL" in 20261017044015_rename_hockey_franchise_to_nhl.sql) and NFL (Football). Franchises are looked up by
 -- name scoped to the Sports root category, and slugs are derived from the team
 -- name. Idempotent via ON CONFLICT on (franchise_id, slug).
 
