@@ -117,9 +117,13 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md rounded-2xl p-0 overflow-hidden gap-0">
+      {/* A flex column: the header and footer stay put and only the form body
+          scrolls. Never put `overflow-hidden` back on this element — it
+          cancels the dialog's own `overflow-y-auto`, and on a phone the form
+          was clipped so the Send Offer button could not be reached. */}
+      <DialogContent className="sm:max-w-md w-[calc(100%-1.5rem)] rounded-2xl p-0 gap-0 flex flex-col overflow-hidden">
         {submitted ? (
-          <div className="flex flex-col items-center text-center p-10 gap-4">
+          <div className="flex flex-col items-center text-center p-10 gap-4 overflow-y-auto">
             <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center">
               <CheckCircle2 className="w-8 h-8 text-emerald-500" />
             </div>
@@ -150,7 +154,7 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
         ) : (
           <>
             {/* Header */}
-            <div className="px-6 pt-6 pb-4 border-b border-border">
+            <div className="shrink-0 px-6 pt-6 pb-4 border-b border-border">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-lg">
                   <Tag className="w-5 h-5 text-primary" /> Make an Offer
@@ -161,7 +165,7 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
               </DialogHeader>
             </div>
 
-            <div className="px-6 py-5 space-y-5">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-5 space-y-5">
               {/* Price context */}
               <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl border border-border">
                 <div>
@@ -288,13 +292,14 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-6 pb-6 flex gap-3">
-              <Button variant="outline" className="flex-1 rounded-xl" onClick={handleClose} disabled={submitting}>
+            {/* Footer — pinned below the scrolling body so the actions are
+                always on screen, with room for the iPhone home indicator. */}
+            <div className="shrink-0 px-6 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] border-t border-border bg-background flex gap-3">
+              <Button variant="outline" className="flex-1 h-12 rounded-xl font-bold text-base" onClick={handleClose} disabled={submitting}>
                 Cancel
               </Button>
               <Button
-                className="flex-1 rounded-xl gap-2 font-bold"
+                className="flex-1 h-12 rounded-xl gap-2 font-bold text-base"
                 onClick={handleSubmit}
                 disabled={submitting || numericAmount <= 0 || !acknowledged}
               >
