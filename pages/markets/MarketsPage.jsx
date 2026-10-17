@@ -48,7 +48,7 @@ const DEMO_MOVERS = {
     { name: 'Charizard VMAX (Rainbow)', set: "Champion's Path", collection: 'Pokémon', price: 220, change: -14.2, volume: 98 },
     { name: 'Evolving Skies ETB', set: 'Evolving Skies', collection: 'Pokémon', price: 78, change: -9.4, volume: 312 },
     { name: 'Mewtwo V-Union (Alt Art)', set: 'Celebrations', collection: 'Pokémon', price: 48, change: -7.3, volume: 187 },
-    { name: 'Connor McDavid Young Guns', set: '2015-16 Upper Deck', collection: 'Hockey', price: 1200, change: -6.8, volume: 34 },
+    { name: 'Connor McDavid Young Guns', set: '2015-16 Upper Deck', collection: 'NHL', price: 1200, change: -6.8, volume: 34 },
     { name: 'Paradox Rift Booster Box', set: 'Paradox Rift', collection: 'Pokémon', price: 165, change: -5.9, volume: 503 },
     { name: 'Zacian V Alt Art 211/202', set: 'Sword & Shield', collection: 'Pokémon', price: 82, change: -5.1, volume: 241 },
     { name: 'Michael Jordan 1986 Fleer RC', set: '1986-87 Fleer', collection: 'NBA', price: 18500, change: -4.7, volume: 11 },
