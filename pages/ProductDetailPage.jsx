@@ -967,8 +967,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                       <Button size="lg" className="w-full h-14 rounded-xl font-bold text-lg shadow-md" onClick={handleBuyNow}>
                         Buy Now
                       </Button>
-                      <Button size="lg" variant="outline" className="w-full h-12 rounded-xl font-semibold" onClick={handleAddToCart}>
-                        <ShoppingCart className="w-4 h-4 mr-2" aria-hidden="true" /> Add to cart
+                      <Button size="lg" variant="outline" className="w-full h-14 rounded-xl font-bold text-lg" onClick={handleAddToCart}>
+                        <ShoppingCart className="w-5 h-5 mr-2" aria-hidden="true" /> Add to Cart
                       </Button>
                     </>
                   )
@@ -978,7 +978,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <Button
                     size="lg"
                     variant={isEOI ? 'default' : 'outline'}
-                    className="w-full h-14 rounded-xl font-bold text-lg shadow-md"
+                    className="w-full h-14 rounded-xl font-bold text-lg"
                     onClick={handleOpenOffer}
                   >
                     {isEOI ? <HandCoins className="w-5 h-5 mr-2" /> : <Tag className="w-5 h-5 mr-2" />}
