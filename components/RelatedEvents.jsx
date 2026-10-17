@@ -15,6 +15,7 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
         let query = supabase
           .from('events_public')
           .select('*')
+          .eq('status', 'approved')
           .neq('id', currentEventId)
           .gte('start_date', todayStr)
           .order('start_date', { ascending: true })
@@ -29,6 +30,7 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
           ({ data, error } = await supabase
             .from('events_public')
             .select('*')
+            .eq('status', 'approved')
             .neq('id', currentEventId)
             .gte('start_date', todayStr)
             .order('start_date', { ascending: true })

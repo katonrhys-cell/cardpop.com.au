@@ -3,8 +3,9 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink, Accessibility, ShieldAlert } from 'lucide-react';
-import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
+import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink, Accessibility, ShieldAlert, History } from 'lucide-react';
+import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation, toLocalDateStr } from '@/lib/eventSeo.js';
+import { isPastEvent } from '@/utils/eventPast.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -17,6 +18,8 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
   const formattedTime = formatEventTime(event);
   const formattedLocation = formatEventLocation(event);
   const ticketLink = event.ticket_url || event.website_url || event.ticketLink;
+  // A finished event takes reviews, not RSVPs or tickets.
+  const past = isPastEvent(event, toLocalDateStr(new Date()));
 
   const imageUrl = publicImageUrl(event.image_url || event.image || null);
 
@@ -83,10 +86,22 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
             </div>
           </div>
 
-          <div className="bg-secondary/50 p-4 rounded-xl border border-border">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Attending?</h3>
-            <EventRsvp event={event} variant="detail" />
-          </div>
+          {past ? (
+            <div className="bg-secondary/50 p-4 rounded-xl border border-border flex items-start gap-3">
+              <History className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-1">This event has ended</h3>
+                <p className="text-sm text-muted-foreground">
+                  Were you there? Open the event page to read what collectors thought and leave your own review.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="bg-secondary/50 p-4 rounded-xl border border-border">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3">Attending?</h3>
+              <EventRsvp event={event} variant="detail" />
+            </div>
+          )}
 
           <div>
             <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
@@ -123,8 +138,8 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
         {/* Equal-width columns so every action reads as the same size — the
             dialog's own X is the only way out, so there's no Close button. */}
         <DialogFooter className="p-4 bg-muted/20 border-t border-border grid grid-cols-1 sm:grid-flow-col sm:auto-cols-fr gap-2 sm:space-x-0 shrink-0">
-          <AddToCalendarButton event={event} className="h-11 font-semibold" />
-          {ticketLink && (
+          {!past && <AddToCalendarButton event={event} className="h-11 font-semibold" />}
+          {!past && ticketLink && (
             <Button variant="secondary" className="w-full h-11 font-semibold" asChild>
               <a href={ticketLink} target="_blank" rel="noopener noreferrer">
                 <Ticket className="w-4 h-4 mr-2" /> Tickets & Info
@@ -132,8 +147,8 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
             </Button>
           )}
           <Button className="w-full h-11 font-semibold" asChild onClick={onClose}>
-            <Link to={eventPath(event)}>
-              <ExternalLink className="w-4 h-4 mr-2" /> Full Event Page
+            <Link to={past ? `${eventPath(event)}#reviews` : eventPath(event)}>
+              <ExternalLink className="w-4 h-4 mr-2" /> {past ? 'Event Page & Reviews' : 'Full Event Page'}
             </Link>
           </Button>
         </DialogFooter>

@@ -7,7 +7,9 @@ import EventInfoBoard from '@/components/events/EventInfoBoard.jsx';
 import EventDiscussion from '@/components/events/EventDiscussion.jsx';
 import RelatedEvents from '@/components/RelatedEvents.jsx';
 import EventReviewTeaser from '@/components/reviews/EventReviewTeaser.jsx';
+import EventAttendeeReviews from '@/components/events/EventAttendeeReviews.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { isPastEvent } from '@/utils/eventPast.js';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -19,6 +21,7 @@ import {
   buildEventJsonLd,
   buildBreadcrumbJsonLd,
   buildVideoJsonLd,
+  toLocalDateStr,
 } from '@/lib/eventSeo.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -37,7 +40,7 @@ const EventDetailPage = () => {
       setIsLoading(true);
       try {
         const column = UUID_PATTERN.test(eventId) ? 'id' : 'slug';
-        // events_public exposes only approved events with public-safe columns
+        // events_public exposes approved and completed (past) events with public-safe columns
         const { data, error } = await supabase
           .from('events_public')
           .select('*')
@@ -90,6 +93,9 @@ const EventDetailPage = () => {
   }
 
   const locationText = formatEventLocation(event);
+  // Finished (by date, or archived as `completed` by an admin): no RSVP or
+  // tickets, and the attendee reviews section opens.
+  const isPast = isPastEvent(event, toLocalDateStr(new Date()));
   const seoTitle = event.seo_title
     ? `${event.seo_title} | CardPop`
     : `${event.title} – ${formatEventDate(event)} | ${locationText} | CardPop`;
@@ -130,10 +136,13 @@ const EventDetailPage = () => {
           </Link>
         </Button>
 
-        <EventDetailCard event={displayEvent} />
+        <EventDetailCard event={displayEvent} isPast={isPast} />
 
         {/* "CardPop was there" — shown only once an admin has published a review of this event */}
         <EventReviewTeaser eventId={event.id} />
+
+        {/* Collector reviews — only once the event has finished */}
+        {isPast && <EventAttendeeReviews event={event} />}
 
         <EventInfoBoard event={event} />
 

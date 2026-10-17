@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
-import { CalendarDays, Search, MapPin, SlidersHorizontal, X } from 'lucide-react';
+import { CalendarDays, Search, MapPin, SlidersHorizontal, X, History } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -12,14 +12,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { fetchReviewStatsMap } from '@/lib/eventAttendeeReviews.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SITE_URL, EVENT_TYPE_LABELS, buildEventListJsonLd, parseDate, toLocalDateStr } from '@/lib/eventSeo.js';
 
 const AU_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
 const EVENT_TYPES = Object.entries(EVENT_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
+const DAY_MS = 24 * 60 * 60 * 1000;
 const todayStr = toLocalDateStr(new Date());
-const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
+const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * DAY_MS));
+// The "Past events" window: yesterday back two years. Older shows are still
+// reachable by moving the start date.
+const yesterdayStr = toLocalDateStr(new Date(Date.now() - DAY_MS));
+const twoYearsAgoStr = toLocalDateStr(new Date(Date.now() - 2 * 365 * DAY_MS));
 
 // Everything the card, the detail modal and the JSON-LD read from an event —
 // the public view minus its SEO-only columns.
@@ -43,11 +50,26 @@ const MAX_EVENTS = 500;
  * fetched: the page used to pull every public event ever — most of them past —
  * and filter in the browser, and the filter defaults to "today → next year"
  * anyway. Dates are validated before they reach the filter string.
+ *
+ * `past: true` is the "Past events" toggle: finished events inside the window
+ * (newest first, no undated ones) plus anything an admin has marked
+ * `completed` — their archive — whatever its date. The upcoming view is
+ * `approved` only, so an archived event never sits in the calendar. `today`
+ * caps the past window when the end date is blank.
  */
-export function buildEventsQuery(client, { startDate, endDate } = {}) {
+export function buildEventsQuery(client, { startDate, endDate, past = false, today } = {}) {
   let q = client.from('events_public').select(EVENT_CARD_COLUMNS);
   const start = ISO_DATE_RE.test(startDate || '') ? startDate : null;
-  const end = ISO_DATE_RE.test(endDate || '') ? endDate : null;
+  let end = ISO_DATE_RE.test(endDate || '') ? endDate : null;
+  if (past) {
+    if (!end && ISO_DATE_RE.test(today || '')) end = today;
+    const window = start && end ? `and(start_date.gte.${start},start_date.lte.${end})`
+      : start ? `start_date.gte.${start}`
+        : end ? `start_date.lte.${end}` : null;
+    q = window ? q.or(`status.eq.completed,${window}`) : q.not('start_date', 'is', null);
+    return q.order('start_date', { ascending: false }).limit(MAX_EVENTS);
+  }
+  q = q.eq('status', 'approved');
   if (start && end) q = q.or(`start_date.is.null,and(start_date.gte.${start},start_date.lte.${end})`);
   else if (start) q = q.or(`start_date.is.null,start_date.gte.${start}`);
   else if (end) q = q.or(`start_date.is.null,start_date.lte.${end}`);
@@ -105,11 +127,35 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   const [rsvpCounts, setRsvpCounts] = useState({});
   const [myRsvps, setMyRsvps] = useState({});
 
+  // "Past events" lives in the URL (?past=1) so a look back is linkable and
+  // survives the back button. Off = the calendar: today → next year.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showPast = searchParams.get('past') === '1';
+  const defaultStart = showPast ? twoYearsAgoStr : todayStr;
+  const defaultEnd = showPast ? yesterdayStr : nextYearStr;
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filterState, setFilterState] = useState('all');
   const [filterType, setFilterType] = useState(defaultType);
-  const [startDate, setStartDate] = useState(todayStr);
-  const [endDate, setEndDate] = useState(nextYearStr);
+  const [startDate, setStartDate] = useState(defaultStart);
+  const [endDate, setEndDate] = useState(defaultEnd);
+  // Star summaries for the past grid ({ [eventId]: { review_count, average_rating } }).
+  const [reviewStats, setReviewStats] = useState({});
+
+  const setShowPast = (on) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (on) next.set('past', '1'); else next.delete('past');
+      return next;
+    }, { replace: true });
+  };
+
+  // Flipping the toggle (or arriving via the URL) resets the window to that
+  // mode's defaults; a hand-picked range in one mode makes no sense in the other.
+  useEffect(() => {
+    setStartDate(showPast ? twoYearsAgoStr : todayStr);
+    setEndDate(showPast ? yesterdayStr : nextYearStr);
+  }, [showPast]);
 
   // Reset filter when the route changes between type pages
   useEffect(() => {
@@ -133,7 +179,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
       setIsLoading(true);
       setError(null);
       try {
-        const { data, error: fetchError } = await buildEventsQuery(supabase, { startDate, endDate });
+        const { data, error: fetchError } = await buildEventsQuery(supabase, { startDate, endDate, past: showPast, today: todayStr });
         if (fetchError) throw fetchError;
         if (!cancelled && isMounted.current) setEvents(data || []);
       } catch (err) {
@@ -146,8 +192,20 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
     const timer = setTimeout(run, fetchRef.current && events.length ? 300 : 0);
     return () => { cancelled = true; clearTimeout(timer); isMounted.current = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- events.length only picks the debounce
-  }, [startDate, endDate]);
+  }, [startDate, endDate, showPast]);
   const fetchEvents = () => fetchRef.current?.();
+
+  // Past grid only: one request for every card's star summary.
+  useEffect(() => {
+    if (!showPast) { setReviewStats({}); return undefined; }
+    const ids = events.map(e => e.id).filter(Boolean);
+    if (ids.length === 0) { setReviewStats({}); return undefined; }
+    let cancelled = false;
+    fetchReviewStatsMap(ids)
+      .then((map) => { if (!cancelled) setReviewStats(map); })
+      .catch(() => { if (!cancelled) setReviewStats({}); });
+    return () => { cancelled = true; };
+  }, [events, showPast]);
 
   // Batch-load RSVP data for every loaded event at once. Re-runs when the signed-in
   // user resolves so their own RSVP roles fill in. Each helper issues a single
@@ -193,10 +251,12 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
       const eventDate = e.start_date ? parseDate(e.start_date) : null;
       const matchStart = !startDate || !eventDate || eventDate >= parseDate(startDate);
       const matchEnd = !endDate || !eventDate || eventDate <= new Date(endDate + 'T23:59:59');
+      // An archived (completed) event belongs in the past view whatever its date.
+      const matchDate = (showPast && e.status === 'completed') || (matchStart && matchEnd);
 
-      return matchSearch && matchState && matchType && matchStart && matchEnd;
+      return matchSearch && matchState && matchType && matchDate;
     });
-  }, [events, searchTerm, filterState, filterType, startDate, endDate]);
+  }, [events, searchTerm, filterState, filterType, startDate, endDate, showPast]);
 
   const groupedEvents = useMemo(() => {
     const groups = {};
@@ -210,25 +270,26 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   }, [filteredEvents]);
 
   const hasActiveFilters = searchTerm || filterState !== 'all' || filterType !== defaultType ||
-    startDate !== todayStr || endDate !== nextYearStr;
+    startDate !== defaultStart || endDate !== defaultEnd;
 
   const clearFilters = () => {
     setSearchTerm('');
     setFilterState('all');
     setFilterType(defaultType);
-    setStartDate(todayStr);
-    setEndDate(nextYearStr);
+    setStartDate(defaultStart);
+    setEndDate(defaultEnd);
   };
 
   const dateInputClass = 'flex h-11 w-full min-w-0 appearance-none items-center rounded-xl border border-border bg-background px-3 text-left text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [&::-webkit-date-and-time-value]:text-left';
 
   const structuredData = useMemo(() => {
+    if (showPast) return null;
     const upcoming = events
       .filter(e => e.start_date && new Date(e.start_date) >= new Date(todayStr))
       .slice(0, 25);
     if (upcoming.length === 0) return null;
     return buildEventListJsonLd(upcoming);
-  }, [events]);
+  }, [events, showPast]);
 
   const seo = TYPE_SEO[defaultType] || ALL_SEO;
 
@@ -329,6 +390,17 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
                 className={dateInputClass}
               />
             </div>
+
+            {/* Past events toggle */}
+            <div className="w-full lg:w-36 shrink-0">
+              <label htmlFor="show-past-events" className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground mb-1.5">
+                <History className="w-3.5 h-3.5" /> Past Events
+              </label>
+              <div className="flex h-11 items-center gap-2.5 rounded-xl border border-border bg-background px-3">
+                <Switch id="show-past-events" checked={showPast} onCheckedChange={setShowPast} aria-label="Show past events" />
+                <span className="text-sm font-medium">{showPast ? 'Showing' : 'Hidden'}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -337,7 +409,10 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
           <p className="text-sm text-muted-foreground">
             Showing{' '}
             <span className="font-semibold text-foreground">{filteredEvents.length}</span>{' '}
-            approved event{filteredEvents.length !== 1 ? 's' : ''}
+            {showPast ? 'past' : 'upcoming'} event{filteredEvents.length !== 1 ? 's' : ''}
+            {showPast && (
+              <span className="hidden sm:inline"> — been to one? Open it to read and leave reviews.</span>
+            )}
           </p>
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground hover:text-foreground">
@@ -368,9 +443,11 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
         ) : filteredEvents.length === 0 ? (
           <div className="text-center py-24 bg-card rounded-3xl border border-dashed border-border">
             <CalendarDays className="w-14 h-14 text-muted-foreground mx-auto mb-4 opacity-40" />
-            <h3 className="text-xl font-bold mb-2">No upcoming events found</h3>
+            <h3 className="text-xl font-bold mb-2">No {showPast ? 'past' : 'upcoming'} events found</h3>
             <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-              There are currently no approved events matching your selected criteria.
+              {showPast
+                ? 'No finished events match your selected criteria. Try widening the dates.'
+                : 'There are currently no approved events matching your selected criteria.'}
             </p>
             <Button onClick={clearFilters}>Clear All Filters</Button>
           </div>
@@ -390,6 +467,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
                       event={event}
                       isAdmin={false}
                       rsvpData={rsvpDataById[event.id]}
+                      reviewStats={reviewStats[event.id]}
                       onView={ev => { setSelectedEvent(ev); setIsDetailOpen(true); }}
                     />
                   ))}

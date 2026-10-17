@@ -1506,7 +1506,9 @@ async function renderEvent(supabase, param) {
   query = byUuid ? query.eq('id', param) : query.eq('slug', param);
   const { data: event } = await query.maybeSingle();
 
-  if (!event || event.status !== 'approved') {
+  // Approved, or completed — an admin's archive. A finished event keeps its
+  // page (collectors review it there); only pending/rejected/cancelled 404.
+  if (!event || !['approved', 'completed'].includes(event.status)) {
     return notFound({
       title: 'Event Not Found | CardPop',
       description: 'This event could not be found on CardPop.',

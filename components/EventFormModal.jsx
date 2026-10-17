@@ -30,7 +30,7 @@ const STATUS_OPTIONS = [
   { value: 'approved',       label: 'Approved (Live)' },
   { value: 'pending_review', label: 'Pending Review' },
   { value: 'cancelled',      label: 'Cancelled' },
-  { value: 'completed',      label: 'Completed' },
+  { value: 'completed',      label: 'Completed (archived — stays under Past Events)' },
   { value: 'rejected',       label: 'Rejected' },
 ];
 

@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff } from 'lucide-react';
+import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff, History, MessageSquareQuote } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventTime, formatEventLocation } from '@/lib/eventSeo.js';
+import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventTime, formatEventLocation, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
+import HalfStars from '@/components/reviews/HalfStars.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { isPastEvent } from '@/utils/eventPast.js';
 
-const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData }) => {
+// `reviewStats` ({ review_count, average_rating }) is the past grid's star
+// summary, batch-loaded by the page; an upcoming event never shows one.
+const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewStats }) => {
   const eventTitle = event.title || event.name;
+  const past = isPastEvent(event, toLocalDateStr(new Date()));
+  const reviewCount = Number(reviewStats?.review_count) || 0;
   const formattedDate = formatEventDate(event);
   const formattedTime = formatEventTime(event);
   const formattedLocation = formatEventLocation(event);
@@ -52,8 +58,10 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData }) => {
               <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
             );
           })()}
-          {event.status === 'inactive' && (
-            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">Inactive</Badge>
+          {past && (
+            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground gap-1">
+              <History className="w-3 h-3" /> Past event
+            </Badge>
           )}
         </div>
         <div className="absolute bottom-3 right-3 bg-background/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-1.5">
@@ -83,10 +91,33 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData }) => {
       </CardContent>
 
       <CardFooter className="pt-4 border-t border-border flex flex-col gap-3">
-        <EventRsvp event={event} variant="card" rsvpData={rsvpData} />
+        {past ? (
+          <Link to={`${eventPath(event)}#reviews`} className="flex w-full items-center gap-2 text-sm hover:text-primary transition-colors">
+            {reviewCount > 0 ? (
+              <>
+                <HalfStars value={reviewStats.average_rating} />
+                <span className="font-semibold">{Number(reviewStats.average_rating).toFixed(1)}</span>
+                <span className="text-muted-foreground">· {reviewCount} review{reviewCount !== 1 ? 's' : ''}</span>
+              </>
+            ) : (
+              <>
+                <MessageSquareQuote className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">No reviews yet — were you there?</span>
+              </>
+            )}
+          </Link>
+        ) : (
+          <EventRsvp event={event} variant="card" rsvpData={rsvpData} />
+        )}
 
         <div className="flex w-full items-center gap-2">
-          {onView ? (
+          {past ? (
+            <Button variant="secondary" className="flex-1 gap-2 font-semibold" asChild>
+              <Link to={`${eventPath(event)}#reviews`}>
+                <MessageSquareQuote className="w-4 h-4" /> Details &amp; Reviews
+              </Link>
+            </Button>
+          ) : onView ? (
             <Button variant="secondary" className="flex-1 gap-2 font-semibold" onClick={() => onView(event)}>
               <Info className="w-4 h-4" /> Details
             </Button>
