@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { filterEvents, sortEvents, defaultSortDir, EVENT_SORT_KEYS } from '@/utils/adminEventList.js';
+import { filterEvents, sortEvents, groupEventsByTiming, defaultSortDir, EVENT_SORT_KEYS } from '@/utils/adminEventList.js';
 
 const E = (o) => ({ status: 'approved', event_type: 'card_show', auto_discovered: false, is_featured: false, ...o });
 const events = [
@@ -92,5 +92,40 @@ describe('sortEvents', () => {
     expect(defaultSortDir('created')).toBe('desc');
     expect(defaultSortDir('title')).toBe('asc');
     expect(EVENT_SORT_KEYS).toEqual(['date', 'title', 'location', 'status', 'created', 'updated']);
+  });
+});
+
+describe('groupEventsByTiming', () => {
+  it('splits current from past, leaving out an empty section', () => {
+    const sections = groupEventsByTiming(events, 'date', 'desc', { today: TODAY });
+    expect(sections.map((s) => s.key)).toEqual(['current', 'past']);
+    expect(sections[0].label).toBe('Current & upcoming');
+    expect(ids(sections[1].events)).toEqual(['scanned', 'done']);
+    const onlyPast = groupEventsByTiming(events.filter((e) => e.id === 'done'), 'date', 'desc', { today: TODAY });
+    expect(onlyPast.map((s) => s.key)).toEqual(['past']);
+    expect(groupEventsByTiming([], 'date', 'desc', { today: TODAY })).toEqual([]);
+  });
+
+  it('shows current events soonest-first and past events most-recent-first by default', () => {
+    const [current, past] = groupEventsByTiming(events, 'date', 'desc', { today: TODAY });
+    expect(ids(current.events)).toEqual(['hangout', 'tcxpo', 'sydney', 'perth', 'undated']);
+    expect(ids(past.events)).toEqual(['scanned', 'done']);
+  });
+
+  it('flips both sections when the date direction is reversed', () => {
+    const [current, past] = groupEventsByTiming(events, 'date', 'asc', { today: TODAY });
+    expect(ids(current.events)).toEqual(['perth', 'sydney', 'tcxpo', 'hangout', 'undated']);
+    expect(ids(past.events)).toEqual(['done', 'scanned']);
+  });
+
+  it('sorts both sections the same way for a non-date column', () => {
+    const [current, past] = groupEventsByTiming(events, 'title', 'asc', { today: TODAY });
+    expect(ids(current.events)[0]).toBe('undated');
+    expect(ids(past.events)).toEqual(['scanned', 'done']);
+  });
+
+  it('files a completed event under Past even if its date is in the future', () => {
+    const future = [E({ id: 'archived', title: 'Archived early', status: 'completed', start_date: '2027-01-01' })];
+    expect(groupEventsByTiming(future, 'date', 'desc', { today: TODAY })[0].key).toBe('past');
   });
 });

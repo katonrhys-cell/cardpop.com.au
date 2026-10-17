@@ -125,3 +125,32 @@ export function sortEvents(events, sortKey = 'date', direction = 'desc') {
 // text A→Z, status in work order.
 export const DEFAULT_SORT_DIR = { date: 'desc', created: 'desc', updated: 'desc' };
 export const defaultSortDir = (key) => DEFAULT_SORT_DIR[key] || 'asc';
+
+export const EVENT_SECTIONS = [
+  { key: 'current', label: 'Current & upcoming' },
+  { key: 'past',    label: 'Past' },
+];
+
+/**
+ * Split a filtered list into the Current & upcoming and Past sections and sort
+ * each. Empty sections are left out.
+ *
+ * The one sort control drives both sections, with a twist for the event-date
+ * column: "newest first" means what an admin expects in each half — in Past
+ * the most recently finished event, in Current the one happening soonest —
+ * so the date direction is flipped for the current section. Every other
+ * column sorts both sections the same way.
+ *
+ * @returns {{ key: string, label: string, events: object[] }[]}
+ */
+export function groupEventsByTiming(events, sortKey = 'date', direction = 'desc', ctx = {}) {
+  const buckets = { current: [], past: [] };
+  for (const ev of events || []) buckets[isPastEvent(ev, ctx.today) ? 'past' : 'current'].push(ev);
+  return EVENT_SECTIONS
+    .filter(({ key }) => buckets[key].length > 0)
+    .map(({ key, label }) => {
+      const flip = key === 'current' && (SORT_VALUES[sortKey] ? sortKey : 'date') === 'date';
+      const dir = flip ? (direction === 'asc' ? 'desc' : 'asc') : direction;
+      return { key, label, events: sortEvents(buckets[key], sortKey, dir) };
+    });
+}
