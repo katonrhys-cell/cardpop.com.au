@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert, History, MessageSquareQuote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } from '@/lib/eventSeo.js';
@@ -10,7 +10,9 @@ import InArticleAd from '@/components/InArticleAd.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { toast } from 'sonner';
 
-const EventDetailCard = ({ event }) => {
+// `isPast` — the event has finished (utils/eventPast.js): the RSVP, ticket
+// and calendar actions give way to a pointer at the reviews section.
+const EventDetailCard = ({ event, isPast = false }) => {
   const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
   const fbEmbedUrl = facebookEmbedUrl(event.facebook_video_url);
   const ytFrameRef = useRef(null);
@@ -234,11 +236,29 @@ const EventDetailCard = ({ event }) => {
               )}
             </div>
 
-            <div className="space-y-3 pt-4 border-t border-border">
-              <h3 className="font-bold text-lg uppercase tracking-wider text-muted-foreground pb-1">Attending?</h3>
-              <EventRsvp event={event} variant="detail" />
-            </div>
+            {isPast ? (
+              <div className="pt-4 border-t border-border">
+                <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
+                  <History className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="space-y-2">
+                    <p className="font-bold text-foreground">This event has ended</p>
+                    <p className="text-sm text-muted-foreground leading-snug">
+                      Were you there? Read what collectors thought and add your own review.
+                    </p>
+                    <Button variant="outline" size="sm" className="rounded-xl font-semibold gap-1.5" asChild>
+                      <a href="#reviews"><MessageSquareQuote className="w-4 h-4" /> Go to reviews</a>
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 pt-4 border-t border-border">
+                <h3 className="font-bold text-lg uppercase tracking-wider text-muted-foreground pb-1">Attending?</h3>
+                <EventRsvp event={event} variant="detail" />
+              </div>
+            )}
 
+            {!isPast && (
             <div className="space-y-3 pt-4">
               {event.ticketLink ? (
                 <Button className="w-full h-12 text-base font-bold shadow-lg shadow-primary/20" asChild>
@@ -260,6 +280,7 @@ const EventDetailCard = ({ event }) => {
 
               <AddToCalendarButton event={event} />
             </div>
+            )}
 
             {(event.instagram_url || event.facebook_url || event.website_url) && (
               <div className="pt-6 border-t border-border">

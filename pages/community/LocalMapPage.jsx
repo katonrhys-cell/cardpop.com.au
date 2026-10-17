@@ -216,6 +216,7 @@ const LocalMapPage = () => {
         const { data: events } = await supabase
           .from('events_public')
           .select('id, title, event_type, venue_name, address, suburb, state, postcode, start_date, end_date, website_url, slug')
+          .eq('status', 'approved')
           .gte('start_date', today)
           .not('state', 'is', null)
           .order('start_date', { ascending: true })

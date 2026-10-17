@@ -81,6 +81,25 @@ describe('BLOG_CARD_COLUMNS and EVENT_CARD_COLUMNS', () => {
     expect(cols(EVENT_CARD_COLUMNS)).not.toContain('seo_keywords');
   });
 
+  it('keeps the calendar to approved events and the past view to finished or archived ones', () => {
+    const calls = [];
+    const q = new Proxy({}, { get: (_t, prop) => (...args) => { calls.push([prop, ...args]); return q; } });
+    const client = { from: () => q };
+    buildEventsQuery(client, { startDate: '2026-10-10', endDate: '2027-10-10' });
+    expect(calls).toContainEqual(['eq', 'status', 'approved']);
+
+    calls.length = 0;
+    buildEventsQuery(client, { startDate: '2024-10-16', endDate: '2026-10-16', past: true, today: '2026-10-17' });
+    expect(calls).toContainEqual(['or', 'status.eq.completed,and(start_date.gte.2024-10-16,start_date.lte.2026-10-16)']);
+    expect(calls).toContainEqual(['order', 'start_date', { ascending: false }]);
+    expect(calls.some(([m, a]) => m === 'eq' && a === 'status')).toBe(false);
+
+    // A blank end date in past mode is capped at today, never open-ended.
+    calls.length = 0;
+    buildEventsQuery(client, { startDate: '', endDate: '', past: true, today: '2026-10-17' });
+    expect(calls).toContainEqual(['or', 'status.eq.completed,start_date.lte.2026-10-17']);
+  });
+
   it('refuses a malformed date rather than interpolating it into the filter', () => {
     const calls = [];
     const q = new Proxy({}, { get: (_t, prop) => (...args) => { calls.push([prop, ...args]); return q; } });

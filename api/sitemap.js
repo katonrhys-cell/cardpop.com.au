@@ -246,7 +246,7 @@ export default async function handler(req, res) {
       fetchAll(() => supabase
         .from('events')
         .select('id, slug, updated_at, created_at')
-        .eq('status', 'approved')
+        .in('status', ['approved', 'completed'])
         .gte('start_date', EVENTS_SINCE)
         .order('start_date', { ascending: true })
         .order('id'), MAX_ROWS.events),
