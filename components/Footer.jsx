@@ -129,7 +129,7 @@ const Footer = () => {
             © {new Date().getFullYear()} CardPop Australia™. All rights reserved.
           </p>
           <p className="text-muted-foreground text-sm">
-            Made with ❤️ for the Australian trading card community
+            Made with ❤️ for the Australian Trading Card Community
           </p>
         </div>
       </div>
