@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload } from 'lucide-react';
+import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload, ExternalLink } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,7 @@ import ShopCategoryManager from '@/components/admin/ShopCategoryManager.jsx';
 import BulkProductImport from '@/components/admin/BulkProductImport.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { variantKind } from '@/utils/shopVariants.js';
 import {
   SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
@@ -203,7 +204,21 @@ const ProductManagementPage = () => {
 
   const renderRow = (product) => (
     <TableRow key={product.id}>
-      <TableCell className="font-bold text-foreground">{product.title}</TableCell>
+      <TableCell className="font-bold text-foreground">
+        {/* The name opens the product's public page in a new tab — the same
+            canonical URL shoppers use (utils/shopProductUrl.js), so a draft
+            or archived row shows the admin exactly what the shop would. */}
+        <a
+          href={shopProductPath(product)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open product page in a new tab"
+          className="inline-flex items-center gap-1.5 hover:text-primary hover:underline underline-offset-2"
+        >
+          {product.title}
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </a>
+      </TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">
         {product.sku || <span className="text-destructive">missing</span>}
         {(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length > 0 && (

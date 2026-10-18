@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const rows = vi.hoisted(() => ({
   shop_products: [
     { id: 'a', sku: 'TL-55PT', title: 'Palms Off Top Loaders 55pt', category: 'Top Loaders', price_aud: 7.5, stock_quantity: 0, status: 'coming_soon', brand: 'Palms Off Gaming' },
-    { id: 'b', sku: 'CP-TL-25', title: 'Top Loaders 25 Pack', category: 'Top Loaders', price_aud: 9.99, stock_quantity: 12, status: 'active', brand: null },
+    { id: 'b', sku: 'CP-TL-25', slug: 'top-loaders-25-pack', title: 'Top Loaders 25 Pack', category: 'Top Loaders', price_aud: 9.99, stock_quantity: 12, status: 'active', brand: null },
     { id: 'c', sku: 'CP-BM-10', title: 'Bubble Mailers 10 Pack', category: 'Bubble Mailers', price_aud: 6.95, stock_quantity: 5, status: 'active', brand: null },
   ],
   shop_product_costs: [],
@@ -50,6 +50,18 @@ describe('ProductManagementPage filters, sorting and sections', () => {
     expect(screen.getByText('Shipping')).toBeInTheDocument();
     expect(screen.getByText('Top Loaders · 2')).toBeInTheDocument();
     expect(screen.getByText('Bubble Mailers · 1')).toBeInTheDocument();
+  });
+
+  it('links each product name to its public page in a new tab', async () => {
+    renderPage();
+    await screen.findByText('Protection');
+    const link = screen.getByRole('link', { name: /Top Loaders 25 Pack/ });
+    expect(link).toHaveAttribute('href', '/shop/top-loaders/top-loaders-25-pack');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', expect.stringContaining('noopener'));
+    // A row with no slug yet still opens somewhere: the legacy id-based URL.
+    expect(screen.getByRole('link', { name: /Bubble Mailers 10 Pack/ }))
+      .toHaveAttribute('href', '/product/shop/c/bubble-mailers-10-pack');
   });
 
   it('sorts by a column in the flat list view', async () => {
