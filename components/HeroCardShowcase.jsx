@@ -163,10 +163,15 @@ const HeroCardShowcase = ({ cards = [] }) => {
   // stage or the stand below it.
   const stageHeight = 460 + Math.max(0, shelfRows.length - 1) * SHELF_ROW_STEP;
 
+  // Positioned by the hero text column (`relative`, right padding reserved
+  // for the stage in pages/HomePage.jsx), not the full-width section — the
+  // 540px stage is 460px of shelf centred in it, so hanging it 32–40px past
+  // the column edge puts the shelf flush with the column's right edge and
+  // clear of the headline's wrap width.
   return (
     <div
       aria-hidden="true"
-      className="absolute right-[1%] xl:right-[4%] top-1/2 -translate-y-1/2 hidden lg:block w-[540px] pointer-events-none select-none"
+      className="absolute -right-8 xl:-right-10 top-1/2 -translate-y-1/2 hidden lg:block w-[540px] pointer-events-none select-none"
       style={{ height: stageHeight }}
     >
       {/* ── Background cabinet / shelf(-ves) — a bookshelf of up to 5 cards per row ── */}
