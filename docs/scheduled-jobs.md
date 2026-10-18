@@ -146,6 +146,14 @@ Not every schedule is in Actions. pg_cron inside the Supabase project runs:
 
 ## Troubleshooting
 
+**Every run fails in a few seconds with "CRON_SECRET is empty".** The `CRON_SECRET`
+repository secret was never added (this is how every schedule sat broken from
+2026-09-13 to 2026-10-18: price snapshots stopped, no retention email went out,
+the blog stopped publishing). Add it under Settings → Secrets and variables →
+Actions with exactly the value Vercel holds, then re-run each workflow by hand.
+`.github/workflows/cron-health.yml` now opens one tracking issue the first time
+any `Cron ·` workflow fails so this can't go unnoticed again.
+
 **A run fails with HTTP 401.** The `CRON_SECRET` repository secret and the
 `CRON_SECRET` environment variable in Vercel have drifted apart, or the Vercel
 variable is unset (every endpoint fails closed, so unset reads as 401).

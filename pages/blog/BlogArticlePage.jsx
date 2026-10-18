@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import DOMPurify from 'dompurify';
 import SEOHead from '@/components/SEOHead.jsx';
+import { articleDisclosure } from '@/utils/articleProvenance.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowLeft, FileText } from 'lucide-react';
@@ -502,6 +503,10 @@ const BlogArticlePage = () => {
               </>
             )}
           </div>
+
+          {articleDisclosure(article) && (
+            <p className="text-xs leading-relaxed text-muted-foreground">{articleDisclosure(article)}</p>
+          )}
 
           <ConvictionRating article={article} />
 

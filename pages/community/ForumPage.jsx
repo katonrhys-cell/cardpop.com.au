@@ -76,6 +76,7 @@ const ForumPage = () => {
       <SEOHead
         title="Community Forum | CardPop"
         description="Join discussions with Australian trading card collectors. Talk market trends, trading, grading and more on CardPop."
+        noindex={!loading && !error && posts.length === 0}
       />
 
       <div className="container-default pt-6">

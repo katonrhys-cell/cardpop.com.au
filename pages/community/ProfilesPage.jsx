@@ -70,6 +70,7 @@ const ProfilesPage = () => {
       <SEOHead
         title="Collector Profiles | CardPop Community"
         description="Browse verified trading card collectors on CardPop. Find fellow hobbyists, traders and sellers across Australia."
+        noindex={!loading && !error && profiles.length === 0}
       />
 
       <div className="container-default pt-6">
@@ -260,7 +261,7 @@ const ProfilesPage = () => {
         <div className="max-w-5xl mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 text-center">
           <h2 className="text-2xl font-bold mb-3">Meet Australia's Collectors</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-sm leading-relaxed">
-            CardPop is home to thousands of Australian trading card collectors. Browse verified profiles,
+            CardPop is a growing community of Australian trading card collectors. Browse verified profiles,
             find traders who specialise in your favourite games, and connect with the community.
           </p>
         </div>

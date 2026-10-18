@@ -21,6 +21,7 @@ import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerPro
 import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
+import { articleDisclosure } from '../utils/articleProvenance.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -522,6 +523,7 @@ async function renderBlogArticle(supabase, param) {
   <article>
     <h1>${esc(article.title)}</h1>
     <p><em>By ${esc(author)}${published ? ` — ${esc(new Date(published).toISOString().split('T')[0])}` : ''}${article.read_time_minutes ? ` · ${esc(String(article.read_time_minutes))} min read` : ''}</em></p>
+    ${articleDisclosure(article) ? `<p><small>${esc(articleDisclosure(article))}</small></p>` : ''}
     ${article.excerpt ? `<p>${esc(article.excerpt)}</p>` : ''}
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
     ${addHeadingAnchors(bodyContent) || `<p>${esc(description)}</p>`}
@@ -1218,7 +1220,7 @@ const LANDINGS = {
   },
   '/marketplace': {
     title: 'Buy & Sell Trading Cards Online Australia | CardPop Marketplace', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
-    description: 'Browse thousands of Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian sellers. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
+    description: 'Browse Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
     intro: "Discover cards directly from other collectors' vaults alongside official CardPop listings.",
   },
 };
@@ -1800,6 +1802,11 @@ const STATIC_CONTENT = {
 
 
   '/launch': {
+    // The pre-launch capture page. The site is live, so a "launching late
+    // 2026, join the waitlist" page is a stale under-construction signal to a
+    // reviewer and a thin page to a search engine — kept reachable, never
+    // indexed, and no longer in the sitemap.
+    robots: 'noindex, follow',
     title: "CardPop — Australia's Trading Card Marketplace | Launching Late 2026",
     description: "CardPop is launching late 2026: buy, sell and trade Pokémon, Magic and sports cards on Australia's new trading card marketplace. Join the launch list to be first in.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Launch', path: '/launch' }],
@@ -2069,7 +2076,7 @@ const STATIC_CONTENT = {
     intro: 'Discuss market trends, connect with verified collectors, and discover authorized retailers shaping the hobby.',
     sections: [
       { h2: 'List free for 30 days', paras: ['List and sell cards completely free for 30 days, no card required. Join Australia’s fastest-growing trading card community.'] },
-      { h2: 'Promote your Whatnot shows', paras: ['Got live pack breaks and auctions? List your shows on CardPop and reach thousands of Australian collectors.'] },
+      { h2: 'Promote your Whatnot shows', paras: ['Got live pack breaks and auctions? List your shows on CardPop and reach Australian collectors before you go live.'] },
       { h2: 'Recent discussions', paras: ['Join the forum to talk market trends, pulls and deals with collectors across Australia.'] },
       { h2: 'Verified collectors', paras: ['Browse collectors who have built a public presence on CardPop.'] },
       { h2: 'Retailers & suppliers', paras: ['Authorized retailers and suppliers trusted by the CardPop community.'] },
@@ -2089,7 +2096,7 @@ const STATIC_CONTENT = {
     intro: "Advertise your upcoming Whatnot live shows to the CardPop community. Let collectors know when you're going live.",
     sections: [
       { h2: 'Live shows from Australian sellers', paras: ['Australian trading card sellers list their upcoming Whatnot live shows here \u2014 pack breaks, singles auctions and box openings. Check the schedule and tune in when they go live.'] },
-      { h2: 'Promote your show', paras: ['Selling on Whatnot? List your upcoming shows on CardPop for free and reach thousands of Australian collectors before you go live.'] },
+      { h2: 'Promote your show', paras: ['Selling on Whatnot? List your upcoming shows on CardPop for free and reach Australian collectors before you go live.'] },
     ],
     links: [{ text: 'Community Hub', href: '/community' }, { text: 'Trading Card Events', href: '/events' }, { text: 'Local Traders', href: '/community/local-traders' }],
   },
@@ -2375,7 +2382,7 @@ function renderStaticContent(path) {
 ${[sectionsHtml, faqHtml, linksHtml].filter(Boolean).join('\n')}
 </main>`;
 
-  return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems, bodyHtml });
+  return htmlDoc({ title: cfg.title, description: cfg.description, canonical, robots: cfg.robots, jsonLdItems, bodyHtml });
 }
 
 // ── Community forum (/community/forum) ───────────────────────────────────────
@@ -2435,7 +2442,10 @@ ${itemsHtml || '    <li>No discussions yet — be the first to start a conversat
   </section>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, ...(itemList ? [itemList] : [])], bodyHtml });
+  // With no discussions the page is a heading and an invitation. Keep it out
+  // of the index (follow its links) until collectors have posted.
+  const robots = posts.length ? undefined : 'noindex, follow';
+  return htmlDoc({ title, description, canonical, robots, jsonLdItems: [breadcrumb, ...(itemList ? [itemList] : [])], bodyHtml });
 }
 
 // ── Collector profiles (/community/profiles) ─────────────────────────────────
@@ -2492,11 +2502,12 @@ ${itemsHtml || '    <li>Collectors will appear here once they set up a public pr
   </ul>
   <section>
   <h2>Meet Australia's Collectors</h2>
-  <p>CardPop is home to thousands of Australian trading card collectors. Browse verified profiles, find traders who specialise in your favourite games, and connect with the community.</p>
+  <p>CardPop is a growing community of Australian trading card collectors. Browse verified profiles, find traders who specialise in your favourite games, and connect with the community.</p>
   </section>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, ...(itemList ? [itemList] : [])], bodyHtml });
+  const robots = profiles.length ? undefined : 'noindex, follow';
+  return htmlDoc({ title, description, canonical, robots, jsonLdItems: [breadcrumb, ...(itemList ? [itemList] : [])], bodyHtml });
 }
 
 // ── Buying Guides (/analytics/buying-guides) ────────────────────────────────
@@ -3531,6 +3542,244 @@ async function renderStoresCity(supabase, citySlug) {
   });
 }
 
+// ── Homepage (/) ─────────────────────────────────────────────────────────────
+// Humans get the static shell + SPA (tools/home-shell.html → HomePage.jsx).
+// Crawlers that don't execute JS — AdSense's site reviewer among them — used to
+// get only that shell: header, hero and the cookie banner, with every section
+// below the fold left for React. A homepage that reads as a headline and
+// nothing else is precisely what AdSense's "low value content" finding
+// describes, so bots are rewritten here (vercel.json) and get the same
+// sections HomePage.jsx renders — how it works, trust signals, categories, the
+// newest listings, the latest articles, upcoming events, the price guides and
+// the site's main navigation — as plain HTML. It is the human page's content,
+// not a different one, so it is dynamic rendering rather than cloaking. The
+// title must stay identical to index.html's: Google reads the homepage title
+// as a site-name candidate.
+const HOME_TITLE = 'CardPop Australia™ | Trading Card Marketplace';
+const HOME_DESCRIPTION = 'Buy, sell and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards with verified Australian sellers on CardPop — AUD prices, Buyer Protection on every order, live Australian market data, card shows and collector guides.';
+
+const HOME_HOW_IT_WORKS = [
+  {
+    title: 'Find your card',
+    desc: 'Search by name, set or number across every Australian seller, filter by grade and condition, and compare against live market prices.',
+  },
+  {
+    title: 'Pay securely',
+    desc: 'Checkout in AUD through Stripe — card, PayPal, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
+  },
+  {
+    title: 'Get it delivered, protected',
+    desc: `Sellers post tracked within a week. If a card isn't as described or doesn't arrive, ${MP.name} refunds you in full.`,
+  },
+];
+
+const HOME_TRUST_SIGNALS = [
+  { title: 'Secure payments', body: 'Processed by Stripe on a PCI-DSS checkout — your card details never touch our servers.' },
+  { title: 'Verified members', body: 'Sellers confirm their identity with Stripe Identity, so you only trade with verified people.' },
+  { title: MP.name, body: `${PROTECTION_COPY.marketplaceOneLine} Report it within ${MP.claimWindowDaysFromDelivery} days of delivery.` },
+];
+
+const HOME_SITE_LINKS = [
+  { text: 'Marketplace — cards from Australian collectors', href: '/marketplace' },
+  { text: 'Shop — sleeves, binders, storage and sealed product', href: '/shop' },
+  { text: 'Collections — browse by game and sport', href: '/collections' },
+  { text: 'Price guides — Australian market data', href: '/prices' },
+  { text: 'The Parallel Report — articles and guides', href: '/blog' },
+  { text: 'Events — card shows across Australia', href: '/events' },
+  { text: 'Card shop directory', href: '/card-shops' },
+  { text: 'The Grading Handbook', href: '/grading' },
+  { text: 'Community', href: '/community' },
+  { text: 'About CardPop', href: '/about' },
+  { text: 'Contact us', href: '/contact' },
+  { text: 'FAQ', href: '/faq' },
+  { text: 'Trust & Safety', href: '/trust-safety' },
+  { text: 'Returns & Refunds', href: '/returns' },
+  { text: 'Shipping', href: '/shipping' },
+  { text: 'Privacy Policy', href: '/privacy-policy' },
+  { text: 'Terms of Service', href: '/terms' },
+];
+
+// Each section's query is settled independently so a slow or failing table
+// trims that one section instead of failing the page — the static copy, the
+// navigation and the structured data always render.
+async function loadHomeSections(supabase) {
+  const today = new Date().toISOString().split('T')[0];
+  const [listingsRes, articlesRes, eventsRes] = await Promise.allSettled([
+    supabase
+      .from('listings')
+      .select('id, slug, price_aud, vault_item:vault_items(card_name, collection)')
+      .eq('status', 'active')
+      .neq('listing_type', 'vault')
+      .order('created_at', { ascending: false })
+      .limit(12),
+    supabase
+      .from('blog_articles')
+      .select('slug, id, title, excerpt, author, category, published_at, created_at')
+      .eq('is_published', true)
+      .order('published_at', { ascending: false })
+      .limit(6),
+    supabase
+      .from('events')
+      .select('id, slug, title, short_description, venue_name, suburb, state, start_date, end_date')
+      .eq('status', 'approved')
+      .gte('start_date', today)
+      .order('start_date', { ascending: true })
+      .limit(6),
+  ]);
+  const rows = (r) => (r.status === 'fulfilled' ? r.value?.data : null) || [];
+  return { listings: rows(listingsRes), articles: rows(articlesRes), events: rows(eventsRes) };
+}
+
+async function renderHome(supabase) {
+  const canonical = `${BASE_URL}/`;
+  const { listings, articles, events } = await loadHomeSections(supabase);
+
+  const website = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${BASE_URL}/#website`,
+    name: 'CardPop Australia™',
+    alternateName: ['CardPop', 'CardPop Australia'],
+    publisher: { '@id': `${BASE_URL}/#organization` },
+    url: BASE_URL,
+    description: "Australia's trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: { '@type': 'EntryPoint', urlTemplate: `${BASE_URL}/search?q={search_term_string}` },
+      'query-input': 'required name=search_term_string',
+    },
+  };
+  const organization = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${BASE_URL}/#organization`,
+    name: 'CardPop Australia™',
+    alternateName: ['CardPop', 'CardPop Australia'],
+    url: BASE_URL,
+    logo: `${BASE_URL}/og-image.jpg`,
+    description: "Australia's trading card marketplace.",
+    address: {
+      '@type': 'PostalAddress',
+      postOfficeBoxNumber: '1024',
+      addressLocality: 'Ascot Vale',
+      addressRegion: 'VIC',
+      postalCode: '3032',
+      addressCountry: 'AU',
+    },
+    sameAs: [
+      'https://twitter.com/cardpopau',
+      'https://www.instagram.com/cardpop_aus/',
+      'https://www.facebook.com/profile.php?id=61591488466915',
+    ],
+  };
+
+  const stepsHtml = HOME_HOW_IT_WORKS.map((s, i) =>
+    `    <li><strong>${i + 1}. ${esc(s.title)}</strong> — ${esc(s.desc)}</li>`).join('\n');
+  const trustHtml = HOME_TRUST_SIGNALS.map((t) =>
+    `    <li><strong>${esc(t.title)}</strong> — ${esc(t.body)}</li>`).join('\n');
+  const categoriesHtml = Object.entries(COLLECTION_SEO).map(([slug, cfg]) =>
+    `    <li><a href="${BASE_URL}/collections/${esc(slug)}">${esc(cfg.name)} cards</a></li>`).join('\n');
+  const listingsHtml = listings.map((l) => {
+    const name = l.vault_item?.card_name || 'Trading Card';
+    const collection = l.vault_item?.collection ? ` (${esc(l.vault_item.collection)})` : '';
+    const price = l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : '';
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>${collection}${price}</li>`;
+  }).join('\n');
+  const articlesHtml = articles.map((a) => {
+    const date = (a.published_at || a.created_at || '').split('T')[0];
+    const byline = [a.author || 'CardPop Australia', date].filter(Boolean).join(', ');
+    return `    <li><a href="${BASE_URL}/blog/${esc(a.slug || a.id)}"><strong>${esc(a.title || 'Article')}</strong></a>`
+      + `${a.excerpt ? ` — ${esc(toText(a.excerpt, 160))}` : ''} <em>(${esc(byline)})</em></li>`;
+  }).join('\n');
+  const eventsHtml = events.map((ev) => {
+    const when = eventDateLine(ev);
+    const where = eventLocationLine(ev);
+    return `    <li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}"><strong>${esc(ev.title || 'Event')}</strong></a>`
+      + `${when ? ` — ${esc(when)}` : ''}${where ? `, ${esc(where)}` : ''}`
+      + `${ev.short_description ? `: ${esc(toText(ev.short_description, 140))}` : ''}</li>`;
+  }).join('\n');
+  const pricesHtml = Object.entries(PRICE_CATEGORIES).map(([slug, name]) =>
+    `    <li><a href="${BASE_URL}/prices/${esc(slug)}">${esc(name)} card prices</a></li>`).join('\n');
+  const siteLinksHtml = HOME_SITE_LINKS.map((l) =>
+    `    <li><a href="${BASE_URL}${esc(l.href)}">${esc(l.text)}</a></li>`).join('\n');
+
+  const bodyHtml = `<main>
+  <h1>Buy and Sell Trading Cards with Collectors Across Australia</h1>
+  <p>Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by ${esc(MP.name)} on every order. Selling is free.</p>
+  <p>CardPop is an Australian trading card marketplace and collector resource. Collectors list cards from their own vaults, buyers pay in Australian dollars through Stripe, and every marketplace order is covered by ${esc(MP.name)}. Alongside the marketplace, CardPop tracks Australian market prices for popular cards, lists card shows and store events around the country, maintains a directory of local card shops, and publishes The Parallel Report — guides, price checks and market analysis written for Australian collectors.</p>
+  <section>
+  <h2>How CardPop works</h2>
+  <ol>
+${stepsHtml}
+  </ol>
+  </section>
+  <section>
+  <h2>Why collectors trust CardPop</h2>
+  <ul>
+${trustHtml}
+  </ul>
+  <p><a href="${BASE_URL}/trust-safety">Read our Trust &amp; Safety commitments</a></p>
+  </section>
+  <section>
+  <h2>Browse by category</h2>
+  <ul>
+${categoriesHtml}
+  </ul>
+  </section>
+  <section>
+  <h2>Just listed</h2>
+  <p>Fresh cards from Australian collectors — buy now or make an offer.</p>
+  <ul>
+${listingsHtml || '    <li>New cards land here as collectors list them. <a href="' + BASE_URL + '/marketplace">Browse the marketplace</a>.</li>'}
+  </ul>
+  <p><a href="${BASE_URL}/marketplace">View all listings</a></p>
+  </section>
+  <section>
+  <h2>From The Parallel Report</h2>
+  <p>Price checks, grading guides and market analysis for Australian collectors.</p>
+  <ul>
+${articlesHtml || '    <li><a href="' + BASE_URL + '/blog">Read the latest articles</a></li>'}
+  </ul>
+  <p><a href="${BASE_URL}/blog">All articles</a></p>
+  </section>
+  <section>
+  <h2>Upcoming card shows and events</h2>
+  <ul>
+${eventsHtml || '    <li><a href="' + BASE_URL + '/events">See the events calendar</a></li>'}
+  </ul>
+  <p><a href="${BASE_URL}/events">Full events calendar</a> · <a href="${BASE_URL}/card-shops">Find a card shop near you</a></p>
+  </section>
+  <section>
+  <h2>Live Australian price guides</h2>
+  <p>Daily Australian market prices for the cards collectors ask about most, raw and graded, in AUD.</p>
+  <ul>
+${pricesHtml}
+  </ul>
+  </section>
+  <section>
+  <h2>Supplies and sealed product</h2>
+  <p>The CardPop Shop carries sleeves, toploaders, binders, storage and display supplies plus sealed boxes, shipped across Australia.</p>
+  <p><a href="${BASE_URL}/shop">Visit the shop</a></p>
+  </section>
+  <nav aria-label="Site sections">
+  <h2>Explore CardPop</h2>
+  <ul>
+${siteLinksHtml}
+  </ul>
+  </nav>
+</main>`;
+
+  return htmlDoc({
+    title: HOME_TITLE,
+    description: HOME_DESCRIPTION,
+    canonical,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    ogImageAlt: 'CardPop Australia — trading card marketplace',
+    jsonLdItems: [website, organization],
+    bodyHtml,
+  });
+}
+
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
@@ -3538,6 +3787,10 @@ export default async function handler(req, res) {
   const rawPath = String(req.query.path || '').split('?')[0];
 
   try {
+    if (rawPath === '/' || rawPath === '') {
+      return sendDoc(res, await renderHome(supabase));
+    }
+
     if (rawPath === '/community/local-traders') {
       return sendDoc(res, await renderLocalTraders(supabase));
     }

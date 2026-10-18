@@ -499,7 +499,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
             <h2 className="text-2xl font-bold mb-4">Running a Card Event?</h2>
             <p className="text-muted-foreground leading-relaxed">
               Organising a card show, tournament or trade night in Australia? List it on CardPop for
-              free and reach thousands of collectors. Sign in and submit your event
+              free and reach collectors across Australia. Sign in and submit your event
               from <Link to="/account/events" className="text-primary font-semibold hover:underline">My Events</Link> in
               your account — every submission is reviewed before it appears on the calendar. Between
               shows, explore the <Link to="/marketplace" className="text-primary font-semibold hover:underline">CardPop marketplace</Link> to

@@ -1089,3 +1089,128 @@ describe('Palms Off Gaming per-product copy', () => {
     expect(body).toContain(`"description":"${product.metaDescription}"`);
   });
 });
+
+describe('prerender homepage', () => {
+  it('gives crawlers the full homepage, not just the hero', async () => {
+    state.listResultByTable = {
+      listings: { data: [
+        { id: 'l1', slug: 'charizard-base-set-psa-9', price_aud: 1250, vault_item: { card_name: 'Charizard Base Set', collection: 'Pokémon' } },
+      ] },
+      blog_articles: { data: [
+        { slug: 'nrl-rookie-cards-price-check-2026', title: 'What NRL rookie cards are actually selling for', excerpt: 'A price check.', author: 'CardPop Research', published_at: '2026-08-03T00:00:00.000Z' },
+      ] },
+      events: { data: [
+        { id: 'e1', slug: 'melbourne-card-show', title: 'Melbourne Card Show', short_description: 'Vendors and trading.', venue_name: 'Showgrounds', suburb: 'Ascot Vale', state: 'VIC', start_date: '2099-01-10' },
+      ] },
+    };
+    const { status, body, headers } = await run('/');
+    expect(status).toBe(200);
+    expect(headers['Content-Type']).toContain('text/html');
+    // Same title as index.html — Google reads it as the site-name candidate.
+    expect(body).toContain('<title>CardPop Australia™ | Trading Card Marketplace</title>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/" />');
+    expect(body).not.toContain('noindex');
+    // Every section HomePage.jsx renders, as real HTML.
+    expect(body).toContain('<h1>Buy and Sell Trading Cards with Collectors Across Australia</h1>');
+    expect(body).toContain('<h2>How CardPop works</h2>');
+    expect(body).toContain('<h2>Why collectors trust CardPop</h2>');
+    expect(body).toContain('CardPop Buyer Protection');
+    expect(body).toContain('<h2>Browse by category</h2>');
+    expect(body).toContain('href="https://cardpop.com.au/collections/pokemon"');
+    expect(body).toContain('<h2>Just listed</h2>');
+    expect(body).toContain('href="https://cardpop.com.au/marketplace/l1/charizard-base-set-psa-9"');
+    expect(body).toContain('Charizard Base Set');
+    expect(body).toContain('<h2>From The Parallel Report</h2>');
+    expect(body).toContain('href="https://cardpop.com.au/blog/nrl-rookie-cards-price-check-2026"');
+    expect(body).toContain('<h2>Upcoming card shows and events</h2>');
+    expect(body).toContain('href="https://cardpop.com.au/events/melbourne-card-show"');
+    expect(body).toContain('2099-01-10');
+    expect(body).toContain('href="https://cardpop.com.au/prices/pokemon"');
+    // Main navigation + the pages a reviewer looks for.
+    for (const path of ['/about', '/contact', '/faq', '/privacy-policy', '/terms', '/trust-safety', '/shop', '/events', '/blog']) {
+      expect(body).toContain(`href="https://cardpop.com.au${path}"`);
+    }
+    expect(body).toContain('"@type":"WebSite"');
+    expect(body).toContain('"@type":"Organization"');
+    expect(body).toContain('"@type":"SearchAction"');
+    // Honest copy: no invented scale.
+    expect(body).not.toMatch(/thousands of/i);
+  });
+
+  it('still renders the static sections when every table is empty', async () => {
+    const { status, body } = await run('/');
+    expect(status).toBe(200);
+    expect(body).toContain('<h2>How CardPop works</h2>');
+    expect(body).toContain('New cards land here as collectors list them.');
+    expect(body).toContain('href="https://cardpop.com.au/blog"');
+    expect(body).not.toContain('noindex');
+  });
+});
+
+describe('prerender empty community pages', () => {
+  it('marks the forum noindex until there are discussions', async () => {
+    const { status, body } = await run('/community/forum');
+    expect(status).toBe(200);
+    expect(body).toContain('<meta name="robots" content="noindex, follow" />');
+  });
+
+  it('indexes the forum once collectors have posted', async () => {
+    state.listResult = { data: [{ id: 'p1', title: 'Best binder for slabs?', body: 'Looking for options.', category: 'Storage', created_at: '2026-09-01T00:00:00Z' }] };
+    const { body } = await run('/community/forum');
+    expect(body).not.toContain('noindex');
+    expect(body).toContain('Best binder for slabs?');
+  });
+
+  it('marks the profiles directory noindex when empty and never claims thousands of members', async () => {
+    const { body } = await run('/community/profiles');
+    expect(body).toContain('<meta name="robots" content="noindex, follow" />');
+    expect(body).not.toMatch(/thousands of/i);
+  });
+
+  it('keeps the pre-launch page out of the index', async () => {
+    const { status, body } = await run('/launch');
+    expect(status).toBe(200);
+    expect(body).toContain('<meta name="robots" content="noindex, follow" />');
+  });
+});
+
+describe('vercel.json routes crawlers to the prerendered homepage', () => {
+  it('rewrites "/" for bots and the AdSense crawler, but not Lighthouse', async () => {
+    const { readFileSync } = await import('node:fs');
+    const vercel = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8'));
+    const rewrites = vercel.rewrites;
+    const home = rewrites.find((r) => r.source === '/' && r.destination === '/api/prerender?path=/');
+    expect(home).toBeTruthy();
+    const ua = home.has.find((h) => h.type === 'header' && h.key.toLowerCase() === 'user-agent');
+    expect(ua).toBeTruthy();
+    const re = new RegExp(ua.value.replace(/^\(\?i\)/, ''), 'i');
+    for (const agent of [
+      'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+      'Mediapartners-Google',
+      'AdsBot-Google (+http://www.google.com/adsbot.html)',
+      'Mozilla/5.0 (compatible; Google-InspectionTool/1.0)',
+      'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    ]) {
+      expect(re.test(agent), agent).toBe(true);
+    }
+    // PageSpeed Insights must keep measuring the real homepage.
+    expect(re.test('Mozilla/5.0 (Linux; Android 11; moto g power (2022)) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Mobile Safari/537.36 Chrome-Lighthouse')).toBe(false);
+    expect(re.test('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36')).toBe(false);
+    // It must sit before the catch-all that serves the SPA shell.
+    const catchAll = rewrites.findIndex((r) => r.destination === '/app.html');
+    expect(rewrites.indexOf(home)).toBeLessThan(catchAll);
+  });
+});
+
+describe('prerender article provenance', () => {
+  it('discloses AI-assisted drafts and says nothing on hand-written ones', async () => {
+    state.result = { data: { id: 'a1', slug: 'afl-rookies', title: 'AFL rookies, priced', content: '<p>Body.</p>', is_published: true, auto_generated: true, published_at: '2026-08-02T00:00:00.000Z' } };
+    let { body } = await run('/blog/afl-rookies');
+    expect(body).toContain('How this article was produced');
+    expect(body).toContain('checked and published by the CardPop team');
+
+    state.result = { data: { id: 'a2', slug: 'hand-written', title: 'Hand written', content: '<p>Body.</p>', is_published: true, auto_generated: false, published_at: '2026-08-02T00:00:00.000Z' } };
+    ({ body } = await run('/blog/hand-written'));
+    expect(body).not.toContain('How this article was produced');
+  });
+});

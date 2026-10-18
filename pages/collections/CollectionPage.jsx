@@ -1126,7 +1126,7 @@ const CollectionPage = () => {
               </div>
               <h3 className="text-xl font-bold">No listings yet</h3>
               <p className="text-muted-foreground max-w-sm">
-                Be the first to list {name} cards on CardPop! Connect with thousands of Australian collectors.
+                Be the first to list {name} cards on CardPop and reach Australian collectors looking for them.
               </p>
               <Button className="rounded-full font-bold px-8 mt-2" asChild>
                 <Link to="/vault/add">List Your Cards</Link>

@@ -95,3 +95,26 @@ describe('sitemap paging', () => {
     expect(body).not.toContain(loc('/seller/empty-seller'));
   });
 });
+
+describe('sitemap leaves thin pages out', () => {
+  it('omits the pre-launch page and the interactive community directories', async () => {
+    const { body } = await run();
+    for (const path of ['/launch', '/community/profiles', '/community/leaderboard', '/community/map', '/community/whatnot']) {
+      expect(body, path).not.toContain(loc(path));
+    }
+    // The content pages next to them are still advertised.
+    expect(body).toContain(loc('/community/local-traders'));
+    expect(body).toContain(loc('/community/building-your-business'));
+    expect(body).toContain(loc('/about'));
+    expect(body).toContain(loc('/contact'));
+  });
+
+  it('lists the forum only once it has a discussion', async () => {
+    let { body } = await run();
+    expect(body).not.toContain(loc('/community/forum'));
+
+    state.tables.posts = [{ id: 'p1', created_at: '2026-09-14T03:00:00Z' }];
+    ({ body } = await run());
+    expect(body).toContain(`${loc('/community/forum')}\n    <lastmod>2026-09-14</lastmod>`);
+  });
+});
