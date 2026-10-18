@@ -284,6 +284,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
+          <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />
           <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
         </div>
       </div>

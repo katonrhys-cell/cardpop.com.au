@@ -33,6 +33,7 @@ import { getAutographLabel, getRefractorLabel, getRefractorBadgeClass, genericVa
 import { sellerFromProfile, OFFICIAL_STORE_NAME } from '@/lib/sellerIdentity.js';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
+import PlayerLinkChip from '@/components/PlayerLinkChip.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta } from '@/utils/shopStock.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
@@ -695,6 +696,13 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
               <p className="text-muted-foreground text-sm mb-6">
                 {[product.year, product.set].filter(Boolean).join(' · ')}
               </p>
+            )}
+            {/* The athlete on the card, linking to their player page. Reads the
+                player row itself so the listing query above stays unchanged. */}
+            {vi?.player_id && (
+              <div className="mb-6">
+                <PlayerLinkChip playerId={vi.player_id} />
+              </div>
             )}
 
             {hasCardDetails && (

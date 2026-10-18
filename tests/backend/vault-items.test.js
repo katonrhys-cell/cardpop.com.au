@@ -184,6 +184,23 @@ describe('POST /items', () => {
     expect(failB.insert.mock.calls[0][0]).toHaveProperty('language', 'Japanese');
     expect(retryB.insert.mock.calls[0][0]).not.toHaveProperty('language');
   });
+
+  it('retries without player_id when that column is missing, keeping language', async () => {
+    const pid = '11111111-2222-4333-8444-555555555555';
+    const failB = builder({
+      data: null,
+      error: { code: 'PGRST204', message: "Could not find the 'player_id' column of 'vault_items' in the schema cache" },
+    });
+    const retryB = builder({ data: { id: 'card-1' }, error: null });
+    queueFrom(profilesB(), failB, retryB, builder({ error: null }));
+
+    const res = await request(app).post('/items').send({ item: { ...VALID_ITEM, language: 'English', player_id: pid } });
+
+    expect(res.status).toBe(201);
+    expect(failB.insert.mock.calls[0][0]).toHaveProperty('player_id', pid);
+    expect(retryB.insert.mock.calls[0][0]).not.toHaveProperty('player_id');
+    expect(retryB.insert.mock.calls[0][0]).toHaveProperty('language', 'English');
+  });
 });
 
 // ─── PUT /items/:id ───────────────────────────────────────────────────────────

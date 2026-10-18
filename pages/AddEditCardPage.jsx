@@ -74,6 +74,8 @@ import { openDateToTimestamp, closeDateToTimestamp, timestampToOpenDate, timesta
 import WizardStepper from '@/components/WizardStepper.jsx';
 import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
 import SellerPayoutEstimate from '@/components/SellerPayoutEstimate.jsx';
+import PlayerPicker from '@/components/PlayerPicker.jsx';
+import { SPORTS_COLLECTIONS } from '@/data/collections.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 const GRADING_COMPANIES = [
@@ -197,6 +199,8 @@ const AddEditCardPage = () => {
   const [franchiseId, setFranchiseId]         = useState('');
   const [manufacturerId, setManufacturerId]   = useState('');
   const [teamId, setTeamId]                   = useState('');
+  // The athlete on the card (players.id) — tags the card for its player page.
+  const [playerId, setPlayerId]               = useState('');
   const [setId, setSetId]                     = useState('');
   const [parallelId, setParallelId]           = useState('');
   const [parallelOpts, setParallelOpts]       = useState([]);
@@ -534,7 +538,7 @@ const AddEditCardPage = () => {
 
   useEffect(() => {
     if (isEdit || !currentUser?.id || saving) return;
-    const hierarchy = { selCategoryId, franchiseId, manufacturerId, teamId, setId, parallelId, subsetId };
+    const hierarchy = { selCategoryId, franchiseId, manufacturerId, teamId, playerId, setId, parallelId, subsetId };
     const timer = setTimeout(() => {
       if (hasMeaningfulContent(formData, emptyForm, hierarchy)) {
         saveListingDraft(currentUser.id, { formData, hierarchy });
@@ -545,7 +549,7 @@ const AddEditCardPage = () => {
     }, 800);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [formData, selCategoryId, franchiseId, manufacturerId, teamId, setId, parallelId, subsetId, isEdit, currentUser?.id, saving]);
+  }, [formData, selCategoryId, franchiseId, manufacturerId, teamId, playerId, setId, parallelId, subsetId, isEdit, currentUser?.id, saving]);
 
   const restoreDraft = () => {
     if (!restorableDraft) return;
@@ -559,6 +563,7 @@ const AddEditCardPage = () => {
     if (hierarchy.franchiseId) setFranchiseId(hierarchy.franchiseId);
     if (hierarchy.manufacturerId) setManufacturerId(hierarchy.manufacturerId);
     if (hierarchy.teamId) setTeamId(hierarchy.teamId);
+    if (hierarchy.playerId) setPlayerId(hierarchy.playerId);
     if (hierarchy.setId) setSetId(hierarchy.setId);
     if (hierarchy.parallelId) setParallelId(hierarchy.parallelId);
     if (hierarchy.subsetId) setSubsetId(hierarchy.subsetId);
@@ -639,6 +644,7 @@ const AddEditCardPage = () => {
         if (card.set_id) setSetId(card.set_id);
         if (card.parallel_id) setParallelId(card.parallel_id);
         if (card.subset_id) setSubsetId(card.subset_id);
+        if (card.player_id) setPlayerId(card.player_id);
 
         // Fetch PSA population data if the card has a CardSight ID
         if (card.cardsight_card_id) {
@@ -1541,6 +1547,7 @@ const AddEditCardPage = () => {
         franchise_id:        franchiseId || null,
         manufacturer_id:     manufacturerId || null,
         team_id:             teamId || null,
+        player_id:           playerId || null,
         set_id:              setId || null,
         parallel_id:         parallelId || null,
         subset_id:           subsetId   || null,
@@ -2290,6 +2297,29 @@ const AddEditCardPage = () => {
                     />
                     {errors.cardName && <p className="text-destructive text-xs">{errors.cardName}</p>}
                   </div>
+
+                  {/* Player — sports cards only. Tags the card for its player
+                      page (/players/<slug>); the picker's link opens in a new
+                      tab so the half-finished listing is never abandoned. */}
+                  {(!formData.collection || SPORTS_COLLECTIONS.includes(formData.collection)) && (
+                    <div className="md:col-span-2 space-y-2">
+                      <Label htmlFor="player" className="font-bold">
+                        Player <span className="text-muted-foreground font-normal text-xs">(optional)</span>
+                      </Label>
+                      <PlayerPicker
+                        id="player"
+                        value={playerId}
+                        onSelect={(p) => {
+                          formDirtyRef.current = true;
+                          setPlayerId(p?.id || '');
+                          if (p && !formData.cardName.trim()) set('cardName', p.name);
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Pick the athlete on the card and it appears on their player page once listed.
+                      </p>
+                    </div>
+                  )}
 
                   {/* Era / Set Name — read-only if a set was picked from the hierarchy */}
                   <div className="space-y-2">
