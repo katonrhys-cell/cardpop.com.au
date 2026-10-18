@@ -23,7 +23,8 @@ const SOCIAL_LINKS = [
 
 const GITHUB_URL = 'https://github.com/katonrhys-cell';
 // Support / donation link. VITE_DONATE_URL overrides it at build time; set it to an empty string to hide the link.
-const DONATE_URL = import.meta.env.VITE_DONATE_URL ?? 'https://x.com/conway33167';
+const DONATE_URL = import.meta.env.VITE_DONATE_URL ?? 'https://patreon.com/cardpopaustralia';
+const X_URL = 'https://x.com/conway33167';
 
 const Footer = () => {
   const { settings } = usePlatformSettings();
@@ -151,9 +152,18 @@ const Footer = () => {
                 className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
               >
                 <Heart className="w-4 h-4" aria-hidden="true" />
-                Support CardPop
+                Support on Patreon
               </a>
             )}
+            <a
+              href={X_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <Twitter className="w-4 h-4" aria-hidden="true" />
+              X
+            </a>
           </p>
           <p className="text-muted-foreground text-sm">
             Made with ❤️ for the Australian Trading Card Community
