@@ -89,10 +89,36 @@ Unpublishing hides the page and keeps everything.
 ## SEO
 
 Both routes are prerendered for bots (`vercel.json` rewrites → `api/prerender.js`)
-with `BreadcrumbList` and `ProfilePage` / `Person` JSON-LD, and listed in the
-sitemap. Per `docs/adsense-readiness.md`, `/players` is `noindex, follow` and
-left out of the sitemap while it has no published rows. Pages never claim a
-number the DB doesn't back: listing counts and prices come from the tables.
+and listed in the sitemap. Per `docs/adsense-readiness.md`, `/players` is
+`noindex, follow` and left out of the sitemap while it has no published rows.
+Pages never claim a number the DB doesn't back: listing counts and prices come
+from the tables. `tests/backend/playersPrerender.test.js` pins all of this.
+
+* **One source for titles and descriptions** — `playerSeo()` and
+  `PLAYERS_INDEX_SEO` in `utils/players.js`, used by the SPA's `SEOHead` and
+  the prerender alike. Titles stay inside Google's ~60-character cutoff by
+  degrading from "`Name` Cards – Rookie Cards & Prices | CardPop" to shorter
+  forms for long names; descriptions lead with the name and sport, then the
+  headline, capped at 155 characters on a word boundary (`truncateAt()`).
+* **One URL per player** — `/players/<slug>`, lower-case, hyphenated. A
+  mis-cased or underscored slug (`/players/Luka-Doncic`) 301s from the
+  prerender and `<Navigate replace>`s in the SPA onto the canonical URL via
+  `playerSlug()`. Unknown slugs 404 with `noindex, follow`.
+* **Structured data** — `BreadcrumbList`, `ProfilePage` (`dateCreated` /
+  `dateModified`) with a `Person` `mainEntity`, and `FAQPage`. The FAQ copy is
+  `playerFaqs()`: three questions (rookie card, worth in Australia, where to
+  buy) whose every figure comes from the first key card, the latest tracker
+  snapshot and the live listing count — the visible FAQ section and the JSON-LD
+  share the same strings.
+* **Internal links both ways** — each player page links to its sport's
+  collection page, the price hub and the index; each sport collection page
+  lists its players (`PlayersStrip` in the SPA, a `<h2>NBA players</h2>` list in
+  the prerender, matched by `playersForSport()` on slug / name / alias); a
+  tracked price card linked to a player shows "Player: … cards" (the
+  `player:players(slug, name)` embed in `lib/cardPrices.js` and `renderPriceCard`).
+  Header, mobile browse and footer carry sitewide links to `/players`.
+* `listingMeta()` keeps "2003 · 2003-04 Topps Chrome" from doubling the year in
+  listing lines.
 
 Bios state career facts (titles, awards, draft position). Never type a price
 into a bio or key-card note — prices come from the tracker and go stale.

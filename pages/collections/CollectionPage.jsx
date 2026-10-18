@@ -18,6 +18,7 @@ import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import PlayersStrip from '@/components/PlayersStrip.jsx';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
@@ -780,6 +781,9 @@ const CollectionPage = () => {
             </button>
           </section>
         )}
+
+        {/* ── SHOP BY PLAYER (sports collections with player pages) ────────── */}
+        <PlayersStrip names={[slug, config.name, ...(config.categoryAliases ?? [])]} />
 
         {/* ── NEW RELEASES ─────────────────────────────────────────────────── */}
         <section>

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { ArrowRight, BadgeCheck, Sparkles, Tag, TrendingUp, UsersRound } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
@@ -14,7 +14,7 @@ import { PlayerAvatar } from '@/components/PlayerPicker.jsx';
 import { fetchPlayerBySlug, fetchPlayerListings, fetchPlayerTrackedCards } from '@/lib/players.js';
 import { formatAud } from '@/lib/cardPrices.js';
 import { resolveCollectionSlug } from '@/data/collectionConfigs.js';
-import { playerPath, playerSubtitle, splitParagraphs } from '@/utils/players.js';
+import { playerPath, playerSlug, playerSeo, playerFaqs, splitParagraphs } from '@/utils/players.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -59,13 +59,17 @@ const TrackedCardTile = ({ card }) => {
 };
 
 const PlayerPage = () => {
-  const { slug } = useParams();
+  const { slug: rawSlug } = useParams();
+  // One canonical lower-case URL per player — a shared /players/Luka-Doncic
+  // lands on the real page instead of a 404 (the prerender 301s the same way).
+  const slug = playerSlug(rawSlug || '');
   const [player, setPlayer] = useState(undefined); // undefined = loading, null = not found
   const [listings, setListings] = useState([]);
   const [tracked, setTracked] = useState([]);
   const [chartCard, setChartCard] = useState(null);
 
   useEffect(() => {
+    if (!slug || slug !== rawSlug) return undefined; // redirecting below
     let cancelled = false;
     setPlayer(undefined);
     setListings([]);
@@ -92,7 +96,7 @@ const PlayerPage = () => {
       })
       .catch(() => { if (!cancelled) setPlayer(null); });
     return () => { cancelled = true; };
-  }, [slug]);
+  }, [slug, rawSlug]);
 
   const paragraphs = useMemo(() => splitParagraphs(player?.bio), [player]);
   const notes = useMemo(() => splitParagraphs(player?.collecting_notes), [player]);
@@ -105,6 +109,12 @@ const PlayerPage = () => {
     Raw: s.raw_avg != null ? Number(s.raw_avg) : null,
     Graded: s.graded_avg != null ? Number(s.graded_avg) : null,
   })), [charted]);
+
+  const activeListingCount = useMemo(() => listings.filter((l) => l.status === 'active').length, [listings]);
+  const faqs = useMemo(
+    () => (player ? playerFaqs({ player, trackedCards: tracked, listingCount: activeListingCount, formatPrice: formatAud }) : []),
+    [player, tracked, activeListingCount],
+  );
 
   const structuredData = useMemo(() => {
     if (!player) return null;
@@ -122,17 +132,33 @@ const PlayerPage = () => {
         '@context': 'https://schema.org',
         '@type': 'ProfilePage',
         url,
+        ...(player.created_at ? { dateCreated: player.created_at } : {}),
+        ...(player.updated_at ? { dateModified: player.updated_at } : {}),
         mainEntity: {
           '@type': 'Person',
           name: player.name,
+          url,
           ...(player.nationality ? { nationality: player.nationality } : {}),
           ...(player.team ? { memberOf: { '@type': 'SportsTeam', name: player.team } } : {}),
           ...(player.image_url ? { image: publicImageUrl(player.image_url) } : {}),
           description: player.headline || undefined,
         },
       },
-    ];
-  }, [player]);
+      faqs.length ? {
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqs.map(({ q, a }) => ({
+          '@type': 'Question',
+          name: q,
+          acceptedAnswer: { '@type': 'Answer', text: a },
+        })),
+      } : null,
+    ].filter(Boolean);
+  }, [player, faqs]);
+
+  if (rawSlug && slug !== rawSlug) {
+    return <Navigate to={slug ? playerPath(slug) : '/players'} replace />;
+  }
 
   if (player === null) {
     return (
@@ -161,10 +187,7 @@ const PlayerPage = () => {
     );
   }
 
-  const title = `${player.name} Cards — Rookie Cards, Prices & Listings | CardPop`;
-  const description = player.headline
-    ? `${player.name} (${player.sport}${player.team ? `, ${player.team}` : ''}): ${player.headline} Key cards, Australian-dollar prices and every ${player.name} card listed on CardPop.`
-    : `${player.name} trading cards: key rookie cards, Australian-dollar prices and every card listed on CardPop.`;
+  const { title, description } = playerSeo(player);
 
   const activeListings = listings.filter((l) => l.status === 'active');
 
@@ -334,6 +357,30 @@ const PlayerPage = () => {
           </div>
         )}
       </section>
+
+      {/* FAQ — the same copy the prerender emits as FAQPage JSON-LD, every
+          figure from the tracker snapshot (utils/players.js playerFaqs). */}
+      {faqs.length > 0 && (
+        <section className="mt-14 max-w-3xl">
+          <h2 className="mb-4 text-2xl font-bold">{player.name} cards: frequently asked questions</h2>
+          <div className="space-y-5">
+            {faqs.map(({ q, a }) => (
+              <div key={q}>
+                <h3 className="text-base font-bold text-foreground">{q}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{a}</p>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-sm text-muted-foreground">
+            <Link to="/players" className="font-bold text-primary hover:underline">All players</Link>
+            {collectionSlug && (
+              <> · <Link to={`/collections/${collectionSlug}`} className="font-bold text-primary hover:underline">Browse {player.sport} cards</Link></>
+            )}
+            {' · '}
+            <Link to="/prices" className="font-bold text-primary hover:underline">Card prices (AUD)</Link>
+          </p>
+        </section>
+      )}
     </div>
   );
 };
