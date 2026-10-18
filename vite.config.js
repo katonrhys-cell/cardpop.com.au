@@ -4,12 +4,20 @@ import { createLogger, defineConfig } from 'vite';
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import Beasties from 'beasties';
 import { patchOpenCvSource } from './tools/opencvCspPatch.mjs';
 import { appShellFromHomeShell } from './tools/appShell.mjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
-const allDeps = Object.keys(pkg.dependencies || {});
+// Pre-bundle every runtime dependency — except those with no root entry point.
+// @tiptap/pm only exports subpaths (@tiptap/pm/state, …); asking Vite to
+// optimise its bare name fails the whole dev server at startup with
+// '"." is not exported under the conditions […] from package @tiptap/pm'.
+const hasRootEntry = (dep) => {
+	try { createRequire(import.meta.url).resolve(dep); return true; } catch { return false; }
+};
+const allDeps = Object.keys(pkg.dependencies || {}).filter(hasRootEntry);
 
 // After the build, emit two HTML entries from one Vite-built index.html:
 //   • index.html — the "/"-only document, with the static hero shell injected
