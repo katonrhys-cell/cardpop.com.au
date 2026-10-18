@@ -272,6 +272,33 @@ export const PLANS = {
 /** Convenience: the Hobby monthly listing allowance. */
 export const HOBBY_LISTINGS_PER_MONTH = LISTINGS_PER_MONTH.free;
 
+/** The top of the ladder — nothing to upgrade to from here. */
+export const TOP_PLAN = PLAN_ULTIMATE;
+
+/**
+ * Position on the plan ladder (Hobby = 0 … Ultimate = 4). Accepts a plan key
+ * or a `profiles.subscription_tier` value; anything unknown ranks as Hobby.
+ */
+export function planRank(keyOrTier) {
+  const index = PLAN_ORDER.indexOf(planKeyFromTier(keyOrTier));
+  return index < 0 ? 0 : index;
+}
+
+/** True when the account is already on the top plan (no upgrade to offer). */
+export function isTopPlan(keyOrTier) {
+  return planKeyFromTier(keyOrTier) === TOP_PLAN;
+}
+
+/** Plan keys above the given one, ascending — empty on the top plan. */
+export function upgradePlansFor(keyOrTier) {
+  return PLAN_ORDER.slice(planRank(keyOrTier) + 1);
+}
+
+/** The next step up the ladder, or null on the top plan. */
+export function nextPlanFor(keyOrTier) {
+  return upgradePlansFor(keyOrTier)[0] || null;
+}
+
 export default {
   PLAN_HOBBY,
   PLAN_PRO,
@@ -292,4 +319,9 @@ export default {
   WHATNOT_SHOW_TIERS,
   canListWhatnotShows,
   HOBBY_LISTINGS_PER_MONTH,
+  TOP_PLAN,
+  planRank,
+  isTopPlan,
+  upgradePlansFor,
+  nextPlanFor,
 };

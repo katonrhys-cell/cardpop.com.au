@@ -3,12 +3,14 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requireAal2 } from '../middleware/requireAal2.js';
 import { invalidReturnUrl } from '../utils/returnUrl.js';
 import {
   getOrCreateStripeCustomer,
   applyPaypalSubscription,
   mapPaypalStatus,
   getSubscriptionStatus,
+  changeStripeSubscriptionTier,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -112,6 +114,23 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
   } catch (err) {
     logger.error(`[SUB] /stripe/checkout error: ${err.message}`);
     res.status(500).json({ error: 'Could not start Stripe checkout' });
+  }
+});
+
+// ─── POST /stripe/change-tier ────────────────────────────────────────────────
+// Upgrade an existing Stripe-billed membership to a higher tier in place
+// (re-prices the subscription with prorations; no new trial). Hobby members
+// and anyone without an active Stripe subscription get a 409 and should start
+// a plan through /stripe/checkout instead. MFA-gated like the other routes
+// that change what the member's card is charged.
+router.post('/stripe/change-tier', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    const result = await changeStripeSubscriptionTier(req.user.id, req.body?.tier);
+    res.json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    logger.error(`[SUB] /stripe/change-tier error: ${err.message}`);
+    res.status(500).json({ error: 'Could not change your plan' });
   }
 });
 
