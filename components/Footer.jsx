@@ -22,8 +22,8 @@ const SOCIAL_LINKS = [
 ];
 
 const GITHUB_URL = 'https://github.com/katonrhys-cell';
-// Donation page (Ko-fi, Buy Me a Coffee, GitHub Sponsors…). The link only renders once this is set.
-const DONATE_URL = import.meta.env.VITE_DONATE_URL || '';
+// Support / donation link. VITE_DONATE_URL overrides it at build time; set it to an empty string to hide the link.
+const DONATE_URL = import.meta.env.VITE_DONATE_URL ?? 'https://x.com/conway33167';
 
 const Footer = () => {
   const { settings } = usePlatformSettings();
