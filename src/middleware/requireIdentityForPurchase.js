@@ -30,8 +30,8 @@ import {
 // and only when EVERY listing in the order is official; one peer-to-peer
 // listing gates the whole order exactly as below. If the seller lookup fails,
 // the order falls through to the normal gate (fail closed for the exemption).
-// Exempt orders are marked `req.officialStoreOrder` so the checkout handlers
-// also skip the new-buyer purchase limits for them.
+// The exemption covers the identity gate only: the new-buyer / guest purchase
+// velocity limits (utils/purchaseVelocity.js) still apply to these orders.
 //
 // Must run AFTER optionalAuthMiddleware (needs req.user when present). Detects a
 // marketplace purchase from either request shape:
@@ -66,12 +66,8 @@ export async function requireIdentityForMarketplacePurchase(req, res, next) {
     // Shop-only (or empty) order — no marketplace listing to gate.
     if (!hasMarketplaceItem) return next();
 
-    if (await onlyOfficialStoreListings(req.body, items)) {
-      // Downstream handlers skip the new-buyer purchase limits for these
-      // orders (checkPurchaseVelocity) — CardPop's own cards are open to all.
-      req.officialStoreOrder = true;
-      return next();
-    }
+    // CardPop's own cards are open to all (identity gate only — see above).
+    if (await onlyOfficialStoreListings(req.body, items)) return next();
 
     if (!req.user) {
       return res.status(401).json({

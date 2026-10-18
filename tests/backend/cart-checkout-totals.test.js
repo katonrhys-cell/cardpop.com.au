@@ -21,11 +21,8 @@ vi.mock('../../src/middleware/auth.js', () => ({
   optionalAuthMiddleware: (req, _res, next) => { req.user = { id: 'buyer-1', email: 'b@example.com' }; next(); },
 }));
 vi.mock('../../src/middleware/requireEmailVerified.js', () => ({ requireEmailVerified: (_q, _s, n) => n() }));
-// `gate.officialStore` simulates the identity gate recognising an Official
-// CardPop Store order (it sets req.officialStoreOrder).
-const gate = vi.hoisted(() => ({ officialStore: false }));
 vi.mock('../../src/middleware/requireIdentityForPurchase.js', () => ({
-  requireIdentityForMarketplacePurchase: (req, _s, n) => { if (gate.officialStore) req.officialStoreOrder = true; n(); },
+  requireIdentityForMarketplacePurchase: (_req, _s, n) => n(),
 }));
 vi.mock('../../src/utils/purchaseVelocity.js', () => ({ checkPurchaseVelocity: vi.fn(async () => ({ allowed: true })) }));
 vi.mock('../../src/utils/returnUrl.js', () => ({ invalidReturnUrl: () => null }));
@@ -86,7 +83,6 @@ beforeEach(() => {
   vi.clearAllMocks();
   ordersInserts.length = 0;
   wallet.balanceCents = 0;
-  gate.officialStore = false;
   checkPurchaseVelocity.mockResolvedValue({ allowed: true });
   mockStripe.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://stripe.test/cs_1' });
   mockStripe.coupons.create.mockResolvedValue({ id: 'coupon_1' });
@@ -182,12 +178,13 @@ describe('POST /create-cart-checkout — buyer purchase limits', () => {
     expect(res.body.code).toBe('velocity_limit');
   });
 
-  it('skips the limits for an Official CardPop Store order', async () => {
-    gate.officialStore = true;
-    checkPurchaseVelocity.mockResolvedValue(BLOCKED);
+  it('checks every order, including one the identity gate let through as an Official CardPop Store order', async () => {
+    // The identity gate's official-store exemption is deliberately separate: it
+    // never skips the purchase limits, so a guest buying official stock is
+    // capped like any other guest.
     const res = await request(app).post('/create-cart-checkout').send(BODY);
     expect(res.status).toBe(200);
-    expect(checkPurchaseVelocity).not.toHaveBeenCalled();
+    expect(checkPurchaseVelocity).toHaveBeenCalledTimes(1);
     expect(ordersInserts).toHaveLength(1);
   });
 });
