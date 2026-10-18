@@ -2,6 +2,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import { calculateBreakdown, calculateProcessingFee, calculateGst, gstInsideCents } from './commissionService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
 import { isPurchasableStatus, isPreorder, preorderEta } from '../../utils/shopStock.js';
+import { variantKind } from '../../utils/shopVariants.js';
 
 const SHOP_COLUMNS = 'id, title, price_aud, stock_quantity, status, variants:shop_product_variants(id, sku, colour, barcode, stock_quantity, price_aud, status)';
 
@@ -85,15 +86,16 @@ export async function priceCart(items, userId) {
       const preorder = isPreorder(product);
       const eta = preorder ? preorderEta(product) : '';
 
-      // A product with colour variants is sold per variant: the line must name
-      // one (a single-variant product is resolved automatically), stock is the
-      // variant's, and the variant may override the price.
+      // A product with colour (or size) variants is sold per variant: the line
+      // must name one (a single-variant product is resolved automatically),
+      // stock is the variant's, and the variant may override the price.
       const variants = (Array.isArray(product.variants) ? product.variants : []).filter((v) => v && v.status !== 'archived');
       let variant = null;
       if (variants.length > 0) {
+        const kind = variantKind({ variants }).toLowerCase();
         const wanted = typeof raw?.variantId === 'string' ? raw.variantId : null;
         variant = wanted ? variants.find((v) => v.id === wanted) : (variants.length === 1 ? variants[0] : null);
-        if (!variant) throw httpError(wanted ? 404 : 400, wanted ? `That colour of ${product.title} is unavailable` : `Please choose a colour for ${product.title}`);
+        if (!variant) throw httpError(wanted ? 404 : 400, wanted ? `That ${kind} of ${product.title} is unavailable` : `Please choose a ${kind} for ${product.title}`);
         if (!preorder && variant.stock_quantity < quantity) throw httpError(409, `Not enough stock for ${product.title}${variant.colour ? ` — ${variant.colour}` : ''}`);
       } else if (!preorder && product.stock_quantity < quantity) {
         throw httpError(409, `Not enough stock for ${product.title}`);

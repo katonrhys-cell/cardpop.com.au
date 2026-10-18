@@ -84,9 +84,25 @@ Rules enforced by triggers in `supabase/migrations/*_shop_product_variants.sql`:
 - Grid cards can't know the colour, so a product with variants shows
   **Choose colour** linking to its page instead of Add to Cart.
 
+## Sizes
+
+The same rows sell a line by **size**. Put the size in the `colour` column
+(`Small`, `Medium`, `Large`, `XL`, `2XL`…) with no hex: `variantKind()` in
+`utils/shopVariants.js` calls a product's variants *sizes* when every active
+one is a size name (`isSizeName()`), and the picker heading, the grid's
+"Choose size" button, the product-page toasts and the cart's 400 message all
+follow it. Anything else (or a mix) is a colour choice, as before. Order the
+sizes with `sort_order` — the default sort is sort order then name, which
+would put 2XL before Small.
+
+First use: the **Black Nitrile Heavy Duty Gloves - Box of 100**
+(`CP-GLOVES-NITRILE-100-PACK`, Shield Right XtraGuard, bought from Werko) —
+five sizes, SKUs `SR1361`–`SR1365`, seeded by
+`20261018103000_nitrile_gloves_sizes_and_werko_supplier.sql`.
+
 ## Admin
 
-Admin → Products → edit: a **Colour variants** table (colour + swatch, SKU with
+Admin → Products → edit: a **Colour / size variants** table (colour + swatch, SKU with
 an auto-suggested `<PRODUCT-SKU>-<COLOUR CODE>`, barcode, stock, price
 override, active tick, remove). With variants present the product's stock
 field is read-only and shows the sum. Search matches variant SKUs, barcodes

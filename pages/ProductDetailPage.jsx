@@ -38,7 +38,7 @@ import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta } from '@/utils/shopStock.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFamily.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
@@ -417,12 +417,12 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     const shopVariants = source === 'shop' ? activeVariants(product) : [];
     const chosenVariant = shopVariants.find((v) => v.id === selectedVariantId) || null;
     if (shopVariants.length > 0 && !chosenVariant) {
-      toast.error('Please choose a colour first.');
+      toast.error(`Please choose a ${variantKind(product).toLowerCase()} first.`);
       return;
     }
     const unlimited = source === 'shop' && isPreorder(product);
     if (chosenVariant && !unlimited && !variantInStock(chosenVariant)) {
-      toast.error(`${chosenVariant.colour || 'That colour'} is sold out.`);
+      toast.error(`${chosenVariant.colour || 'That option'} is sold out.`);
       return;
     }
     const priceInCents = Math.round((chosenVariant ? variantPrice(product, chosenVariant) : (product.price || 0)) * 100);

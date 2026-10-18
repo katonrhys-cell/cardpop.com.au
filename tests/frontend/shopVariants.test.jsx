@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { activeVariants, hasVariants, pickDefaultVariant, toCartVariant, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, chooseVariantLabel, hasVariants, isSizeName, pickDefaultVariant, toCartVariant, variantKind, variantPrice } from '@/utils/shopVariants.js';
 
 const product = {
   id: 'p1', price_aud: '44.95', stock_quantity: 3, has_variants: true,
@@ -34,7 +34,49 @@ describe('shopVariants helpers', () => {
   });
 });
 
+const gloves = {
+  id: 'p-gloves', price_aud: '12.95', has_variants: true,
+  variants: [
+    { id: 'v-s', sku: 'SR1361', colour: 'Small', stock_quantity: 10, status: 'active', sort_order: 0 },
+    { id: 'v-m', sku: 'SR1362', colour: 'Medium', stock_quantity: 10, status: 'active', sort_order: 1 },
+    { id: 'v-xl', sku: 'SR1364', colour: 'XL', stock_quantity: 0, status: 'active', sort_order: 3 },
+    { id: 'v-2xl', sku: 'SR1365', colour: '2XL', stock_quantity: 10, status: 'active', sort_order: 4 },
+  ],
+};
+
+describe('size variants', () => {
+  it('recognises size names regardless of case or spacing', () => {
+    ['S', 'm', 'XL', '2xl', 'Small', 'Extra Large', ' Medium '].forEach((n) => expect(isSizeName(n)).toBe(true));
+    ['Black', 'Red', '', null, 'Clear'].forEach((n) => expect(isSizeName(n)).toBe(false));
+  });
+
+  it('calls a product Size when every variant is a size, otherwise Colour', () => {
+    expect(variantKind(gloves)).toBe('Size');
+    expect(variantKind(product)).toBe('Colour');
+    // A mix is still a colour choice, and a grid row (no rows embedded) stays neutral.
+    expect(variantKind({ variants: [{ id: 'a', colour: 'Small' }, { id: 'b', colour: 'Black' }] })).toBe('Colour');
+    expect(variantKind({ has_variants: true })).toBe('Colour');
+    expect(chooseVariantLabel(gloves)).toBe('Choose size');
+    expect(chooseVariantLabel(product)).toBe('Choose colour');
+    expect(chooseVariantLabel({ has_variants: true })).toBe('Choose options');
+  });
+
+  it('keeps sizes in their sort order, not alphabetical', () => {
+    expect(activeVariants(gloves).map((v) => v.colour)).toEqual(['Small', 'Medium', 'XL', '2XL']);
+  });
+});
+
 describe('VariantPicker', () => {
+  it('labels a sized product "Size" and lists the sizes with no swatch', () => {
+    render(<VariantPicker product={gloves} value="v-m" onChange={() => {}} />);
+    expect(screen.getByRole('radiogroup', { name: 'Size' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /^Size · 4 options$/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Medium' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'XL (sold out)' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: '2XL' })).toBeInTheDocument();
+  });
+
+
   it('renders a chip per active colour, marks sold-out ones, and reports the choice', () => {
     const onChange = vi.fn();
     render(<VariantPicker product={product} value="v-blk" onChange={onChange} />);
