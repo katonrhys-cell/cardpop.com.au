@@ -411,15 +411,20 @@ const HomePage = () => {
         <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
-        {/* ── Animated card showcase — shelf → stand (desktop only) ── */}
-        {isDesktop && (
-          <Suspense fallback={null}>
-            <HeroCardShowcase cards={heroCards} />
-          </Suspense>
-        )}
-
         {/* ── Hero text ── */}
         <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
+          {/* ── Animated card showcase — shelf → stand (desktop only) ──
+              Lives INSIDE the centred column, anchored to its right edge, so it
+              sits in the padding reserved for it (lg:pr-[460px]) beside the
+              headline at every viewport width. It used to be positioned against
+              the full-width <section>, which lined up at ~1440px but drifted
+              further from the text with every extra pixel of screen width. */}
+          {isDesktop && (
+            <Suspense fallback={null}>
+              <HeroCardShowcase cards={heroCards} />
+            </Suspense>
+          )}
+
           {/* NOTE: the hero text block is intentionally NOT wrapped in a
               motion fade. It contains the LCP <h1>, which must paint the moment
               HomePage renders — gating it behind a framer-motion opacity:0→1
