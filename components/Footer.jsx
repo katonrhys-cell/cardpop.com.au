@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Twitter, Instagram, Facebook, Youtube, ShieldCheck } from 'lucide-react';
+import { Twitter, Instagram, Facebook, Youtube, ShieldCheck, Github, Heart } from 'lucide-react';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -20,6 +20,10 @@ const SOCIAL_LINKS = [
   { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591488466915', Icon: Facebook },
   { label: 'YouTube', href: 'https://youtube.com/@cardpopau', Icon: Youtube },
 ];
+
+const GITHUB_URL = 'https://github.com/katonrhys-cell';
+// Donation page (Ko-fi, Buy Me a Coffee, GitHub Sponsors…). The link only renders once this is set.
+const DONATE_URL = import.meta.env.VITE_DONATE_URL || '';
 
 const Footer = () => {
   const { settings } = usePlatformSettings();
@@ -127,6 +131,28 @@ const Footer = () => {
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-muted-foreground text-sm font-medium">
             © {new Date().getFullYear()} CardPop Australia™. All Rights Reserved.
+          </p>
+          <p className="text-muted-foreground text-sm flex items-center gap-4">
+            <a
+              href={GITHUB_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <Github className="w-4 h-4" aria-hidden="true" />
+              GitHub
+            </a>
+            {DONATE_URL && (
+              <a
+                href={DONATE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+              >
+                <Heart className="w-4 h-4" aria-hidden="true" />
+                Support CardPop
+              </a>
+            )}
           </p>
           <p className="text-muted-foreground text-sm">
             Made with ❤️ for the Australian Trading Card Community
