@@ -707,7 +707,7 @@ const CheckoutPage = () => {
       <div className="container-default">
 
         <header className="mb-8">
-          <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure checkout</h1>
+          <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure Checkout</h1>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
             <Lock className="h-3.5 w-3.5" /> Encrypted &amp; processed by Stripe — you never leave this page.
           </p>

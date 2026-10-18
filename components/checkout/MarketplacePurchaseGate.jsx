@@ -38,7 +38,7 @@ const MarketplacePurchaseGate = ({ level = 'account', thresholdAud, returnPath, 
           {identity ? <ShieldCheck className="h-7 w-7 text-brand-red" /> : <UserPlus className="h-7 w-7 text-brand-red" />}
         </div>
         <h2 className="font-heading text-xl font-bold text-foreground">
-          {identity ? 'One quick ID check before this purchase' : 'Sign in to buy marketplace cards'}
+          {identity ? 'One Quick ID Check Before This Purchase' : 'Sign In to Buy Marketplace Cards'}
         </h2>
         <p className="mt-2 max-w-md text-sm text-muted-foreground">
           {identity ? (
@@ -61,19 +61,19 @@ const MarketplacePurchaseGate = ({ level = 'account', thresholdAud, returnPath, 
           {identity ? (
             <Button asChild className="h-12 w-full bg-brand-red font-bold hover:bg-brand-red/90">
               <Link to={`/verify-identity?next=${next}`}>
-                <ShieldCheck className="mr-2 h-4 w-4" /> Verify with Stripe
+                <ShieldCheck className="mr-2 h-4 w-4" /> Verify With Stripe
               </Link>
             </Button>
           ) : (
             <>
               <Button asChild className="h-12 w-full bg-brand-red font-bold hover:bg-brand-red/90">
                 <Link to={`/signup?next=${next}`}>
-                  <UserPlus className="mr-2 h-4 w-4" /> Create a free account
+                  <UserPlus className="mr-2 h-4 w-4" /> Create a Free Account
                 </Link>
               </Button>
               <Button asChild variant="outline" className="h-12 w-full font-bold">
                 <Link to="/login" state={{ from: { pathname: backTo } }}>
-                  <LogIn className="mr-2 h-4 w-4" /> I already have an account
+                  <LogIn className="mr-2 h-4 w-4" /> I Already Have an Account
                 </Link>
               </Button>
             </>
@@ -81,14 +81,14 @@ const MarketplacePurchaseGate = ({ level = 'account', thresholdAud, returnPath, 
           {shopItemCount > 0 && onCheckoutShopOnly && (
             <Button type="button" variant="ghost" className="h-11 w-full font-semibold" onClick={onCheckoutShopOnly}>
               <ShoppingBag className="mr-2 h-4 w-4" />
-              Check out {shopItemCount === 1 ? 'the shop item' : `${shopItemCount} shop items`} now
+              Check Out {shopItemCount === 1 ? 'the Shop Item' : `${shopItemCount} Shop Items`} Now
             </Button>
           )}
         </div>
 
         <p className="mt-4 text-xs text-muted-foreground">
           <Link to="/trust-safety" className="text-primary hover:underline">
-            {identity ? 'Why we ask for ID on larger orders →' : 'How CardPop protects buyers →'}
+            {identity ? 'Why We Ask for ID on Larger Orders →' : 'How CardPop Protects Buyers →'}
           </Link>
         </p>
       </CardContent>
