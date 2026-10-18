@@ -110,15 +110,22 @@ async function anthropic() {
   return cachedClient;
 }
 
+// The API refuses a schema with more than 16 union-typed (nullable/anyOf)
+// parameters — "exponential compilation cost" — and answers 400 before reading
+// the page, which silently failed every extraction. So unions are kept only
+// where "unknown" must differ from a value (dates, times, fees, capacity,
+// enums); every other field is a plain string/array that is empty when the page
+// doesn't say, and validateAndNormalizeEventData turns '' / [] into null.
 const nullableString = { anyOf: [{ type: 'string' }, { type: 'null' }] };
 const nullableNumber = { anyOf: [{ type: 'number' }, { type: 'null' }] };
-const nullableStringArray = { anyOf: [{ type: 'array', items: { type: 'string' } }, { type: 'null' }] };
+const plainString = { type: 'string' };
+const plainStringArray = { type: 'array', items: { type: 'string' } };
 
 // Mirrors the JSON contract spelled out in EventScraperPrompt. Enforcing it as
 // a schema means the model cannot return prose, a code fence, or a partial
 // object — the failure modes parseAndValidateEventJson exists to clean up on
 // the streaming admin path.
-const EVENT_SCHEMA = {
+export const EVENT_SCHEMA = {
   type: 'object',
   properties: {
     is_trading_card_event: {
@@ -130,36 +137,36 @@ const EVENT_SCHEMA = {
       description: 'When is_trading_card_event is false, one short sentence saying why. Otherwise null.',
     },
     title: { type: 'string' },
-    short_description: nullableString,
-    description: nullableString,
+    short_description: plainString,
+    description: plainString,
     event_type: { anyOf: [{ type: 'string', enum: VALID_EVENT_TYPES }, { type: 'null' }] },
-    featured_card_games: nullableStringArray,
-    venue_name: nullableString,
-    address: nullableString,
-    suburb: nullableString,
+    featured_card_games: plainStringArray,
+    venue_name: plainString,
+    address: plainString,
+    suburb: plainString,
     state: { anyOf: [{ type: 'string', enum: VALID_STATES }, { type: 'null' }] },
-    postcode: nullableString,
+    postcode: plainString,
     start_date: { ...nullableString, description: 'YYYY-MM-DD, or null if the page gives no specific date.' },
     end_date: nullableString,
     start_time: { ...nullableString, description: 'HH:MM 24-hour, or null.' },
     end_time: nullableString,
-    organizer_name: nullableString,
-    organizer_email: nullableString,
-    organizer_phone: nullableString,
-    website_url: nullableString,
-    ticket_url: nullableString,
+    organizer_name: plainString,
+    organizer_email: plainString,
+    organizer_phone: plainString,
+    website_url: plainString,
+    ticket_url: plainString,
     entry_fee_aud: nullableNumber,
     presale_fee_aud: nullableNumber,
     is_free: { type: 'boolean' },
     capacity: nullableNumber,
     registration_required: { type: 'boolean' },
-    accessibility_info: nullableString,
-    age_restrictions: nullableString,
-    image_url: nullableString,
-    seo_title: nullableString,
-    seo_description: nullableString,
-    seo_keywords: nullableStringArray,
-    tags: nullableStringArray,
+    accessibility_info: plainString,
+    age_restrictions: plainString,
+    image_url: plainString,
+    seo_title: plainString,
+    seo_description: plainString,
+    seo_keywords: plainStringArray,
+    tags: plainStringArray,
   },
   required: [
     'is_trading_card_event', 'rejection_reason', 'title', 'short_description', 'description',

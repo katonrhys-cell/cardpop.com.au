@@ -64,6 +64,7 @@ const {
   extractEventFromPage,
   normalizeUrl,
   isBlockedDomain,
+  EVENT_SCHEMA,
 } = await import('../../src/utils/eventScanner.js');
 
 // ─── Fixtures ────────────────────────────────────────────────────────────────
@@ -448,5 +449,15 @@ describe('runEventScan', () => {
     expect(summary.eventsCreated).toBe(0);
     expect(runUpdate(calls).status).toBe('completed');
     expect(summary.warnings).toContain('No active scan sources configured.');
+  });
+});
+
+describe('EVENT_SCHEMA', () => {
+  // The API rejects a structured-output schema with more than 16 union-typed
+  // properties (400, before the page is read) — this once failed every scan.
+  it('stays within the API limit of 16 union-typed parameters', () => {
+    const unions = Object.values(EVENT_SCHEMA.properties)
+      .filter((p) => p.anyOf || Array.isArray(p.type)).length;
+    expect(unions).toBeLessThanOrEqual(16);
   });
 });
