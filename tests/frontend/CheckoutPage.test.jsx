@@ -11,20 +11,33 @@ vi.mock('@/lib/apiServerClient.js', () => ({ default: { fetch: mockFetch } }));
 
 const h = vi.hoisted(() => ({
   cartItems: [],
+  addToCart: vi.fn(),
   // Auth defaults to an identity-verified buyer so the normal checkout flow
   // renders; the marketplace identity gate is exercised in its own test.
   auth: { currentUser: { email: 'user@x.com' }, isIdentityVerified: true, profileLoading: false },
+  // Row each table's `.single()` / `.maybeSingle()` resolves with (null = not found).
+  rows: {},
+  // Every supabase query chain built, keyed by table, so a test can assert filters.
+  queries: [],
 }));
-vi.mock('@/hooks/useCart.jsx', () => ({ useCart: () => ({ cartItems: h.cartItems, removeFromCart: vi.fn(), setIsCartOpen: vi.fn() }) }));
+vi.mock('@/hooks/useCart.jsx', () => ({
+  useCart: () => ({ cartItems: h.cartItems, addToCart: h.addToCart, removeFromCart: vi.fn(), setIsCartOpen: vi.fn() }),
+}));
 vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => h.auth }));
 
 vi.mock('@/lib/supabaseClient.js', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn().mockReturnThis(), eq: vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({ data: null, error: null }),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-    })),
+    from: vi.fn((table) => {
+      const chain = { table, filters: [] };
+      for (const m of ['select', 'eq', 'in', 'ilike', 'order', 'limit']) {
+        chain[m] = vi.fn((...args) => { chain.filters.push([m, ...args]); return chain; });
+      }
+      const resolve = () => Promise.resolve({ data: h.rows[table] ?? null, error: null });
+      chain.single = vi.fn(resolve);
+      chain.maybeSingle = vi.fn(resolve);
+      h.queries.push(chain);
+      return chain;
+    }),
     storage: { from: vi.fn(() => ({ getPublicUrl: () => ({ data: { publicUrl: '' } }) })) },
   },
 }));
@@ -85,9 +98,9 @@ function cartItem(id, price) {
   return { product: { id, type: 'listing', title: 'Charizard', price }, quantity: 1, variant: null };
 }
 
-function renderCheckout() {
+function renderCheckout(path = '/checkout') {
   return render(
-    <MemoryRouter initialEntries={['/checkout']}>
+    <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/checkout" element={<CheckoutPage />} />
         <Route path="/marketplace" element={<div>Marketplace Page</div>} />
@@ -100,6 +113,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   window.sessionStorage.clear();
   h.cartItems = [cartItem('l1', 100)];
+  h.addToCart = vi.fn().mockResolvedValue(undefined);
+  h.rows = {};
+  h.queries = [];
   h.auth = { currentUser: { email: 'user@x.com' }, isIdentityVerified: true, profileLoading: false };
   setFetch();
   // Avoid happy-dom navigation when the success path assigns window.location.href.
@@ -252,5 +268,69 @@ describe('CheckoutPage — checkout flow', () => {
     await reachPayment();
     const body = JSON.parse(screen.getByTestId('embedded-checkout').textContent);
     expect(body.saveShippingAddress).toBe(true);
+  });
+});
+
+// ─── Merchant Center checkout link (?id=…&quantity=…) ───────────────────────
+
+describe('CheckoutPage — Merchant Center checkout link', () => {
+  const shopRow = {
+    id: '11111111-1111-4111-8111-111111111111', title: '9-Pocket Zip Binder', sku: 'CP-9-POCKET-ZIP-BINDER',
+    price_aud: 34.95, stock_quantity: 12, status: 'active', images: ['shop/binder.webp'], variants: [],
+  };
+
+  it('adds the shop product named by ?id=<sku> at the requested quantity and strips the params', async () => {
+    h.cartItems = [];
+    h.rows = { shop_products: shopRow };
+    renderCheckout('/checkout?id=cp-9-pocket-zip-binder&quantity=2');
+
+    await waitFor(() => expect(h.addToCart).toHaveBeenCalledTimes(1));
+    const [product, variant, quantity, available] = h.addToCart.mock.calls[0];
+    expect(product).toMatchObject({ id: shopRow.id, type: 'shop', source: 'shop', title: '9-Pocket Zip Binder', price: 34.95 });
+    expect(variant).toMatchObject({ id: shopRow.id, price_in_cents: 3495, manage_inventory: true, inventory_quantity: 12 });
+    expect(quantity).toBe(2);
+    expect(available).toBe(12);
+
+    // Looked up by upper-cased SKU, purchasable statuses only.
+    const q = h.queries.find((c) => c.table === 'shop_products');
+    expect(q.filters).toEqual(expect.arrayContaining([['eq', 'sku', 'CP-9-POCKET-ZIP-BINDER'], ['in', 'status', ['active', 'preorder']]]));
+    expect(mockToast.success).toHaveBeenCalledWith(expect.stringContaining('added to your cart'));
+  });
+
+  it('looks a UUID up by product id, then falls back to an active buy-now listing', async () => {
+    h.cartItems = [];
+    const listing = {
+      id: '22222222-2222-4222-8222-222222222222', status: 'active', listing_type: 'fixed', price_aud: 250,
+      seller: { is_admin: true }, vault_item: { card_name: 'Charizard', set_name: 'Base Set', card_images: ['cards/char.jpg'] },
+    };
+    h.rows = { shop_products: null, listings: listing };
+    renderCheckout(`/checkout?id=${listing.id}`);
+
+    await waitFor(() => expect(h.addToCart).toHaveBeenCalledTimes(1));
+    const [product, variant, quantity] = h.addToCart.mock.calls[0];
+    expect(product).toMatchObject({ id: listing.id, type: 'listing', title: 'Charizard', price: 250, officialStore: true });
+    expect(variant).toBeNull();
+    expect(quantity).toBe(1);
+    const shopQ = h.queries.find((c) => c.table === 'shop_products');
+    expect(shopQ.filters).toEqual(expect.arrayContaining([['eq', 'id', listing.id]]));
+    // A UUID never goes to the variant-SKU lookup.
+    expect(h.queries.some((c) => c.table === 'shop_product_variants')).toBe(false);
+  });
+
+  it('tells the shopper when nothing matches and leaves the cart alone', async () => {
+    h.cartItems = [];
+    h.rows = {};
+    renderCheckout('/checkout?id=NOPE-123');
+    await waitFor(() => expect(mockToast.error).toHaveBeenCalledWith(expect.stringContaining("isn't available")));
+    expect(h.addToCart).not.toHaveBeenCalled();
+  });
+
+  it('does not add a product that is already in the cart', async () => {
+    h.cartItems = [{ product: { id: shopRow.id, type: 'shop', title: shopRow.title, price: 34.95 }, quantity: 1, variant: { id: shopRow.id } }];
+    h.rows = { shop_products: shopRow };
+    renderCheckout('/checkout?id=CP-9-POCKET-ZIP-BINDER');
+    await waitFor(() => expect(h.queries.some((c) => c.table === 'shop_products')).toBe(true));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(h.addToCart).not.toHaveBeenCalled();
   });
 });
