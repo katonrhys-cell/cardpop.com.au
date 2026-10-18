@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   playerPath, playerSlug, playerInitials, foldDiacritics, playerMatchScore, matchPlayers,
-  splitParagraphs, groupPlayersBySport, cleanKeyCards, parseAliases, playerSubtitle,
+  splitParagraphs, groupPlayersBySport, cleanKeyCards, parseAliases, playerSubtitle, isValidBirthDate, formatBorn,
 } from '@/utils/players.js';
+import { buildPlayerRow } from '@/pages/admin/PlayersAdminPage.jsx';
 
 const PLAYERS = [
   { id: '1', slug: 'michael-jordan', name: 'Michael Jordan', sport: 'NBA', team: 'Chicago Bulls', aliases: ['MJ', 'Air Jordan'], sort_order: 1 },
@@ -106,5 +107,36 @@ describe('text helpers', () => {
   it('builds the subtitle from whatever is present', () => {
     expect(playerSubtitle({ sport: 'NBA', team: 'Chicago Bulls', position: 'Shooting guard' })).toBe('NBA · Chicago Bulls · Shooting guard');
     expect(playerSubtitle({ sport: 'AFL' })).toBe('AFL');
+  });
+});
+
+describe('date of birth', () => {
+  it('accepts only real calendar days inside the DB range', () => {
+    expect(isValidBirthDate('1984-12-30')).toBe(true);
+    expect(isValidBirthDate('1984-02-30')).toBe(false);
+    expect(isValidBirthDate('1700-01-01')).toBe(false);
+    expect(isValidBirthDate('30/12/1984')).toBe(false);
+    expect(isValidBirthDate('')).toBe(false);
+    expect(isValidBirthDate(null)).toBe(false);
+  });
+
+  it('formats the full date when known and falls back to the year', () => {
+    expect(formatBorn({ born_on: '1984-12-30', born_year: 1984 })).toBe('30 December 1984');
+    expect(formatBorn({ born_on: null, born_year: 1978 })).toBe(1978);
+    expect(formatBorn({})).toBeNull();
+    expect(formatBorn(null)).toBeNull();
+  });
+
+  it('admin form derives the year from the date of birth', () => {
+    const { row, errors } = buildPlayerRow({ name: 'LeBron James', sport: 'NBA', team: 'Philadelphia 76ers', born_on: '1984-12-30', born_year: '' });
+    expect(errors).toBeUndefined();
+    expect(row.born_on).toBe('1984-12-30');
+    expect(row.born_year).toBe(1984);
+    expect(row.team).toBe('Philadelphia 76ers');
+  });
+
+  it('admin form keeps a bare year and rejects a bad date', () => {
+    expect(buildPlayerRow({ name: 'A', sport: 'NBA', born_on: '', born_year: '1978' }).row).toMatchObject({ born_on: null, born_year: 1978 });
+    expect(buildPlayerRow({ name: 'A', sport: 'NBA', born_on: '1984-13-01' }).errors.born_on).toBeTruthy();
   });
 });

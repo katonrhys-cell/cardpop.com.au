@@ -15,6 +15,8 @@ trap 'dropdb --if-exists "$DB"' EXIT
 run() { psql -X -q -v ON_ERROR_STOP=1 -d "$DB" -f "$1"; }
 run tests/db/players_stub_schema.sql
 run supabase/migrations/20261018020526_players.sql
+run supabase/migrations/20261018083926_players_born_on_lebron_76ers.sql
 # Re-applying must be a no-op (db push can re-run a straggler).
 run supabase/migrations/20261018020526_players.sql
+run supabase/migrations/20261018083926_players_born_on_lebron_76ers.sql
 psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/players.test.sql

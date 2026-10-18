@@ -22,7 +22,7 @@ import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
-import { playerPath, splitParagraphs, groupPlayersBySport } from '../utils/players.js';
+import { formatBorn, playerPath, splitParagraphs, groupPlayersBySport } from '../utils/players.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -3061,7 +3061,7 @@ ${sections || '<p>Player pages are being written.</p>'}
 async function renderPlayer(supabase, slug) {
   const { data: player } = await supabase
     .from('players')
-    .select('id, slug, name, sport, team, position, nationality, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, updated_at')
+    .select('id, slug, name, sport, team, position, nationality, born_on, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, updated_at')
     .eq('slug', slug)
     .eq('is_published', true)
     .maybeSingle();
@@ -3111,7 +3111,7 @@ async function renderPlayer(supabase, slug) {
 
   const facts = [
     ['Sport', player.sport], ['Team', player.team], ['Position', player.position],
-    ['Nationality', player.nationality], ['Born', player.born_year], ['Career', player.career_span],
+    ['Nationality', player.nationality], ['Born', formatBorn(player)], ['Career', player.career_span],
   ].filter(([, v]) => v);
 
   const jsonLd = [
@@ -3133,6 +3133,7 @@ async function renderPlayer(supabase, slug) {
         name: player.name,
         ...(player.headline ? { description: player.headline } : {}),
         ...(player.nationality ? { nationality: player.nationality } : {}),
+        ...(player.born_on ? { birthDate: player.born_on } : {}),
         ...(player.team ? { memberOf: { '@type': 'SportsTeam', name: player.team } } : {}),
         ...(image ? { image } : {}),
       },

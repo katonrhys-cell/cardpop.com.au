@@ -110,3 +110,28 @@ export const parseAliases = (text = '') =>
 /** One-line "sport · team · position" for cards and search results. */
 export const playerSubtitle = (p) =>
   [p?.sport, p?.team, p?.position].filter(Boolean).join(' · ');
+
+/** A `YYYY-MM-DD` date of birth that is a real calendar day in the DB's range. */
+export const isValidBirthDate = (iso = '') => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (y < 1850 || y > 2100) return false;
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
+};
+
+/**
+ * The "Born" fact: the full date ("30 December 1984") when it is known, else
+ * the year, else null. Formatted in UTC so the day never shifts with the
+ * reader's time zone.
+ */
+export const formatBorn = (player) => {
+  const iso = player?.born_on;
+  if (iso && isValidBirthDate(iso)) {
+    return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-AU', {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+    });
+  }
+  return player?.born_year ?? null;
+};

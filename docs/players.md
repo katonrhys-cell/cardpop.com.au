@@ -31,7 +31,7 @@ edit, hide and reorder players at **Admin → Players** without a deploy.
 | Column | Meaning |
 |---|---|
 | `slug` | URL key, unique, `^[a-z0-9]+(-[a-z0-9]+)*$` (checked by the DB). Changing a published slug breaks shared links; there is no redirect table. |
-| `name`, `sport`, `team`, `position`, `nationality`, `born_year`, `career_span` | The facts row. `sport` is the marketplace collection name (`NBA`, `AFL`, `Soccer`, `Formula 1`…) so the page can link to `/collections/<slug>` via `resolveCollectionSlug()`. |
+| `name`, `sport`, `team`, `position`, `nationality`, `born_on`, `born_year`, `career_span` | The facts row. `born_on` is the full date of birth (rendered by `formatBorn()` as "30 December 1984" and emitted as schema.org `birthDate`); `born_year` is for rows where only the year is known and is overwritten from `born_on` by the `trg_players_sync_born_year` trigger whenever a full date is set (`20261018083926_players_born_on_lebron_76ers.sql`). `sport` is the marketplace collection name (`NBA`, `AFL`, `Soccer`, `Formula 1`…) so the page can link to `/collections/<slug>` via `resolveCollectionSlug()`. |
 | `headline` | One sentence: cards, search results, `<meta description>`. |
 | `bio`, `collecting_notes` | Plain text, paragraphs separated by a blank line (`splitParagraphs()`). No HTML. |
 | `key_cards` | `[{ name, note }]` — "Cards worth knowing". Must be a JSON array (DB check). |

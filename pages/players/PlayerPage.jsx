@@ -14,7 +14,7 @@ import { PlayerAvatar } from '@/components/PlayerPicker.jsx';
 import { fetchPlayerBySlug, fetchPlayerListings, fetchPlayerTrackedCards } from '@/lib/players.js';
 import { formatAud } from '@/lib/cardPrices.js';
 import { resolveCollectionSlug } from '@/data/collectionConfigs.js';
-import { playerPath, playerSubtitle, splitParagraphs } from '@/utils/players.js';
+import { formatBorn, playerPath, playerSubtitle, splitParagraphs } from '@/utils/players.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -126,6 +126,7 @@ const PlayerPage = () => {
           '@type': 'Person',
           name: player.name,
           ...(player.nationality ? { nationality: player.nationality } : {}),
+          ...(player.born_on ? { birthDate: player.born_on } : {}),
           ...(player.team ? { memberOf: { '@type': 'SportsTeam', name: player.team } } : {}),
           ...(player.image_url ? { image: publicImageUrl(player.image_url) } : {}),
           description: player.headline || undefined,
@@ -202,7 +203,7 @@ const PlayerPage = () => {
           {player.headline && <p className="mt-3 max-w-2xl text-lg text-muted-foreground">{player.headline}</p>}
           <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Fact label="Nationality" value={player.nationality} />
-            <Fact label="Born" value={player.born_year} />
+            <Fact label="Born" value={formatBorn(player)} />
             <Fact label="Career" value={player.career_span} />
             <Fact label="Cards on CardPop" value={listings.length ? `${activeListings.length} live` : null} />
           </div>

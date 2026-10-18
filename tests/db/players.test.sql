@@ -38,6 +38,32 @@ begin
   raise notice 'ok: tracker backfill';
 end $$;
 
+-- 2b. born_on (20261018083926): LeBron's date of birth and team, year kept in step.
+do $$
+declare r record;
+begin
+  select born_on, born_year, team into r from public.players where slug = 'lebron-james';
+  if r.born_on <> date '1984-12-30' then raise exception 'LeBron born_on not set: %', r.born_on; end if;
+  if r.born_year <> 1984 then raise exception 'born_year not derived from born_on: %', r.born_year; end if;
+  if r.team <> 'Philadelphia 76ers' then raise exception 'LeBron team not updated: %', r.team; end if;
+  -- Setting a full date overrides a stale year; clearing it leaves the year alone.
+  update public.players set born_on = date '1990-05-05', born_year = 1900 where slug = 'lebron-james';
+  if (select born_year from public.players where slug = 'lebron-james') <> 1990 then
+    raise exception 'trigger did not sync born_year from born_on';
+  end if;
+  update public.players set born_on = null where slug = 'lebron-james';
+  if (select born_year from public.players where slug = 'lebron-james') <> 1990 then
+    raise exception 'clearing born_on must not clear born_year';
+  end if;
+  update public.players set born_on = date '1984-12-30' where slug = 'lebron-james';
+  begin
+    update public.players set born_on = date '1700-01-01' where slug = 'lebron-james';
+    raise exception 'out-of-range born_on accepted';
+  exception when check_violation then null;
+  end;
+  raise notice 'ok: born_on';
+end $$;
+
 -- 3. RLS: anon reads published rows only; a non-admin cannot write; an admin can.
 insert into public.profiles (id, is_admin) values
   ('00000000-0000-0000-0000-000000000001', false),
