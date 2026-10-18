@@ -261,6 +261,70 @@ export function mapPaypalStatus(paypalStatus) {
 }
 
 /** Read the current entitlement snapshot for a user (used by GET /status). */
+const httpError = (statusCode, message) => Object.assign(new Error(message), { statusCode });
+
+/**
+ * Move a member's existing Stripe subscription onto a higher paid tier
+ * (Account → Dashboard / Membership → "Upgrade your plan"). The subscription's
+ * single item is re-priced in place with prorations, so the member keeps
+ * their billing anchor, trial and payment method — no second subscription,
+ * no second trial. The webhook mirrors the change too, but the profile is
+ * updated here as well so the UI reflects the new tier straight away.
+ *
+ * Throws an Error with `statusCode` for the route to relay: 400 for a tier
+ * that isn't a step up, 409 when there is no Stripe subscription to change
+ * (Hobby, PayPal-billed, complimentary or lapsed), 503 when the target
+ * tier's price isn't configured.
+ */
+export async function changeStripeSubscriptionTier(userId, tier) {
+  if (!PAID_TIER_ORDER.includes(tier)) throw httpError(400, 'Choose a paid plan to upgrade to.');
+  const priceId = process.env[ENV.stripePriceIds[tier]];
+  if (!priceId) {
+    logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
+    throw httpError(503, `The ${tier} plan is not available yet.`);
+  }
+
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('subscription_status, subscription_provider, subscription_tier, stripe_subscription_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!profile) throw httpError(404, 'Profile not found.');
+
+  if (profile.subscription_status === COMPLIMENTARY_STATUS) {
+    throw httpError(409, 'Your complimentary membership is managed by CardPop — contact support to change it.');
+  }
+  if (profile.subscription_provider === 'paypal') {
+    throw httpError(409, 'Your membership is billed through PayPal. Cancel it there, then start the new plan here.');
+  }
+  if (!profile.stripe_subscription_id) {
+    throw httpError(409, 'No active membership to change — start a plan below.');
+  }
+  if (PAID_TIER_ORDER.indexOf(tier) <= PAID_TIER_ORDER.indexOf(profile.subscription_tier)) {
+    throw httpError(400, 'Choose a plan above your current one.');
+  }
+
+  const current = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+  if (!['active', 'trialing'].includes(current?.status)) {
+    throw httpError(409, 'Your membership is not active — start a plan below.');
+  }
+  const item = current.items?.data?.[0];
+  if (!item?.id) throw new Error(`Stripe subscription ${current.id} has no item to re-price`);
+
+  const updated = await stripe.subscriptions.update(current.id, {
+    items: [{ id: item.id, price: priceId }],
+    proration_behavior: 'create_prorations',
+    // `tier` in the metadata is what applyStripeSubscription mirrors onto
+    // profiles.subscription_tier.
+    metadata: { ...(current.metadata || {}), userId, tier },
+  });
+
+  await applyStripeSubscription(updated);
+  logger.info(`[SUB] ${userId} upgraded ${profile.subscription_tier} → ${tier} (stripe ${updated.id})`);
+  return { tier: tierFromStripeSubscription(updated), status: mapStripeStatus(updated.status) };
+}
+
 export async function getSubscriptionStatus(userId) {
   const { data } = await supabase
     .from('profiles')

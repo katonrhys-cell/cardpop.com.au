@@ -254,7 +254,8 @@ and can be cleaned up.
 | `VAPID_PUBLIC_KEY` | Web push (`src/utils/pushService.js`) — generate the pair once with `npx web-push generate-vapid-keys`. Unset = push silently disabled (fail-safe): `/push/public-key` returns null and the enable-push UI hides itself |
 | `VAPID_PRIVATE_KEY` | Web push — the private half of the pair. Never expose client-side |
 | `VAPID_SUBJECT` | *(optional)* Web push contact URI (`mailto:` or https URL) sent to push services — defaults to `mailto:noreply@cardpop.com.au` |
-| `VITE_AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — address autocomplete on the checkout shipping form (build-time, public) — blank = free-text fallback |
+| `VITE_GOOGLE_PLACES_API_KEY` | *(optional, build-time)* Google **Places API (New)** key — address autocomplete on the checkout shipping form (`lib/googlePlaces.js`, REST, no Maps SDK script). When set it takes precedence over Amazon Location for the browser suggestions (`lib/addressAutocomplete.js` picks the provider); the key must have Places API (New) enabled and be restricted to the site's HTTP referrers — see `docs/address-autocomplete.md` |
+| `VITE_AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — address autocomplete on the checkout shipping form (build-time, public) when `VITE_GOOGLE_PLACES_API_KEY` is unset — blank = free-text fallback |
 | `VITE_AWS_LOCATION_REGION` | *(optional)* Region for the browser Amazon Location endpoint (`places.geo.<region>.amazonaws.com`) — defaults to `ap-southeast-2` |
 | `AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — server-side geocode check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
 | `AWS_LOCATION_REGION` | *(optional)* Region for the server-side Amazon Location endpoint — defaults to `ap-southeast-2` |

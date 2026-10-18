@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import BinderCapacityPicker from '@/components/shop/BinderCapacityPicker.jsx';
-import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
@@ -30,6 +30,7 @@ import {
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
 import { trackViewItem } from '@/lib/analytics.js';
+import { getCardImage } from '@/utils/imageUrl.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -102,7 +103,7 @@ const ShopBinderProductPage = () => {
 
   const handleAddToCart = () => {
     if (!row || !isPurchasable) return;
-    if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
+    if (variants.length > 0 && !chosenVariant) { toast.error(`Please choose a ${variantKind(row).toLowerCase()} first.`); return; }
     if (!inStock) return;
     const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
     const cartVariant = chosenVariant
@@ -443,7 +444,8 @@ const ShopBinderProductPage = () => {
               >
                 <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                   <CardImage
-                    src={binderImages(other)[0]}
+                    {...getCardImage(binderImages(other)[0], { widths: [240, 400, 600] })}
+                    sizes="(min-width: 1024px) 25vw, 50vw"
                     alt={binderImageAlt(other, other.imageFiles[0])}
                     imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                   />

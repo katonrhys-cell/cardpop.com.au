@@ -792,26 +792,28 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
             <Textarea value={formData.description} onChange={(e) => handleInputChange('description', e.target.value)} className="bg-background min-h-[120px]" />
           </div>
 
-          {/* Colour variants — each is a sellable unit with its own SKU,
-              barcode and stock. Shoppers pick one on the product page. */}
+          {/* Colour (or size) variants — each is a sellable unit with its own
+              SKU, barcode and stock. Shoppers pick one on the product page. A
+              size (S, M, L, XL, 2XL…) goes in the colour box with no swatch;
+              the storefront then labels the picker "Size". */}
           <div className="space-y-2 pt-4 border-t border-border">
             <div className="flex items-center justify-between gap-2">
-              <Label>Colour variants <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Label>Colour / size variants <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setVariants((prev) => [...prev, newVariant()])}
               >
-                <Plus className="w-4 h-4 mr-1" /> Add colour
+                <Plus className="w-4 h-4 mr-1" /> Add variant
               </Button>
             </div>
             {variants.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No variants — this product is sold as a single unit with the stock above. Add a colour to sell and track stock per colour (each colour gets its own SKU and barcode).</p>
+              <p className="text-xs text-muted-foreground">No variants — this product is sold as a single unit with the stock above. Add a colour or size to sell and track stock per option (each gets its own SKU and barcode). Sizes such as S, M, L, XL and 2XL are shown as a Size picker.</p>
             ) : (
               <div className="space-y-2">
                 <div className="hidden md:grid grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_auto_auto] gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1">
-                  <span>Colour</span><span>SKU</span><span>Barcode</span><span>Stock</span><span>Price</span><span>Active</span><span></span>
+                  <span>Colour / size</span><span>SKU</span><span>Barcode</span><span>Stock</span><span>Price</span><span>Active</span><span></span>
                 </div>
                 {variants.map((v, i) => (
                   <div key={v._key} className="grid grid-cols-2 md:grid-cols-[1.1fr_1.2fr_1.3fr_0.6fr_0.8fr_auto_auto] gap-2 items-center rounded-xl border border-border p-2 bg-background/50">
@@ -825,7 +827,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                       />
                       <Input
                         aria-label="Variant colour"
-                        placeholder="Colour"
+                        placeholder="Colour or size"
                         value={v.colour}
                         onChange={(e) => setVariants((prev) => prev.map((x, j) => (j === i ? { ...x, colour: e.target.value, sku: x.sku || suggestVariantSku(formData.sku, e.target.value) } : x)))}
                         className="bg-background h-9"

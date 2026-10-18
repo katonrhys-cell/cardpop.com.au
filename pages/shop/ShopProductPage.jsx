@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import { getCardImage } from '@/utils/imageUrl.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import SizePicker from '@/components/shop/SizePicker.jsx';
 import useSizeStock from '@/hooks/useSizeStock.js';
 import { sizeGroupFor, sizeProductPath } from '@/utils/shopSizes.js';
-import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
@@ -128,7 +129,7 @@ const ShopProductPage = () => {
 
   const handleAddToCart = () => {
     if (!row || !isPurchasable) return;
-    if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
+    if (variants.length > 0 && !chosenVariant) { toast.error(`Please choose a ${variantKind(row).toLowerCase()} first.`); return; }
     if (!inStock) return;
     const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
     const cartVariant = chosenVariant
@@ -488,7 +489,8 @@ const ShopProductPage = () => {
                   <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                     {other.imagePaths?.length > 0 && (
                       <CardImage
-                        src={palmsOffImages(other)[0]}
+                        {...getCardImage(palmsOffImages(other)[0], { widths: [240, 400, 600] })}
+                        sizes="(min-width: 1024px) 25vw, 50vw"
                         alt={palmsOffImageAlt(other, other.imagePaths[0])}
                         imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                       />

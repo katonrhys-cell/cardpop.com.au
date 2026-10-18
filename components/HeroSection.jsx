@@ -101,7 +101,7 @@ const HeroSection = () => {
       <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
+      <div className="max-w-[90rem] mx-auto w-full relative z-10 lg:pr-[500px] xl:pr-[560px]">
         <div className="text-center lg:text-left">
           <div
             className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"

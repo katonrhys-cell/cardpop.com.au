@@ -76,7 +76,10 @@ publish standard product data (most Shopify / WooCommerce wholesalers) read
 reliably without the model.
 
 The Magnetic Metal Slab Case colours were seeded with their Temu link by
-`20261002222536_shop_supplier_price_watch.sql`.
+`20261002222536_shop_supplier_price_watch.sql`; the Black Nitrile Heavy Duty
+Gloves with their Werko page (sold there by the carton of 10 boxes, so the
+price the watch reads is the carton price, not the per-box cost on the row) by
+`20261018103000_nitrile_gloves_sizes_and_werko_supplier.sql`.
 
 ## Running it by hand
 

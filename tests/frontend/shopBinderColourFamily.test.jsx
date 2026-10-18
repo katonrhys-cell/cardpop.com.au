@@ -25,7 +25,16 @@ vi.mock('@/lib/supabaseClient.js', () => {
     };
     return b;
   };
-  return { supabase: { from: (t) => builder(t) } };
+  // The related-binder cards build their image URLs through utils/imageUrl.js,
+  // which reads supabase.storage — give it a plain public-URL shape.
+  const storage = {
+    from: (bucket) => ({
+      getPublicUrl: (path) => ({
+        data: { publicUrl: `https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/${bucket}/${path}` },
+      }),
+    }),
+  };
+  return { supabase: { from: (t) => builder(t), storage } };
 });
 vi.mock('@/hooks/useCart.jsx', () => ({
   useCart: () => ({

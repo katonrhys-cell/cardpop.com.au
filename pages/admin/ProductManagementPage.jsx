@@ -21,6 +21,7 @@ import BulkProductImport from '@/components/admin/BulkProductImport.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
+import { variantKind } from '@/utils/shopVariants.js';
 import {
   SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
 } from '@/utils/adminProductList.js';
@@ -221,7 +222,7 @@ const ProductManagementPage = () => {
       <TableCell className="font-mono text-xs text-muted-foreground">
         {product.sku || <span className="text-destructive">missing</span>}
         {(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length > 0 && (
-          <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} colours</span>
+          <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} {variantKind({ variants: variantsByProduct[product.id] }).toLowerCase()}s</span>
         )}
       </TableCell>
       <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>

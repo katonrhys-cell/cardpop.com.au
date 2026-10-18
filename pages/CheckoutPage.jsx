@@ -27,7 +27,7 @@ import MarketplacePurchaseGate from '@/components/checkout/MarketplacePurchaseGa
 import CheckoutReassurance from '@/components/checkout/CheckoutReassurance.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
-import { AMAZON_LOCATION_ENABLED } from '@/lib/amazonLocation.js';
+import { ADDRESS_AUTOCOMPLETE_ENABLED } from '@/lib/addressAutocomplete.js';
 import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
 import { fetchSavedAddresses, addressRowToShipping, formatAddressLabel } from '@/lib/savedAddresses.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from '@/lib/analytics.js';
@@ -474,10 +474,11 @@ const CheckoutPage = () => {
       toast.error('Please enter a valid email address for your receipt.');
       return false;
     }
-    // When Amazon Location autocomplete is active, the address must be one the
-    // user picked from the suggestions (verified) — not free-typed. Skipped if
-    // it couldn't load; the server still validates the address before charging.
-    if (AMAZON_LOCATION_ENABLED && !placesUnavailable && !verified) {
+    // When address autocomplete (Google Places / Amazon Location) is active, the
+    // address must be one the user picked from the suggestions (verified) — not
+    // free-typed. Skipped if it couldn't load; the server still validates the
+    // address before charging.
+    if (ADDRESS_AUTOCOMPLETE_ENABLED && !placesUnavailable && !verified) {
       toast.error('Please select your address from the suggestions so we can verify it.');
       return false;
     }

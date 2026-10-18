@@ -412,13 +412,13 @@ const HomePage = () => {
         <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
         {/* ── Hero text ── */}
-        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
+        <div className="max-w-[90rem] mx-auto w-full relative z-10 lg:pr-[500px] xl:pr-[560px]">
           {/* ── Animated card showcase — shelf → stand (desktop only) ──
-              Lives INSIDE the centred column, anchored to its right edge, so it
-              sits in the padding reserved for it (lg:pr-[460px]) beside the
-              headline at every viewport width. It used to be positioned against
-              the full-width <section>, which lined up at ~1440px but drifted
-              further from the text with every extra pixel of screen width. */}
+              Lives INSIDE the hero column, anchored to its right edge, so it
+              sits in the padding reserved for it (lg:pr-[500px] xl:pr-[560px])
+              beside the headline. The column is the same max-w-[90rem] +
+              gutters as the header, so the text starts flush with the logo and
+              the shelf's right edge lines up with the header's right edge. */}
           {isDesktop && (
             <Suspense fallback={null}>
               <HeroCardShowcase cards={heroCards} />
