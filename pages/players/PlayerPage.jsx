@@ -14,7 +14,7 @@ import { PlayerAvatar } from '@/components/PlayerPicker.jsx';
 import { fetchPlayerBySlug, fetchPlayerListings, fetchPlayerTrackedCards } from '@/lib/players.js';
 import { formatAud } from '@/lib/cardPrices.js';
 import { resolveCollectionSlug } from '@/data/collectionConfigs.js';
-import { formatBorn, playerPath, playerSubtitle, splitParagraphs } from '@/utils/players.js';
+import { formatBorn, keyCardImage, playerPath, playerSubtitle, splitParagraphs } from '@/utils/players.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -286,15 +286,29 @@ const PlayerPage = () => {
             <section className="rounded-2xl border border-border bg-card p-6">
               <h2 className="mb-4 flex items-center gap-2 text-xl font-bold"><BadgeCheck className="h-5 w-5 text-primary" /> Cards worth knowing</h2>
               <ol className="space-y-4">
-                {keyCards.map((c, i) => (
-                  <li key={`${c.name}-${i}`} className="flex gap-3">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
-                    <div>
-                      <p className="text-sm font-bold text-foreground">{c.name}</p>
-                      {c.note && <p className="text-sm text-muted-foreground">{c.note}</p>}
-                    </div>
-                  </li>
-                ))}
+                {keyCards.map((c, i) => {
+                  const image = keyCardImage(c);
+                  return (
+                    <li key={`${c.name}-${i}`} className="flex gap-3">
+                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{i + 1}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-bold text-foreground">{c.name}</p>
+                        {c.note && <p className="text-sm text-muted-foreground">{c.note}</p>}
+                      </div>
+                      {image && (
+                        <img
+                          src={image.startsWith('/') ? image : publicImageUrl(image)}
+                          alt={`${c.name} — ${player.name}`}
+                          width={64}
+                          height={80}
+                          loading="lazy"
+                          decoding="async"
+                          className="h-20 w-16 shrink-0 rounded-lg border border-border object-cover"
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           )}

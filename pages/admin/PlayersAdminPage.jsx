@@ -23,7 +23,7 @@ import { PlayerAvatar } from '@/components/PlayerPicker.jsx';
 
 const EMPTY = {
   name: '', slug: '', sport: 'NBA', team: '', position: '', nationality: '', born_on: '', born_year: '', career_span: '',
-  headline: '', bio: '', collecting_notes: '', key_cards: [{ name: '', note: '' }], aliases: '', image_url: '',
+  headline: '', bio: '', collecting_notes: '', key_cards: [{ name: '', note: '', image_url: '' }], aliases: '', image_url: '',
   sort_order: 100, is_published: true,
 };
 
@@ -34,7 +34,7 @@ const toForm = (p) => ({
   born_year: p.born_year ?? '',
   team: p.team || '', position: p.position || '', nationality: p.nationality || '', career_span: p.career_span || '',
   headline: p.headline || '', bio: p.bio || '', collecting_notes: p.collecting_notes || '', image_url: p.image_url || '',
-  key_cards: Array.isArray(p.key_cards) && p.key_cards.length ? p.key_cards.map((c) => ({ name: c.name || '', note: c.note || '' })) : [{ name: '', note: '' }],
+  key_cards: Array.isArray(p.key_cards) && p.key_cards.length ? p.key_cards.map((c) => ({ name: c.name || '', note: c.note || '', image_url: c.image_url || '' })) : [{ name: '', note: '', image_url: '' }],
   aliases: (p.aliases || []).join(', '),
 });
 
@@ -307,15 +307,16 @@ const PlayersAdminPage = () => {
             <div className="space-y-2">
               <Label>Cards worth knowing</Label>
               {form.key_cards.map((c, i) => (
-                <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_auto]">
+                <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1.4fr_1fr_auto]">
                   <Input value={c.name} onChange={(e) => setKeyCard(i, 'name', e.target.value)} placeholder="2003-04 Topps Chrome #111" aria-label={`Key card ${i + 1} name`} />
                   <Input value={c.note} onChange={(e) => setKeyCard(i, 'note', e.target.value)} placeholder="Why it matters" aria-label={`Key card ${i + 1} note`} />
-                  <Button type="button" variant="ghost" size="icon" aria-label="Remove key card" onClick={() => setForm((f) => ({ ...f, key_cards: f.key_cards.length > 1 ? f.key_cards.filter((_, idx) => idx !== i) : [{ name: '', note: '' }] }))}>
+                  <Input value={c.image_url || ''} onChange={(e) => setKeyCard(i, 'image_url', e.target.value)} placeholder="Photo URL or /images/… (optional)" aria-label={`Key card ${i + 1} photo`} />
+                  <Button type="button" variant="ghost" size="icon" aria-label="Remove key card" onClick={() => setForm((f) => ({ ...f, key_cards: f.key_cards.length > 1 ? f.key_cards.filter((_, idx) => idx !== i) : [{ name: '', note: '', image_url: '' }] }))}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => setForm((f) => ({ ...f, key_cards: [...f.key_cards, { name: '', note: '' }] }))}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setForm((f) => ({ ...f, key_cards: [...f.key_cards, { name: '', note: '', image_url: '' }] }))}>
                 <Plus className="mr-1.5 h-4 w-4" /> Add a card
               </Button>
             </div>

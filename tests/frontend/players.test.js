@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   playerPath, playerSlug, playerInitials, foldDiacritics, playerMatchScore, matchPlayers,
-  splitParagraphs, groupPlayersBySport, cleanKeyCards, parseAliases, playerSubtitle, isValidBirthDate, formatBorn,
+  splitParagraphs, groupPlayersBySport, cleanKeyCards, parseAliases, playerSubtitle, isValidBirthDate, formatBorn, keyCardImage,
 } from '@/utils/players.js';
 import { buildPlayerRow } from '@/pages/admin/PlayersAdminPage.jsx';
 
@@ -138,5 +138,17 @@ describe('date of birth', () => {
   it('admin form keeps a bare year and rejects a bad date', () => {
     expect(buildPlayerRow({ name: 'A', sport: 'NBA', born_on: '', born_year: '1978' }).row).toMatchObject({ born_on: null, born_year: 1978 });
     expect(buildPlayerRow({ name: 'A', sport: 'NBA', born_on: '1984-13-01' }).errors.born_on).toBeTruthy();
+  });
+});
+
+describe('key card photos', () => {
+  it('keeps a safe image_url and drops anything else', () => {
+    expect(cleanKeyCards([{ name: 'A', note: '', image_url: ' /images/players/a.webp ' }])).toEqual([{ name: 'A', note: '', image_url: '/images/players/a.webp' }]);
+    expect(cleanKeyCards([{ name: 'A', note: '', image_url: 'https://cdn.example/a.jpg' }])[0].image_url).toBe('https://cdn.example/a.jpg');
+    expect(cleanKeyCards([{ name: 'A', note: '', image_url: '' }])[0]).not.toHaveProperty('image_url');
+    expect(keyCardImage({ image_url: 'javascript:alert(1)' })).toBeNull();
+    expect(keyCardImage({ image_url: '//evil.example/a.jpg' })).toBeNull();
+    expect(keyCardImage({ image_url: 'images/a.jpg' })).toBeNull();
+    expect(keyCardImage(null)).toBeNull();
   });
 });

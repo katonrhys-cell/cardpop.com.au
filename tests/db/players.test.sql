@@ -61,6 +61,12 @@ begin
     raise exception 'out-of-range born_on accepted';
   exception when check_violation then null;
   end;
+  if (select key_cards->0->>'image_url' from public.players where slug = 'lebron-james') <> '/images/players/lebron-james-2003-04-topps-chrome-111.webp' then
+    raise exception 'Topps Chrome key card photo missing';
+  end if;
+  if (select key_cards->0->>'name' from public.players where slug = 'lebron-james') <> '2003-04 Topps Chrome #111' then
+    raise exception 'key card name changed by the photo update';
+  end if;
   raise notice 'ok: born_on';
 end $$;
 

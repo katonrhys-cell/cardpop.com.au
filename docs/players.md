@@ -34,7 +34,7 @@ edit, hide and reorder players at **Admin → Players** without a deploy.
 | `name`, `sport`, `team`, `position`, `nationality`, `born_on`, `born_year`, `career_span` | The facts row. `born_on` is the full date of birth (rendered by `formatBorn()` as "30 December 1984" and emitted as schema.org `birthDate`); `born_year` is for rows where only the year is known and is overwritten from `born_on` by the `trg_players_sync_born_year` trigger whenever a full date is set (`20261018083926_players_born_on_lebron_76ers.sql`). `sport` is the marketplace collection name (`NBA`, `AFL`, `Soccer`, `Formula 1`…) so the page can link to `/collections/<slug>` via `resolveCollectionSlug()`. |
 | `headline` | One sentence: cards, search results, `<meta description>`. |
 | `bio`, `collecting_notes` | Plain text, paragraphs separated by a blank line (`splitParagraphs()`). No HTML. |
-| `key_cards` | `[{ name, note }]` — "Cards worth knowing". Must be a JSON array (DB check). |
+| `key_cards` | `[{ name, note, image_url? }]` — "Cards worth knowing". Must be a JSON array (DB check). `image_url` is optional: an `http(s)` URL or a site-relative path under `public/` (e.g. `/images/players/lebron-james-2003-04-topps-chrome-111.webp`), shown as a thumbnail beside the entry; `keyCardImage()` drops anything else. |
 | `aliases` | Nicknames and alternate spellings the picker and site search match (`MJ`, `Wemby`, `Luka Doncic`). |
 | `image_url` | Optional. Blank renders the player's initials. Only use a photo CardPop has the rights to. |
 | `sort_order`, `is_published` | Display order (lower first) and visibility. Unpublished rows are hidden from everyone but admins. |

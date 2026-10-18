@@ -96,8 +96,26 @@ export function groupPlayersBySport(players = []) {
 /** Normalise the admin form's key-cards rows: drop blanks, trim strings. */
 export const cleanKeyCards = (rows = []) =>
   (Array.isArray(rows) ? rows : [])
-    .map((r) => ({ name: String(r?.name || '').trim(), note: String(r?.note || '').trim() }))
+    .map((r) => {
+      const row = { name: String(r?.name || '').trim(), note: String(r?.note || '').trim() };
+      const image = keyCardImage(r);
+      if (image) row.image_url = image;
+      return row;
+    })
     .filter((r) => r.name);
+
+/**
+ * A key card's optional photo: an `http(s)` URL or a site-relative path such
+ * as `/images/players/...` (the public/ folder). Anything else is dropped so
+ * a row can't inject `javascript:` or protocol-relative URLs into the page.
+ */
+export const keyCardImage = (card) => {
+  const url = String(card?.image_url || '').trim();
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  return null;
+};
 
 /** "MJ, Air Jordan" → ["MJ", "Air Jordan"]. */
 export const parseAliases = (text = '') =>

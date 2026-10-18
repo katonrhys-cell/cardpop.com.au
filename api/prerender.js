@@ -22,7 +22,7 @@ import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
-import { formatBorn, playerPath, splitParagraphs, groupPlayersBySport } from '../utils/players.js';
+import { formatBorn, keyCardImage, playerPath, splitParagraphs, groupPlayersBySport } from '../utils/players.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -3181,7 +3181,11 @@ ${player.headline ? `<p><strong>${esc(player.headline)}</strong></p>` : ''}
 ${facts.length ? `<ul>\n${facts.map(([k, v]) => `  <li>${esc(k)}: ${esc(v)}</li>`).join('\n')}\n</ul>` : ''}
 ${player.bio ? `<section>\n<h2>About ${esc(player.name)}</h2>\n${splitParagraphs(player.bio).map((p) => `<p>${esc(p)}</p>`).join('\n')}\n</section>` : ''}
 ${player.collecting_notes ? `<section>\n<h2>Collecting ${esc(player.name)}</h2>\n${splitParagraphs(player.collecting_notes).map((p) => `<p>${esc(p)}</p>`).join('\n')}\n</section>` : ''}
-${keyCards.length ? `<section>\n<h2>Cards worth knowing</h2>\n<ol>\n${keyCards.map((c) => `  <li><strong>${esc(c.name)}</strong>${c.note ? ` — ${esc(c.note)}` : ''}</li>`).join('\n')}\n</ol>\n</section>` : ''}
+${keyCards.length ? `<section>\n<h2>Cards worth knowing</h2>\n<ol>\n${keyCards.map((c) => {
+    const image = keyCardImage(c);
+    const img = image ? `<img src="${esc(image.startsWith('/') ? `${BASE_URL}${image}` : publicImageUrl(image))}" alt="${esc(`${c.name} — ${player.name}`)}" width="64" height="80" loading="lazy"> ` : '';
+    return `  <li>${img}<strong>${esc(c.name)}</strong>${c.note ? ` — ${esc(c.note)}` : ''}</li>`;
+  }).join('\n')}\n</ol>\n</section>` : ''}
 ${trackedHtml}
 ${listingsHtml}
 </main>`,

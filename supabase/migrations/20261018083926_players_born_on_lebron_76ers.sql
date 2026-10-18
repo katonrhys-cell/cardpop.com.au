@@ -8,7 +8,10 @@
 --
 -- LeBron James signed a two-year deal with the Philadelphia 76ers in July 2026
 -- (his fourth franchise), so his seeded row is updated: team, date of birth and
--- one sentence in the bio. Idempotent: safe to re-run.
+-- one sentence in the bio. His first key card also gets a photo: key_cards
+-- entries may carry an optional `image_url` (http(s) or a site-relative path
+-- under public/), rendered as a thumbnail beside the card on the player page.
+-- Idempotent: safe to re-run.
 
 alter table public.players
   add column if not exists born_on date;
@@ -52,3 +55,15 @@ set
   team = 'Philadelphia 76ers',
   bio = E'LeBron James went straight from high school in Akron, Ohio to the first pick of the 2003 draft. He has won four championships with three franchises (Miami 2012 and 2013, Cleveland 2016, the Lakers 2020), four MVP awards and four Finals MVPs, and in February 2023 passed Kareem Abdul-Jabbar as the league''s all-time leading scorer.\n\nIn July 2026 he left the Lakers for the Philadelphia 76ers, his fourth franchise, chasing a fifth ring. More than two decades after his debut he is still an All-Star, which is why his rookie cards have held their place at the top of the modern market for so long.'
 where slug = 'lebron-james';
+
+-- Photo of the 2003-04 Topps Chrome #111 (BGS 9) beside that key card. The
+-- file ships with the app (public/images/players/).
+update public.players
+set key_cards = jsonb_set(
+  key_cards,
+  '{0,image_url}',
+  to_jsonb('/images/players/lebron-james-2003-04-topps-chrome-111.webp'::text),
+  true
+)
+where slug = 'lebron-james'
+  and key_cards->0->>'name' = '2003-04 Topps Chrome #111';
