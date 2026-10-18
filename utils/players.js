@@ -110,3 +110,126 @@ export const parseAliases = (text = '') =>
 /** One-line "sport · team · position" for cards and search results. */
 export const playerSubtitle = (p) =>
   [p?.sport, p?.team, p?.position].filter(Boolean).join(' · ');
+
+// ─── SEO ─────────────────────────────────────────────────────────────────────
+// One source for the <title> / meta description of the player pages, used by
+// the SPA (SEOHead) and api/prerender.js alike so bots and browsers agree.
+
+export const SEO_TITLE_MAX = 60;   // Google shows ~60 characters of a title.
+export const SEO_DESCRIPTION_MAX = 155;
+
+export const PLAYERS_INDEX_SEO = {
+  title: 'Player Cards – The Most Collected Athletes | CardPop',
+  description: 'Player pages for the most collected athletes: a short profile, key rookie cards, live Australian-dollar prices and every card of theirs listed on CardPop.',
+};
+
+/** Cut at a word boundary and add an ellipsis; never longer than `max`. */
+export const truncateAt = (text = '', max = SEO_DESCRIPTION_MAX) => {
+  const s = String(text || '').trim();
+  if (s.length <= max) return s;
+  const cut = s.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  const base = space > max * 0.6 ? cut.slice(0, space) : cut;
+  return `${base.replace(/[\s,;:–-]+$/, '')}…`;
+};
+
+/**
+ * <title> and meta description for a player page. The title degrades to
+ * shorter forms for long names so it stays inside Google's cutoff; the
+ * description leads with the name and sport, then the headline.
+ */
+export function playerSeo(player) {
+  const name = String(player?.name || 'Player').trim();
+  const brand = ' | CardPop';
+  const forms = [
+    `${name} Cards – Rookie Cards & Prices${brand}`,
+    `${name} Cards & Prices${brand}`,
+    `${name} Cards${brand}`,
+  ];
+  const title = forms.find((t) => t.length <= SEO_TITLE_MAX) || forms[forms.length - 1];
+
+  const where = [player?.sport, player?.team].filter(Boolean).join(', ');
+  const lead = where ? `${name} (${where})` : name;
+  const tail = `Key cards, AUD prices and every ${name} card on CardPop.`;
+  const headline = String(player?.headline || '').trim();
+  let description = headline ? `${lead}: ${headline} ${tail}` : `${lead}: ${tail}`;
+  if (description.length > SEO_DESCRIPTION_MAX) {
+    description = truncateAt(headline ? `${lead}: ${headline}` : description, SEO_DESCRIPTION_MAX);
+  }
+  return { title, description };
+}
+
+const enAuDate = (isoDate) => {
+  const d = new Date(`${String(isoDate).slice(0, 10)}T00:00:00Z`);
+  return Number.isNaN(d.getTime())
+    ? String(isoDate)
+    : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+};
+
+/**
+ * The FAQ block on a player page: visible copy and FAQPage JSON-LD share it.
+ * Every figure comes from the tracker snapshot handed in — nothing is typed.
+ *
+ * @param {object}   opts.player         players row
+ * @param {object[]} opts.trackedCards   [{ name, latest: { snapshot_date, raw_avg, graded_avg } }]
+ * @param {number}   opts.listingCount   live listings tagged with the player
+ * @param {Function} opts.formatPrice    number → "A$120.50"
+ */
+export function playerFaqs({ player, trackedCards = [], listingCount = 0, formatPrice = (v) => `$${v}` }) {
+  const name = String(player?.name || 'this player').trim();
+  const faqs = [];
+
+  const keyCards = Array.isArray(player?.key_cards) ? player.key_cards.filter((c) => c?.name) : [];
+  if (keyCards.length) {
+    const first = keyCards[0];
+    faqs.push({
+      q: `What is ${name}'s rookie card?`,
+      a: `The card collectors treat as the key ${name} rookie card is the ${first.name}.${first.note ? ` ${first.note}` : ''}${keyCards.length > 1 ? ` Other cards worth knowing: ${keyCards.slice(1).map((c) => c.name).join('; ')}.` : ''}`,
+    });
+  }
+
+  const priced = trackedCards.find((c) => c?.latest && (c.latest.raw_avg != null || c.latest.graded_avg != null));
+  if (priced) {
+    const { latest } = priced;
+    const parts = [];
+    if (latest.raw_avg != null) parts.push(`around ${formatPrice(latest.raw_avg)} ungraded`);
+    if (latest.graded_avg != null) parts.push(`about ${formatPrice(latest.graded_avg)} graded`);
+    faqs.push({
+      q: `How much are ${name} cards worth in Australia?`,
+      a: `It depends on the card, year and grade. As at ${enAuDate(latest.snapshot_date)}, ${priced.name} lists for ${parts.join(' and ')} in Australian dollars. CardPop refreshes these prices daily from live listings.`,
+    });
+  } else {
+    faqs.push({
+      q: `How much are ${name} cards worth in Australia?`,
+      a: `It depends on the card, year and grade. CardPop tracks live Australian-dollar prices for the most traded ${name} cards and shows them on this page as the data builds.`,
+    });
+  }
+
+  faqs.push({
+    q: `Where can I buy ${name} cards in Australia?`,
+    a: `On the CardPop marketplace, from Australian sellers with buyer protection.${listingCount > 0 ? ` ${listingCount} ${name} listing${listingCount === 1 ? ' is' : 's are'} live right now.` : ` New ${name} cards appear here as sellers list them.`}`,
+  });
+
+  return faqs;
+}
+
+/**
+ * Players whose sport matches a collection, given any of its names: the
+ * marketplace collection name ("NBA"), the SEO page name ("NBA Cards"), the
+ * URL slug ("nba", "formula-1") or an alias. Comparison is on a slug with a
+ * trailing "cards" dropped, so "Formula 1 Cards" and "Formula 1" agree.
+ */
+const sportKey = (s) => playerSlug(String(s || '').replace(/\s+cards?\s*$/i, ''));
+export function playersForSport(players = [], names = []) {
+  const wanted = new Set((Array.isArray(names) ? names : [names]).filter(Boolean).map(sportKey).filter(Boolean));
+  if (!wanted.size) return [];
+  return (Array.isArray(players) ? players : []).filter((p) => wanted.has(sportKey(p?.sport)));
+}
+
+/** "2003" + "2003-04 Topps Chrome" → "2003-04 Topps Chrome" (no doubled year). */
+export const listingMeta = (year, setName) => {
+  const y = year ? String(year).trim() : '';
+  const s = setName ? String(setName).trim() : '';
+  if (s && y && s.includes(y)) return s;
+  return [y, s].filter(Boolean).join(' ');
+};

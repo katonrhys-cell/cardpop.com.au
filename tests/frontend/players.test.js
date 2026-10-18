@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   playerPath, playerSlug, playerInitials, foldDiacritics, playerMatchScore, matchPlayers,
   splitParagraphs, groupPlayersBySport, cleanKeyCards, parseAliases, playerSubtitle,
+  playerSeo, playerFaqs, playersForSport, listingMeta, truncateAt, SEO_TITLE_MAX, SEO_DESCRIPTION_MAX, PLAYERS_INDEX_SEO,
 } from '@/utils/players.js';
 
 const PLAYERS = [
@@ -106,5 +107,76 @@ describe('text helpers', () => {
   it('builds the subtitle from whatever is present', () => {
     expect(playerSubtitle({ sport: 'NBA', team: 'Chicago Bulls', position: 'Shooting guard' })).toBe('NBA · Chicago Bulls · Shooting guard');
     expect(playerSubtitle({ sport: 'AFL' })).toBe('AFL');
+  });
+});
+
+describe('SEO helpers', () => {
+  const wemby = { name: 'Victor Wembanyama', sport: 'NBA', team: 'San Antonio Spurs', headline: 'The most anticipated prospect since LeBron and the 2024 Rookie of the Year.' };
+
+  it('keeps every title form inside the snippet limit, degrading for long names', () => {
+    expect(playerSeo({ name: 'Kobe Bryant' }).title).toBe('Kobe Bryant Cards – Rookie Cards & Prices | CardPop');
+    expect(playerSeo(wemby).title.length).toBeLessThanOrEqual(SEO_TITLE_MAX);
+    const long = playerSeo({ name: 'Giannis Sina Ugo Antetokounmpo the Greek Freak' });
+    expect(long.title).toBe('Giannis Sina Ugo Antetokounmpo the Greek Freak Cards | CardPop');
+    expect(PLAYERS_INDEX_SEO.title.length).toBeLessThanOrEqual(SEO_TITLE_MAX);
+    expect(PLAYERS_INDEX_SEO.description.length).toBeLessThanOrEqual(160);
+  });
+
+  it('leads the description with name and sport and caps its length at a word boundary', () => {
+    // Lead + headline + tail would run to ~185 characters, so the tail is
+    // dropped and the description is the lead and the full headline.
+    const { description } = playerSeo(wemby);
+    expect(description).toBe(`Victor Wembanyama (NBA, San Antonio Spurs): ${wemby.headline}`);
+    expect(description.length).toBeLessThanOrEqual(SEO_DESCRIPTION_MAX);
+    // A headline that is itself too long is cut at a word boundary with an ellipsis.
+    const verbose = playerSeo({ ...wemby, headline: `${wemby.headline} He also led the league in blocks and made first-team All-Defense in his second season.` }).description;
+    expect(verbose.length).toBeLessThanOrEqual(SEO_DESCRIPTION_MAX);
+    expect(verbose.endsWith('…')).toBe(true);
+    const short = playerSeo({ name: 'Nick Daicos', sport: 'AFL', team: 'Collingwood', headline: 'Magpies star.' }).description;
+    expect(short).toBe('Nick Daicos (AFL, Collingwood): Magpies star. Key cards, AUD prices and every Nick Daicos card on CardPop.');
+    expect(playerSeo({ name: 'Solo' }).description).toBe('Solo: Key cards, AUD prices and every Solo card on CardPop.');
+  });
+
+  it('truncates at a word boundary with an ellipsis', () => {
+    expect(truncateAt('short', 20)).toBe('short');
+    const t = truncateAt('one two three four five six seven', 15);
+    expect(t.length).toBeLessThanOrEqual(15);
+    expect(t).toBe('one two three…');
+  });
+
+  it('writes FAQs from the key cards, the tracker snapshot and the listing count only', () => {
+    const faqs = playerFaqs({
+      player: { name: 'LeBron James', key_cards: [{ name: '2003-04 Topps Chrome #111', note: 'The flagship rookie.' }, { name: '2003-04 Topps #221', note: '' }] },
+      trackedCards: [{ name: 'LeBron James Topps Rookie', latest: { snapshot_date: '2026-10-17', raw_avg: 120.5, graded_avg: 900 } }],
+      listingCount: 2,
+      formatPrice: (v) => `A$${Number(v).toFixed(2)}`,
+    });
+    expect(faqs.map((f) => f.q)).toEqual([
+      "What is LeBron James's rookie card?",
+      'How much are LeBron James cards worth in Australia?',
+      'Where can I buy LeBron James cards in Australia?',
+    ]);
+    expect(faqs[0].a).toBe('The card collectors treat as the key LeBron James rookie card is the 2003-04 Topps Chrome #111. The flagship rookie. Other cards worth knowing: 2003-04 Topps #221.');
+    expect(faqs[1].a).toContain('As at 17 October 2026, LeBron James Topps Rookie lists for around A$120.50 ungraded and about A$900.00 graded');
+    expect(faqs[2].a).toContain('2 LeBron James listings are live right now.');
+  });
+
+  it('never invents a price when there is no snapshot, and drops the rookie FAQ without key cards', () => {
+    const faqs = playerFaqs({ player: { name: 'Reece Walsh', key_cards: [] }, trackedCards: [{ name: 'x', latest: null }], listingCount: 0 });
+    expect(faqs).toHaveLength(2);
+    expect(faqs[0].q).toBe('How much are Reece Walsh cards worth in Australia?');
+    expect(faqs[0].a).not.toMatch(/\$/);
+    expect(faqs[1].a).toContain('New Reece Walsh cards appear here as sellers list them.');
+  });
+
+  it('matches players to a collection by sport name or alias and dedupes the listing meta', () => {
+    const players = [{ name: 'A', sport: 'NBA' }, { name: 'B', sport: 'AFL' }, { name: 'C', sport: 'Formula 1' }];
+    expect(playersForSport(players, ['NBA', 'Basketball']).map((p) => p.name)).toEqual(['A']);
+    expect(playersForSport(players, 'formula 1').map((p) => p.name)).toEqual(['C']);
+    expect(playersForSport(players, [])).toEqual([]);
+    expect(listingMeta('2003', '2003-04 Topps Chrome')).toBe('2003-04 Topps Chrome');
+    expect(listingMeta('1986', 'Fleer')).toBe('1986 Fleer');
+    expect(listingMeta(null, 'Fleer')).toBe('Fleer');
+    expect(listingMeta('1986', null)).toBe('1986');
   });
 });

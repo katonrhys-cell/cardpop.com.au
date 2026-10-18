@@ -22,7 +22,10 @@ import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
-import { playerPath, splitParagraphs, groupPlayersBySport } from '../utils/players.js';
+import {
+  playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
+  listingMeta, PLAYERS_INDEX_SEO,
+} from '../utils/players.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -2889,7 +2892,7 @@ ${sections}</main>`,
 async function renderPriceCard(supabase, categorySlug, cardSlug) {
   const { data: card } = await supabase
     .from('tracked_cards')
-    .select('id, slug, name, set_name, card_number, category, blurb, image_url')
+    .select('id, slug, name, set_name, card_number, category, blurb, image_url, player:players(slug, name)')
     .eq('slug', cardSlug)
     .eq('active', true)
     .maybeSingle();
@@ -2996,6 +2999,7 @@ async function renderPriceCard(supabase, categorySlug, cardSlug) {
 <nav><a href="${BASE_URL}/prices">Card Prices</a> / <a href="${BASE_URL}/prices/${esc(card.category)}">${esc(categoryLabel)}</a></nav>
 <h1>${esc(card.name)} Price (AUD)</h1>
 <p>${esc(card.set_name || '')}${card.card_number ? ` · ${esc(card.card_number)}` : ''}${updatedOn ? ` · Updated ${esc(updatedOn)}` : ''}</p>
+${card.player?.slug ? `<p>Player: <a href="${BASE_URL}${esc(playerPath(card.player))}">${esc(card.player.name)} cards</a></p>` : ''}
 ${statsHtml}
 ${card.blurb ? `<p>${esc(card.blurb)}</p>` : ''}
 <h2>Frequently asked questions</h2>
@@ -3017,8 +3021,7 @@ async function renderPlayersIndex(supabase) {
     .limit(500);
   const players = data || [];
   const canonical = `${BASE_URL}/players`;
-  const title = 'Players — Trading Cards of the Most Collected Athletes | CardPop';
-  const description = 'Player pages for the athletes collectors chase most: a short profile, their key rookie cards, live Australian-dollar prices and every card of theirs listed on CardPop.';
+  const { title, description } = PLAYERS_INDEX_SEO;
 
   const sections = groupPlayersBySport(players).map(({ sport, players: items }) => `<section>
 <h2>${esc(sport)}</h2>
@@ -3037,11 +3040,21 @@ ${items.map((p) => `  <li><a href="${BASE_URL}${esc(playerPath(p))}"><strong>${e
     jsonLdItems: [
       {
         '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+          { '@type': 'ListItem', position: 2, name: 'Players', item: canonical },
+        ],
+      },
+      {
+        '@context': 'https://schema.org',
         '@type': 'CollectionPage',
-        name: 'Players — the most collected athletes',
+        name: 'Player cards — the most collected athletes',
+        description,
         url: canonical,
         mainEntity: {
           '@type': 'ItemList',
+          numberOfItems: players.length,
           itemListElement: players.map((p, i) => ({
             '@type': 'ListItem', position: i + 1, name: p.name, url: `${BASE_URL}${playerPath(p)}`,
           })),
@@ -3058,10 +3071,15 @@ ${sections || '<p>Player pages are being written.</p>'}
   });
 }
 
-async function renderPlayer(supabase, slug) {
+async function renderPlayer(supabase, rawSlug) {
+  // /players/Luka-Doncic or /players/luka_doncic → one canonical lower-case
+  // URL, so a mistyped share never indexes as a duplicate or a 404.
+  const slug = playerSlug(rawSlug);
+  if (slug && slug !== rawSlug) return { status: 301, location: `${BASE_URL}${playerPath(slug)}` };
+
   const { data: player } = await supabase
     .from('players')
-    .select('id, slug, name, sport, team, position, nationality, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, updated_at')
+    .select('id, slug, name, sport, team, position, nationality, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, created_at, updated_at')
     .eq('slug', slug)
     .eq('is_published', true)
     .maybeSingle();
@@ -3102,12 +3120,10 @@ async function renderPlayer(supabase, slug) {
   const canonicalPath = playerPath(player);
   const canonical = `${BASE_URL}${canonicalPath}`;
   const subtitle = [player.sport, player.team, player.position].filter(Boolean).join(' · ');
-  const title = `${player.name} Cards — Rookie Cards, Prices & Listings | CardPop`;
-  const description = player.headline
-    ? `${player.name} (${[player.sport, player.team].filter(Boolean).join(', ')}): ${player.headline} Key cards, Australian-dollar prices and every ${player.name} card listed on CardPop.`
-    : `${player.name} trading cards: key rookie cards, Australian-dollar prices and every card listed on CardPop.`;
+  const { title, description } = playerSeo(player);
   const image = publicImageUrl(player.image_url);
   const keyCards = Array.isArray(player.key_cards) ? player.key_cards : [];
+  const faqs = playerFaqs({ player, trackedCards: tracked, listingCount: listings.length, formatPrice: audPrice });
 
   const facts = [
     ['Sport', player.sport], ['Team', player.team], ['Position', player.position],
@@ -3127,17 +3143,32 @@ async function renderPlayer(supabase, slug) {
       '@context': 'https://schema.org',
       '@type': 'ProfilePage',
       url: canonical,
+      ...(player.created_at ? { dateCreated: player.created_at } : {}),
       dateModified: player.updated_at,
       mainEntity: {
         '@type': 'Person',
         name: player.name,
+        url: canonical,
         ...(player.headline ? { description: player.headline } : {}),
         ...(player.nationality ? { nationality: player.nationality } : {}),
         ...(player.team ? { memberOf: { '@type': 'SportsTeam', name: player.team } } : {}),
         ...(image ? { image } : {}),
       },
     },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map(({ q, a }) => ({
+        '@type': 'Question',
+        name: q,
+        acceptedAnswer: { '@type': 'Answer', text: a },
+      })),
+    },
   ];
+  const faqHtml = `<section>
+<h2>${esc(player.name)} cards: frequently asked questions</h2>
+${faqs.map(({ q, a }) => `<h3>${esc(q)}</h3>\n<p>${esc(a)}</p>`).join('\n')}
+</section>`;
 
   const trackedHtml = tracked.length ? `<section>
 <h2>${esc(player.name)} card prices (AUD)</h2>
@@ -3157,7 +3188,7 @@ ${tracked.map((c) => {
 ${listings.length ? `<ul>
 ${listings.map((l) => {
     const name = l.vault_item?.card_name || `${player.name} card`;
-    const meta = [l.vault_item?.year, l.vault_item?.set_name].filter(Boolean).join(' ');
+    const meta = listingMeta(l.vault_item?.year, l.vault_item?.set_name);
     const price = l.price_aud != null ? ` — ${audPrice(l.price_aud)}` : '';
     return `  <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>${meta ? ` (${esc(meta)})` : ''}${price}</li>`;
   }).join('\n')}
@@ -3183,6 +3214,8 @@ ${player.collecting_notes ? `<section>\n<h2>Collecting ${esc(player.name)}</h2>\
 ${keyCards.length ? `<section>\n<h2>Cards worth knowing</h2>\n<ol>\n${keyCards.map((c) => `  <li><strong>${esc(c.name)}</strong>${c.note ? ` — ${esc(c.note)}` : ''}</li>`).join('\n')}\n</ol>\n</section>` : ''}
 ${trackedHtml}
 ${listingsHtml}
+${faqHtml}
+<p><a href="${BASE_URL}/players">All players</a>${resolveCollection(player.sport) ? ` · <a href="${BASE_URL}/collections/${esc(resolveCollection(player.sport))}">Browse ${esc(player.sport)} cards</a>` : ''} · <a href="${BASE_URL}/prices">Card prices (AUD)</a></p>
 </main>`,
   });
 }
@@ -3272,6 +3305,16 @@ async function renderCollection(supabase, rawSlug) {
     .limit(50);
   const listings = data || [];
 
+  // Player pages for this sport (docs/players.md) — internal links from the
+  // collection hub to each athlete, and nothing for TCG collections.
+  const { data: playerRows } = await supabase
+    .from('players')
+    .select('slug, name, sport, team, headline')
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true })
+    .limit(100);
+  const sportPlayers = playersForSport(playerRows || [], [slug, ...categoryValues]);
+
   const breadcrumb = {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -3317,6 +3360,10 @@ async function renderCollection(supabase, rawSlug) {
   <h1>${esc(cfg.name)} Cards in Australia</h1>
   <p>${esc(description)}</p>
   ${cfg.intro ? `<p>${esc(cfg.intro)}</p>` : ''}
+  ${sportPlayers.length ? `<h2>${esc(cfg.name.replace(/\s+cards?\s*$/i, ''))} players</h2>
+  <ul>
+${sportPlayers.map((p) => `    <li><a href="${BASE_URL}${esc(playerPath(p))}">${esc(p.name)} cards</a>${p.team ? ` — ${esc(p.team)}` : ''}</li>`).join('\n')}
+  </ul>` : ''}
   <h2>Latest ${esc(cfg.name)} Listings (${listings.length})</h2>
   <ul>
 ${itemsHtml || '    <li>No active listings right now — check back soon or browse the marketplace.</li>'}
