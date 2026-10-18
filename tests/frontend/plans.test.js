@@ -17,6 +17,11 @@ import {
   hasStorefront,
   canListWhatnotShows,
   WHATNOT_SHOW_TIERS,
+  TOP_PLAN,
+  planRank,
+  isTopPlan,
+  upgradePlansFor,
+  nextPlanFor,
 } from '@/config/plans.js';
 import { TIER_PRICES_AUD, SUBSCRIPTION_PRICE_AUD } from '@/config/subscription.js';
 
@@ -102,5 +107,39 @@ describe('config/plans', () => {
     expect(PLANS[PLAN_ULTIMATE].priceAud).toBe(TIER_PRICES_AUD.ultimate);
     expect(TIER_PRICES_AUD).toEqual({ pro: 20, premium: 40, elite: 80, ultimate: 150 });
     expect(SUBSCRIPTION_PRICE_AUD).toBe(20);
+  });
+
+  describe('plan ladder helpers (dashboard "Upgrade your plan")', () => {
+    it('ranks every plan key and tier value on the ladder', () => {
+      expect(planRank('free')).toBe(0);
+      expect(planRank(PLAN_HOBBY)).toBe(0);
+      expect(planRank(null)).toBe(0);
+      expect(planRank('garbage')).toBe(0);
+      expect(planRank('pro')).toBe(1);
+      expect(planRank('premium')).toBe(2);
+      expect(planRank('elite')).toBe(3);
+      expect(planRank('ultimate')).toBe(4);
+    });
+
+    it('only Ultimate is the top plan', () => {
+      expect(TOP_PLAN).toBe(PLAN_ULTIMATE);
+      expect(isTopPlan('ultimate')).toBe(true);
+      expect(isTopPlan('elite')).toBe(false);
+      expect(isTopPlan('free')).toBe(false);
+      expect(isTopPlan(undefined)).toBe(false);
+    });
+
+    it('lists the plans above the current one, ascending, and none on Ultimate', () => {
+      expect(upgradePlansFor('free')).toEqual([PLAN_PRO, PLAN_PREMIUM, PLAN_ELITE, PLAN_ULTIMATE]);
+      expect(upgradePlansFor('pro')).toEqual([PLAN_PREMIUM, PLAN_ELITE, PLAN_ULTIMATE]);
+      expect(upgradePlansFor('elite')).toEqual([PLAN_ULTIMATE]);
+      expect(upgradePlansFor('ultimate')).toEqual([]);
+    });
+
+    it('nextPlanFor is the next step up, or null at the top', () => {
+      expect(nextPlanFor('free')).toBe(PLAN_PRO);
+      expect(nextPlanFor('premium')).toBe(PLAN_ELITE);
+      expect(nextPlanFor('ultimate')).toBeNull();
+    });
   });
 });

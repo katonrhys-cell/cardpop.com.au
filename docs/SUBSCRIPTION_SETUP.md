@@ -160,6 +160,20 @@ marketplace checkout and are reused here.
   Checkout (subscription mode, `trial_period_days`, the tier's price, `tier`
   stamped in the subscription metadata) or PayPal approval (the tier's plan).
   No card data touches CardPop.
+- **Upgrading an existing paid tier** (Account → Dashboard "Upgrade your
+  plan" → `/account/membership?tier=…` → `POST /subscription/stripe/change-tier`,
+  `changeStripeSubscriptionTier()` in `src/services/subscriptionService.js`):
+  the dashboard's plan card (`components/AccountPlanBanner.jsx`) shows the
+  whole ladder with the member's step marked and an **Upgrade your plan**
+  button for everyone but Ultimate (`isTopPlan()` / `nextPlanFor()` in
+  `config/plans.js`). A paid Stripe member upgrades *in place*: the existing
+  subscription's item is re-priced with `create_prorations` and its `tier`
+  metadata rewritten, so they keep their billing anchor, trial and card — no
+  second subscription, no second trial. Hobby members take the trial checkout
+  instead; a PayPal-billed or complimentary (`grandfathered`) membership gets a
+  409 and a message. The route is MFA-gated (`requireAal2`) like the other
+  routes that change what the member's card is charged. Downgrades are not
+  offered — cancel and re-subscribe.
 - **State sync** (`src/services/subscriptionService.js`): provider webhooks
   mirror the subscription status onto `profiles.subscription_status` /
   `trial_ends_at`, and the purchased tier onto `profiles.subscription_tier`.
