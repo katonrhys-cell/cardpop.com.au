@@ -1,0 +1,71 @@
+name: Cron health
+
+# Files ONE tracking issue when a scheduled backend job fails, so a broken
+# schedule is visible from the repo's issue list instead of only as a red run
+# under the Actions tab that nobody opens.
+#
+# This exists because every scheduled job — price refresh, retention emails,
+# payment reconciliation, blog generation, the event scan — failed on every
+# run from 2026-09-13 (the move from Vercel Cron to GitHub Actions, #900) until
+# this was noticed on 2026-10-18: the CRON_SECRET Actions secret was never
+# added, each run failed in under three seconds with a precise error message,
+# and nothing surfaced it. Price pages went stale and the blog stopped
+# publishing for five weeks. Mirrors migration-drift.yml: one open issue is the
+# signal; it is never re-commented on each failing run.
+
+on:
+  workflow_run:
+    workflows:
+      - 'Cron · Daily maintenance'
+      - 'Cron · Blog article generation'
+      - 'Cron · Event scan'
+      - 'Cron · Reconcile pending payments'
+    types: [completed]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  report:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open a tracking issue if none is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          title="Scheduled job failing: ${WORKFLOW_NAME}"
+
+          existing=$(gh issue list --state open --search "\"$title\" in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing is already open — leaving it alone."
+            exit 0
+          fi
+
+          {
+            echo "The **${WORKFLOW_NAME}** scheduled job failed. Until it passes again"
+            echo 'whatever it maintains (price snapshots, retention emails, stuck-payment'
+            echo 'checks, blog drafts, event discovery) is not running.'
+            echo
+            echo "Failing run: $RUN_URL"
+            echo
+            echo 'Most likely causes, in order:'
+            echo
+            echo '1. **`CRON_SECRET` is empty or missing** in Settings → Secrets and variables →'
+            echo '   Actions. It must be the same string as the `CRON_SECRET` environment'
+            echo '   variable in Vercel. The step log says "CRON_SECRET is empty" when this is it.'
+            echo '2. **HTTP 401** — the two values have drifted apart; set both to one new value.'
+            echo '3. **HTTP 5xx / timeout** — the endpoint itself failed; the step log carries'
+            echo '   the response body. See docs/scheduled-jobs.md → Troubleshooting.'
+            echo
+            echo 'Fix the cause, re-run the workflow by hand (Actions → the workflow → Run'
+            echo 'workflow) and close this issue once it is green.'
+          } > issue-body.md
+
+          gh issue create --title "$title" --body-file issue-body.md

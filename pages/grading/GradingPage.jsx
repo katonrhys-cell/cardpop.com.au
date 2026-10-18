@@ -357,7 +357,7 @@ const GradingPage = () => (
         <h2 className="mb-3 font-serif text-2xl font-bold">Are you a Local Game Store?</h2>
         <p className="mx-auto mb-7 max-w-md leading-relaxed text-muted-foreground">
           Join the CardPop Retailer Network. Expand your reach, manage your inventory with our
-          integrated tools, and connect with thousands of active Australian collectors.
+          integrated tools, and connect with active Australian collectors.
         </p>
         <Button size="lg" asChild className="w-full px-10 sm:w-auto">
           <Link to="/partners">Apply as Partner</Link>

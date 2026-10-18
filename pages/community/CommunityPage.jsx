@@ -169,7 +169,7 @@ const CommunityPage = () => {
               </h2>
               <div className="w-12 h-1 bg-yellow-400/60 rounded-full" />
               <p className="text-white/70 text-sm sm:text-base max-w-md leading-relaxed">
-                Got live pack breaks and auctions? Sign up and list your shows on CardPop — reach thousands of Australian collectors.
+                Got live pack breaks and auctions? Sign up and list your shows on CardPop — reach Australian collectors before you go live.
               </p>
               <Link
                 to="/signup"

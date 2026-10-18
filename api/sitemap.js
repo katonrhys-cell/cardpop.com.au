@@ -149,12 +149,14 @@ const STATIC_PAGES = [
   { loc: '/events/community-events', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.8' },
   { loc: '/events/store-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
   { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
-  { loc: '/community/whatnot',     lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
   { loc: '/community/building-your-business', lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
-  { loc: '/community/forum',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.6' },
-  { loc: '/community/leaderboard', lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.5' },
-  { loc: '/community/profiles',    lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.5' },
-  { loc: '/community/map',         lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.5' },
+  // Not advertised: /community/forum is added below only once it has
+  // discussions; /community/profiles, /community/leaderboard, /community/map
+  // and /community/whatnot are interactive directories with little indexable
+  // text of their own (a member list, a points table, a map, a handful of
+  // show links). A sitemap that points a reviewer at empty or near-empty pages
+  // is how a site earns a "low value content" verdict — see
+  // docs/adsense-readiness.md.
   { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   // Blog category hubs — prerendered for bots and linked from the site header.
   ...BLOG_CATEGORIES.map((c) => (
@@ -165,7 +167,8 @@ const STATIC_PAGES = [
   ...BUYING_GUIDES.map((g) => (
     { loc: `/analytics/buying-guides/${g.slug}`, lastmod: g.updated || SITE_UPDATED, freq: 'weekly', pri: '0.6' }
   )),
-  { loc: '/launch',                lastmod: '2026-07-05', freq: 'monthly', pri: '0.6' },
+  // /launch (the pre-launch waitlist page) is deliberately absent: the site is
+  // live, and it carries noindex.
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/partners',              lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
   { loc: '/pricing',               lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
@@ -281,6 +284,13 @@ export default async function handler(req, res) {
       supabase
         .from('shop_categories')
         .select('section_slug, name, description, hidden'),
+      // Content gate for /community/forum: one discussion is enough to list it.
+      supabase
+        .from('posts')
+        .select('id, created_at')
+        .eq('post_type', 'text')
+        .order('created_at', { ascending: false })
+        .limit(1),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -297,6 +307,7 @@ export default async function handler(req, res) {
     const directoryStores = rows(6);
     const sellerProfiles = rows(7);
     const shopCategoryRows = rows(8);
+    const forumPosts = rows(9);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -316,6 +327,13 @@ export default async function handler(req, res) {
 
     for (const p of STATIC_PAGES) {
       parts.push(xmlUrl(`${BASE_URL}${p.loc}`, p.lastmod, p.freq, p.pri));
+    }
+
+    // The forum earns its sitemap entry once collectors have posted; until
+    // then the prerender marks it noindex and it stays out of here.
+    if (forumPosts.length > 0) {
+      const lastmod = (forumPosts[0].created_at || TODAY).split('T')[0];
+      parts.push(xmlUrl(`${BASE_URL}/community/forum`, lastmod, 'weekly', '0.6'));
     }
 
     if (events.length > 0) {

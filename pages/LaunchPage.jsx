@@ -48,9 +48,13 @@ const SOCIAL_LINKS = [
 const LaunchPage = () => {
   return (
     <>
+      {/* The site is live: this waitlist page stays reachable for old links
+          but is never indexed — a "launching soon" page reads as
+          under-construction to search engines and ad reviewers. */}
       <SEOHead
         title="CardPop — Australia's Trading Card Marketplace | Launching Late 2026"
         description="CardPop is launching late 2026: buy, sell and trade Pokémon, Magic and sports cards on Australia's new trading card marketplace. Join the launch list to be first in."
+        noindex
       />
 
       <div className="flex-grow bg-background">
