@@ -4,6 +4,7 @@ import { BookMarked, ChevronRight } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import { getCardImage } from '@/utils/imageUrl.js';
 import { BINDER_PRODUCTS, binderImages, binderImageAlt } from '@/data/shopBinderProducts.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -103,7 +104,8 @@ const ShopBindersHubPage = () => {
               >
                 <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                   <CardImage
-                    src={hero}
+                    {...getCardImage(hero, { widths: [400, 600, 800] })}
+                    sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
                     alt={binderImageAlt(product, product.imageFiles[0])}
                     imgClassName="h-full w-full object-contain p-4 group-hover:scale-105 transition-transform duration-500"
                   />

@@ -217,13 +217,20 @@ const ProductImageCarousel = ({ images = [], video = null, record = null, displa
                     : "border-border hover:border-primary/50 opacity-70 hover:opacity-100"
                 )}
               >
+                {/* An 80 px tile: load the 480 px companion thumb where one exists
+                    rather than the full photo, and let the hero win the bandwidth
+                    race — ten supplier PNGs downloading at once held the hero's
+                    placeholder on screen for the whole gallery's weight. */}
                 <CardImage
+                  thumbSrc={thumb.thumbSrc}
                   src={thumb.src}
                   srcSet={thumb.srcSet}
                   sizes="80px"
                   fallbackSrc={thumb.fallbackSrc}
+                  canonicalSrc={thumb.canonicalSrc}
                   alt={`${altFor(idx)} thumbnail`}
                   imgClassName="w-full h-full object-cover"
+                  fetchPriority="low"
                 />
               </button>
             );

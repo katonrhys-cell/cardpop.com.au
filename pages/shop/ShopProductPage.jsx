@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import { getCardImage } from '@/utils/imageUrl.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
@@ -488,7 +489,8 @@ const ShopProductPage = () => {
                   <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                     {other.imagePaths?.length > 0 && (
                       <CardImage
-                        src={palmsOffImages(other)[0]}
+                        {...getCardImage(palmsOffImages(other)[0], { widths: [240, 400, 600] })}
+                        sizes="(min-width: 1024px) 25vw, 50vw"
                         alt={palmsOffImageAlt(other, other.imagePaths[0])}
                         imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                       />

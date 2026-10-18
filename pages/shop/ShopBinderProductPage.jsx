@@ -30,6 +30,7 @@ import {
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
 import { trackViewItem } from '@/lib/analytics.js';
+import { getCardImage } from '@/utils/imageUrl.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -443,7 +444,8 @@ const ShopBinderProductPage = () => {
               >
                 <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                   <CardImage
-                    src={binderImages(other)[0]}
+                    {...getCardImage(binderImages(other)[0], { widths: [240, 400, 600] })}
+                    sizes="(min-width: 1024px) 25vw, 50vw"
                     alt={binderImageAlt(other, other.imageFiles[0])}
                     imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                   />
