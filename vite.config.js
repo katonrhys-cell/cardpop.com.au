@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import Beasties from 'beasties';
 import { patchOpenCvSource } from './tools/opencvCspPatch.mjs';
 import { appShellFromHomeShell } from './tools/appShell.mjs';
+import { doctypeProblem } from './tools/doctype.mjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
 const allDeps = Object.keys(pkg.dependencies || {});
@@ -125,6 +126,17 @@ function verifyCspBootstrap(ctx, htmlFiles) {
 		if (emitted[1] !== CSP_BOOTSTRAP) {
 			ctx.error(`csp-bootstrap: inline bootstrap in ${file} was altered post-transform — its hash no longer matches vercel.json`);
 		}
+	}
+}
+
+// Google Customer Reviews reads the order-confirmation page (served from
+// app.html) and rejects the integration if anything precedes <!DOCTYPE html>.
+// Checked on the emitted documents because the shell injection and critical-CSS
+// inlining above run after Vite's own HTML transform (tools/doctype.mjs).
+function verifyDoctype(ctx, htmlFiles) {
+	for (const file of htmlFiles) {
+		const problem = doctypeProblem(readFileSync(file, 'utf-8'));
+		if (problem) ctx.error(`doctype: ${path.basename(file)} — ${problem}; Google Customer Reviews requires <!DOCTYPE html> as the first bytes`);
 	}
 }
 
@@ -405,6 +417,7 @@ function homeShellPlugin() {
 				this.warn('home-shell: `<div id="root"></div>` not found — shells not injected');
 				writeFileSync(appPath, baseHtml, 'utf-8');
 				verifyCspBootstrap(this, [indexPath, appPath]);
+			verifyDoctype(this, [indexPath, appPath]);
 				return;
 			}
 
@@ -426,6 +439,7 @@ function homeShellPlugin() {
 
 			writeFileSync(indexPath, indexHtml, 'utf-8');
 			verifyCspBootstrap(this, [indexPath, appPath]);
+			verifyDoctype(this, [indexPath, appPath]);
 		},
 	};
 }
