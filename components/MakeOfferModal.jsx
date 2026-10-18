@@ -117,10 +117,12 @@ const MakeOfferModal = ({ isOpen, onClose, listing }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      {/* A flex column: the header and footer stay put and only the form body
-          scrolls. Never put `overflow-hidden` back on this element — it
-          cancels the dialog's own `overflow-y-auto`, and on a phone the form
-          was clipped so the Send Offer button could not be reached. */}
+      {/* A flex column bounded by the dialog's max-height: the header and
+          footer stay put and only the form body (`flex-1 min-h-0
+          overflow-y-auto`) scrolls, so Cancel / Send Offer are always on
+          screen. `overflow-hidden` here only clips the rounded corners — it
+          must stay paired with `flex flex-col`; on its own (the old `grid`
+          layout) it clipped the footer on phones. */}
       <DialogContent className="sm:max-w-md w-[calc(100%-1.5rem)] rounded-2xl p-0 gap-0 flex flex-col overflow-hidden">
         {submitted ? (
           <div className="flex flex-col items-center text-center p-10 gap-4 overflow-y-auto">
