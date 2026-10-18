@@ -171,7 +171,7 @@ const HeroCardShowcase = ({ cards = [] }) => {
   return (
     <div
       aria-hidden="true"
-      className="absolute -right-8 xl:-right-10 top-1/2 -translate-y-1/2 hidden lg:block w-[540px] pointer-events-none select-none"
+      className="absolute -right-10 top-1/2 -translate-y-1/2 hidden lg:block w-[540px] pointer-events-none select-none"
       style={{ height: stageHeight }}
     >
       {/* ── Background cabinet / shelf(-ves) — a bookshelf of up to 5 cards per row ── */}
