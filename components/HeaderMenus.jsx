@@ -15,7 +15,7 @@ import {
   Settings, FolderTree, ListOrdered, BarChart3, Store, Shield,
   BookOpen, Award, TrendingUp, BadgeCheck, Ticket, Handshake,
   Calculator, MapPin, ClipboardList, HelpCircle, MessageSquare,
-  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2, ScanLine,
+  ShoppingBag, LineChart, Info, Sparkles, Rocket, Tag, MoreHorizontal, Tv2, ScanLine, UsersRound,
 } from 'lucide-react';
 import { TCG_CATEGORY_DATA, SPORTS_CATEGORY_DATA } from '@/components/CategoryIcons.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
@@ -212,6 +212,18 @@ const MobileBrowseSection = ({ onNavigate }) => {
           ))}
         </div>
       )}
+
+      {/* Shop by player */}
+      <SheetClose asChild>
+        <Link
+          to="/players"
+          onClick={onNavigate}
+          className="flex items-center justify-between gap-2 px-4 py-3 mt-1 rounded-xl hover:bg-muted transition-colors text-sm font-bold text-foreground"
+        >
+          <span className="flex items-center gap-2"><UsersRound className="w-4 h-4 text-primary" aria-hidden="true" />Shop by Player</span>
+          <ArrowRight className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
+        </Link>
+      </SheetClose>
     </div>
   );
 };
@@ -360,6 +372,20 @@ const BrowseDropdown = ({ onNavigate }) => {
               </div>
             </div>
           </div>
+
+          {/* Shop by player — the most collected athletes' pages */}
+          <Link
+            to="/players"
+            onClick={() => { setOpen(false); onNavigate?.(); }}
+            className="flex items-center justify-between px-5 py-3.5 border-t border-border hover:bg-muted/60 transition-colors group"
+          >
+            <span className="flex items-center gap-2 text-sm font-bold text-foreground">
+              <UsersRound className="w-4 h-4 text-primary" aria-hidden="true" />
+              Shop by Player
+              <span className="hidden sm:inline text-xs font-medium text-muted-foreground">— Jordan, LeBron, Wemby, Daicos and more</span>
+            </span>
+            <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all" />
+          </Link>
         </div>
       )}
     </div>

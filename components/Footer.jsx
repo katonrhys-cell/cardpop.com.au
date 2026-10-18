@@ -84,6 +84,7 @@ const Footer = () => {
               )}
               <li><Link to="/analytics" className="hover:text-primary transition-colors">Prices &amp; Analytics</Link></li>
               <li><Link to="/prices" className="hover:text-primary transition-colors">Card Prices (AUD)</Link></li>
+              <li><Link to="/players" className="hover:text-primary transition-colors">Players</Link></li>
               <li><Link to="/card-shops" className="hover:text-primary transition-colors">Card Shop Directory</Link></li>
               <li><Link to="/events" className="hover:text-primary transition-colors">Events</Link></li>
               <li><Link to="/grading" className="hover:text-primary transition-colors">Grading Hub</Link></li>

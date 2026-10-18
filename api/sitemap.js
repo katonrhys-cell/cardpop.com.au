@@ -85,6 +85,7 @@ const MAX_ROWS = {
   products: 3000,
   events: 2000,
   trackedCards: 5000,
+  players: 1000,
   stores: 3000,
   sellerProfiles: 10000,
 };
@@ -291,6 +292,15 @@ export default async function handler(req, res) {
         .eq('post_type', 'text')
         .order('created_at', { ascending: false })
         .limit(1),
+      // Player pages (/players/<slug>) — published rows only; the index is
+      // listed when there is at least one.
+      supabase
+        .from('players')
+        .select('slug, updated_at')
+        .eq('is_published', true)
+        .order('sort_order', { ascending: true })
+        .order('name', { ascending: true })
+        .limit(MAX_ROWS.players),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -308,6 +318,7 @@ export default async function handler(req, res) {
     const sellerProfiles = rows(7);
     const shopCategoryRows = rows(8);
     const forumPosts = rows(9);
+    const players = rows(10);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -435,6 +446,15 @@ export default async function handler(req, res) {
         const snapshotDate = card.card_price_snapshots?.[0]?.snapshot_date;
         const lastmod = snapshotDate || (card.updated_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/prices/${card.category}/${card.slug}`, lastmod, 'daily', '0.7'));
+      }
+    }
+
+    if (players.length > 0) {
+      parts.push('', `  <!-- Player pages (${players.length}) -->`);
+      const newest = players.map((p) => (p.updated_at || TODAY).split('T')[0]).sort().pop() || TODAY;
+      parts.push(xmlUrl(`${BASE_URL}/players`, newest, 'weekly', '0.8'));
+      for (const p of players) {
+        parts.push(xmlUrl(`${BASE_URL}/players/${p.slug}`, (p.updated_at || TODAY).split('T')[0], 'weekly', '0.7'));
       }
     }
 

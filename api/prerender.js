@@ -22,6 +22,7 @@ import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
+import { playerPath, splitParagraphs, groupPlayersBySport } from '../utils/players.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -3004,6 +3005,188 @@ ${faqHtml}
   });
 }
 
+// ─── Player pages (/players, /players/:slug) — docs/players.md ───────────────
+
+async function renderPlayersIndex(supabase) {
+  const { data } = await supabase
+    .from('players')
+    .select('slug, name, sport, team, position, headline')
+    .eq('is_published', true)
+    .order('sort_order', { ascending: true })
+    .order('name', { ascending: true })
+    .limit(500);
+  const players = data || [];
+  const canonical = `${BASE_URL}/players`;
+  const title = 'Players — Trading Cards of the Most Collected Athletes | CardPop';
+  const description = 'Player pages for the athletes collectors chase most: a short profile, their key rookie cards, live Australian-dollar prices and every card of theirs listed on CardPop.';
+
+  const sections = groupPlayersBySport(players).map(({ sport, players: items }) => `<section>
+<h2>${esc(sport)}</h2>
+<ul>
+${items.map((p) => `  <li><a href="${BASE_URL}${esc(playerPath(p))}"><strong>${esc(p.name)}</strong></a>${[p.team, p.position].filter(Boolean).length ? ` — ${esc([p.team, p.position].filter(Boolean).join(', '))}` : ''}${p.headline ? `. ${esc(p.headline)}` : ''}</li>`).join('\n')}
+</ul>
+</section>`).join('\n');
+
+  return htmlDoc({
+    title,
+    description,
+    canonical,
+    ogImage: `${BASE_URL}/og-image.jpg`,
+    // An empty directory is noindexed until it has rows (docs/adsense-readiness.md).
+    robots: players.length ? undefined : 'noindex, follow',
+    jsonLdItems: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Players — the most collected athletes',
+        url: canonical,
+        mainEntity: {
+          '@type': 'ItemList',
+          itemListElement: players.map((p, i) => ({
+            '@type': 'ListItem', position: i + 1, name: p.name, url: `${BASE_URL}${playerPath(p)}`,
+          })),
+        },
+      },
+    ],
+    bodyHtml: `<main>
+<nav><a href="${BASE_URL}/">Home</a> / Players</nav>
+<h1>Players</h1>
+<p>${esc(description)}</p>
+${sections || '<p>Player pages are being written.</p>'}
+<p>Adding a card to your vault? Pick the player in the card form and it appears on their page once listed. <a href="${BASE_URL}/vault/add">List a card</a>.</p>
+</main>`,
+  });
+}
+
+async function renderPlayer(supabase, slug) {
+  const { data: player } = await supabase
+    .from('players')
+    .select('id, slug, name, sport, team, position, nationality, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, updated_at')
+    .eq('slug', slug)
+    .eq('is_published', true)
+    .maybeSingle();
+
+  if (!player) {
+    return notFound({
+      title: 'Player not found | CardPop',
+      description: 'This player page does not exist.',
+      canonical: `${BASE_URL}/players`,
+      bodyHtml: `<main><h1>Player not found</h1><p><a href="${BASE_URL}/players">Browse all players</a></p></main>`,
+    });
+  }
+
+  // Live listings tagged with the player, and the tracker cards linked to them
+  // (each with its latest snapshot). Both are optional sections.
+  const [{ data: listingRows }, { data: trackedRows }] = await Promise.all([
+    supabase
+      .from('listings')
+      .select('id, slug, price_aud, listing_type, vault_item:vault_items!inner(card_name, set_name, year, player_id)')
+      .eq('vault_item.player_id', player.id)
+      .eq('status', 'active')
+      .neq('listing_type', 'vault')
+      .order('created_at', { ascending: false })
+      .limit(24),
+    supabase
+      .from('tracked_cards')
+      .select('slug, name, set_name, category, card_price_snapshots(snapshot_date, raw_avg, graded_avg)')
+      .eq('player_id', player.id)
+      .eq('active', true)
+      .order('name')
+      .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
+      .limit(1, { referencedTable: 'card_price_snapshots' })
+      .limit(12),
+  ]);
+  const listings = listingRows || [];
+  const tracked = (trackedRows || []).map((c) => ({ ...c, latest: c.card_price_snapshots?.[0] || null }));
+
+  const canonicalPath = playerPath(player);
+  const canonical = `${BASE_URL}${canonicalPath}`;
+  const subtitle = [player.sport, player.team, player.position].filter(Boolean).join(' · ');
+  const title = `${player.name} Cards — Rookie Cards, Prices & Listings | CardPop`;
+  const description = player.headline
+    ? `${player.name} (${[player.sport, player.team].filter(Boolean).join(', ')}): ${player.headline} Key cards, Australian-dollar prices and every ${player.name} card listed on CardPop.`
+    : `${player.name} trading cards: key rookie cards, Australian-dollar prices and every card listed on CardPop.`;
+  const image = publicImageUrl(player.image_url);
+  const keyCards = Array.isArray(player.key_cards) ? player.key_cards : [];
+
+  const facts = [
+    ['Sport', player.sport], ['Team', player.team], ['Position', player.position],
+    ['Nationality', player.nationality], ['Born', player.born_year], ['Career', player.career_span],
+  ].filter(([, v]) => v);
+
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Players', item: `${BASE_URL}/players` },
+        { '@type': 'ListItem', position: 2, name: player.name, item: canonical },
+      ],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ProfilePage',
+      url: canonical,
+      dateModified: player.updated_at,
+      mainEntity: {
+        '@type': 'Person',
+        name: player.name,
+        ...(player.headline ? { description: player.headline } : {}),
+        ...(player.nationality ? { nationality: player.nationality } : {}),
+        ...(player.team ? { memberOf: { '@type': 'SportsTeam', name: player.team } } : {}),
+        ...(image ? { image } : {}),
+      },
+    },
+  ];
+
+  const trackedHtml = tracked.length ? `<section>
+<h2>${esc(player.name)} card prices (AUD)</h2>
+<p>Daily Australian-dollar averages from live listings for the ${esc(player.name)} cards CardPop tracks. Asking prices, not sales — a guide only.</p>
+<ul>
+${tracked.map((c) => {
+    const bits = [];
+    if (c.latest?.raw_avg != null) bits.push(`raw ~${audPrice(c.latest.raw_avg)}`);
+    if (c.latest?.graded_avg != null) bits.push(`graded ~${audPrice(c.latest.graded_avg)}`);
+    return `  <li><a href="${BASE_URL}/prices/${esc(c.category)}/${esc(c.slug)}">${esc(c.name)}</a>${c.set_name ? ` (${esc(c.set_name)})` : ''}${bits.length ? ` — ${esc(bits.join(', '))}` : ''}</li>`;
+  }).join('\n')}
+</ul>
+</section>` : '';
+
+  const listingsHtml = `<section>
+<h2>${esc(player.name)} cards on CardPop</h2>
+${listings.length ? `<ul>
+${listings.map((l) => {
+    const name = l.vault_item?.card_name || `${player.name} card`;
+    const meta = [l.vault_item?.year, l.vault_item?.set_name].filter(Boolean).join(' ');
+    const price = l.price_aud != null ? ` — ${audPrice(l.price_aud)}` : '';
+    return `  <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>${meta ? ` (${esc(meta)})` : ''}${price}</li>`;
+  }).join('\n')}
+</ul>` : `<p>No cards tagged with ${esc(player.name)} are listed yet. <a href="${BASE_URL}/vault/add">List one</a> and pick the player in the card form.</p>`}
+</section>`;
+
+  return htmlDoc({
+    title,
+    description,
+    canonical,
+    ogImage: image || `${BASE_URL}/og-image.jpg`,
+    ogImageAlt: player.name,
+    ogType: 'profile',
+    jsonLdItems: jsonLd,
+    bodyHtml: `<main>
+<nav><a href="${BASE_URL}/players">Players</a> / ${esc(player.name)}</nav>
+<h1>${esc(player.name)}</h1>
+${subtitle ? `<p>${esc(subtitle)}</p>` : ''}
+${player.headline ? `<p><strong>${esc(player.headline)}</strong></p>` : ''}
+${facts.length ? `<ul>\n${facts.map(([k, v]) => `  <li>${esc(k)}: ${esc(v)}</li>`).join('\n')}\n</ul>` : ''}
+${player.bio ? `<section>\n<h2>About ${esc(player.name)}</h2>\n${splitParagraphs(player.bio).map((p) => `<p>${esc(p)}</p>`).join('\n')}\n</section>` : ''}
+${player.collecting_notes ? `<section>\n<h2>Collecting ${esc(player.name)}</h2>\n${splitParagraphs(player.collecting_notes).map((p) => `<p>${esc(p)}</p>`).join('\n')}\n</section>` : ''}
+${keyCards.length ? `<section>\n<h2>Cards worth knowing</h2>\n<ol>\n${keyCards.map((c) => `  <li><strong>${esc(c.name)}</strong>${c.note ? ` — ${esc(c.note)}` : ''}</li>`).join('\n')}\n</ol>\n</section>` : ''}
+${trackedHtml}
+${listingsHtml}
+</main>`,
+  });
+}
+
 // Mirror of resolveCollectionSlug in data/collectionConfigs.js — maps URL slug
 // variations (including category aliases) onto the primary collection slug.
 const resolveCollection = (rawSlug) => {
@@ -3896,6 +4079,15 @@ export default async function handler(req, res) {
     if (dealerMatch) {
       const id = safeDecode(dealerMatch[1]);
       return sendDoc(res, await renderDealer(supabase, id));
+    }
+
+    if (rawPath === '/players') {
+      return sendDoc(res, await renderPlayersIndex(supabase));
+    }
+
+    const playerMatch = rawPath.match(/^\/players\/([^/?#]+)/);
+    if (playerMatch) {
+      return sendDoc(res, await renderPlayer(supabase, safeDecode(playerMatch[1])));
     }
 
     if (rawPath === '/collections') {

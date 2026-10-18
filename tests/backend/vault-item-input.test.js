@@ -37,6 +37,16 @@ describe('buildVaultItemRow', () => {
     expect(row).not.toHaveProperty('created_at');
   });
 
+  it('keeps a well-formed player_id and drops anything that is not a UUID', () => {
+    const pid = '11111111-2222-4333-8444-555555555555';
+    expect(build({ player_id: pid }).row.player_id).toBe(pid);
+    expect(build({ player_id: 'lebron-james' }).row.player_id).toBeNull();
+    expect(build({ player_id: { id: pid } }).row.player_id).toBeNull();
+    expect(build({ player_id: null }).row.player_id).toBeNull();
+    // Omitted on an edit = keep the stored tag, like every other column.
+    expect(build({}).row).not.toHaveProperty('player_id');
+  });
+
   it('rejects storage paths outside the caller\'s own folder', () => {
     const { pathErrors } = build({ card_image: 'other-user/steal.jpg' });
     expect(pathErrors.length).toBeGreaterThan(0);

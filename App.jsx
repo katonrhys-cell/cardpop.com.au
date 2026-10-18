@@ -158,6 +158,9 @@ const MarketDetailPage = lazy(() => import('@/pages/markets/MarketDetailPage.jsx
 const AustralianMarketsPage = lazy(() => import('@/pages/AustralianMarketsPage.jsx'));
 const CardPricesHubPage = lazy(() => import('@/pages/prices/CardPricesHubPage.jsx'));
 const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPage.jsx'));
+// Player pages — one public page per collected athlete (docs/players.md)
+const PlayersIndexPage = lazy(() => import('@/pages/players/PlayersIndexPage.jsx'));
+const PlayerPage = lazy(() => import('@/pages/players/PlayerPage.jsx'));
 const BuyingGuidesPage = lazy(() => import('@/pages/analytics/BuyingGuidesPage.jsx'));
 const BuyingGuideDetailPage = lazy(() => import('@/pages/analytics/BuyingGuideDetailPage.jsx'));
 
@@ -234,6 +237,7 @@ const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryA
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const PromoCodesAdminPage = lazy(() => import('@/pages/admin/PromoCodesAdminPage.jsx'));
+const PlayersAdminPage = lazy(() => import('@/pages/admin/PlayersAdminPage.jsx'));
 const ProductReviewsAdminPage = lazy(() => import('@/pages/admin/ProductReviewsAdminPage.jsx'));
 const EventReviewsAdminPage = lazy(() => import('@/pages/admin/EventReviewsAdminPage.jsx'));
 const EventReviewEditorPage = lazy(() => import('@/pages/admin/EventReviewEditorPage.jsx'));
@@ -444,6 +448,10 @@ const App = () => {
                         <Route path="/prices/:category" element={<CardPricesHubPage />} />
                         <Route path="/prices/:category/:slug" element={<CardPriceDetailPage />} />
 
+                        {/* Player pages — the most collected athletes (SEO) */}
+                        <Route path="/players" element={<PlayersIndexPage />} />
+                        <Route path="/players/:slug" element={<PlayerPage />} />
+
                         {/* Partner program */}
                         <Route path="/partners" element={<PartnersPage />} />
                         <Route path="/partners/apply" element={<ProtectedRoute><PartnerApplyPage /></ProtectedRoute>} />
@@ -560,6 +568,7 @@ const App = () => {
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
+                          <Route path="players" element={<PlayersAdminPage />} />
                           <Route path="product-reviews" element={<ProductReviewsAdminPage />} />
                           <Route path="event-reviews" element={<EventReviewsAdminPage />} />
                           <Route path="event-reviews/new" element={<EventReviewEditorPage />} />

@@ -33,6 +33,10 @@ const int = (v) => {
   return n === null ? null : Math.trunc(n);
 };
 const bool = (v) => v === true;
+// A foreign key the client picks from a list: anything that isn't a UUID is
+// dropped here so a stray value fails as "no player" rather than a 22P02 500.
+const UUID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuid = (v) => (typeof v === 'string' && UUID_SHAPE.test(v) ? v : null);
 
 // Every column the API will write, with its coercer. Anything not listed —
 // owner_id, is_featured, locked_base_value_aud, base_value_source, admin/
@@ -42,6 +46,8 @@ const WRITABLE = {
   franchise_id: str,
   manufacturer_id: str,
   team_id: str,
+  // The athlete on the card (players.id) — see docs/players.md.
+  player_id: uuid,
   set_id: str,
   parallel_id: str,
   subset_id: str,

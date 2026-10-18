@@ -29,17 +29,20 @@ const router = express.Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// `language` is a recently added column. Vercel's deploy and the Supabase
-// migration workflow run independently on merge, so for a brief window the new
-// backend can be live against a schema that lacks it. Rather than fail the
-// seller's upload, drop the field and retry once. (PGRST204 = "Could not find
-// the 'x' column ... in the schema cache".)
-const isMissingLanguageColumn = (err) =>
-  err && (err.code === 'PGRST204' || /schema cache/i.test(err.message || '')) &&
-  /language/i.test(err.message || '');
+// Recently added, optional columns. Vercel's deploy and the Supabase migration
+// workflow run independently on merge, so for a brief window the new backend
+// can be live against a schema that lacks one of them. Rather than fail the
+// seller's upload, drop the field the error names and retry once. (PGRST204 =
+// "Could not find the 'x' column ... in the schema cache".)
+const OPTIONAL_COLUMNS = ['language', 'player_id'];
 
-const withoutLanguage = (row) => {
-  const { language, ...rest } = row; // eslint-disable-line no-unused-vars
+const missingOptionalColumn = (err) => {
+  if (!err || !(err.code === 'PGRST204' || /schema cache/i.test(err.message || ''))) return null;
+  return OPTIONAL_COLUMNS.find((col) => new RegExp(`'${col}'`).test(err.message || '')) || null;
+};
+
+const withoutColumn = (row, col) => {
+  const { [col]: _dropped, ...rest } = row;
   return rest;
 };
 
@@ -77,8 +80,9 @@ router.post('/', authMiddleware, async (req, res) => {
   if (Object.keys(fieldErrors).length) return respondValidationError(res, fieldErrors);
 
   let { data: inserted, error } = await userClient.from('vault_items').insert(row).select('id').single();
-  if (isMissingLanguageColumn(error)) {
-    ({ data: inserted, error } = await userClient.from('vault_items').insert(withoutLanguage(row)).select('id').single());
+  const missingOnInsert = missingOptionalColumn(error);
+  if (missingOnInsert) {
+    ({ data: inserted, error } = await userClient.from('vault_items').insert(withoutColumn(row, missingOnInsert)).select('id').single());
   }
   if (error) {
     if (error.code === '42501' || /row-level security/i.test(error.message || '')) {
@@ -132,8 +136,9 @@ router.put('/:id', authMiddleware, async (req, res) => {
   if (Object.keys(fieldErrors).length) return respondValidationError(res, fieldErrors);
 
   let { error } = await userClient.from('vault_items').update(row).eq('id', id).eq('owner_id', req.user.id);
-  if (isMissingLanguageColumn(error)) {
-    ({ error } = await userClient.from('vault_items').update(withoutLanguage(row)).eq('id', id).eq('owner_id', req.user.id));
+  const missingOnUpdate = missingOptionalColumn(error);
+  if (missingOnUpdate) {
+    ({ error } = await userClient.from('vault_items').update(withoutColumn(row, missingOnUpdate)).eq('id', id).eq('owner_id', req.user.id));
   }
   if (error) {
     if (error.code === '42501' || /row-level security/i.test(error.message || '')) {

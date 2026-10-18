@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, ImageOff } from 'lucide-react';
+import { Search, Store, User, Newspaper, CalendarDays, ShoppingBag, ArrowRight, ImageOff, UsersRound } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { LISTING_CARD_VAULT_EMBED_INNER } from '@/lib/listingCardColumns.js';
@@ -16,6 +16,8 @@ import SearchBar from '@/components/SearchBar.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
+import { loadPlayers } from '@/hooks/usePlayers.js';
+import { matchPlayers, playerPath, playerSubtitle } from '@/utils/players.js';
 
 // How many hits to show per content type. The page favours breadth ("did the
 // site have anything?"), so a handful of the *best* matches per source beats a
@@ -156,6 +158,22 @@ async function searchEvents(tokens) {
   }));
 }
 
+// Players are matched in the browser (utils/players.js) against the cached
+// published list, so "wemby", "doncic" and "MJ" all land on the right page.
+async function searchPlayers(rawQuery) {
+  const players = await loadPlayers();
+  return matchPlayers(players, rawQuery, OVER_FETCH).map((p) => ({
+    key: `player-${p.id}`,
+    url: playerPath(p),
+    image: publicImageUrl(p.image_url),
+    title: p.name,
+    subtitle: p.headline || playerSubtitle(p),
+    meta: p.sport || null,
+    _title: p.name || '',
+    _haystack: `${p.name || ''} ${(p.aliases || []).join(' ')} ${p.team || ''} ${p.sport || ''}`,
+  }));
+}
+
 // ─── Generic result card (shop / sellers / blog / events) ─────────────────────
 const ResultCard = ({ item }) => {
   const [imgOk, setImgOk] = useState(Boolean(item.image));
@@ -212,7 +230,7 @@ const SearchResultsPage = () => {
   const query = searchParams.get('q') || '';
 
   const [loading, setLoading] = useState(true);
-  const [groups, setGroups] = useState({ listings: [], shop: [], sellers: [], blog: [], events: [] });
+  const [groups, setGroups] = useState({ players: [], listings: [], shop: [], sellers: [], blog: [], events: [] });
   // Fuzzy fallback for zero-result queries ("Charzard" → "Charizard"),
   // served by the suggestions endpoint's did-you-mean matcher.
   const [didYouMean, setDidYouMean] = useState(null);
@@ -223,14 +241,15 @@ const SearchResultsPage = () => {
       const safe = sanitizeSearch(query);
       const tokens = tokenizeSearch(query);
       if (safe.length < 2 || tokens.length === 0) {
-        setGroups({ listings: [], shop: [], sellers: [], blog: [], events: [] });
+        setGroups({ players: [], listings: [], shop: [], sellers: [], blog: [], events: [] });
         setDidYouMean(null);
         setLoading(false);
         return;
       }
       setLoading(true);
       const qLower = safe.toLowerCase();
-      const [listings, shop, sellers, blog, events] = await Promise.allSettled([
+      const [players, listings, shop, sellers, blog, events] = await Promise.allSettled([
+        searchPlayers(safe),
         searchListings(tokens),
         searchShop(tokens),
         searchSellers(tokens),
@@ -241,6 +260,7 @@ const SearchResultsPage = () => {
       // Rank each group by relevance and keep the best matches.
       const val = (r) => (r.status === 'fulfilled' ? rankItems(r.value, qLower, tokens, PER_SOURCE) : []);
       const ranked = {
+        players: val(players),
         listings: val(listings),
         shop: val(shop),
         sellers: val(sellers),
@@ -265,7 +285,7 @@ const SearchResultsPage = () => {
   }, [query]);
 
   const total =
-    groups.listings.length + groups.shop.length + groups.sellers.length + groups.blog.length + groups.events.length;
+    groups.players.length + groups.listings.length + groups.shop.length + groups.sellers.length + groups.blog.length + groups.events.length;
 
   return (
     <div className="container-default section-padding">
@@ -352,6 +372,14 @@ const SearchResultsPage = () => {
         </div>
       ) : (
         <>
+          {groups.players.length > 0 && (
+            <Section icon={UsersRound} label="Players" count={groups.players.length} viewAll="/players">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {groups.players.map((item) => <ResultCard key={item.key} item={item} />)}
+              </div>
+            </Section>
+          )}
+
           {groups.listings.length > 0 && (
             <Section icon={ShoppingBag} label="Marketplace" count={groups.listings.length} viewAll={`/marketplace?q=${encodeURIComponent(query)}`}>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
