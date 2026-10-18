@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
-  AMAZON_LOCATION_ENABLED,
+  ADDRESS_AUTOCOMPLETE_ENABLED,
+  ADDRESS_AUTOCOMPLETE_LABEL,
   autocompleteAddress,
   resolveSuggestion,
-} from '@/lib/amazonLocation.js';
+} from '@/lib/addressAutocomplete.js';
 
 const AU_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 const DEBOUNCE_MS = 250;
@@ -31,20 +32,20 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false, emailAc
   const [loading, setLoading] = useState(false);
   // Flips to true if a request errors — we then degrade to plain free-text and
   // drop the "verified pick" gate (the server still validates the address).
-  const [unavailable, setUnavailable] = useState(!AMAZON_LOCATION_ENABLED);
+  const [unavailable, setUnavailable] = useState(!ADDRESS_AUTOCOMPLETE_ENABLED);
 
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
   const abortRef = useRef(null);
 
-  const placesActive = AMAZON_LOCATION_ENABLED && !unavailable;
+  const placesActive = ADDRESS_AUTOCOMPLETE_ENABLED && !unavailable;
   const verified = Boolean(values.verified);
 
-  // Log the real failure to the console (status + AWS message) and degrade to
-  // manual entry. The visible fallback below tells the shopper why the search
+  // Log the real failure to the console (status + the provider's message) and
+  // degrade to manual entry. The visible fallback below tells the shopper why the search
   // box went away, so a misconfigured key never looks like a broken form.
   const degradeToManual = useCallback((context, err) => {
-    console.warn(`[address] Amazon Location ${context} failed — falling back to manual entry.`, err);
+    console.warn(`[address] ${ADDRESS_AUTOCOMPLETE_LABEL} ${context} failed — falling back to manual entry.`, err);
     setUnavailable(true);
     onChangeRef.current?.({ ...valuesRef.current, placesUnavailable: true });
   }, []);
@@ -87,7 +88,7 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false, emailAc
       })
       .catch((err) => {
         if (controller.signal.aborted || err?.name === 'AbortError') return;
-        // AWS unreachable / key misconfigured — degrade to plain free-text entry
+        // Provider unreachable / key misconfigured — degrade to plain free-text entry
         // and tell the page to drop its "verified pick" requirement.
         degradeToManual('autocomplete', err);
       })
@@ -266,7 +267,7 @@ const ShippingAddressForm = ({ values = {}, onChange, showEmail = false, emailAc
         )}
         {/* Autocomplete was enabled but a request failed — tell the shopper the
             search fell back to manual entry rather than leaving them puzzled. */}
-        {AMAZON_LOCATION_ENABLED && unavailable && (
+        {ADDRESS_AUTOCOMPLETE_ENABLED && unavailable && (
           <p className="text-xs text-muted-foreground">
             Address search is unavailable right now — please enter your address manually.
           </p>
