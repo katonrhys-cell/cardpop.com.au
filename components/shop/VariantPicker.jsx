@@ -1,12 +1,14 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
-import { activeVariants, variantInStock, variantLabel, variantStock } from '@/utils/shopVariants.js';
+import { activeVariants, variantInStock, variantKind, variantLabel, variantStock } from '@/utils/shopVariants.js';
 
 /**
- * Colour chips for a product with variants. Sold-out colours stay visible but
- * disabled so the shopper can see the range (and enquire), not just what's
- * left. Renders nothing for a product with no variants.
+ * Colour (or size) chips for a product with variants. Sold-out options stay
+ * visible but disabled so the shopper can see the range (and enquire), not
+ * just what's left. Renders nothing for a product with no variants. The
+ * heading reads "Size" when every variant is a size (gloves in S–2XL) — see
+ * variantKind() in utils/shopVariants.js.
  *
  * Props: product (with `variants`), value (selected variant id), onChange(variant),
  * showAvailability (default true) — pass false where nothing is buyable yet
@@ -20,12 +22,13 @@ const VariantPicker = ({ product, value, onChange, className = '', showAvailabil
   const list = activeVariants(product);
   if (list.length === 0) return null;
   const selected = list.find((v) => v.id === value) || null;
+  const kind = variantKind(product);
 
   return (
     <div className={className}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground">
-          Colour{list.length > 1 ? ` · ${list.length} options` : ''}
+          {kind}{list.length > 1 ? ` · ${list.length} options` : ''}
         </h2>
         {selected && (
           <span className="text-sm text-muted-foreground">
@@ -38,7 +41,7 @@ const VariantPicker = ({ product, value, onChange, className = '', showAvailabil
           </span>
         )}
       </div>
-      <div role="radiogroup" aria-label="Colour" className="mt-3 flex flex-wrap gap-2">
+      <div role="radiogroup" aria-label={kind} className="mt-3 flex flex-wrap gap-2">
         {list.map((v) => {
           const inStock = !showAvailability || optionAvailable(v);
           const isSelected = v.id === value;

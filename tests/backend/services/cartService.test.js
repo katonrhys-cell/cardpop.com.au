@@ -344,6 +344,16 @@ describe('priceCart — colour variants', () => {
       .rejects.toMatchObject({ statusCode: 400, message: expect.stringMatching(/choose a colour/i) });
   });
 
+  it('asks for a size, not a colour, when the variants are sizes', async () => {
+    const sizes = [
+      { id: 'v-s', sku: 'SR1361', colour: 'Small', barcode: null, stock_quantity: 10, price_aud: null, status: 'active' },
+      { id: 'v-xl', sku: 'SR1364', colour: 'XL', barcode: null, stock_quantity: 10, price_aud: null, status: 'active' },
+    ];
+    mockSupabase.from.mockReturnValueOnce(rowBuilder({ data: { id: 'p-gloves', title: 'Black Nitrile Heavy Duty Gloves - Box of 100', price_aud: 12.95, stock_quantity: 20, status: 'active', variants: sizes }, error: null }));
+    await expect(priceCart([{ type: 'shop', id: 'p-gloves', quantity: 1 }], 'buyer-1'))
+      .rejects.toMatchObject({ statusCode: 400, message: 'Please choose a size for Black Nitrile Heavy Duty Gloves - Box of 100' });
+  });
+
   it('rejects an unknown or archived variant id', async () => {
     mockSupabase.from.mockReturnValueOnce(rowBuilder(binder()));
     await expect(priceCart([{ type: 'shop', id: 'p-zb09', quantity: 1, variantId: 'v-old' }], 'buyer-1'))

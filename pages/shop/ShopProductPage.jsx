@@ -13,7 +13,7 @@ import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import SizePicker from '@/components/shop/SizePicker.jsx';
 import useSizeStock from '@/hooks/useSizeStock.js';
 import { sizeGroupFor, sizeProductPath } from '@/utils/shopSizes.js';
-import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
@@ -128,7 +128,7 @@ const ShopProductPage = () => {
 
   const handleAddToCart = () => {
     if (!row || !isPurchasable) return;
-    if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
+    if (variants.length > 0 && !chosenVariant) { toast.error(`Please choose a ${variantKind(row).toLowerCase()} first.`); return; }
     if (!inStock) return;
     const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
     const cartVariant = chosenVariant
