@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -10,11 +10,18 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import EventScraperPanel from '@/components/EventScraperPanel.jsx';
 import EventScanPanel from '@/components/EventScanPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import EventRsvpListDialog from '@/components/admin/EventRsvpListDialog.jsx';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import { toLocalDateStr } from '@/lib/eventSeo.js';
+import {
+  filterEvents, groupEventsByTiming, defaultSortDir,
+  EVENT_STATUS_OPTIONS, EVENT_TYPE_OPTIONS, EVENT_STATE_OPTIONS, EVENT_SOURCE_OPTIONS, EVENT_SORT_OPTIONS,
+} from '@/utils/adminEventList.js';
 
 const STATUS_STYLES = {
   pending_review: 'bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-400',
@@ -40,6 +47,37 @@ const FILTERS = {
   discovered: (ev) => ev.auto_discovered && ev.status === 'pending_review',
 };
 
+// Search / filter / sort state lives in the URL so a refresh, the back button
+// or a shared link lands on the same view. A param at its default is dropped.
+const PARAM_DEFAULTS = { q: '', status: 'all', type: 'all', state: 'all', source: 'all', sort: 'date', dir: 'desc' };
+const FILTER_PARAMS = ['status', 'type', 'state', 'source'];
+
+// Which of the Current & upcoming / Past sections the admin has collapsed. A
+// per-browser convenience, so it lives in localStorage (which can throw or
+// be empty in private windows — fall back to both open).
+const COLLAPSED_STORAGE_KEY = 'cardpop.admin.events.collapsed';
+const loadCollapsed = () => {
+  try {
+    const raw = window.localStorage.getItem(COLLAPSED_STORAGE_KEY);
+    const keys = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(keys) ? keys : []);
+  } catch {
+    return new Set();
+  }
+};
+const saveCollapsed = (set) => {
+  try {
+    window.localStorage.setItem(COLLAPSED_STORAGE_KEY, JSON.stringify([...set]));
+  } catch { /* storage unavailable — collapse state just won't persist */ }
+};
+
+// Sortable table columns. `key` is a sortEvents() key.
+const COLUMNS = [
+  { key: 'title', label: 'Event' },
+  { key: 'date', label: 'Date & Location', className: 'hidden md:table-cell' },
+  { key: 'status', label: 'Status' },
+];
+
 // How long a row the admin has just published stays in the "Found by scan"
 // list before it leaves. Without this the row vanishes on the same render
 // that flips its toggle, so the next event slides up under the cursor with
@@ -60,6 +98,36 @@ const EventsManagementPage = () => {
   // there (toggle on, fading) until their linger timer removes them.
   const [lingeringIds, setLingeringIds] = useState(() => new Set());
   const lingerTimers = useRef(new Map());
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+  const toggleCollapsed = (key) => setCollapsed((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    saveCollapsed(next);
+    return next;
+  });
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const param = (k) => searchParams.get(k) || PARAM_DEFAULTS[k];
+  const setParams = (updates) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v === undefined || v === null || v === PARAM_DEFAULTS[k]) next.delete(k);
+        else next.set(k, v);
+      }
+      return next;
+    }, { replace: true });
+  };
+  const searchTerm = param('q');
+  const listFilters = { search: searchTerm, status: param('status'), type: param('type'), state: param('state'), source: param('source') };
+  const sortKey = param('sort');
+  const sortDir = param('dir');
+  const activeFilterCount = FILTER_PARAMS.filter((k) => listFilters[k] !== 'all').length + (searchTerm ? 1 : 0);
+  const clearFilters = () => setParams({ q: null, status: null, type: null, state: null, source: null });
+  const toggleSort = (key) => {
+    if (sortKey === key) setParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' });
+    else setParams({ sort: key, dir: defaultSortDir(key) });
+  };
 
   useEffect(() => {
     const timers = lingerTimers.current;
@@ -165,11 +233,23 @@ const EventsManagementPage = () => {
   };
 
   const discoveredCount = events.filter(FILTERS.discovered).length;
-  const visibleEvents = events.filter(
+  const queueEvents = events.filter(
     filter === 'discovered'
       ? (ev) => FILTERS.discovered(ev) || lingeringIds.has(ev.id)
       : FILTERS[filter]
   );
+  // Search, dropdown filters and sort apply on top of the queue view, and the
+  // result is split into Current & upcoming / Past. `today` is the admin's
+  // local date so the split matches the public calendar.
+  const sections = useMemo(
+    () => {
+      const today = toLocalDateStr(new Date());
+      return groupEventsByTiming(filterEvents(queueEvents, listFilters, { today }), sortKey, sortDir, { today });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- listFilters/sortKey/sortDir all derive from searchParams
+    [events, filter, lingeringIds, searchParams],
+  );
+  const visibleCount = sections.reduce((n, s) => n + s.events.length, 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -216,42 +296,128 @@ const EventsManagementPage = () => {
       )}
 
       <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
+        <div className="p-4 border-b border-border bg-muted/20 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="search"
+              name="admin-event-search"
+              aria-label="Search events"
+              placeholder="Search by title, venue, suburb, organiser or tag..."
+              className="pl-9 h-10 rounded-xl bg-background border-border text-foreground"
+              value={searchTerm}
+              onChange={(e) => setParams({ q: e.target.value })}
+            />
+          </div>
+          <FilterSelect label="Status" value={listFilters.status} onChange={(v) => setParams({ status: v })} options={EVENT_STATUS_OPTIONS} allLabel="All statuses" />
+          <FilterSelect label="State" value={listFilters.state} onChange={(v) => setParams({ state: v })} options={EVENT_STATE_OPTIONS} allLabel="All states" width="w-[130px]" />
+          <FilterSelect label="Type" value={listFilters.type} onChange={(v) => setParams({ type: v })} options={EVENT_TYPE_OPTIONS} allLabel="All types" />
+          <FilterSelect label="Source" value={listFilters.source} onChange={(v) => setParams({ source: v })} options={EVENT_SOURCE_OPTIONS} allLabel="Any source" />
+          {activeFilterCount > 0 && (
+            <Button variant="ghost" size="sm" className="gap-1 h-10 rounded-xl text-muted-foreground" onClick={clearFilters}>
+              <X className="w-4 h-4" /> Clear ({activeFilterCount})
+            </Button>
+          )}
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-sm text-muted-foreground tabular-nums" aria-live="polite">
+              {visibleCount} of {queueEvents.length}
+            </span>
+            <Select value={sortKey} onValueChange={(v) => setParams({ sort: v, dir: defaultSortDir(v) })}>
+              <SelectTrigger aria-label="Sort events by" className="h-10 w-[150px] rounded-xl bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="rounded-xl">
+                {EVENT_SORT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-10 w-10 rounded-xl p-0"
+              onClick={() => setParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' })}
+              aria-label={sortDir === 'asc' ? 'Sorted ascending — switch to descending' : 'Sorted descending — switch to ascending'}
+              title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {sortDir === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           {isLoading ? (
             <div className="p-6 space-y-4">
               {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl bg-background" />)}
             </div>
-          ) : visibleEvents.length === 0 ? (
+          ) : visibleCount === 0 ? (
             <div className="text-center py-20 px-4">
               <Calendar className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <h3 className="text-xl font-bold mb-2 text-foreground">No events found</h3>
+              <h3 className="text-xl font-bold mb-2 text-foreground">
+                {activeFilterCount > 0 ? 'No events match' : 'No events found'}
+              </h3>
               <p className="text-muted-foreground mb-6">
-                {filter === 'discovered'
-                  ? 'The scan has nothing waiting for review.'
-                  : "You haven't created any events yet."}
+                {activeFilterCount > 0
+                  ? 'Nothing matches your search and filters.'
+                  : filter === 'discovered'
+                    ? 'The scan has nothing waiting for review.'
+                    : "You haven't created any events yet."}
               </p>
-              <div className="flex justify-center gap-3">
-                <Button onClick={() => setIsScraperOpen(true)} variant="outline" className="rounded-xl font-bold">
-                  <Wand2 className="w-4 h-4 mr-2" /> Scrape from URL
+              {activeFilterCount > 0 ? (
+                <Button onClick={clearFilters} variant="outline" className="rounded-xl font-bold">
+                  <X className="w-4 h-4 mr-2" /> Clear filters
                 </Button>
-                <Button onClick={() => handleOpenModal()} className="rounded-xl font-bold">
-                  Create your first event
-                </Button>
-              </div>
+              ) : (
+                <div className="flex justify-center gap-3">
+                  <Button onClick={() => setIsScraperOpen(true)} variant="outline" className="rounded-xl font-bold">
+                    <Wand2 className="w-4 h-4 mr-2" /> Scrape from URL
+                  </Button>
+                  <Button onClick={() => handleOpenModal()} className="rounded-xl font-bold">
+                    Create your first event
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="text-xs text-muted-foreground uppercase bg-muted/20 border-b border-border">
                 <tr>
-                  <th className="px-6 py-4 font-bold whitespace-nowrap">Event</th>
-                  <th className="px-6 py-4 font-bold whitespace-nowrap hidden md:table-cell">Date & Location</th>
-                  <th className="px-6 py-4 font-bold whitespace-nowrap">Status</th>
+                  {COLUMNS.map((col) => {
+                    const active = sortKey === col.key;
+                    const Icon = !active ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown;
+                    return (
+                      <th
+                        key={col.key}
+                        className={`px-6 py-4 font-bold whitespace-nowrap ${col.className || ''}`}
+                        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                      >
+                        <button type="button" onClick={() => toggleSort(col.key)} className="inline-flex items-center gap-1 uppercase hover:text-primary">
+                          {col.label}
+                          <Icon className={`w-3.5 h-3.5 ${active ? 'text-primary' : 'text-muted-foreground/60'}`} />
+                        </button>
+                      </th>
+                    );
+                  })}
                   <th className="px-6 py-4 font-bold whitespace-nowrap text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {visibleEvents.map((event) => (
+                {sections.map(({ key, label, events: rows }) => {
+                  const open = !collapsed.has(key);
+                  return (
+                  <React.Fragment key={key}>
+                  <tr className="bg-muted/60 hover:bg-muted/80" data-section={key}>
+                    <td colSpan={4} className="p-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleCollapsed(key)}
+                        aria-expanded={open}
+                        className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-foreground"
+                      >
+                        <ChevronRight aria-hidden="true" className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+                        {label} <span className="font-semibold text-muted-foreground normal-case tracking-normal">· {rows.length}</span>
+                      </button>
+                    </td>
+                  </tr>
+                  {open && rows.map((event) => (
                   <tr
                     key={event.id}
                     data-lingering={lingeringIds.has(event.id) ? 'true' : undefined}
@@ -350,7 +516,10 @@ const EventsManagementPage = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))}
+                  </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
             </div>
@@ -382,5 +551,17 @@ const EventsManagementPage = () => {
     </div>
   );
 };
+
+const FilterSelect = ({ label, value, onChange, options, allLabel, width = 'w-[160px]' }) => (
+  <Select value={value} onValueChange={onChange}>
+    <SelectTrigger aria-label={`Filter by ${label.toLowerCase()}`} className={`h-10 ${width} rounded-xl bg-background ${value !== 'all' ? 'border-primary text-foreground' : ''}`}>
+      <SelectValue placeholder={allLabel} />
+    </SelectTrigger>
+    <SelectContent className="rounded-xl">
+      <SelectItem value="all">{allLabel}</SelectItem>
+      {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+    </SelectContent>
+  </Select>
+);
 
 export default EventsManagementPage;
