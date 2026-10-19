@@ -442,7 +442,6 @@ const ShopDropdown = ({ onNavigate }) => {
           >
             <div className="min-w-0">
               <span className="text-sm font-bold text-foreground">Shop All Supplies</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Sleeves, binders, storage and display — sold by CardPop</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
