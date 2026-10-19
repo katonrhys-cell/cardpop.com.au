@@ -224,7 +224,7 @@ const ShopProductPage = () => {
         structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
-      <div className="container mx-auto px-4 py-6 md:py-10">
+      <div className="container-default py-6 md:py-10">
         <Breadcrumb items={[
           { label: 'Home', path: '/' },
           { label: 'Shop', path: '/shop' },
@@ -414,20 +414,6 @@ const ShopProductPage = () => {
               </div>
             ))}
 
-            {highlights.length > 0 && (
-              <div className="mt-8">
-                <h2 className="text-lg font-bold text-foreground">Why collectors pick this one</h2>
-                <ul className="mt-3 space-y-2">
-                  {highlights.map((point) => (
-                    <li key={point} className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {category.choosing && (
               <div className="mt-8">
                 <h2 className="text-lg font-bold text-foreground">Choosing the right one</h2>
@@ -437,20 +423,40 @@ const ShopProductPage = () => {
           </div>
         </div>
 
-        {product.details?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
-            <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
-            <div className="mt-4 space-y-4">
-              {product.details.map((paragraph) => (
-                <p key={paragraph.slice(0, 40)} className="text-base leading-relaxed text-muted-foreground">{paragraph}</p>
-              ))}
-            </div>
+        {/* The long-form copy sits under the photo at the page's full width: the
+            "About" paragraphs alongside the highlight list, so a reader who
+            scrolls past the price gets the whole pitch in one band. */}
+        {(product.details?.length > 0 || highlights.length > 0) && (
+          <section className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-12">
+            {product.details?.length > 0 && (
+              <div className="lg:col-span-2">
+                <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
+                <div className="mt-4 space-y-4">
+                  {product.details.map((paragraph) => (
+                    <p key={paragraph.slice(0, 40)} className="text-base leading-relaxed text-muted-foreground">{paragraph}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {highlights.length > 0 && (
+              <div className={product.details?.length > 0 ? 'self-start rounded-2xl border border-border bg-card p-6' : 'lg:col-span-3'}>
+                <h2 className="text-lg font-bold text-foreground">Why collectors pick this one</h2>
+                <ul className="mt-3 space-y-2.5">
+                  {highlights.map((point) => (
+                    <li key={point} className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
 
         <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
-        <section className="mt-14 max-w-3xl">
+        <section className="mt-14">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>
           <dl className="mt-4 divide-y divide-border rounded-2xl border border-border overflow-hidden">
             {specs.map((spec) => (
@@ -463,7 +469,7 @@ const ShopProductPage = () => {
         </section>
 
         {category.faqs?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
+          <section className="mt-14">
             <h2 className="text-2xl font-bold text-foreground">Common questions</h2>
             <div className="mt-4 space-y-6">
               {category.faqs.map((faq) => (

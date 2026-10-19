@@ -193,7 +193,7 @@ const ShopBinderProductPage = () => {
         structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
-      <div className="container mx-auto px-4 py-6 md:py-10">
+      <div className="container-default py-6 md:py-10">
         <Breadcrumb items={[
           { label: 'Home', path: '/' },
           { label: 'Shop', path: '/shop' },
@@ -392,7 +392,7 @@ const ShopBinderProductPage = () => {
         </div>
 
         {product.details?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
+          <section className="mt-14">
             <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
             <div className="mt-4 space-y-4">
               {product.details.map((paragraph) => (
@@ -405,7 +405,7 @@ const ShopBinderProductPage = () => {
         <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
         {/* ── Specifications ──────────────────────────────────────────────── */}
-        <section className="mt-14 max-w-3xl">
+        <section className="mt-14">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>
           <dl className="mt-4 divide-y divide-border rounded-2xl border border-border overflow-hidden">
             {specs.map((spec) => (
@@ -419,7 +419,7 @@ const ShopBinderProductPage = () => {
 
         {/* ── FAQ ─────────────────────────────────────────────────────────── */}
         {product.faqs?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
+          <section className="mt-14">
             <h2 className="text-2xl font-bold text-foreground">Common questions</h2>
             <div className="mt-4 space-y-6">
               {product.faqs.map((faq) => (

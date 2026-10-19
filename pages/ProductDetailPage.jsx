@@ -504,7 +504,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
 
   if (loading) {
     return (
-      <div className="max-w-[90rem] mx-auto px-4 py-12">
+      <div className="container-default py-12">
         <Skeleton className="h-6 w-32 mb-8 rounded-md" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
           <div className="lg:col-span-7">

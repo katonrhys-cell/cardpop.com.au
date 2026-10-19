@@ -181,7 +181,7 @@ const PublicCollectionsPage = () => {
       <SEOHead title="Collections & Marketplace | CardPop Australia" description="Browse public trading card collections and marketplace listings from Australian collectors." />
       
       <div className="bg-secondary py-12 relative overflow-hidden">
-        <div className="max-w-[90rem] mx-auto px-4 relative z-10 grid lg:grid-cols-2 gap-6 lg:gap-16 items-end">
+        <div className="container-default relative z-10 grid lg:grid-cols-2 gap-6 lg:gap-16 items-end">
           <h1 className="font-serif text-4xl md:text-5xl font-bold text-white">Marketplace Collections</h1>
           <p className="text-secondary-foreground/80 text-lg lg:pb-1">
             Explore curated official store items alongside verified collector vault listings in our unified marketplace.
@@ -189,7 +189,7 @@ const PublicCollectionsPage = () => {
         </div>
       </div>
 
-      <div className="flex-1 max-w-[90rem] mx-auto px-4 py-8 w-full flex flex-col md:flex-row gap-8">
+      <div className="flex-1 container-default py-8 w-full flex flex-col md:flex-row gap-8">
         
         <aside className="w-full md:w-64 shrink-0 space-y-8">
           <div>

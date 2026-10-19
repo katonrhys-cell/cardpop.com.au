@@ -170,7 +170,7 @@ const VaultProfilePage = () => {
 
   if (loading) {
     return (
-      <div className="max-w-[90rem] mx-auto px-4 py-12 space-y-8">
+      <div className="container-default py-12 space-y-8">
         <Skeleton className="h-64 w-full rounded-2xl" />
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <Skeleton className="h-96 md:col-span-2 rounded-2xl" />

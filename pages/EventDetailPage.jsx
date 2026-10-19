@@ -62,7 +62,7 @@ const EventDetailPage = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col bg-background font-sans min-h-screen">
-        <div className="flex-1 max-w-[90rem] mx-auto px-4 py-12 w-full space-y-6">
+        <div className="flex-1 container-default py-12 w-full space-y-6">
           <Skeleton className="h-10 w-44 rounded-xl" />
           <Skeleton className="h-96 w-full rounded-3xl" />
           <Skeleton className="h-6 w-2/3" />
@@ -125,7 +125,7 @@ const EventDetailPage = () => {
         structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event), buildVideoJsonLd(event)].filter(Boolean)}
       />
 
-      <div className="flex-1 max-w-[90rem] mx-auto px-4 py-12 w-full">
+      <div className="flex-1 container-default py-12 w-full">
         <Button
           variant="ghost"
           asChild
