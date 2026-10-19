@@ -42,7 +42,17 @@ The transactional emails and where they fire:
 | Back in stock | Whoever clicked **Notify me** on a sold-out shop product (`shop_restock_requests`) | retention sweep |
 | Welcome code expires in 7 days | New user with an unused code | retention sweep |
 
-Email HTML is built by the templates in `src/emails/templates.js`.
+Email HTML is built by the templates in `src/emails/templates.js`. Every one of
+them goes through the shared `cpEmail()` wrapper, so the branding is in one
+place: the header is the official CardPop Australia logo (card icon ·
+CardPop™ · AUSTRALIA), served from
+`https://cardpop.com.au/images/email/cardpop-logo-v1.png` (a trimmed 440 px
+copy shown at 220 px, so it is crisp on retina inboxes) on a band that
+matches the artwork's own near-black ground, with the title band below it in
+brand red. `/images/` is cached immutable for a year, so a new logo must be a
+**new `-vN` filename** referenced from `EMAIL_LOGO_URL` — never overwrite
+`-v1`. A client that blocks remote images shows the white "CardPop Australia"
+alt text in its place.
 
 ### Order shipped (tracking)
 

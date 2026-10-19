@@ -25,12 +25,25 @@ export function esc(v) {
     .replace(/'/g, '&#39;');
 }
 
+// The brand logo at the top of every email. A trimmed copy of the official
+// lockup (card icon · CardPop™ · AUSTRALIA on its near-black ground) served
+// from the site at 2× so it stays crisp on retina inboxes. /images/ is cached
+// immutable for a year, so a new artwork needs a new -vN filename, never an
+// overwrite. The band behind it matches the artwork's own background so the
+// PNG's edges are invisible; the alt text (styled white) is what a client that
+// blocks remote images shows instead, so the header never reads as empty.
+export const EMAIL_LOGO_URL = 'https://cardpop.com.au/images/email/cardpop-logo-v1.png';
+const EMAIL_LOGO_BG = '#0A0A0A';
+const EMAIL_LOGO_WIDTH = 220; // 440px source ÷ 2
+
 export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaText, footerNote) {
   const cta = ctaUrl
     ? `<div style="text-align:center;margin:32px 0 0"><a href="${ctaUrl}" style="background:#E63946;color:#FFFFFF;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block;letter-spacing:-0.3px">${ctaText}</a></div>`
     : '';
+  // The title band sits directly under the near-black logo header, so it is
+  // brand red (as the header used to be) rather than charcoal-on-black.
   const titleRow = titleBand
-    ? `<tr><td style="background:#1C1C1E;padding:20px 40px;"><p style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.3;">${titleBand}</p></td></tr>`
+    ? `<tr><td style="background:#E63946;padding:20px 40px;"><p style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.3;">${titleBand}</p></td></tr>`
     : '';
   const greetingRow = greeting
     ? `<p style="margin:0 0 20px;font-size:17px;font-weight:600;color:#111827;">${greeting}</p>`
@@ -45,9 +58,8 @@ export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaTex
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F0F5;padding:40px 16px;">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
-<tr><td style="background:#E63946;border-radius:12px 12px 0 0;padding:28px 40px 24px;text-align:center;">
-<p style="margin:0;font-size:30px;font-weight:900;color:#FFFFFF;letter-spacing:-1px;">CardPop</p>
-<p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.75);letter-spacing:2.5px;text-transform:uppercase;">Australia's Card Marketplace</p>
+<tr><td style="background:${EMAIL_LOGO_BG};border-radius:12px 12px 0 0;padding:24px 40px;text-align:center;">
+<a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-size:26px;font-weight:900;color:#FFFFFF;letter-spacing:-1px;text-align:center;"></a>
 </td></tr>
 ${titleRow}
 <tr><td style="background:#FFFFFF;padding:40px;">
