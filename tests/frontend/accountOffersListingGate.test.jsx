@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 
@@ -30,6 +31,8 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
 import AccountOffers from '@/pages/account/AccountOffers.jsx';
 
+const renderPage = () => render(<MemoryRouter><AccountOffers /></MemoryRouter>);
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn();
@@ -56,7 +59,7 @@ describe('AccountOffers — listing no longer active', () => {
 
   it('seller sees only Decline on a pending offer for a sold listing', async () => {
     mockLists.received = [{ id: 'o1', status: 'pending', amount_aud: 4000, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: sold('KD RC'), buyer: { display_name: 'Ash' } }];
-    render(<AccountOffers />);
+    renderPage();
     expect(await screen.findByRole('button', { name: /^decline$/i })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^accept$/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^counter$/i })).not.toBeInTheDocument();
@@ -65,7 +68,7 @@ describe('AccountOffers — listing no longer active', () => {
   it('buyer can decline but not accept a counter on a sold listing', async () => {
     const user = userEvent.setup();
     mockLists.sent = [{ id: 'o1', status: 'countered', amount_aud: 4000, counter_amount_aud: 4500, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: sold('KD RC'), seller: { display_name: 'Kat' } }];
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('tab', { name: /sent/i }));
     await user.click(await screen.findByRole('button', { name: /^decline$/i }));
     expect(screen.queryByRole('button', { name: /accept counter/i })).not.toBeInTheDocument();
@@ -74,7 +77,7 @@ describe('AccountOffers — listing no longer active', () => {
 
   it('active listing still shows Accept and Counter, with no blue styling', async () => {
     mockLists.received = [{ id: 'o1', status: 'pending', amount_aud: 4000, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), buyer: { display_name: 'Ash' } }];
-    render(<AccountOffers />);
+    renderPage();
     expect(await screen.findByRole('button', { name: /^accept$/i })).toBeInTheDocument();
     const counter = screen.getByRole('button', { name: /^counter$/i });
     expect(counter.className).not.toMatch(/blue/);

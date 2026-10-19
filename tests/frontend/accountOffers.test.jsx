@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 
@@ -30,6 +31,8 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 import { toast } from 'sonner';
 import AccountOffers from '@/pages/account/AccountOffers.jsx';
 
+const renderPage = () => render(<MemoryRouter><AccountOffers /></MemoryRouter>);
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = vi.fn();
   Element.prototype.hasPointerCapture = vi.fn();
@@ -55,7 +58,7 @@ describe('AccountOffers — responses go through the backend', () => {
   it('seller Accept → PATCH /offers/:id { action: "accept" }', async () => {
     mockLists.received = [{ id: 'o1', status: 'pending', amount_aud: 4000, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), buyer: { display_name: 'Ash' } }];
     const user = userEvent.setup();
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('button', { name: /^accept$/i }));
     expect(mockApiFetch).toHaveBeenCalledWith('/offers/o1', expect.objectContaining({ method: 'PATCH' }));
     expect(patchBody()).toEqual({ action: 'accept' });
@@ -66,7 +69,7 @@ describe('AccountOffers — responses go through the backend', () => {
   it('seller Counter → PATCH { action: "counter", counterAmountAud, counterMessage }', async () => {
     mockLists.received = [{ id: 'o1', status: 'pending', amount_aud: 4000, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), buyer: { display_name: 'Ash' } }];
     const user = userEvent.setup();
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('button', { name: /^counter$/i }));
     const dialog = await screen.findByRole('dialog');
     await user.type(within(dialog).getByLabelText(/your counter amount/i), '4500');
@@ -81,7 +84,7 @@ describe('AccountOffers — responses go through the backend', () => {
       { id: 'o2', status: 'pending', amount_aud: 100, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('Pikachu'), seller: { display_name: 'Kat' } },
     ];
     const user = userEvent.setup();
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('tab', { name: /sent/i }));
     await user.click(await screen.findByRole('button', { name: /accept counter/i }));
     expect(mockApiFetch.mock.calls[0][0]).toBe('/offers/o1');
@@ -95,7 +98,7 @@ describe('AccountOffers — responses go through the backend', () => {
     mockLists.received = [{ id: 'o1', status: 'pending', amount_aud: 4000, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), buyer: { display_name: 'Ash' } }];
     mockApiFetch.mockResolvedValue({ ok: false, status: 409, json: async () => ({ error: 'This offer has expired' }) });
     const user = userEvent.setup();
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('button', { name: /^accept$/i }));
     expect(toast.error).toHaveBeenCalledWith('This offer has expired');
     expect(toast.success).not.toHaveBeenCalled();
@@ -106,7 +109,7 @@ describe('AccountOffers — payment deadline', () => {
   it('shows the buyer a Pay button and their pay-by time on an accepted offer', async () => {
     mockLists.sent = [{ id: 'o1', status: 'accepted', amount_aud: 4000, payment_due_at: iso(20 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), seller: { display_name: 'Kat' } }];
     const user = userEvent.setup();
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('tab', { name: /sent/i }));
     expect(await screen.findByRole('button', { name: /pay \$4000\.00/i })).toBeInTheDocument();
     expect(screen.getByText(/please pay by/i)).toBeInTheDocument();
@@ -115,7 +118,7 @@ describe('AccountOffers — payment deadline', () => {
   it('shows an accepted offer past its payment window as Expired with no Pay button', async () => {
     mockLists.sent = [{ id: 'o1', status: 'accepted', amount_aud: 4000, payment_due_at: iso(-HOUR), created_at: iso(-60 * HOUR), listing: listing('KD RC'), seller: { display_name: 'Kat' } }];
     const user = userEvent.setup();
-    render(<AccountOffers />);
+    renderPage();
     await user.click(await screen.findByRole('tab', { name: /sent/i }));
     expect(await screen.findByText('Expired')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /pay/i })).not.toBeInTheDocument();
@@ -123,13 +126,47 @@ describe('AccountOffers — payment deadline', () => {
 
   it('shows a paid offer as Paid', async () => {
     mockLists.received = [{ id: 'o1', status: 'accepted', amount_aud: 4000, payment_due_at: iso(-HOUR), paid_at: iso(-2 * HOUR), created_at: iso(-10 * HOUR), listing: listing('KD RC'), buyer: { display_name: 'Ash' } }];
-    render(<AccountOffers />);
+    renderPage();
     expect(await screen.findByText('Paid')).toBeInTheDocument();
   });
 
   it('tells the seller when the buyer’s payment is due', async () => {
     mockLists.received = [{ id: 'o1', status: 'accepted', amount_aud: 4000, payment_due_at: iso(20 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), buyer: { display_name: 'Ash' } }];
-    render(<AccountOffers />);
+    renderPage();
     expect(await screen.findByText(/waiting on the buyer's payment \(due/i)).toBeInTheDocument();
+  });
+});
+
+describe('AccountOffers — account-section layout', () => {
+  it('summarises what is waiting on whom and links each row to its listing and counterparty', async () => {
+    mockLists.received = [
+      { id: 'r1', status: 'pending', amount_aud: 4000, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('KD RC'), buyer: { id: 'b1', display_name: 'Ash' } },
+      { id: 'r2', status: 'declined', amount_aud: 10, created_at: iso(-HOUR), listing: listing('Charizard'), buyer: { id: 'b2', display_name: 'Misty' } },
+    ];
+    mockLists.sent = [
+      { id: 's1', status: 'pending', amount_aud: 100, expires_at: iso(10 * HOUR), created_at: iso(-HOUR), listing: listing('Pikachu'), seller: { id: 'k1', display_name: 'Kat' } },
+      { id: 's2', status: 'accepted', amount_aud: 200, payment_due_at: iso(20 * HOUR), created_at: iso(-HOUR), listing: { ...listing('Jokic'), id: 'l2' }, seller: { id: 'k1', display_name: 'Kat' } },
+    ];
+    renderPage();
+    const tile = (title) => screen.getByText(title).closest('[class*="rounded-card"]');
+    expect(await screen.findByText('Needs your reply')).toBeInTheDocument();
+    expect(within(tile('Needs your reply')).getByText('1')).toBeInTheDocument();
+    expect(within(tile('Awaiting sellers')).getByText('1')).toBeInTheDocument();
+    expect(within(tile('Ready to pay')).getByText('1')).toBeInTheDocument();
+
+    // Received rows: the card name links to the listing, the buyer to their profile.
+    expect(screen.getByRole('link', { name: 'KD RC' })).toHaveAttribute('href', '/marketplace/l1/kd-rc');
+    expect(screen.getByRole('link', { name: 'Ash' })).toHaveAttribute('href', '/community/user/b1');
+    expect(screen.getAllByText('Their offer')).toHaveLength(2);
+  });
+
+  it('shows a tailored empty state with a next step on each tab', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText('No received offers')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /manage my listings/i })).toHaveAttribute('href', '/account/listings');
+    await user.click(screen.getByRole('tab', { name: /sent/i }));
+    expect(await screen.findByText('No sent offers')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /browse marketplace/i }).pop()).toHaveAttribute('href', '/marketplace');
   });
 });
