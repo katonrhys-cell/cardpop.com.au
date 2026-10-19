@@ -1160,8 +1160,8 @@ const MarketplacePage = () => {
             {/* totalCount is an estimate (count: 'estimated'), so it can't drive
                 exact page math without trapping users on empty pages (over-estimate)
                 or hiding real pages (under-estimate). Drive next/prev off whether
-                the current page came back full instead, and show the estimate only
-                as an approximate label. */}
+                the current page came back full instead; the page total shown is the
+                estimate (never below the current page) with no "~" marker. */}
             {(page > 0 || listings.length === PAGE_SIZE) && (
               <div className="flex items-center justify-center gap-4 mt-12">
                 <Button
@@ -1174,7 +1174,7 @@ const MarketplacePage = () => {
                 </Button>
                 <span className="text-sm font-medium text-muted-foreground tabular-nums">
                   Page {page + 1}
-                  {totalCount > 0 && ` of ~${Math.max(Math.ceil(totalCount / PAGE_SIZE), page + 1)}`}
+                  {totalCount > 0 && ` of ${Math.max(Math.ceil(totalCount / PAGE_SIZE), page + 1)}`}
                 </span>
                 <Button
                   variant="outline"
