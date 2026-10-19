@@ -57,7 +57,7 @@ const ShopBindersHubPage = () => {
         structuredData={[itemListLd, breadcrumbLd]}
       />
 
-      <div className="container mx-auto px-4 py-6 md:py-10">
+      <div className="container-default py-6 md:py-10">
         <Breadcrumb items={[
           { label: 'Home', path: '/' },
           { label: 'Shop', path: '/shop' },

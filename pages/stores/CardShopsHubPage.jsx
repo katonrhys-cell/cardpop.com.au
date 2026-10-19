@@ -46,7 +46,7 @@ const CardShopsHubPage = () => {
       />
 
       <section className="bg-card border-b border-border py-16 text-center">
-        <div className="container mx-auto px-4">
+        <div className="container-default">
           <Store className="w-12 h-12 text-primary mx-auto mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold mb-4">
             Australian Card Shops <span className="text-primary">& Shows</span>

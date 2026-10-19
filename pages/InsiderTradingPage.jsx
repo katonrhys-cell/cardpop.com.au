@@ -151,7 +151,7 @@ const InsiderTradingPage = () => {
       {/* Hero Section */}
       <div className="bg-secondary py-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593814681464-eef5af2b0628?auto=format&fit=crop&w=1920&q=80')] opacity-5 mix-blend-overlay bg-cover bg-center" />
-        <div className="max-w-[90rem] mx-auto px-4 relative z-10 flex flex-col items-center text-center">
+        <div className="container-default relative z-10 flex flex-col items-center text-center">
           <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mb-6 backdrop-blur-sm">
             <Store className="w-8 h-8 text-primary" />
           </div>

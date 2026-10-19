@@ -40,7 +40,7 @@ const CommunityPage = () => {
       {/* Hero Section */}
       <div className="bg-card py-16 relative overflow-hidden border-b border-border shadow-sm">
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593814681464-eef5af2b0628?auto=format&fit=crop&w=1920&q=80')] opacity-5 mix-blend-overlay bg-cover bg-center" />
-        <div className="max-w-[90rem] mx-auto px-4 relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
+        <div className="container-default relative z-10 flex flex-col md:flex-row items-center justify-between gap-12">
           <div className="flex-1 text-center md:text-left">
             <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold text-foreground mb-4 tracking-tight">
               Seller Directory

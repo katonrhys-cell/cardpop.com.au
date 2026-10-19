@@ -148,7 +148,6 @@ export const PALMS_OFF_CATEGORIES = {
     blurb: 'Rubber-backed Core Playmats in eight colours.',
     intro:
       'A playmat does two jobs: it gives sleeves a surface they can be picked up from without scraping a table, and it keeps a game area defined. The rubber backing stops the mat sliding mid-game, and the cloth top is what lets you get a fingernail under a card without dragging it across bare wood.',
-    choosing: 'These differ only by colour. Eight are available.',
     faqs: [
       { q: 'Can I wash a playmat?', a: 'Spot-clean with a damp cloth and let it air dry flat. Machine washing and heat will separate the cloth from the rubber backing.' },
       { q: 'Does it work for card photography?', a: 'A plain matte mat is a good neutral background and stops cards sliding while you shoot. Darker colours show dust more readily under direct light.' },

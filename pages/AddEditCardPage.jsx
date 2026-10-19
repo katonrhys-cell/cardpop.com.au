@@ -4335,7 +4335,7 @@ const AddEditCardPage = () => {
     <div className="bg-muted/30 font-sans">
       <Helmet><title>{isEdit ? 'Edit Card' : 'Add New Card'} | Card Pop</title></Helmet>
 
-      <div className="max-w-[90rem] mx-auto px-4 py-8 w-full">
+      <div className="container-default py-8 w-full">
         <nav className="flex items-center text-sm text-muted-foreground mb-6 font-medium">
           <Link to="/vault" className="hover:text-primary transition-colors">Vault</Link>
           <ChevronRight className="w-4 h-4 mx-2 opacity-50" />
