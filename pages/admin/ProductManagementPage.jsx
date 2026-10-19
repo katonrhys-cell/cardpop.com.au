@@ -52,9 +52,12 @@ const COLUMNS = [
 // shared link keeps the admin where they were.
 const PARAM_DEFAULTS = { q: '', section: 'all', category: 'all', status: 'all', brand: 'all', sort: 'title', dir: 'asc', view: 'sections' };
 
-// Which section / category headers the admin has collapsed in the Sections
-// view. A per-browser convenience, so it lives in localStorage (which can
-// throw or be empty in private windows — fall back to everything open).
+// Which section headers the admin has collapsed in the Sections view. A
+// per-browser convenience, so it lives in localStorage (which can throw or be
+// empty in private windows — fall back to every section open). Category rows
+// are not persisted: they start closed on every open so the page lands as a
+// compact index of sections and categories with their counts, and the admin
+// opens only the category they came for.
 const COLLAPSED_STORAGE_KEY = 'cardpop.admin.products.collapsed';
 const loadCollapsed = () => {
   try {
@@ -105,7 +108,8 @@ const ProductManagementPage = () => {
   // Built-in + admin-added categories, minus removed ones.
   const { groups: categoryGroups } = useShopCategoryGroups();
   const isMounted = useRef(true);
-  // Keys are `section` or `section/category`.
+  // Sections the admin has collapsed (persisted) and the `section/category`
+  // keys they have opened this visit (every category starts closed).
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const updateCollapsed = (fn) => setCollapsed((prev) => {
     const next = new Set(prev);
@@ -114,6 +118,12 @@ const ProductManagementPage = () => {
     return next;
   });
   const toggleCollapsed = (key) => updateCollapsed((set) => (set.has(key) ? set.delete(key) : set.add(key)));
+  const [openCategories, setOpenCategories] = useState(() => new Set());
+  const toggleCategory = (key) => setOpenCategories((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   const fetchProducts = async () => {
     if (!isMounted.current) return;
@@ -182,10 +192,28 @@ const ProductManagementPage = () => {
   const brandChoices = useMemo(() => brandOptions(products), [products]);
   const activeFilterCount = ['section', 'category', 'status', 'brand'].filter((k) => filters[k] !== 'all').length + (searchTerm ? 1 : 0);
 
-  const allGroupKeys = sections.flatMap(({ section, categories }) => [section, ...categories.map(({ category }) => `${section}/${category}`)]);
-  const anyCollapsed = allGroupKeys.some((k) => collapsed.has(k));
-  const collapseAll = () => updateCollapsed((set) => sections.forEach(({ section }) => set.add(section)));
-  const expandAll = () => updateCollapsed((set) => allGroupKeys.forEach((k) => set.delete(k)));
+  const allCategoryKeys = sections.flatMap(({ section, categories }) => categories.map(({ category }) => `${section}/${category}`));
+  // A search or filter has already narrowed the table to what the admin is
+  // looking for, so show those rows rather than making them open each
+  // category; clearing it returns to the compact closed-category index.
+  // Re-run when the filter changes and once the catalogue first arrives (a
+  // shared link can carry a filter before there are rows to open) — not on
+  // every refetch after an edit, which would snap the admin's open category shut.
+  const filterSignature = `${searchTerm}|${filters.section}|${filters.category}|${filters.status}|${filters.brand}`;
+  const hasProducts = products.length > 0;
+  useEffect(() => {
+    setOpenCategories(activeFilterCount > 0 ? new Set(allCategoryKeys) : new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSignature, hasProducts]);
+  const anyCollapsed = sections.some(({ section }) => collapsed.has(section)) || allCategoryKeys.some((k) => !openCategories.has(k));
+  const collapseAll = () => {
+    updateCollapsed((set) => sections.forEach(({ section }) => set.add(section)));
+    setOpenCategories(new Set());
+  };
+  const expandAll = () => {
+    updateCollapsed((set) => sections.forEach(({ section }) => set.delete(section)));
+    setOpenCategories(new Set(allCategoryKeys));
+  };
 
   const toggleSort = (col) => {
     if (sortKey === col.key) setParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' });
@@ -435,12 +463,12 @@ const ProductManagementPage = () => {
                         </TableRow>
                         {sectionOpen && categories.map(({ category, products: rows }) => {
                           const key = `${section}/${category}`;
-                          const categoryOpen = !collapsed.has(key);
+                          const categoryOpen = openCategories.has(key);
                           return (
                             <React.Fragment key={key}>
                               <TableRow className="bg-muted/20 hover:bg-muted/40">
                                 <TableCell colSpan={10} className="p-0">
-                                  <button type="button" onClick={() => toggleCollapsed(key)} aria-expanded={categoryOpen}
+                                  <button type="button" onClick={() => toggleCategory(key)} aria-expanded={categoryOpen}
                                     className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 text-left text-xs font-semibold text-muted-foreground">
                                     <ChevronRight aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 transition-transform ${categoryOpen ? 'rotate-90' : ''}`} />
                                     {category} · {rows.length}
