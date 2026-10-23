@@ -29,6 +29,8 @@ const setAuth = (overrides) => {
     trialActive: false,
     trialDaysLeft: null,
     subscriptionTier: 'free',
+    subscriptionStatus: 'none',
+    isAdmin: false,
     ...overrides,
   };
 };
@@ -79,5 +81,33 @@ describe('AccountPlanBanner', () => {
     expect(screen.getByText(/top plan/i)).toBeInTheDocument();
     const ladder = screen.getByRole('list', { name: 'Plan options' });
     expect(ladder.querySelector('[aria-current="true"]')).toHaveTextContent('Ultimate');
+  });
+
+  // Every admin holds Ultimate free (subscription_status 'grandfathered'): the
+  // card says it is included rather than quoting the $150/mo they never pay.
+  it('tells an admin their Ultimate plan is complimentary, not $150/mo', () => {
+    setAuth({ isPro: true, isAdmin: true, subscriptionTier: 'ultimate', subscriptionStatus: 'grandfathered' });
+    renderBanner();
+    expect(screen.getByText('CardPop Ultimate')).toBeInTheDocument();
+    expect(screen.getByText(/complimentary/i)).toBeInTheDocument();
+    expect(screen.getByText(/included with your admin access/i)).toBeInTheDocument();
+    const current = screen.getByRole('list', { name: 'Plan options' }).querySelector('[aria-current="true"]');
+    expect(current).toHaveTextContent('Included free');
+    expect(current).not.toHaveTextContent('$150/mo');
+    expect(screen.queryByRole('link', { name: /upgrade your plan/i })).toBeNull();
+  });
+
+  it('describes a non-admin complimentary membership as covered by CardPop', () => {
+    setAuth({ isPro: true, subscriptionTier: 'ultimate', subscriptionStatus: 'grandfathered' });
+    renderBanner();
+    expect(screen.getByText(/cardpop covers this membership/i)).toBeInTheDocument();
+    expect(screen.queryByText(/admin access/i)).toBeNull();
+  });
+
+  it('keeps the trial countdown for a paying member', () => {
+    setAuth({ isPro: true, subscriptionTier: 'pro', subscriptionStatus: 'trialing', trialActive: true, trialDaysLeft: 12 });
+    renderBanner();
+    expect(screen.getByText(/12 trial days left/i)).toBeInTheDocument();
+    expect(screen.queryByText(/complimentary/i)).toBeNull();
   });
 });

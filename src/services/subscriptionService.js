@@ -20,6 +20,9 @@ const isEntitledStatus = (status) => ['trialing', 'active'].includes(status);
  */
 export const COMPLIMENTARY_STATUS = 'grandfathered';
 
+/** The tier every admin holds, free — the top of config/plans.js PLAN_ORDER. */
+export const ADMIN_COMPLIMENTARY_TIER = 'ultimate';
+
 /**
  * Which paid tier a Stripe subscription buys. The tier is stamped into the
  * subscription metadata at checkout; for subscriptions created before the
@@ -323,6 +326,107 @@ export async function changeStripeSubscriptionTier(userId, tier) {
   await applyStripeSubscription(updated);
   logger.info(`[SUB] ${userId} upgraded ${profile.subscription_tier} → ${tier} (stripe ${updated.id})`);
   return { tier: tierFromStripeSubscription(updated), status: mapStripeStatus(updated.status) };
+}
+
+/**
+ * Admins hold the complimentary Ultimate plan — a rule, not a per-account
+ * grant (the `trg_sync_admin_complimentary_membership` trigger in
+ * 20261023032430 is the database half: it flips the plan columns whenever
+ * `is_admin` is written, and backfilled every existing admin). This is the
+ * server half — the part a trigger can't do: an admin must never be CHARGED,
+ * so any live Stripe subscription the newly promoted account was paying for is
+ * cancelled, immediately and without a final invoice, before the profile is
+ * marked complimentary (once it is, the provider webhooks ignore the account
+ * and a still-running subscription would bill a plan the profile no longer
+ * reads). The profile columns are written here too so the grant doesn't wait
+ * on the migration landing; the writes agree with the trigger.
+ *
+ * Called by `PATCH /admin/users/:id/role` on promotion. Idempotent.
+ * @returns {{ cancelledStripeSubscription: string|null }}
+ */
+export async function grantAdminComplimentaryMembership(userId) {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('subscription_status, subscription_provider, subscription_tier, stripe_subscription_id, paypal_subscription_id')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (!profile) throw httpError(404, 'Profile not found.');
+
+  let cancelledStripeSubscription = null;
+  if (profile.stripe_subscription_id && profile.subscription_status !== COMPLIMENTARY_STATUS) {
+    try {
+      const current = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+      if (current && current.status !== 'canceled') {
+        await stripe.subscriptions.cancel(current.id, { invoice_now: false, prorate: false });
+        cancelledStripeSubscription = current.id;
+        logger.info(`[SUB] Cancelled Stripe ${current.id} for ${userId} — admins hold Ultimate free`);
+      }
+    } catch (err) {
+      // A subscription Stripe no longer knows about has nothing left to bill.
+      if (!isStripeObjectMissing(err)) throw err;
+      logger.warn(`[SUB] Stripe subscription ${profile.stripe_subscription_id} for ${userId} no longer exists — nothing to cancel`);
+    }
+  }
+  if (profile.paypal_subscription_id && ['trialing', 'active', 'past_due'].includes(profile.subscription_status)) {
+    // PayPal billing is switched off (config/subscription.js PAYMENT_PROVIDERS)
+    // and the client here can't cancel at PayPal; say so loudly rather than
+    // silently leaving a billed subscription behind.
+    logger.error(`[SUB] ${userId} is now an admin but has a live PayPal subscription ${profile.paypal_subscription_id} — cancel it in the PayPal dashboard`);
+  }
+
+  const { error: updateError } = await supabase
+    .from('profiles')
+    .update({
+      subscription_tier:      ADMIN_COMPLIMENTARY_TIER,
+      subscription_status:    COMPLIMENTARY_STATUS,
+      trial_ends_at:          null,
+      // The cancelled subscription is finished with; a stale id would only
+      // confuse the next change-tier / status read.
+      ...(cancelledStripeSubscription ? { stripe_subscription_id: null } : {}),
+    })
+    .eq('id', userId);
+  if (updateError) throw updateError;
+
+  logger.info(`[SUB] ${userId} → complimentary ${ADMIN_COMPLIMENTARY_TIER} (admin)`);
+  return { cancelledStripeSubscription };
+}
+
+/**
+ * The reverse of grantAdminComplimentaryMembership, for a demoted admin: the
+ * complimentary plan goes with the role, back to Hobby. Only a complimentary
+ * (grandfathered) membership is touched — a real paid subscription is left
+ * exactly as it is. Mirrors the trigger's demotion branch. Idempotent.
+ */
+export async function revokeAdminComplimentaryMembership(userId) {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ subscription_tier: 'free', subscription_status: 'none' })
+    .eq('id', userId)
+    .eq('subscription_status', COMPLIMENTARY_STATUS);
+  if (error) throw error;
+  logger.info(`[SUB] ${userId} → Hobby (complimentary membership revoked with admin access)`);
+}
+
+/**
+ * Refuse to sell a paid plan to an account that already holds the top tier for
+ * free: an admin, or any complimentary (grandfathered) member. Before this the
+ * checkout happily created a Stripe subscription the profile then ignored —
+ * a bill for nothing. Throws a 409 the checkout routes relay as-is.
+ */
+export async function assertCanStartPaidMembership(userId) {
+  const { data: profile, error } = await supabase
+    .from('profiles')
+    .select('is_admin, subscription_status')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  if (profile?.is_admin) {
+    throw httpError(409, 'Admin accounts include the Ultimate plan at no charge — there is nothing to buy.');
+  }
+  if (profile?.subscription_status === COMPLIMENTARY_STATUS) {
+    throw httpError(409, 'Your complimentary membership is managed by CardPop — there is nothing to buy.');
+  }
 }
 
 export async function getSubscriptionStatus(userId) {

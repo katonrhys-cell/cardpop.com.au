@@ -38,10 +38,52 @@ A tier can be granted with no Stripe/PayPal subscription behind it by setting
 is in `ENTITLED_STATUSES`, so the app treats the account as a paying member of
 that tier, and **no provider webhook ever emits it**, so nothing external flips
 it back. Both `subscription_tier` and `subscription_status` are locked against
-self-writes, so the grant has to be made service-side — by migration, which is
-the repeatable, production-applied way (never the SQL editor; see CLAUDE.md).
+self-writes, so the grant has to be made service-side.
 
-Current grants (all **Ultimate**, the top tier, at no cost):
+### Every admin holds Ultimate, free
+
+Admin access **includes the Ultimate plan at no charge**. This is a rule, not a
+per-account grant (`20261023032430_admins_hold_complimentary_ultimate.sql`):
+
+- **Database** — `trg_sync_admin_complimentary_membership` (BEFORE INSERT /
+  UPDATE OF `is_admin` on `profiles`) sets `subscription_tier = 'ultimate'`,
+  `subscription_status = 'grandfathered'` and clears `trial_ends_at` whenever
+  `is_admin` is written as `true`, and on demotion (`true → false`) returns a
+  *complimentary* member to Hobby (`'free'` / `'none'`). A real paid
+  subscription (any other status) is never touched by a demotion. The
+  migration backfilled every existing admin. Test:
+  `tests/db/run-admin-membership-migration.sh`.
+- **Server** — the part a trigger can't do: an admin must never be *billed*.
+  `PATCH /admin/users/:id/role` (Admin → Users → Make Admin) calls
+  `grantAdminComplimentaryMembership()` (`src/services/subscriptionService.js`)
+  **before** flipping `is_admin`: it cancels any live Stripe subscription the
+  account was paying for (immediately, `invoice_now: false`, so no final
+  charge), clears `stripe_subscription_id`, and writes the plan columns. If
+  the cancel fails the promotion fails with it — an admin left paying for a
+  plan they now hold free is exactly the bill the rule exists to prevent.
+  Demotion calls `revokeAdminComplimentaryMembership()`. A live **PayPal**
+  subscription can't be cancelled from here (PayPal billing is switched off);
+  it is logged as an error to cancel in the PayPal dashboard.
+- **Checkout** — `POST /subscription/stripe/checkout` and
+  `/subscription/paypal/create` answer **409** for an admin or any
+  complimentary member (`assertCanStartPaidMembership()`), so a plan can't be
+  bought by an account that already holds the top tier for free. (Before this
+  the checkout created a Stripe subscription the profile then ignored — a bill
+  for nothing.) `/stripe/change-tier` already refused complimentary members.
+- **UI** — Account → Dashboard (`components/AccountPlanBanner.jsx`) and Account
+  → Membership show "complimentary" / "Included free" instead of the $150/mo
+  the member never pays, and offer no trial or upgrade.
+
+If an existing admin was mid-way through a paid Stripe subscription when the
+migration landed, the backfill granted Ultimate but the DB could not cancel
+Stripe — find them with
+`select id, stripe_subscription_id from profiles where is_admin and stripe_subscription_id is not null`
+and cancel in the Stripe dashboard.
+
+### Per-account comps
+
+The earlier per-email grants are still in the repo and still valid, and are
+now also covered by the admin rule (all three accounts are admins):
 
 | Account | Migration |
 |---|---|
@@ -49,18 +91,17 @@ Current grants (all **Ultimate**, the top tier, at no cost):
 | `rfkates09@hotmail.com` (owner) | `20261004064733_grant_admin_accounts_ultimate_membership.sql` |
 | `admin@cardpop.com.au` (platform store + admin login) | `20260806064711_…` (Premium) raised to Ultimate by `20261004064733_…` |
 
-To comp another account, add a new migration in the same shape (keyed on
-`lower(auth.users.email)`, idempotent). `applyStripeSubscription` /
+To comp a **non-admin** account, add a new migration in the same shape (keyed
+on `lower(auth.users.email)`, idempotent). `applyStripeSubscription` /
 `applyPaypalSubscription` (`src/services/subscriptionService.js`) skip any
 profile whose status is `grandfathered` (`COMPLIMENTARY_STATUS`), so a provider
 event about a comped account — a stray cancel, a PayPal `create` — can never
-downgrade it. To *revoke* a comp, a migration sets the status back to `'none'`
-and the tier to `'free'`.
+downgrade it. To *revoke* a non-admin comp, a migration sets the status back to
+`'none'` and the tier to `'free'` (an admin's comp is revoked by removing admin
+access).
 
-Note that being an admin (`profiles.is_admin`) does **not** by itself confer a
-tier — admin access and membership are separate grants. The only admin
-exemptions in the tier system are the monthly listing quota trigger and the
-Whatnot-shows insert policy.
+Besides the plan itself, admins are exempt from the monthly listing quota
+trigger and the Whatnot-shows insert policy.
 
 ## Where to change the offer
 

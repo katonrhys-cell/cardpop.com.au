@@ -31,7 +31,11 @@ Why `subscription_status = 'grandfathered'`: it is the status
 `config/subscription.js` treats as entitled with no Stripe/PayPal subscription
 behind it, and **no provider webhook ever emits it** — so nothing external will
 flip it back. Same trick as the owner account
-(`20260802062300_grant_owner_ultimate_membership.sql`).
+(`20260802062300_grant_owner_ultimate_membership.sql`). Since
+`20261023032430_admins_hold_complimentary_ultimate.sql` this is the rule for
+**every** admin — `is_admin = true` grants complimentary Ultimate by trigger,
+so this account would hold it even without its own migration (see
+`docs/SUBSCRIPTION_SETUP.md` → Complimentary memberships).
 
 ## How it gets provisioned
 
@@ -87,12 +91,13 @@ fine, but proceeds accumulate in the seller wallet instead of paying out — see
   address (`docs/email.md`). Password resets, Supabase Auth mail and buyer
   replies all land there. The script pre-confirms the email so provisioning
   doesn't depend on the mailbox, but recovery does.
-- **Don't subscribe from this account.** There is nothing to buy — it already
-  holds the top tier. `applyStripeSubscription` / `applyPaypalSubscription`
-  skip any profile whose `subscription_status` is `grandfathered`
-  (`COMPLIMENTARY_STATUS` in `src/services/subscriptionService.js`), so a stray
-  provider event can't downgrade the grant; a real checkout would just bill a
-  subscription the profile ignores.
+- **It can't subscribe.** There is nothing to buy — it already holds the top
+  tier — and the paid checkout routes answer 409 to an admin or complimentary
+  member (`assertCanStartPaidMembership()`). `applyStripeSubscription` /
+  `applyPaypalSubscription` skip any profile whose `subscription_status` is
+  `grandfathered` (`COMPLIMENTARY_STATUS` in
+  `src/services/subscriptionService.js`), so a stray provider event can't
+  downgrade the grant either.
 - **It is a shared admin credential.** It has the full admin panel: user data,
   refunds, listings moderation. Prefer a long random password in a password
   manager over a memorable one, and turn on MFA (Account → Security) once you're

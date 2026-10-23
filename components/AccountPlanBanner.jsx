@@ -16,9 +16,16 @@ import { PLANS, PLAN_ORDER, PLAN_HOBBY, planKeyFromTier, planRank, isTopPlan, ne
  *     member switches tier in place and a Hobby member starts a trial
  *   • nudges Hobby users to verify their ID (to unlock selling/trading) and
  *     sellers to keep a card on file for one-tap buying
+ *   • a complimentary membership (`subscription_status === 'grandfathered'` —
+ *     every admin holds Ultimate this way, free) says so instead of quoting a
+ *     price the member will never be charged
  */
 const AccountPlanBanner = () => {
-  const { currentUser, isPro, isIdentityVerified, hasSavedCard, trialActive, trialDaysLeft, subscriptionTier } = useAuth();
+  const {
+    currentUser, isPro, isAdmin, isIdentityVerified, hasSavedCard, trialActive, trialDaysLeft,
+    subscriptionTier, subscriptionStatus,
+  } = useAuth();
+  const complimentary = isPro && subscriptionStatus === 'grandfathered';
   const currentPlanKey = isPro ? planKeyFromTier(subscriptionTier) : PLAN_HOBBY;
   const currentPlan = PLANS[currentPlanKey];
   const currentRank = planRank(currentPlanKey);
@@ -52,11 +59,19 @@ const AccountPlanBanner = () => {
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your plan</p>
             <p className="font-heading text-lg font-bold text-foreground">
               {isPro ? `CardPop ${currentPlan.name}` : 'Hobby (free)'}
-              {trialActive && trialDaysLeft != null && (
+              {complimentary ? (
+                <span className="ml-2 text-sm font-semibold text-brand-red">· complimentary</span>
+              ) : trialActive && trialDaysLeft != null && (
                 <span className="ml-2 text-sm font-semibold text-brand-red">· {trialDaysLeft} trial {trialDaysLeft === 1 ? 'day' : 'days'} left</span>
               )}
             </p>
-            {topPlan ? (
+            {complimentary ? (
+              <p className="text-sm text-muted-foreground">
+                {isAdmin
+                  ? 'Included with your admin access — unlimited listings and every display style, and you are never billed for it.'
+                  : 'CardPop covers this membership — you are never billed for it.'}
+              </p>
+            ) : topPlan ? (
               <p className="text-sm text-muted-foreground">You're on our top plan — unlimited listings and every display style.</p>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -103,7 +118,7 @@ const AccountPlanBanner = () => {
                   )}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {plan.priceAud ? `$${plan.priceAud}/mo` : 'Free'}
+                  {isCurrent && complimentary ? 'Included free' : plan.priceAud ? `$${plan.priceAud}/mo` : 'Free'}
                   {' · '}
                   {plan.limits.listingsPerMonth == null ? 'Unlimited listings' : `${plan.limits.listingsPerMonth} listings/mo`}
                 </span>

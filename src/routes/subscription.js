@@ -11,6 +11,7 @@ import {
   mapPaypalStatus,
   getSubscriptionStatus,
   changeStripeSubscriptionTier,
+  assertCanStartPaidMembership,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -57,6 +58,9 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
     const userId = req.user.id;
+    // Admins hold Ultimate free and complimentary members already have their
+    // plan — never bill either (a subscription the profile ignores).
+    await assertCanStartPaidMembership(userId);
     const customerId = await getOrCreateStripeCustomer(userId, req.user.email);
 
     // Partner referral: the partner's % comes off the first invoice (a 'once'
@@ -112,6 +116,7 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     logger.info(`[SUB] Stripe subscription checkout created for ${userId}: ${session.id}`);
     res.json({ url: session.url });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error(`[SUB] /stripe/checkout error: ${err.message}`);
     res.status(500).json({ error: 'Could not start Stripe checkout' });
   }
@@ -148,6 +153,7 @@ router.post('/paypal/create', authMiddleware, async (req, res) => {
     const badPaypalUrl = invalidReturnUrl({ returnUrl, cancelUrl });
     if (badPaypalUrl) return res.status(400).json({ error: badPaypalUrl });
 
+    await assertCanStartPaidMembership(req.user.id);
     const tier = normalizePaidTier(req.body?.tier);
     const { id, approveUrl } = await createPaypalSubscription({
       userId: req.user.id,
@@ -169,6 +175,7 @@ router.post('/paypal/create', authMiddleware, async (req, res) => {
     logger.info(`[SUB] PayPal subscription created for ${req.user.id}: ${id}`);
     res.json({ id, approveUrl });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error(`[SUB] /paypal/create error: ${err.message}`);
     res.status(500).json({ error: 'Could not start PayPal checkout' });
   }

@@ -9,6 +9,8 @@ const mockSupabase = vi.hoisted(() => ({
 const mockIsAdminUser = vi.hoisted(() => vi.fn());
 const mockPayoutSeller = vi.hoisted(() => vi.fn());
 const mockSendOrderShipped = vi.hoisted(() => vi.fn());
+const mockGrantMembership = vi.hoisted(() => vi.fn());
+const mockRevokeMembership = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
 vi.mock('../../src/utils/stripeClient.js', () => ({ default: { transfers: { create: vi.fn() } } }));
@@ -23,6 +25,12 @@ vi.mock('../../src/services/refundAmounts.js', async (importOriginal) => ({
   getRefundPolicyOptions: vi.fn(async () => ({ retentionPct: 50, retainProcessingFee: true })),
 }));
 vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: mockSendOrderShipped }));
+// The complimentary-Ultimate half of the role change has its own test
+// (subscription-admin-complimentary.test.js); here it only needs to be called.
+vi.mock('../../src/services/subscriptionService.js', () => ({
+  grantAdminComplimentaryMembership: mockGrantMembership,
+  revokeAdminComplimentaryMembership: mockRevokeMembership,
+}));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
@@ -66,6 +74,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockIsAdminUser.mockResolvedValue(true);
   mockPayoutSeller.mockResolvedValue({ status: 'transferred', transferId: 'tr_x' });
+  mockGrantMembership.mockResolvedValue({ cancelledStripeSubscription: null });
+  mockRevokeMembership.mockResolvedValue(undefined);
 });
 
 // ─── admin gate ────────────────────────────────────────────────────────────────
@@ -90,6 +100,34 @@ describe('PATCH /users/:userId/role', () => {
     const res = await request(app).patch('/admin/users/u2/role').send({ is_admin: true });
     expect(res.status).toBe(200);
     expect(res.body.user).toEqual({ id: 'u2', is_admin: true });
+  });
+
+  // Admin access includes the Ultimate plan free: promotion grants it (cancelling
+  // any paid subscription first, before is_admin flips), demotion takes it away.
+  it('grants the complimentary Ultimate plan before promoting, and reports a cancelled subscription', async () => {
+    mockGrantMembership.mockResolvedValue({ cancelledStripeSubscription: 'sub_paid' });
+    queueFrom(makeBuilder({ data: { id: 'u2', is_admin: true }, error: null }), makeBuilder());
+    const res = await request(app).patch('/admin/users/u2/role').send({ is_admin: true });
+    expect(res.status).toBe(200);
+    expect(res.body.cancelledStripeSubscription).toBe('sub_paid');
+    expect(mockGrantMembership).toHaveBeenCalledWith('u2');
+    expect(mockGrantMembership.mock.invocationCallOrder[0]).toBeLessThan(mockSupabase.from.mock.invocationCallOrder[0]);
+    expect(mockRevokeMembership).not.toHaveBeenCalled();
+  });
+
+  it('revokes the complimentary plan on demotion', async () => {
+    queueFrom(makeBuilder({ data: { id: 'u2', is_admin: false }, error: null }), makeBuilder());
+    const res = await request(app).patch('/admin/users/u2/role').send({ is_admin: false });
+    expect(res.status).toBe(200);
+    expect(mockRevokeMembership).toHaveBeenCalledWith('u2');
+    expect(mockGrantMembership).not.toHaveBeenCalled();
+  });
+
+  it('does not promote when the plan grant fails (the admin would be left paying)', async () => {
+    mockGrantMembership.mockRejectedValue(new Error('stripe down'));
+    const res = await request(app).patch('/admin/users/u2/role').send({ is_admin: true });
+    expect(res.status).toBe(500);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
   });
 
   it('requires a boolean is_admin', async () => {
