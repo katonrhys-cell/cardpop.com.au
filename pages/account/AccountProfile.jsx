@@ -4,6 +4,7 @@ import { Save, Upload, Trash2, Eye, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { profilePhotoUrl, profilePhotoColumns } from '@/utils/profileAvatar.js';
 import { compressImage } from '@/utils/compressImage.js';
+import { AVATAR_MAX_BYTES, checkImageFile, describeUploadError } from '@/utils/storageUploadError.js';
 import { isVerified } from '@/utils/verification.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
+import UploadErrorDialog from '@/components/account/UploadErrorDialog.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const AccountProfile = () => {
@@ -34,6 +36,10 @@ const AccountProfile = () => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [removeAvatar, setRemoveAvatar] = useState(false);
+  // Why the last save failed — shown in a dialog the user has to dismiss,
+  // because a toast reading "new row violates row level security" looked
+  // like an image-size problem and vanished before anyone could read it.
+  const [saveError, setSaveError] = useState(null);
 
   useEffect(() => {
     if (currentUser) {
@@ -62,12 +68,10 @@ const AccountProfile = () => {
   const handleAvatarChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please upload a valid image file.');
-        return;
-      }
-      if (file.size > 20 * 1024 * 1024) {
-        toast.error('Image exceeds 20MB limit.');
+      const problem = checkImageFile(file, { what: 'profile photo' });
+      if (problem) {
+        setSaveError(problem);
+        e.target.value = '';
         return;
       }
       setAvatarFile(file);
@@ -93,12 +97,22 @@ const AccountProfile = () => {
 
       if (avatarFile) {
         const compressed = await compressImage(avatarFile, { maxDimension: 512, quality: 0.85 });
+        if (compressed.size > AVATAR_MAX_BYTES) {
+          // Say so here rather than letting the bucket 413 — same dialog either way.
+          setSaveError(describeUploadError({ message: 'The object exceeded the maximum allowed size', statusCode: '413' }, { what: 'profile photo', sizeBytes: compressed.size }));
+          return;
+        }
         const ext = compressed.name.split('.').pop();
         // Timestamped name (not a fixed per-user path) so the file is
-        // immutable and can carry a long-lived cache header.
+        // immutable and can carry a long-lived cache header. The bucket's
+        // INSERT policy admits `avatars/<uid>-…` — keep the two in step
+        // (supabase/migrations/20261023231611_fix_avatars_bucket_upload_policy.sql).
         const path = `avatars/${currentUser.id}-${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
-        if (uploadErr) throw uploadErr;
+        if (uploadErr) {
+          setSaveError(describeUploadError(uploadErr, { what: 'profile photo', sizeBytes: compressed.size }));
+          return;
+        }
         avatar_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeAvatar) {
         avatar_url = null;
@@ -127,7 +141,7 @@ const AccountProfile = () => {
       // back into AuthContext — refresh it so the header/avatar update now.
       Promise.resolve(refetchProfile?.()).catch(() => {});
     } catch (err) {
-      toast.error(err.message || 'Failed to update profile.');
+      setSaveError(describeUploadError(err, { what: 'profile photo' }));
     } finally {
       setLoading(false);
     }
@@ -188,6 +202,8 @@ const AccountProfile = () => {
         </Dialog>
       }
     >
+      <UploadErrorDialog error={saveError} onClose={() => setSaveError(null)} />
+
       {/* ── Profile form ──────────────────────────────────────────────────── */}
       <form onSubmit={handleSubmit}>
         <Card className="shadow-sm overflow-hidden">
@@ -229,7 +245,7 @@ const AccountProfile = () => {
 
               <div className="flex-1 space-y-1 mt-2">
                 <Label className="font-bold text-foreground">Profile Photo</Label>
-                <p className="text-sm text-muted-foreground font-medium">Recommended 400×400px. JPG, PNG or WEBP. Max 20MB.</p>
+                <p className="text-sm text-muted-foreground font-medium">Recommended 400×400px. JPG, PNG or WEBP, up to 20MB — it's resized to 512px before it's stored.</p>
               </div>
             </div>
 
