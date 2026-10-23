@@ -5,6 +5,7 @@ import { CheckCircle2 } from 'lucide-react';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { isVerified } from '@/utils/verification.js';
 import { Button } from '@/components/ui/button';
+import { hasStorefront } from '@/config/plans.js';
 
 const FeaturedSellerCard = ({ seller }) => {
   const navigate = useNavigate();
@@ -22,9 +23,13 @@ const FeaturedSellerCard = ({ seller }) => {
     : seller.location_state || null;
 
   // Dealers (sole traders) have their own store page resolved by store_slug
-  // (legacy UUID also works); everyone else uses the public seller profile,
-  // which is resolved by profile id.
-  const storePath = seller.is_sole_trader
+  // (legacy UUID also works) — but a store page is a paid-membership perk and
+  // answers "Store Unavailable" for a Hobby account, so those fall back to the
+  // public seller profile, as does everyone else (resolved by profile id).
+  const storePath = seller.is_sole_trader && hasStorefront({
+    subscriptionTier: seller.subscription_tier,
+    subscriptionStatus: seller.subscription_status,
+  })
     ? `/dealer/${seller.store_slug || seller.id}`
     : `/seller/${seller.id}`;
 
