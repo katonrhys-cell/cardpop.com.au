@@ -11,6 +11,9 @@
     "api/sitemap.js": {
       "maxDuration": 10
     },
+    "api/merchant-feed.js": {
+      "maxDuration": 10
+    },
     "api/prerender.js": {
       "maxDuration": 10
     },
@@ -58,6 +61,10 @@
     {
       "source": "/sitemap.xml",
       "destination": "/api/sitemap"
+    },
+    {
+      "source": "/merchant-feed.tsv",
+      "destination": "/api/merchant-feed"
     },
     {
       "source": "/",
