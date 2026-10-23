@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, Check, CalendarDays, Tv2 } from 'lucide-react';
+import { LogOut, Settings, Package, ArrowRightLeft, ShieldAlert, LayoutDashboard, Check, CalendarDays, Tv2, Store } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Button } from '@/components/ui/button';
@@ -139,6 +139,12 @@ const VaultDropdown = ({ isMobile = false }) => {
           <Link to="/account/shows" className="flex items-center w-full">
             <Tv2 className="mr-2 h-4 w-4" />
             <span>My Shows</span>
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="cursor-pointer py-2.5">
+          <Link to="/account/sole-trader" className="flex items-center w-full">
+            <Store className="mr-2 h-4 w-4" />
+            <span>Sole Trader Store</span>
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="cursor-pointer py-2.5">
