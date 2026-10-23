@@ -14,14 +14,14 @@ import { PLANS, planKeyFromTier, isTopPlan, upgradePlansFor } from '@/config/pla
 const statusLabel = (subscriptionStatus, tierName) => ({
   trialing:      { label: `${tierName} trial active`, tone: 'text-brand-red', Icon: Sparkles },
   active:        { label: `CardPop ${tierName} active`, tone: 'text-green-600', Icon: BadgeCheck },
-  grandfathered: { label: `CardPop ${tierName} active`, tone: 'text-green-600', Icon: BadgeCheck },
+  grandfathered: { label: `CardPop ${tierName} · complimentary`, tone: 'text-green-600', Icon: BadgeCheck },
   past_due:      { label: 'Payment overdue',   tone: 'text-yellow-600', Icon: Clock },
   canceled:      { label: 'Membership cancelled', tone: 'text-muted-foreground', Icon: Clock },
   none:          { label: 'Hobby (free) plan', tone: 'text-muted-foreground', Icon: Clock },
 }[subscriptionStatus]);
 
 const AccountMembership = () => {
-  const { isPro, subscriptionStatus, subscriptionTier, trialDaysLeft, refetchProfile } = useAuth();
+  const { isPro, isAdmin, subscriptionStatus, subscriptionTier, trialDaysLeft, refetchProfile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [activating, setActivating] = useState(false);
   const [welcomeCode, setWelcomeCode] = useState('');
@@ -162,6 +162,13 @@ const AccountMembership = () => {
             {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left on your free trial.
           </p>
         )}
+        {complimentary && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isAdmin
+              ? 'Every CardPop admin holds the Ultimate plan at no charge — it comes with your admin access, and you are never billed for it.'
+              : 'CardPop covers this membership — you are never billed for it.'}
+          </p>
+        )}
       </div>
 
       {isPro && (
@@ -173,7 +180,8 @@ const AccountMembership = () => {
                 You're on our top plan
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Ultimate includes unlimited listings and every display style — there's nothing above it.
+                Ultimate includes unlimited listings and every display style — there's nothing above it
+                {complimentary ? ', and nothing to pay' : ''}.
               </p>
             </>
           ) : (
