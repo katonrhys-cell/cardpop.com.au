@@ -71,9 +71,9 @@ describe('ProductManagementPage filters, sorting and sections', () => {
     renderPage();
     await screen.findByText('Protection');
     await user.click(screen.getByRole('button', { name: /List/ }));
-    await user.click(screen.getByRole('button', { name: /^Price/ }));
+    await user.click(screen.getByRole('button', { name: /^Sale price/ }));
     expect(productNames()).toEqual(['Top Loaders 25 Pack', 'Palms Off Top Loaders 55pt', 'Bubble Mailers 10 Pack']);
-    await user.click(screen.getByRole('button', { name: /^Price/ }));
+    await user.click(screen.getByRole('button', { name: /^Sale price/ }));
     expect(productNames()).toEqual(['Bubble Mailers 10 Pack', 'Palms Off Top Loaders 55pt', 'Top Loaders 25 Pack']);
   });
 

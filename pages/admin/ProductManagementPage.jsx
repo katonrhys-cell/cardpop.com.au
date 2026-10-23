@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload, ExternalLink } from 'lucide-react';
+import { Search, Plus, Save, DollarSign, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload, ExternalLink } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -40,7 +40,7 @@ const COLUMNS = [
   { key: 'title', label: 'Product Name' },
   { key: 'sku', label: 'SKU' },
   { key: 'category', label: 'Category' },
-  { key: 'price', label: 'Price', numeric: true },
+  { key: 'price', label: 'Sale price', numeric: true },
   { key: 'rrp', label: 'RRP', numeric: true },
   { key: 'cost', label: 'Cost (inc)', numeric: true },
   { key: 'margin', label: 'Margin', numeric: true },
@@ -172,6 +172,91 @@ const ProductManagementPage = () => {
     }
   };
 
+  // ── Inline price editing ────────────────────────────────────────────────
+  // `drafts[id]` holds only the fields the admin has touched, as input
+  // strings: { price, rrp, cost } (cost = inc GST). A field equal to the saved
+  // value is dropped, so the Save button counts real changes only.
+  const [priceEdit, setPriceEdit] = useState(false);
+  const [drafts, setDrafts] = useState({});
+  const [saving, setSaving] = useState(false);
+  const money = (v) => (v == null || v === '' ? '' : Number(v).toFixed(2));
+  const savedField = (p, field) => field === 'price' ? money(p.price_aud)
+    : field === 'rrp' ? money(p.retail_price_aud)
+    : money(costs[p.id]?.wholesale_inc_gst_aud);
+  const fieldValue = (p, field) => drafts[p.id]?.[field] ?? savedField(p, field);
+  const setDraft = (p, field, value) => setDrafts((prev) => {
+    const row = { ...prev[p.id], [field]: value };
+    const same = (f) => row[f] === undefined || row[f].trim() === savedField(p, f)
+      || (row[f].trim() !== '' && savedField(p, f) !== '' && Number(row[f]) === Number(savedField(p, f)));
+    for (const f of ['price', 'rrp', 'cost']) if (same(f)) delete row[f];
+    const next = { ...prev };
+    if (Object.keys(row).length) next[p.id] = row; else delete next[p.id];
+    return next;
+  });
+  const dirtyCount = Object.keys(drafts).length;
+  const leavePriceEdit = () => {
+    if (dirtyCount && !window.confirm(`Discard ${dirtyCount} unsaved price change${dirtyCount === 1 ? '' : 's'}?`)) return;
+    setDrafts({});
+    setPriceEdit(false);
+  };
+
+  const savePrices = async () => {
+    const parsed = [];
+    for (const [id, d] of Object.entries(drafts)) {
+      const p = products.find((x) => x.id === id);
+      const row = { id, title: p?.title };
+      for (const f of ['price', 'rrp', 'cost']) {
+        if (d[f] === undefined) continue;
+        const raw = d[f].trim();
+        const n = raw === '' ? null : Number(raw);
+        if (n !== null && (Number.isNaN(n) || n < 0)) return toast.error(`"${p?.title}": ${f === 'price' ? 'sale price' : f === 'rrp' ? 'RRP' : 'cost'} must be a valid amount`);
+        if (f === 'price' && n === null) return toast.error(`"${p?.title}": a sale price is required`);
+        row[f] = n;
+      }
+      parsed.push(row);
+    }
+    setSaving(true);
+    const failed = [];
+    const now = new Date().toISOString();
+    const updatedProducts = {};
+    const updatedCosts = {};
+    await Promise.all(parsed.map(async (r) => {
+      try {
+        const patch = {};
+        if ('price' in r) patch.price_aud = r.price;
+        if ('rrp' in r) patch.retail_price_aud = r.rrp;
+        if (Object.keys(patch).length) {
+          patch.updated_at = now;
+          const { error: e } = await supabase.from('shop_products').update(patch).eq('id', r.id);
+          if (e) throw e;
+          updatedProducts[r.id] = patch;
+        }
+        if ('cost' in r) {
+          // Same GST rule as the product form: the ex-GST figure is derived at 10%.
+          const inc = r.cost;
+          const ex = inc === null ? null : Math.round((inc / 1.1) * 100) / 100;
+          if (inc === null && !costs[r.id]) { /* nothing stored, nothing to clear */ } else {
+            const { error: e } = await supabase.from('shop_product_costs')
+              .upsert({ product_id: r.id, wholesale_ex_gst_aud: ex, wholesale_inc_gst_aud: inc, updated_at: now }, { onConflict: 'product_id' });
+            if (e) throw e;
+            updatedCosts[r.id] = { ...costs[r.id], product_id: r.id, wholesale_ex_gst_aud: ex, wholesale_inc_gst_aud: inc };
+          }
+        }
+      } catch (err) {
+        failed.push(r.id);
+        toast.error(`"${r.title}" not saved: ${err.message}`);
+      }
+    }));
+    if (isMounted.current) {
+      setProducts((prev) => prev.map((p) => (updatedProducts[p.id] ? { ...p, ...updatedProducts[p.id] } : p)));
+      setCosts((prev) => ({ ...prev, ...updatedCosts }));
+      setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => failed.includes(id))));
+      setSaving(false);
+    }
+    const saved = parsed.length - failed.length;
+    if (saved) toast.success(`Saved ${saved} product${saved === 1 ? '' : 's'}.`);
+  };
+
   const handleEdit = (product) => {
     setEditingProduct(product);
     setIsAddModalOpen(true);
@@ -254,17 +339,41 @@ const ProductManagementPage = () => {
         )}
       </TableCell>
       <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
-      <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
-      <TableCell className="tabular-nums text-muted-foreground">
-        {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
-      </TableCell>
-      <TableCell className="tabular-nums text-muted-foreground">
-        {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
-      </TableCell>
+      {priceEdit ? (
+        ['price', 'rrp', 'cost'].map((field) => (
+          <TableCell key={field}>
+            <div className="relative w-24">
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+              <Input
+                type="number" inputMode="decimal" min="0" step="0.01"
+                aria-label={`${field === 'price' ? 'Sale price' : field === 'rrp' ? 'RRP' : 'Cost inc GST'} for ${product.title}`}
+                className={`h-8 pl-5 pr-1 tabular-nums ${drafts[product.id]?.[field] !== undefined ? 'border-primary bg-primary/5' : ''}`}
+                value={fieldValue(product, field)}
+                onChange={(e) => setDraft(product, field, e.target.value)}
+              />
+            </div>
+          </TableCell>
+        ))
+      ) : (
+        <>
+          <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
+          <TableCell className="tabular-nums text-muted-foreground">
+            {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
+          </TableCell>
+          <TableCell className="tabular-nums text-muted-foreground">
+            {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
+          </TableCell>
+        </>
+      )}
       <TableCell className="tabular-nums">
         {(() => {
           // Ex-GST gross margin: (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
-          const m = grossMargin(product.price_aud, costs[product.id]?.wholesale_ex_gst_aud);
+          // While editing, it follows the unsaved sale price and cost.
+          const dp = drafts[product.id];
+          const costInc = dp?.cost !== undefined ? (dp.cost.trim() === '' ? null : Number(dp.cost)) : null;
+          const price = dp?.price !== undefined && dp.price.trim() !== '' ? Number(dp.price) : product.price_aud;
+          const costEx = dp?.cost !== undefined ? (costInc == null ? null : costInc / 1.1) : costs[product.id]?.wholesale_ex_gst_aud;
+          const m = grossMargin(price, costEx);
           if (m == null) return <span className="text-muted-foreground">—</span>;
           const cls = m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600';
           return <span className={`font-semibold ${cls}`}>{(m * 100).toFixed(0)}%</span>;
@@ -308,6 +417,9 @@ const ProductManagementPage = () => {
         title="Shop Products"
         subtitle="Manage official catalog and inventory."
       >
+        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" aria-pressed={priceEdit} onClick={() => (priceEdit ? leavePriceEdit() : setPriceEdit(true))}>
+          <DollarSign className="w-4 h-4" /> {priceEdit ? 'Done editing' : 'Edit prices'}
+        </Button>
         <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setIsCategoriesOpen(true)}>
           <FolderTree className="w-4 h-4" /> Categories
         </Button>
@@ -490,6 +602,18 @@ const ProductManagementPage = () => {
           </Table>
         </div>
       </Card>
+
+      {priceEdit && (
+        <div className="sticky bottom-4 z-20 mx-auto flex w-fit max-w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
+          <span className="text-sm text-muted-foreground">
+            {dirtyCount ? `${dirtyCount} product${dirtyCount === 1 ? '' : 's'} changed` : 'Edit sale price, RRP or cost (inc GST), then save'}
+          </span>
+          <Button variant="ghost" size="sm" disabled={!dirtyCount || saving} onClick={() => setDrafts({})}>Reset</Button>
+          <Button size="sm" className="gap-1.5 font-bold" disabled={!dirtyCount || saving} onClick={savePrices}>
+            <Save className="w-4 h-4" /> {saving ? 'Saving…' : `Save ${dirtyCount || ''} change${dirtyCount === 1 ? '' : 's'}`.replace('  ', ' ')}
+          </Button>
+        </div>
+      )}
 
       <ShopCategoryManager open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} products={products} />
 
