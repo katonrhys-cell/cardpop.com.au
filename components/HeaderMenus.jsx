@@ -1151,6 +1151,11 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
             </Link>
           </SheetClose>
           <SheetClose asChild>
+            <Link to="/account/sole-trader" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Store className="w-4 h-4" /> Sole Trader Store
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
             <Link to="/account/profile" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
               <Settings className="w-4 h-4" /> Account Settings
             </Link>

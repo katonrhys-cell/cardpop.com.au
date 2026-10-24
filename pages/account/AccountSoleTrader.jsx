@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Upload, Trash2, Store, ExternalLink, Building2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { compressImage } from '@/utils/compressImage.js';
 import { AVATAR_MAX_BYTES, checkImageFile, describeUploadError } from '@/utils/storageUploadError.js';
 import UploadErrorDialog from '@/components/account/UploadErrorDialog.jsx';
@@ -47,6 +48,8 @@ const AccountSoleTrader = () => {
   const [pageLoading, setPageLoading]   = useState(true);
 
   const [isSoleTrader, setIsSoleTrader] = useState(false);
+  // Last value saved to the DB — a save that flips it emails the admins.
+  const [savedSoleTrader, setSavedSoleTrader] = useState(false);
   const [formData, setFormData]         = useState({
     business_name: '',
     business_tagline: '',
@@ -73,6 +76,7 @@ const AccountSoleTrader = () => {
       .then(({ data }) => {
         if (cancelled || !data) return;
         setIsSoleTrader(data.is_sole_trader ?? false);
+        setSavedSoleTrader(data.is_sole_trader ?? false);
         setFormData({
           business_name:          data.business_name          ?? '',
           business_tagline:       data.business_tagline       ?? '',
@@ -184,6 +188,16 @@ const AccountSoleTrader = () => {
       setExistingLogoUrl(business_logo_url);
       setStoreSlug(finalSlug);
       toast.success('Business profile saved!');
+      // Switching sole trader mode on or off tells the admins. Best-effort —
+      // the profile is already saved, so a failed notice never surfaces.
+      if (isSoleTrader !== savedSoleTrader) {
+        apiServerClient.fetch('/stores/sole-trader-change', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: isSoleTrader }),
+        }).catch(() => {});
+      }
+      setSavedSoleTrader(isSoleTrader);
       // No realtime push for profiles any more — refresh AuthContext's copy.
       Promise.resolve(refetchProfile?.()).catch(() => {});
     } catch (err) {

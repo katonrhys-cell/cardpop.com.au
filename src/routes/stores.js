@@ -4,6 +4,8 @@ import logger from '../utils/logger.js';
 import { escapeLike } from '../utils/escapeLike.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
+import { sendSoleTraderChanged } from '../utils/emailService.js';
+import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 
 const router = express.Router();
 
@@ -27,6 +29,74 @@ const slugify = (str = '') => String(str)
   .replace(/-+/g, '-');
 
 const clean = (value, max) => String(value ?? '').trim().slice(0, max);
+
+/**
+ * POST /stores/sole-trader-change   { enabled: boolean }
+ * Called by Account → Sole Trader right after a member switches Sole Trader
+ * mode on or off. The profile is already saved (through RLS); this is the
+ * server-side moment to tell admins — an email to every admin plus a bell.
+ *
+ * The state is re-read from the DB and the notice is only sent when it matches
+ * `enabled`, so a client can't make us email admins about a change that never
+ * happened. Best-effort: a failed email never fails the member's save.
+ */
+router.post('/sole-trader-change', authMiddleware, async (req, res) => {
+  const enabled = req.body?.enabled;
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled must be true or false' });
+  }
+  const userId = req.user?.id;
+  if (!userId) return res.status(401).json({ error: 'Authentication required' });
+
+  try {
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select('id, email, display_name, username, is_sole_trader, business_name, abn, store_slug')
+      .eq('id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!profile || Boolean(profile.is_sole_trader) !== enabled) {
+      return res.json({ notified: false });
+    }
+
+    const userName = profile.display_name || profile.username || null;
+    const userEmail = profile.email || req.user?.email || null;
+
+    try {
+      const { data: admins, error: adminsErr } = await supabase.from('profiles').select('id').eq('is_admin', true);
+      if (adminsErr) throw adminsErr;
+      if (admins?.length) {
+        const { error: insertErr } = await supabase.from('notifications').insert(admins.map((a) => ({
+          user_id: a.id,
+          type: 'sole_trader_changed',
+          title: `Sole trader mode ${enabled ? 'enabled' : 'disabled'}`,
+          body: `${userName || 'A member'} switched sole trader mode ${enabled ? 'on' : 'off'}.`,
+          link: `/admin/users/${userId}`,
+          related_id: userId,
+        })));
+        if (insertErr) throw insertErr;
+      }
+    } catch (e) {
+      logger.warn(`[STORES] sole-trader bell notification failed for ${userId}: ${e.message}`);
+    }
+
+    const to = await getAdminNotificationEmails();
+    const sent = await sendSoleTraderChanged({
+      to,
+      enabled,
+      userId,
+      userName,
+      userEmail,
+      businessName: profile.business_name,
+      abn: profile.abn,
+      storeSlug: profile.store_slug,
+    });
+    return res.json({ notified: Boolean(sent) });
+  } catch (err) {
+    logger.error(`[STORES] sole-trader-change failed for ${userId}: ${err.message}`);
+    return res.status(500).json({ error: 'Could not send the notification' });
+  }
+});
 
 /**
  * POST /stores/submit

@@ -483,6 +483,34 @@ ${summaryTable([
   );
 }
 
+// ─── Sole trader mode changed (admin) ─────────────────────────────────────────
+
+// Internal heads-up when a member switches Sole Trader mode on or off in
+// Account → Sole Trader, so admins know a dealer store page appeared or went.
+export function soleTraderChangedEmail({ userId, userName, userEmail, enabled, businessName, abn, storeSlug }) {
+  const state = enabled ? 'switched ON' : 'switched OFF';
+  const body = `<p>A member has ${state} Sole Trader mode on their account.</p>
+${summaryTable([
+  ['Member', esc(userName) || '—'],
+  ['Email', esc(userEmail) || '—'],
+  ['Status', enabled ? 'Sole trader (store page live)' : 'Not a sole trader (store page hidden)'],
+  ['Business name', esc(businessName) || '—'],
+  ['ABN', esc(abn) || '—'],
+  ['Store URL', storeSlug ? `https://cardpop.com.au/dealer/${esc(storeSlug)}` : '—'],
+])}
+<p>Open the member's admin page to review or verify the business.</p>`;
+
+  return cpEmail(
+    `Sole trader mode ${enabled ? 'enabled' : 'disabled'}: ${esc(userName) || 'A member'}`,
+    'Sole Trader Change',
+    `Sole trader mode ${enabled ? 'enabled' : 'disabled'}`,
+    body,
+    `https://cardpop.com.au/admin/users/${userId}`,
+    'Review in Admin',
+    'You received this because you are a CardPop admin.',
+  );
+}
+
 // ─── Contact form message (admin/support) ─────────────────────────────────────
 
 export function contactMessageEmail({ name, email, subject, message }) {

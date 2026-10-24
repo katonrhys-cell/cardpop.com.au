@@ -12,6 +12,7 @@ import {
   launchWelcomeEmail,
   eventSubmittedEmail,
   identityReviewNeededEmail,
+  soleTraderChangedEmail,
   orderAdminNoticeEmail,
   contactMessageEmail,
   offerReceivedEmail,
@@ -284,6 +285,16 @@ export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail
     to,
     subject: `Identity verification needs review: ${userName || 'A user'}`,
     html: identityReviewNeededEmail({ userId, userName, userEmail }),
+  });
+}
+
+// Admin heads-up when a member switches Sole Trader mode on or off. `to` may be
+// a single address or an array.
+export async function sendSoleTraderChanged({ to, enabled, userName, ...details }) {
+  return send({
+    to,
+    subject: `Sole trader mode ${enabled ? 'enabled' : 'disabled'}: ${userName || 'A member'}`,
+    html: soleTraderChangedEmail({ enabled, userName, ...details }),
   });
 }
 
