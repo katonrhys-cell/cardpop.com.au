@@ -233,7 +233,13 @@ const ShopProductPage = () => {
         ]} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          <div><ProductImageCarousel key={row?.id || 'line'} images={images} /></div>
+          <div>
+            {loading ? (
+              <Skeleton className="w-full aspect-[4/5] md:aspect-square rounded-3xl" />
+            ) : (
+              <ProductImageCarousel key={row?.id || 'line'} images={images} />
+            )}
+          </div>
 
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
