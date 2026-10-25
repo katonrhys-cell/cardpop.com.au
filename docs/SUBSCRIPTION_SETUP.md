@@ -157,9 +157,6 @@ supabase db push
    (`/api/stripe/webhook`): `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`,
    `customer.subscription.trial_will_end`, **`invoice.payment_failed`**.
-4. Turn on the **Customer portal** (Stripe Dashboard → Settings → Billing →
-   Customer portal → save once) — the membership page's **Update card** button
-   opens it. Until it's saved, `POST /subscription/stripe/portal` answers 503.
 
 ## 3. PayPal — currently switched OFF
 
@@ -216,8 +213,12 @@ marketplace checkout and are reused here.
   second subscription, no second trial. Hobby members take the trial checkout
   instead; a PayPal-billed or complimentary (`grandfathered`) membership gets a
   409 and a message. The route is MFA-gated (`requireAal2`) like the other
-  routes that change what the member's card is charged. Downgrades are not
-  offered — cancel and re-subscribe.
+  routes that change what the member's card is charged.
+- **Downgrading** goes through the same route and the membership page's
+  *Change your plan* grid (every other paid tier, labelled Upgrade/Downgrade):
+  the item is re-priced with `create_prorations`, so the unused part of the
+  dearer plan is credited against the next invoice. Dropping to Hobby is a
+  cancellation, not a tier change.
 - **Cancelling** (Account → Membership → *Cancel membership* →
   `POST /subscription/stripe/cancel`, `cancelStripeMembership()`): a trialing
   or active member is cancelled **at the end of the period they already have**
@@ -225,8 +226,17 @@ marketplace checkout and are reused here.
   undo it until then (*Keep my membership* → `/stripe/resume`); a member whose
   payment is failing is cancelled **immediately** and the unpaid invoice
   voided, so the retries stop. The page reads the live state from
-  `GET /subscription/stripe/details`. *Update card* opens the Stripe Customer
-  portal (`/stripe/portal`). All three writes are MFA-gated (`requireAal2`).
+  `GET /subscription/stripe/details`. Members never get Stripe access — every
+  action is a call to our API, which makes the change in Stripe.
+- **Updating the card** (*Update card* → `POST /subscription/stripe/update-card`,
+  `createMembershipCardSession()`): a Checkout Session in `setup` mode (the same
+  hosted card step as the trial sign-up, no charge). On return the page calls
+  `/stripe/update-card/confirm`, and the `checkout.session.completed` webhook
+  does the same (`applyMembershipCardFromSession()`, idempotent): the card
+  becomes the customer's and the subscription's default payment method, and a
+  `past_due` membership's open invoice is retried on it at once so the plan is
+  restored straight away. Stripe's own Customer portal is not used. The
+  writes are MFA-gated (`requireAal2`).
 - **Trial reminder**: `customer.subscription.trial_will_end` (3 days out)
   emails the member the charge date, the amount and where to cancel
   (`membershipTrialEndingEmail`) — skipped once they've cancelled.

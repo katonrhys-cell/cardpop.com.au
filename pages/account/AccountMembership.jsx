@@ -112,18 +112,22 @@ const AccountMembership = () => {
   const currentTierName = PLANS[currentPlanKey]?.name || 'Pro';
   const meta = statusLabel(subscriptionStatus, currentTierName) || statusLabel('none', currentTierName);
   const { Icon } = meta;
-  // Tiers a paid member can move up to. A tier change re-prices the existing
-  // subscription (no second trial), so it goes through its own endpoint, not
-  // the trial checkout.
-  const upgradeOptions = isPro ? upgradePlansFor(currentPlanKey) : [];
-  const onTopPlan = isPro && isTopPlan(currentPlanKey);
   const complimentary = subscriptionStatus === 'grandfathered';
+  // Tiers a paid member can switch to — up or down. A tier change re-prices the
+  // existing subscription (no second trial), so it goes through its own
+  // endpoint, not the trial checkout. A complimentary plan is managed by
+  // CardPop, so it only ever shows what sits above it (disabled).
+  const changeOptions = !isPro ? [] : complimentary
+    ? upgradePlansFor(currentPlanKey)
+    : PAID_TIER_ORDER.filter((tier) => tier !== currentPlanKey);
+  const onTopPlan = complimentary && isTopPlan(currentPlanKey);
+  const currentRank = PAID_TIER_ORDER.indexOf(currentPlanKey);
   // A member Stripe is billing (or trying to): show the billing controls, and
   // never the trial sign-up to someone whose payment is merely failing.
   const billed = !complimentary && ['trialing', 'active', 'past_due'].includes(subscriptionStatus);
   const pastDue = subscriptionStatus === 'past_due';
 
-  const handleUpgrade = async (tier) => {
+  const handleChangePlan = async (tier) => {
     setUpgrading(tier);
     try {
       const res = await apiServerClient.fetch('/subscription/stripe/change-tier', {
@@ -195,18 +199,19 @@ const AccountMembership = () => {
             <>
               <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
                 <ArrowUpRight className="h-5 w-5 text-brand-red" />
-                Upgrade your plan
+                {complimentary ? 'Upgrade your plan' : 'Change your plan'}
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {complimentary
                   ? 'Your complimentary membership is managed by CardPop — contact support to change it.'
-                  : 'Switch tiers any time. The change applies straight away and the difference is pro-rated on your next invoice; your trial, if you have one, carries over.'}
+                  : 'Move up or down any time. The change applies straight away and is pro-rated on your next invoice — a downgrade credits the unused part of your current plan. Your trial, if you have one, carries over. To stop paying altogether, cancel your membership above.'}
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                {upgradeOptions.map((key) => {
+                {changeOptions.map((key) => {
                   const plan = PLANS[key];
                   const preselected = normalizePaidTier(params.get('tier')) === key;
                   const busy = upgrading === key;
+                  const verb = PAID_TIER_ORDER.indexOf(key) > currentRank ? 'Upgrade' : 'Downgrade';
                   return (
                     <div
                       key={key}
@@ -226,11 +231,11 @@ const AccountMembership = () => {
                       </ul>
                       <Button
                         type="button"
-                        onClick={() => handleUpgrade(key)}
+                        onClick={() => handleChangePlan(key)}
                         disabled={complimentary || upgrading != null}
                         className="mt-4 w-full bg-brand-red font-bold hover:bg-brand-red/90"
                       >
-                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `Switch to ${plan.name}`}
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `${complimentary ? 'Switch' : verb} to ${plan.name}`}
                       </Button>
                     </div>
                   );

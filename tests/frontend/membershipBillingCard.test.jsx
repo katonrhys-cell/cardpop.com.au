@@ -72,4 +72,25 @@ describe('MembershipBillingCard', () => {
     expect(screen.getByTestId('start-trial')).toBeInTheDocument();
     expect(mockApiFetch).not.toHaveBeenCalledWith('/subscription/stripe/details');
   });
+
+  it('offers a paid member every other tier, up and down', async () => {
+    setAuth({ subscriptionStatus: 'active', subscriptionTier: 'premium' });
+    routeApi(membership({ status: 'active', tier: 'premium' }));
+    renderPage();
+    expect(await screen.findByText('Change your plan')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Downgrade to Pro' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upgrade to Elite' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upgrade to Ultimate' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /to Premium/ })).toBeNull();
+  });
+
+  it('sends Update card through our API, never a Stripe portal', async () => {
+    setAuth({ subscriptionStatus: 'active' });
+    routeApi(membership({ status: 'active' }), { '/subscription/stripe/update-card': json({}, false) });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /update card/i }));
+    await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith('/subscription/stripe/update-card', expect.objectContaining({ method: 'POST' })));
+    const body = JSON.parse(mockApiFetch.mock.calls.find(([p]) => p === '/subscription/stripe/update-card')[1].body);
+    expect(body.successUrl).toMatch(/\?card=updated&session_id=\{CHECKOUT_SESSION_ID\}$/);
+  });
 });
