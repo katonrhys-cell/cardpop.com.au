@@ -15,6 +15,8 @@ import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
+import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx';
+import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -156,6 +158,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   // existing watch's on/off state replaces the default once it loads.
   const [rescanWeekly, setRescanWeekly] = useState(true);
   const [existingWatch, setExistingWatch] = useState(null);
+  // Member ticket code + referral link (admin only, own table — the events
+  // row is public). `existingOffer` also carries the click/reveal counts.
+  const [offerForm, setOfferForm] = useState(EMPTY_OFFER_FORM);
+  const [existingOffer, setExistingOffer] = useState(null);
 
   const handleWatchLoaded = useCallback((watch) => {
     setExistingWatch(watch);
@@ -188,6 +194,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     if (!isOpen) return;
     setRescanWeekly(true);
     setExistingWatch(null);
+    setOfferForm(EMPTY_OFFER_FORM);
+    setExistingOffer(null);
 
     // Guards the async scraped-image fetch below: if the modal closes or the
     // form is reset before it resolves, we must not resurrect the image.
@@ -289,6 +297,19 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setImagePreview(event.image_url || null);
       setActiveTab('details');
 
+      if (!isUserMode) {
+        loadAdminTicketOffer(event.id).then((row) => {
+          if (cancelled || !row) return;
+          setExistingOffer(row);
+          setOfferForm({
+            offer_text: row.offer_text || '',
+            discount_code: row.discount_code || '',
+            referral_url: row.referral_url || '',
+            is_active: row.is_active,
+          });
+        }).catch(() => toast.error("Couldn't load this event's member offer."));
+      }
+
     } else {
       setFormData(INITIAL_STATE);
       setImagePreview(null);
@@ -299,7 +320,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     setRemoveExistingImage(false);
 
     return () => { cancelled = true; };
-  }, [isOpen, event, scrapedData]);
+  }, [isOpen, event, scrapedData, isUserMode]);
 
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
@@ -339,6 +360,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     if (!formData.start_date) {
       toast.error('Start date is required.');
       setActiveTab('venue');
+      return;
+    }
+
+    const offerError = isUserMode ? null : validateOfferForm(offerForm);
+    if (offerError) {
+      toast.error(offerError);
+      setActiveTab('offer');
       return;
     }
 
@@ -440,6 +468,16 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         }
       }
 
+      // Member offer — saved after the event so a new event has its id. The
+      // event is already saved, so a failure here is reported, not fatal.
+      if (!isUserMode && savedId) {
+        try {
+          await saveAdminTicketOffer(savedId, offerForm, existingOffer);
+        } catch (err) {
+          toast.error(err.message || 'Event saved, but the member offer failed to save.');
+        }
+      }
+
       // Weekly re-scan of the website to scrape. The event is already saved, so
       // a problem here is reported but doesn't fail the save.
       if (!isUserMode && savedId) {
@@ -503,6 +541,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
                   { id: 'seo',       label: 'SEO' },
+                  ...(isUserMode ? [] : [{ id: 'offer', label: 'Member Offer' }]),
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.id}
@@ -823,6 +862,19 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
                 )}
               </TabsContent>
+
+              {/* ── TAB 5: MEMBER OFFER (admin) ── */}
+              {!isUserMode && (
+                <TabsContent value="offer" className="mt-0 animate-in fade-in">
+                  <EventTicketOfferPanel
+                    value={offerForm}
+                    onChange={setOfferForm}
+                    stats={existingOffer}
+                    ticketUrl={formData.ticket_url.trim()}
+                    disabled={loading}
+                  />
+                </TabsContent>
+              )}
 
             </div>
           </Tabs>
