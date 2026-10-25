@@ -409,7 +409,7 @@ const ProductManagementPage = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet><title>Official Shop Management | Admin</title></Helmet>
 
       <AdminPageHeader

@@ -254,7 +254,7 @@ const ShopSinglesPage = () => {
           </div>
 
           {/* Grid */}
-          {loading ? (
+          {loading && products.length === 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
                 <div key={i} className="flex flex-col space-y-4">

@@ -326,7 +326,7 @@ const MarketplacePage = () => {
   const [savingSearch, setSavingSearch] = useState(false);
 
   useEffect(() => {
-    if (!currentUser) { setSavedSearches([]); return; }
+    if (!currentUser?.id) { setSavedSearches([]); return; }
     let cancelled = false;
     supabase
       .from('saved_searches')
@@ -335,7 +335,7 @@ const MarketplacePage = () => {
       .limit(10)
       .then(({ data }) => { if (!cancelled) setSavedSearches(data || []); });
     return () => { cancelled = true; };
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   const saveCurrentSearch = async () => {
     const params = window.location.search.replace(/^\?/, '');
@@ -1139,7 +1139,11 @@ const MarketplacePage = () => {
             <p className="mb-6">{error}</p>
             <Button onClick={() => fetchRef.current?.(true)} className="rounded-xl font-bold">Try Again</Button>
           </div>
-        ) : loading ? (
+        ) : loading && listings.length === 0 ? (
+          // Skeletons only for the first load. A refetch (filter change, the
+          // refresh button, coming back to the tab) keeps the current grid on
+          // screen, dimmed, until the new rows land — swapping it for eight
+          // skeletons collapsed the page and flashed every card.
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {Array(8).fill(0).map((_, i) => (
               <div key={i} className="flex flex-col space-y-4 bg-card border border-border rounded-2xl p-4">
@@ -1152,7 +1156,10 @@ const MarketplacePage = () => {
           </div>
         ) : listings.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div
+              className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity ${loading ? 'opacity-60' : ''}`}
+              aria-busy={loading || undefined}
+            >
               {listings.map((listing, i) => (
                 <MarketplaceListingCard key={`${listing.source}-${listing.id}`} listing={listing} priority={i < 2} />
               ))}

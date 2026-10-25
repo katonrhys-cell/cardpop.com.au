@@ -109,7 +109,7 @@ const FinanceTaxPage = () => {
   const exportInventory = () => downloadCsv(`cardpop-inventory-${format(new Date(), 'yyyy-MM-dd')}.csv`, toCsv(inventory.rows, INVENTORY_CSV_COLUMNS));
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet><title>Finance &amp; Tax | Admin</title></Helmet>
 
       <AdminPageHeader

@@ -23,17 +23,37 @@ const DEFAULTS = {
   default_shipping_rate_aud: 15,
 };
 
+// The last settings this browser fetched, used as the starting point on the
+// next load. Starting from DEFAULTS every time meant nav/footer items an admin
+// had switched (blog/marketplace off, trading on) appeared and then vanished
+// — or popped in — once the fetch landed, on every page load. The fetch still
+// runs and wins; this only makes a returning visitor's first frame right.
+const CACHE_KEY = 'cardpop_platform_settings';
+const readCachedSettings = () => {
+  try {
+    const cached = JSON.parse(window.localStorage.getItem(CACHE_KEY) || 'null');
+    // maintenance_mode stays fail-open: a cached "on" would put the
+    // maintenance screen in front of everyone returning after it ended.
+    if (cached && typeof cached === 'object') return { ...DEFAULTS, ...cached, maintenance_mode: false };
+  } catch { /* storage blocked or corrupt — fall back to the defaults */ }
+  return DEFAULTS;
+};
+
 const PlatformSettingsContext = createContext({ settings: DEFAULTS, loading: true });
 
 export const PlatformSettingsProvider = ({ children }) => {
-  const [settings, setSettings] = useState(DEFAULTS);
+  const [settings, setSettings] = useState(readCachedSettings);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     apiServerClient.fetch('/settings/public')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (!cancelled && data && typeof data === 'object') setSettings({ ...DEFAULTS, ...data }); })
+      .then((data) => {
+        if (cancelled || !data || typeof data !== 'object') return;
+        setSettings({ ...DEFAULTS, ...data });
+        try { window.localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch { /* best-effort */ }
+      })
       .catch(() => { /* keep fail-open defaults */ })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

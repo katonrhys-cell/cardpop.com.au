@@ -292,7 +292,7 @@ const PromoCodesAdminPage = () => {
   const codeLocked = !isNew && editing && (editing.redeemed_count > 0);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <Helmet><title>Promo Codes | Admin</title></Helmet>
 
       <AdminPageHeader

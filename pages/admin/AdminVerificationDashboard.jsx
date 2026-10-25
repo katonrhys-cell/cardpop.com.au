@@ -177,7 +177,7 @@ const AdminVerificationDashboard = () => {
   const pendingActionCfg = ACTIONS.find(a => a.value === pendingAction);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <Helmet><title>Verification Management | Admin</title></Helmet>
 
       <AdminPageHeader

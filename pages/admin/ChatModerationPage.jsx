@@ -144,7 +144,7 @@ const ChatModerationPage = () => {
   const threadFirst = thread ? profiles[thread.a] : null;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet><title>Chat Moderation | CardPop Admin</title></Helmet>
 
       <AdminPageHeader

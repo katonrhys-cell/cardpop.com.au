@@ -11,7 +11,7 @@ import { WELCOME_DISCOUNT_PCT } from '@/config/welcomeOffer.js';
 // above the header for signed-out visitors, dismisses for the session, and
 // stays out of the way on checkout and the pre-launch page.
 const STORAGE_KEY = 'cardpop_announcement_dismissed';
-const QUIET_PREFIXES = ['/checkout', '/checkout-success', '/success', '/launch', '/admin', '/login', '/signup', '/welcome', '/verify-identity'];
+export const QUIET_PREFIXES = ['/checkout', '/checkout-success', '/success', '/launch', '/admin', '/login', '/signup', '/welcome', '/verify-identity'];
 
 const readDismissed = () => {
   try { return window.sessionStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }

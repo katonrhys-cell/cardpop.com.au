@@ -197,7 +197,7 @@ const SubcategoryManagementPage = () => {
   });
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet>
         <title>Subcategory Management | Admin Portal</title>
       </Helmet>

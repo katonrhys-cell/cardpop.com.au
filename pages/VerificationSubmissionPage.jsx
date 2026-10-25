@@ -56,7 +56,7 @@ const VerificationSubmissionPage = () => {
     
     checkExisting();
     return () => { isMounted = false; };
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   const handleIdPhotoChange = (e) => {
     const file = e.target.files[0];
