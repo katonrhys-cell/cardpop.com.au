@@ -5,7 +5,8 @@ import path from 'node:path';
 import process from 'node:process';
 import { WELCOME_DISCOUNT_PCT } from '@/config/welcomeOffer.js';
 import { CONSENT_STORAGE_KEY } from '@/lib/consent.js';
-import { AUTH_TOKEN_STORAGE_KEY } from '@/components/AnnouncementBar.jsx';
+import { AUTH_TOKEN_STORAGE_KEY, QUIET_PREFIXES as ANNOUNCEMENT_QUIET } from '@/components/AnnouncementBar.jsx';
+import { QUIET_PREFIXES as COOKIE_QUIET } from '@/components/CookieConsentBanner.jsx';
 import { appShellFromHomeShell, APP_SHELL_MAIN } from '../../tools/appShell.mjs';
 
 // The static homepage shell is what the first paint shows before any JS runs.
@@ -43,6 +44,21 @@ describe('static homepage shell', () => {
     expect(bootstrap).toContain(`"${CONSENT_STORAGE_KEY}"`);
     expect(bootstrap).toContain(`"${AUTH_TOKEN_STORAGE_KEY}"`);
     expect(bootstrap).toContain('"cardpop_announcement_dismissed"');
+  });
+
+  it('bootstrap applies the dark theme before first paint, like hooks/useDarkMode.js', () => {
+    const hook = readFileSync(path.join(root, 'hooks/useDarkMode.js'), 'utf8');
+    const key = hook.match(/const STORAGE_KEY = '([^']+)'/)[1];
+    expect(bootstrap).toContain(`localStorage.getItem("${key}")`);
+    expect(bootstrap).toContain('matchMedia("(prefers-color-scheme: dark)")');
+    expect(bootstrap).toContain('document.documentElement.classList.add("dark")');
+  });
+
+  it('bootstrap hides the shell banners on the same quiet routes as the components', () => {
+    // Otherwise the shell paints a banner on e.g. /login that React never
+    // renders, and it vanishes on mount — the page jumps up by its height.
+    expect(bootstrap).toContain(`qp("${ANNOUNCEMENT_QUIET.join(',')}")`);
+    expect(bootstrap).toContain(`qp("${COOKIE_QUIET.join(',')}")`);
   });
 
   it('bootstrap defers the JS/CSS fetches until after the first paint', () => {
