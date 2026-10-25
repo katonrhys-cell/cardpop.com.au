@@ -24,7 +24,7 @@ import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../u
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
-  listingMeta, PLAYERS_INDEX_SEO,
+  listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
 } from '../utils/players.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
@@ -3079,7 +3079,7 @@ async function renderPlayer(supabase, rawSlug) {
 
   const { data: player } = await supabase
     .from('players')
-    .select('id, slug, name, sport, team, position, nationality, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, created_at, updated_at')
+    .select('id, slug, name, sport, team, position, nationality, born_on, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, created_at, updated_at')
     .eq('slug', slug)
     .eq('is_published', true)
     .maybeSingle();
@@ -3127,7 +3127,7 @@ async function renderPlayer(supabase, rawSlug) {
 
   const facts = [
     ['Sport', player.sport], ['Team', player.team], ['Position', player.position],
-    ['Nationality', player.nationality], ['Born', player.born_year], ['Career', player.career_span],
+    ['Nationality', player.nationality], ['Born', formatBorn(player)], ['Career', player.career_span],
   ].filter(([, v]) => v);
 
   const jsonLd = [
@@ -3151,6 +3151,7 @@ async function renderPlayer(supabase, rawSlug) {
         url: canonical,
         ...(player.headline ? { description: player.headline } : {}),
         ...(player.nationality ? { nationality: player.nationality } : {}),
+        ...(player.born_on ? { birthDate: player.born_on } : {}),
         ...(player.team ? { memberOf: { '@type': 'SportsTeam', name: player.team } } : {}),
         ...(image ? { image } : {}),
       },
@@ -3211,7 +3212,11 @@ ${player.headline ? `<p><strong>${esc(player.headline)}</strong></p>` : ''}
 ${facts.length ? `<ul>\n${facts.map(([k, v]) => `  <li>${esc(k)}: ${esc(v)}</li>`).join('\n')}\n</ul>` : ''}
 ${player.bio ? `<section>\n<h2>About ${esc(player.name)}</h2>\n${splitParagraphs(player.bio).map((p) => `<p>${esc(p)}</p>`).join('\n')}\n</section>` : ''}
 ${player.collecting_notes ? `<section>\n<h2>Collecting ${esc(player.name)}</h2>\n${splitParagraphs(player.collecting_notes).map((p) => `<p>${esc(p)}</p>`).join('\n')}\n</section>` : ''}
-${keyCards.length ? `<section>\n<h2>Cards worth knowing</h2>\n<ol>\n${keyCards.map((c) => `  <li><strong>${esc(c.name)}</strong>${c.note ? ` — ${esc(c.note)}` : ''}</li>`).join('\n')}\n</ol>\n</section>` : ''}
+${keyCards.length ? `<section>\n<h2>Cards worth knowing</h2>\n<ol>\n${keyCards.map((c) => {
+    const image = keyCardImage(c);
+    const img = image ? `<img src="${esc(image.startsWith('/') ? `${BASE_URL}${image}` : publicImageUrl(image))}" alt="${esc(`${c.name} — ${player.name}`)}" width="64" height="80" loading="lazy"> ` : '';
+    return `  <li>${img}<strong>${esc(c.name)}</strong>${c.note ? ` — ${esc(c.note)}` : ''}</li>`;
+  }).join('\n')}\n</ol>\n</section>` : ''}
 ${trackedHtml}
 ${listingsHtml}
 ${faqHtml}

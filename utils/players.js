@@ -96,8 +96,26 @@ export function groupPlayersBySport(players = []) {
 /** Normalise the admin form's key-cards rows: drop blanks, trim strings. */
 export const cleanKeyCards = (rows = []) =>
   (Array.isArray(rows) ? rows : [])
-    .map((r) => ({ name: String(r?.name || '').trim(), note: String(r?.note || '').trim() }))
+    .map((r) => {
+      const row = { name: String(r?.name || '').trim(), note: String(r?.note || '').trim() };
+      const image = keyCardImage(r);
+      if (image) row.image_url = image;
+      return row;
+    })
     .filter((r) => r.name);
+
+/**
+ * A key card's optional photo: an `http(s)` URL or a site-relative path such
+ * as `/images/players/...` (the public/ folder). Anything else is dropped so
+ * a row can't inject `javascript:` or protocol-relative URLs into the page.
+ */
+export const keyCardImage = (card) => {
+  const url = String(card?.image_url || '').trim();
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/') && !url.startsWith('//')) return url;
+  return null;
+};
 
 /** "MJ, Air Jordan" → ["MJ", "Air Jordan"]. */
 export const parseAliases = (text = '') =>
@@ -232,4 +250,29 @@ export const listingMeta = (year, setName) => {
   const s = setName ? String(setName).trim() : '';
   if (s && y && s.includes(y)) return s;
   return [y, s].filter(Boolean).join(' ');
+};
+
+/** A `YYYY-MM-DD` date of birth that is a real calendar day in the DB's range. */
+export const isValidBirthDate = (iso = '') => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (y < 1850 || y > 2100) return false;
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === mo - 1 && date.getUTCDate() === d;
+};
+
+/**
+ * The "Born" fact: the full date ("30 December 1984") when it is known, else
+ * the year, else null. Formatted in UTC so the day never shifts with the
+ * reader's time zone.
+ */
+export const formatBorn = (player) => {
+  const iso = player?.born_on;
+  if (iso && isValidBirthDate(iso)) {
+    return new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-AU', {
+      day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
+    });
+  }
+  return player?.born_year ?? null;
 };
