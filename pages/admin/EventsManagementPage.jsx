@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Helmet } from 'react-helmet-async';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -142,7 +142,7 @@ const EventsManagementPage = () => {
         if (payload.eventType === 'INSERT') {
           setEvents(prev => [payload.new, ...prev].sort((a, b) => new Date(b.start_date) - new Date(a.start_date)));
         } else if (payload.eventType === 'UPDATE') {
-          setEvents(prev => prev.map(ev => ev.id === payload.new.id ? payload.new : ev));
+          setEvents(prev => prev.map(ev => ev.id === payload.new.id ? { ...payload.new, ticket_offer: ev.ticket_offer } : ev));
         } else if (payload.eventType === 'DELETE') {
           setEvents(prev => prev.filter(ev => ev.id !== payload.old.id));
         }
@@ -152,12 +152,27 @@ const EventsManagementPage = () => {
     return () => { supabase.removeChannel(channel); };
   }, []);
 
+  const loadOfferCounts = async () => {
+    try {
+      const { data } = await supabase.from('event_ticket_offers').select('event_id, is_active, ticket_clicks, code_reveals');
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  };
+
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false });
+      const [{ data, error }, offers] = await Promise.all([
+        supabase.from('events').select('*').order('start_date', { ascending: false }),
+        // Member offer counts (lib/eventTicketOffers.js). Separate read so a
+        // problem here never empties the list.
+        loadOfferCounts(),
+      ]);
       if (error) throw error;
-      setEvents(data ?? []);
+      const offerByEvent = new Map(offers.map((o) => [o.event_id, o]));
+      setEvents((data ?? []).map((ev) => ({ ...ev, ticket_offer: offerByEvent.get(ev.id) ?? null })));
     } catch (err) {
       toast.error('Failed to load events.');
     } finally {
@@ -443,6 +458,15 @@ const EventsManagementPage = () => {
                               />
                             )}
                           </div>
+                          {event.ticket_offer && (
+                            <p
+                              className={`flex items-center gap-1 text-xs mt-1 font-medium ${event.ticket_offer.is_active ? 'text-primary' : 'text-muted-foreground'}`}
+                              title="Member ticket offer — ticket clicks / code reveals"
+                            >
+                              <BadgePercent className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                              Member offer{event.ticket_offer.is_active ? '' : ' (off)'} · {event.ticket_offer.ticket_clicks} clicks · {event.ticket_offer.code_reveals} reveals
+                            </p>
+                          )}
                           {event.short_description && (
                             <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">{event.short_description}</p>
                           )}

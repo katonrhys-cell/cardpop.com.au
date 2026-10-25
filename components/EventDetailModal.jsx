@@ -9,17 +9,23 @@ import { isPastEvent } from '@/utils/eventPast.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
+import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
+import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
 
 const EventDetailModal = ({ isOpen, onClose, event }) => {
+  const past = event ? isPastEvent(event, toLocalDateStr(new Date())) : true;
+  // Hooks run before the early return; only ask while the dialog is open.
+  const ticketOffer = useEventTicketOffer(event?.id, { enabled: Boolean(isOpen && event && !past) });
   if (!event) return null;
 
   const eventTitle = event.title || event.name;
   const formattedDate = formatEventDate(event, true);
   const formattedTime = formatEventTime(event);
   const formattedLocation = formatEventLocation(event);
-  const ticketLink = event.ticket_url || event.website_url || event.ticketLink;
-  // A finished event takes reviews, not RSVPs or tickets.
-  const past = isPastEvent(event, toLocalDateStr(new Date()));
+  // A finished event (`past`) takes reviews, not RSVPs or tickets.
+  const ticketLink = ticketDestination(event, ticketOffer);
+  const countTicketClick = () => { if (ticketOffer) recordEventTicketClick(event.id); };
 
   const imageUrl = publicImageUrl(event.image_url || event.image || null);
 
@@ -103,6 +109,8 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
             </div>
           )}
 
+          {!past && <EventTicketOffer eventId={event.id} offer={ticketOffer} />}
+
           <div>
             <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
               <Info className="w-5 h-5 text-primary" /> About this event
@@ -141,7 +149,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
           {!past && <AddToCalendarButton event={event} className="h-11 font-semibold" />}
           {!past && ticketLink && (
             <Button variant="secondary" className="w-full h-11 font-semibold" asChild>
-              <a href={ticketLink} target="_blank" rel="noopener noreferrer">
+              <a href={ticketLink} target="_blank" rel="noopener noreferrer" onClick={countTicketClick} onAuxClick={countTicketClick}>
                 <Ticket className="w-4 h-4 mr-2" /> Tickets & Info
               </a>
             </Button>
