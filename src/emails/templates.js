@@ -1012,3 +1012,30 @@ ${centred('It’s applied automatically at checkout when you’re signed in.')}`
     'This one-time offer was generated for your CardPop account and can’t be transferred.',
   );
 }
+
+// Sent on Stripe's `customer.subscription.trial_will_end` (3 days before the
+// first charge) so a member who forgot about the trial can cancel before it
+// bills — and knows exactly where to do it.
+export function membershipTrialEndingEmail({ name, planName, amountAud, chargeDate }) {
+  const when = new Date(chargeDate);
+  const whenStr = when.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const daysLeft = Math.max(1, Math.ceil((when.getTime() - Date.now()) / 86400000));
+  const price = amountAud != null ? `${money(amountAud)}/month` : 'the monthly price';
+  const body = `${heroBadge('⏱', TILE.charcoal)}
+${heroHeading('Your free trial ends soon', `Hi ${esc(name || 'there')} — here’s what happens next.`)}
+${statRow([
+  { glyph: '★', colour: TILE.red, value: esc(planName), caption: 'Your trial plan', small: true },
+  { glyph: '⏱', colour: TILE.charcoal, value: String(daysLeft), caption: `${plural(daysLeft, 'Day', 'Days')} left · ${esc(whenStr)}` },
+])}
+${centred(`On ${esc(whenStr)} your card will be charged ${esc(price)} to keep CardPop ${esc(planName)}.`)}
+${centred('Don’t want it? Cancel any time before then from Account → Membership and you won’t be charged. Your account stays on the free Hobby plan — buying and selling still work.')}`;
+  return cpEmail(
+    `Your CardPop ${esc(planName)} trial ends ${esc(whenStr)}.`,
+    '',
+    '',
+    body,
+    'https://cardpop.com.au/account/membership',
+    'Manage Membership',
+    'You’re receiving this because you started a free trial of a CardPop membership.',
+  );
+}

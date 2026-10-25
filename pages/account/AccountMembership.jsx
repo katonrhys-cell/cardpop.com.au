@@ -4,6 +4,7 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import StartTrialOptions from '@/components/StartTrialOptions.jsx';
+import MembershipBillingCard from '@/components/account/MembershipBillingCard.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -117,6 +118,10 @@ const AccountMembership = () => {
   const upgradeOptions = isPro ? upgradePlansFor(currentPlanKey) : [];
   const onTopPlan = isPro && isTopPlan(currentPlanKey);
   const complimentary = subscriptionStatus === 'grandfathered';
+  // A member Stripe is billing (or trying to): show the billing controls, and
+  // never the trial sign-up to someone whose payment is merely failing.
+  const billed = !complimentary && ['trialing', 'active', 'past_due'].includes(subscriptionStatus);
+  const pastDue = subscriptionStatus === 'past_due';
 
   const handleUpgrade = async (tier) => {
     setUpgrading(tier);
@@ -170,6 +175,8 @@ const AccountMembership = () => {
           </p>
         )}
       </div>
+
+      {billed && <MembershipBillingCard subscriptionStatus={subscriptionStatus} onChanged={refetchProfile} />}
 
       {isPro && (
         <div className="rounded-card border border-border bg-card p-6">
@@ -237,7 +244,7 @@ const AccountMembership = () => {
         </div>
       )}
 
-      {!isPro && (
+      {!isPro && !pastDue && (
         <>
           <div className="rounded-card border border-brand-red/30 bg-brand-red/5 p-6">
             <div className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">

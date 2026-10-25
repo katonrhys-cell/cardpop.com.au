@@ -34,7 +34,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { reconcilePendingOrders } from '../services/pendingOrderAlertService.js';
-import { applyStripeSubscription } from '../services/subscriptionService.js';
+import { applyStripeSubscription, handleSubscriptionInvoiceFailed, sendTrialEndingReminder } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress, checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
@@ -902,8 +902,21 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
+        await applyStripeSubscription(event.data.object);
+        break;
+
       case 'customer.subscription.trial_will_end':
         await applyStripeSubscription(event.data.object);
+        // The reminder is best-effort — a failed email must not 500 the
+        // webhook and have Stripe redeliver (and re-apply) the event.
+        await sendTrialEndingReminder(event.data.object).catch((err) =>
+          logger.error(`[STRIPE] Trial-ending reminder failed for ${event.data.object.id}: ${err.message}`));
+        break;
+
+      // A membership charge failed (first charge after the trial, or a
+      // renewal). A failed trial conversion is cancelled rather than retried.
+      case 'invoice.payment_failed':
+        await handleSubscriptionInvoiceFailed(event.data.object);
         break;
 
       default:

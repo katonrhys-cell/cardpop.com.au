@@ -73,7 +73,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
         </div>
         <p className="mt-1 text-muted-foreground">
           Add a payment method to unlock CardPop {tierName}. You won't be charged until your trial
-          ends, and you can cancel anytime before then.
+          ends, and you can cancel anytime before then from Account → Membership — we email you 3 days before the first charge.
         </p>
       </div>
 
