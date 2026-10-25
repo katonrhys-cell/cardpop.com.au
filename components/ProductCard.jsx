@@ -20,7 +20,7 @@ import RookiePill from '@/components/RookiePill.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { isSoldOut, isComingSoon, isPreorder, preorderEta } from '@/utils/shopStock.js';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
-import { hasVariants } from '@/utils/shopVariants.js';
+import { hasVariants, chooseVariantLabel } from '@/utils/shopVariants.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
@@ -260,9 +260,9 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
               />
             </div>
           ) : onAddToCart && hasVariants(product) ? (
-            // Colour must be chosen on the product page — the grid can't know it.
+            // The colour or size must be chosen on the product page — the grid can't know it.
             <Button size="sm" className="w-full rounded-xl font-bold" asChild>
-              <Link to={detailPath}><ShoppingCart className="w-4 h-4 mr-2" /> Choose colour</Link>
+              <Link to={detailPath}><ShoppingCart className="w-4 h-4 mr-2" /> {chooseVariantLabel(product)}</Link>
             </Button>
           ) : onAddToCart && (
             <Button

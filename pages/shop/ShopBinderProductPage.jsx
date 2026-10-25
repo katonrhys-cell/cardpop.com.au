@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import BinderCapacityPicker from '@/components/shop/BinderCapacityPicker.jsx';
-import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
@@ -30,6 +30,7 @@ import {
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
 import { trackViewItem } from '@/lib/analytics.js';
+import { getCardImage } from '@/utils/imageUrl.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -102,7 +103,7 @@ const ShopBinderProductPage = () => {
 
   const handleAddToCart = () => {
     if (!row || !isPurchasable) return;
-    if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
+    if (variants.length > 0 && !chosenVariant) { toast.error(`Please choose a ${variantKind(row).toLowerCase()} first.`); return; }
     if (!inStock) return;
     const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
     const cartVariant = chosenVariant
@@ -192,7 +193,7 @@ const ShopBinderProductPage = () => {
         structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
-      <div className="container mx-auto px-4 py-6 md:py-10">
+      <div className="container-default py-6 md:py-10">
         <Breadcrumb items={[
           { label: 'Home', path: '/' },
           { label: 'Shop', path: '/shop' },
@@ -203,7 +204,14 @@ const ShopBinderProductPage = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
           {/* ── Gallery ─────────────────────────────────────────────────── */}
           <div>
-            <ProductImageCarousel key={row?.id || 'line'} images={images} />
+            {/* Hold the gallery until the colour is known: showing the
+                catalogue photos first and then swapping to the chosen
+                colour's own photos read as the page flashing. */}
+            {loading ? (
+              <Skeleton className="w-full aspect-[4/5] md:aspect-square rounded-3xl" />
+            ) : (
+              <ProductImageCarousel key={row?.id || 'line'} images={images} />
+            )}
           </div>
 
           {/* ── Buy box ─────────────────────────────────────────────────── */}
@@ -391,7 +399,7 @@ const ShopBinderProductPage = () => {
         </div>
 
         {product.details?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
+          <section className="mt-14">
             <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
             <div className="mt-4 space-y-4">
               {product.details.map((paragraph) => (
@@ -404,7 +412,7 @@ const ShopBinderProductPage = () => {
         <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
         {/* ── Specifications ──────────────────────────────────────────────── */}
-        <section className="mt-14 max-w-3xl">
+        <section className="mt-14">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>
           <dl className="mt-4 divide-y divide-border rounded-2xl border border-border overflow-hidden">
             {specs.map((spec) => (
@@ -418,7 +426,7 @@ const ShopBinderProductPage = () => {
 
         {/* ── FAQ ─────────────────────────────────────────────────────────── */}
         {product.faqs?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
+          <section className="mt-14">
             <h2 className="text-2xl font-bold text-foreground">Common questions</h2>
             <div className="mt-4 space-y-6">
               {product.faqs.map((faq) => (
@@ -443,7 +451,8 @@ const ShopBinderProductPage = () => {
               >
                 <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                   <CardImage
-                    src={binderImages(other)[0]}
+                    {...getCardImage(binderImages(other)[0], { widths: [240, 400, 600] })}
+                    sizes="(min-width: 1024px) 25vw, 50vw"
                     alt={binderImageAlt(other, other.imageFiles[0])}
                     imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                   />

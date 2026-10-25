@@ -31,9 +31,14 @@ Google's checklist items, as they apply here:
   payment returns to `/checkout-success` on our domain).
 - Confirmation page on our own domain — yes.
 - `<!DOCTYPE html>` as the very first bytes of every page, with nothing (not even
-  a blank line) before it — `index.html` (served for every SPA route) and
-  `api/prerender.js`. `index.html` used to open with a blank line; that was removed
-  and `tests/frontend/indexDoctype.test.js` now guards it.
+  a blank line) before it. The confirmation page is served from the **built**
+  `app.html` (every route but `/`; `/` is the built `index.html`), both derived
+  from the source `index.html` by the home-shell plugin in `vite.config.js`, plus
+  `api/prerender.js` for bots. `index.html` used to open with a blank line; that
+  was removed. Guards: `tools/doctype.mjs` is run by the build plugin on both
+  emitted documents and **fails the build** if anything precedes the DOCTYPE, and
+  `tests/frontend/indexDoctype.test.js` checks the source document, the helper
+  and (after `npm run build`) the emitted files.
 - HTTPS only — yes. Every card checkout (cart, embedded, buy-now/offer) returns
   to `/checkout-success`; nothing covers the opt-in dialog there (the badge is
   not started on that page).

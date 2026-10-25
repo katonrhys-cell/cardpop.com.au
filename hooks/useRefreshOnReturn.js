@@ -39,13 +39,25 @@ export function useRefreshOnReturn(refresh, { staleMs = DEFAULT_STALE_MS, enable
     };
     // Some browsers (and the embedded webviews) fire blur/focus without a
     // visibilitychange when the user switches apps; treat them the same way.
-    const onBlur = () => { if (hiddenAt === null) hiddenAt = Date.now(); };
+    // The window also blurs when focus moves into an embedded iframe (Stripe,
+    // Turnstile, YouTube) — the visitor never left, so coming back out of the
+    // frame must not refetch (and flash) the page. document.hasFocus() stays
+    // true while a child frame holds focus; check it once the blur settles.
+    let blurTimer = null;
+    const onBlur = () => {
+      const blurredAt = Date.now();
+      clearTimeout(blurTimer);
+      blurTimer = setTimeout(() => {
+        if (hiddenAt === null && !document.hasFocus()) hiddenAt = blurredAt;
+      }, 0);
+    };
     const onFocus = () => { if (document.visibilityState !== 'hidden') onVisibility(); };
 
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('blur', onBlur);
     window.addEventListener('focus', onFocus);
     return () => {
+      clearTimeout(blurTimer);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('blur', onBlur);
       window.removeEventListener('focus', onFocus);

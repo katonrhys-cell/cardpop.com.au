@@ -31,10 +31,10 @@ describe('EventFormModal — user/admin field parity', () => {
     expect(screen.queryByText('Feature on Homepage')).not.toBeInTheDocument();
   });
 
-  it('shows every tab in both modes', () => {
+  it('shows every tab in both modes (Member Offer is admin-only)', () => {
     const { unmount } = renderForm('admin');
     const tabNames = (els) => els.map((el) => el.textContent);
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer']);
     unmount();
     renderForm('user');
     expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO']);

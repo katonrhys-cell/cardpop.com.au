@@ -18,6 +18,7 @@ import { vaultItemListing } from '@/lib/vaultItemListing.js';
 import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { useCategories } from '@/hooks/useCategories.js';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
+import PlayersStrip from '@/components/PlayersStrip.jsx';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import SoldBadge from '@/components/SoldBadge.jsx';
@@ -195,7 +196,7 @@ const HolyGrailCard = ({ card, accentHex }) => {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.4 }}
-      className="group relative flex flex-col rounded-2xl overflow-hidden border-2 bg-card hover:shadow-2xl transition-all duration-300"
+      className="group relative isolate flex flex-col rounded-2xl overflow-hidden border-2 bg-card hover:shadow-2xl transition-all duration-300"
       style={{ borderColor: `${accentHex}40` }}
     >
       <div className="absolute top-3 left-3 z-20 flex flex-col items-start gap-1.5 pointer-events-none">
@@ -717,8 +718,10 @@ const CollectionPage = () => {
       {/* ── ERA STICKY PILL BAR ──────────────────────────────────────────────── */}
       {/* top-[70px] = mobile header (py-3 + h-[44px] icon ≈ 68px + 1px border)  */}
       {/* lg:top-[120px] = desktop: Row 1 (68px) + Row 2 nav (48px) + border (1px) */}
+      {/* z-30: above every in-card badge (Holy Grail / SOLD overlays are z-20) so tiles  */}
+      {/* scroll underneath the bar, below the z-50 header.                                */}
       {eras && eras.length > 0 && (
-        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-[70px] lg:top-[120px] z-20 shadow-sm">
+        <section className="border-b border-border bg-background/95 backdrop-blur-md sticky top-[70px] lg:top-[120px] z-30 shadow-sm">
           <div className="container mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide py-3">
 
@@ -780,6 +783,9 @@ const CollectionPage = () => {
             </button>
           </section>
         )}
+
+        {/* ── SHOP BY PLAYER (sports collections with player pages) ────────── */}
+        <PlayersStrip names={[slug, config.name, ...(config.categoryAliases ?? [])]} />
 
         {/* ── NEW RELEASES ─────────────────────────────────────────────────── */}
         <section>

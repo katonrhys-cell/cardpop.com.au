@@ -4,32 +4,35 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import StartTrialOptions from '@/components/StartTrialOptions.jsx';
+import MembershipBillingCard from '@/components/account/MembershipBillingCard.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { BadgeCheck, Clock, Gift, Loader2, Sparkles } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Clock, Crown, Gift, Loader2, Sparkles } from 'lucide-react';
 import { TRIAL_DAYS, TIER_PRICES_AUD, PAID_TIER_ORDER, normalizePaidTier } from '@/config/subscription.js';
-import { PLANS, planKeyFromTier } from '@/config/plans.js';
+import { PLANS, planKeyFromTier, isTopPlan, upgradePlansFor } from '@/config/plans.js';
 
 const statusLabel = (subscriptionStatus, tierName) => ({
   trialing:      { label: `${tierName} trial active`, tone: 'text-brand-red', Icon: Sparkles },
   active:        { label: `CardPop ${tierName} active`, tone: 'text-green-600', Icon: BadgeCheck },
-  grandfathered: { label: `CardPop ${tierName} active`, tone: 'text-green-600', Icon: BadgeCheck },
+  grandfathered: { label: `CardPop ${tierName} · complimentary`, tone: 'text-green-600', Icon: BadgeCheck },
   past_due:      { label: 'Payment overdue',   tone: 'text-yellow-600', Icon: Clock },
   canceled:      { label: 'Membership cancelled', tone: 'text-muted-foreground', Icon: Clock },
   none:          { label: 'Hobby (free) plan', tone: 'text-muted-foreground', Icon: Clock },
 }[subscriptionStatus]);
 
 const AccountMembership = () => {
-  const { isPro, subscriptionStatus, subscriptionTier, trialDaysLeft, refetchProfile } = useAuth();
+  const { isPro, isAdmin, subscriptionStatus, subscriptionTier, trialDaysLeft, refetchProfile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [activating, setActivating] = useState(false);
   const [welcomeCode, setWelcomeCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [codeConfirmed, setCodeConfirmed] = useState(false);
-  // Which paid tier the member is buying — preselected by /pricing's
-  // "?tier=premium" style links, switchable here before checkout.
+  // Which paid tier the member is buying — preselected by /pricing's and the
+  // dashboard's "?tier=premium" style links, switchable here before checkout.
   const [selectedTier, setSelectedTier] = useState(() => normalizePaidTier(params.get('tier')));
+  // A paid member upgrading in place: which tier is being switched to.
+  const [upgrading, setUpgrading] = useState(null);
 
   // Prefill the welcome-code input with the user's own unredeemed code so
   // arriving from the offer email is one click, not a copy-paste hunt.
@@ -105,9 +108,44 @@ const AccountMembership = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const currentTierName = PLANS[planKeyFromTier(subscriptionTier)]?.name || 'Pro';
+  const currentPlanKey = planKeyFromTier(subscriptionTier);
+  const currentTierName = PLANS[currentPlanKey]?.name || 'Pro';
   const meta = statusLabel(subscriptionStatus, currentTierName) || statusLabel('none', currentTierName);
   const { Icon } = meta;
+  const complimentary = subscriptionStatus === 'grandfathered';
+  // Tiers a paid member can switch to — up or down. A tier change re-prices the
+  // existing subscription (no second trial), so it goes through its own
+  // endpoint, not the trial checkout. A complimentary plan is managed by
+  // CardPop, so it only ever shows what sits above it (disabled).
+  const changeOptions = !isPro ? [] : complimentary
+    ? upgradePlansFor(currentPlanKey)
+    : PAID_TIER_ORDER.filter((tier) => tier !== currentPlanKey);
+  const onTopPlan = complimentary && isTopPlan(currentPlanKey);
+  const currentRank = PAID_TIER_ORDER.indexOf(currentPlanKey);
+  // A member Stripe is billing (or trying to): show the billing controls, and
+  // never the trial sign-up to someone whose payment is merely failing.
+  const billed = !complimentary && ['trialing', 'active', 'past_due'].includes(subscriptionStatus);
+  const pastDue = subscriptionStatus === 'past_due';
+
+  const handleChangePlan = async (tier) => {
+    setUpgrading(tier);
+    try {
+      const res = await apiServerClient.fetch('/subscription/stripe/change-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not change your plan.');
+      await refetchProfile?.();
+      toast.success(`You're now on CardPop ${PLANS[data.tier]?.name || PLANS[tier].name}.`);
+      setParams({}, { replace: true });
+    } catch (err) {
+      toast.error(err.message || 'Could not change your plan.');
+    } finally {
+      setUpgrading(null);
+    }
+  };
 
   return (
     <AccountPageShell
@@ -133,9 +171,85 @@ const AccountMembership = () => {
             {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left on your free trial.
           </p>
         )}
+        {complimentary && (
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isAdmin
+              ? 'Every CardPop admin holds the Ultimate plan at no charge — it comes with your admin access, and you are never billed for it.'
+              : 'CardPop covers this membership — you are never billed for it.'}
+          </p>
+        )}
       </div>
 
-      {!isPro && (
+      {billed && <MembershipBillingCard subscriptionStatus={subscriptionStatus} onChanged={refetchProfile} />}
+
+      {isPro && (
+        <div className="rounded-card border border-border bg-card p-6">
+          {onTopPlan ? (
+            <>
+              <div className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+                <Crown className="h-5 w-5 text-brand-red" />
+                You're on our top plan
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Ultimate includes unlimited listings and every display style — there's nothing above it
+                {complimentary ? ', and nothing to pay' : ''}.
+              </p>
+            </>
+          ) : (
+            <>
+              <h2 className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
+                <ArrowUpRight className="h-5 w-5 text-brand-red" />
+                {complimentary ? 'Upgrade your plan' : 'Change your plan'}
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {complimentary
+                  ? 'Your complimentary membership is managed by CardPop — contact support to change it.'
+                  : 'Move up or down any time. The change applies straight away and is pro-rated on your next invoice — a downgrade credits the unused part of your current plan. Your trial, if you have one, carries over. To stop paying altogether, cancel your membership above.'}
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                {changeOptions.map((key) => {
+                  const plan = PLANS[key];
+                  const preselected = normalizePaidTier(params.get('tier')) === key;
+                  const busy = upgrading === key;
+                  const verb = PAID_TIER_ORDER.indexOf(key) > currentRank ? 'Upgrade' : 'Downgrade';
+                  return (
+                    <div
+                      key={key}
+                      className={`flex flex-col rounded-xl border p-4 ${
+                        preselected ? 'border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20' : 'border-border bg-card'
+                      }`}
+                    >
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-heading text-base font-bold text-foreground">{plan.name}</span>
+                        <span className="text-sm font-semibold text-foreground">${TIER_PRICES_AUD[key]}/mo</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{plan.tagline}</p>
+                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                        {plan.features.slice(1, 4).map((f) => (
+                          <li key={f} className="flex gap-1.5"><BadgeCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-red" />{f}</li>
+                        ))}
+                      </ul>
+                      <Button
+                        type="button"
+                        onClick={() => handleChangePlan(key)}
+                        disabled={complimentary || upgrading != null}
+                        className="mt-4 w-full bg-brand-red font-bold hover:bg-brand-red/90"
+                      >
+                        {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : `${complimentary ? 'Switch' : verb} to ${plan.name}`}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                <Link to="/pricing" className="text-primary hover:underline">Compare every plan →</Link>
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {!isPro && !pastDue && (
         <>
           <div className="rounded-card border border-brand-red/30 bg-brand-red/5 p-6">
             <div className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">

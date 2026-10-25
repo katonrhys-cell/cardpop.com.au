@@ -38,7 +38,7 @@ import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta } from '@/utils/shopStock.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { fetchFamily, familyAsVariants, familyProductPath } from '@/utils/shopFamily.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { shopProductPath, shopProductBasePath, shopCategorySlug, legacyShopProductPath } from '@/utils/shopProductUrl.js';
@@ -128,7 +128,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
 
   useEffect(() => {
     let isMounted = true;
-    const fetchProduct = async () => {
+    // `silent` is a background refresh (realtime update, return to the tab):
+    // the page is already showing this product, so keep it on screen and swap
+    // the fresh data in, rather than blanking it to the full-page skeleton.
+    const fetchProduct = async ({ silent = false } = {}) => {
       if (!id || !source) {
         if (isMounted) setError('Invalid product link.');
         setLoading(false);
@@ -139,7 +142,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
       // stay up (loading stays true) until the re-run decides the outcome.
       let stillResolving = false;
       try {
-        setLoading(true);
+        if (!silent) setLoading(true);
 
         if (source === 'marketplace') {
           const { data: listing, error: fetchError } = await supabase
@@ -334,7 +337,9 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
           }
         }
       } catch (err) {
-        if (isMounted) setError('Product not found or unavailable.');
+        // A failed background refresh (e.g. a dropped connection) keeps the
+        // product that is already on screen.
+        if (isMounted && !silent) setError('Product not found or unavailable.');
       } finally {
         if (isMounted && !stillResolving) setLoading(false);
       }
@@ -383,7 +388,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     if (!viewerId || !loadedProductId || !id) return undefined;
     // Private vault views have no live state worth a channel.
     if (source !== 'marketplace' && source !== 'shop') return undefined;
-    const refetch = () => fetchRef.current?.();
+    const refetch = () => fetchRef.current?.({ silent: true });
     let channel = supabase.channel(uniqueTopic(`product-detail-${id}`));
     if (source === 'marketplace') {
       channel = channel.on('postgres_changes',
@@ -403,7 +408,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
 
   // Everyone else (and signed-in viewers too, as a belt-and-braces) refetches
   // when they come back to the tab after a while.
-  useRefreshOnReturn(() => fetchRef.current?.(), { enabled: Boolean(loadedProductId) });
+  useRefreshOnReturn(() => fetchRef.current?.({ silent: true }), { enabled: Boolean(loadedProductId) });
 
   // Shared by "Buy Now" (adds, then straight to checkout) and "Add to cart"
   // (adds, toast with a View Cart action). Resolves to true once the line is in
@@ -417,12 +422,12 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     const shopVariants = source === 'shop' ? activeVariants(product) : [];
     const chosenVariant = shopVariants.find((v) => v.id === selectedVariantId) || null;
     if (shopVariants.length > 0 && !chosenVariant) {
-      toast.error('Please choose a colour first.');
+      toast.error(`Please choose a ${variantKind(product).toLowerCase()} first.`);
       return;
     }
     const unlimited = source === 'shop' && isPreorder(product);
     if (chosenVariant && !unlimited && !variantInStock(chosenVariant)) {
-      toast.error(`${chosenVariant.colour || 'That colour'} is sold out.`);
+      toast.error(`${chosenVariant.colour || 'That option'} is sold out.`);
       return;
     }
     const priceInCents = Math.round((chosenVariant ? variantPrice(product, chosenVariant) : (product.price || 0)) * 100);
@@ -504,7 +509,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
 
   if (loading) {
     return (
-      <div className="max-w-[90rem] mx-auto px-4 py-12">
+      <div className="container-default py-12">
         <Skeleton className="h-6 w-32 mb-8 rounded-md" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16">
           <div className="lg:col-span-7">

@@ -27,6 +27,11 @@ import { markTransformsUnavailable } from '@/utils/imageUrl.js';
 // Thumbnail URLs that 404'd/errored this session — skipped on later renders so
 // a missing companion thumb costs at most one request per session.
 const failedThumbs = new Set();
+// URLs that have already loaded this session. A card that remounts on one of
+// them (navigating back to a grid, re-filtering, a parent refetch) starts
+// visible instead of replaying the shimmer + fade over an image the browser
+// already has — that replay made every card on the page blink.
+const loadedUrls = new Set();
 const CardImage = ({
   src,
   srcSet,
@@ -47,23 +52,28 @@ const CardImage = ({
   priority = false,
   ...props
 }) => {
-  const [status, setStatus] = useState('loading'); // 'loading' | 'loaded' | 'error'
-  const [tier, setTier] = useState(0); // index into `candidates` below
-  const imgRef = useRef(null);
-
   // Ordered, de-duplicated list of sources to try. The primary carries the
   // srcSet; every fallback is a single untransformed URL. Filtering out
   // duplicates keeps the error handler from "advancing" to the same URL (which
-  // would loop) when, say, fallbackSrc === src (no CDN configured).
+  // would loop) when, say, fallbackSrc === src (no CDN configured). The thumb
+  // stays in the list even once it has failed — a known-dead thumb is skipped
+  // by starting past it (startTier) instead. Dropping it from the list
+  // re-indexed every later entry, so the tier just advanced to (and every other
+  // card showing that thumb) jumped past the primary to the wrong source.
   const candidates = [];
-  if (thumbSrc && !failedThumbs.has(thumbSrc)) {
-    candidates.push({ url: thumbSrc, kind: 'thumb' });
-  }
+  if (thumbSrc) candidates.push({ url: thumbSrc, kind: 'thumb' });
   if (src) candidates.push({ url: src, srcSet: srcSet || undefined, kind: 'primary' });
   if (fallbackSrc && fallbackSrc !== src) candidates.push({ url: fallbackSrc });
   if (canonicalSrc && canonicalSrc !== src && canonicalSrc !== fallbackSrc) {
     candidates.push({ url: canonicalSrc });
   }
+  const startTier = thumbSrc && failedThumbs.has(thumbSrc) ? 1 : 0;
+
+  const [tier, setTier] = useState(startTier); // index into `candidates`
+  const [status, setStatus] = useState( // 'loading' | 'loaded' | 'error'
+    () => (loadedUrls.has(candidates[startTier]?.url) ? 'loaded' : 'loading'),
+  );
+  const imgRef = useRef(null);
 
   // Reset when the source changes (e.g. a card re-used in a virtualised list,
   // or the session flipping to untransformed URLs after a transformed one
@@ -73,7 +83,7 @@ const CardImage = ({
   // source in place. Forcing opacity-0 here made loaded homepage photos
   // visibly flicker/disappear on every such re-render (e.g. while scrolling).
   useEffect(() => {
-    setTier(0);
+    setTier(startTier);
     setStatus((prev) => (prev === 'loaded' ? 'loaded' : 'loading'));
   }, [src, thumbSrc]);
 
@@ -90,6 +100,7 @@ const CardImage = ({
   useEffect(() => {
     const img = imgRef.current;
     if (img && img.complete && img.naturalWidth > 0) {
+      loadedUrls.add(effectiveSrc);
       setStatus('loaded');
     }
   }, [effectiveSrc]);
@@ -137,7 +148,7 @@ const CardImage = ({
         // global CDN→origin safety net in utils/imageCdnFallback.js must not
         // also mutate its src — opt out.
         data-managed-image=""
-        onLoad={() => setStatus('loaded')}
+        onLoad={() => { loadedUrls.add(effectiveSrc); setStatus('loaded'); }}
         onError={handleError}
         // Priority (LCP) images render at full opacity immediately — the fade-in
         // used for below-the-fold cards would delay their first paint.

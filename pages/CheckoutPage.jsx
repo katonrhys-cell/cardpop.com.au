@@ -27,12 +27,19 @@ import MarketplacePurchaseGate from '@/components/checkout/MarketplacePurchaseGa
 import CheckoutReassurance from '@/components/checkout/CheckoutReassurance.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
-import { AMAZON_LOCATION_ENABLED } from '@/lib/amazonLocation.js';
+import { ADDRESS_AUTOCOMPLETE_ENABLED } from '@/lib/addressAutocomplete.js';
 import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
 import { fetchSavedAddresses, addressRowToShipping, formatAddressLabel } from '@/lib/savedAddresses.js';
 import { trackBeginCheckout, trackAddPaymentInfo } from '@/lib/analytics.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { marketplaceGate, hasMarketplaceLine } from '@/utils/marketplaceIdentity.js';
+import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
+import { PURCHASABLE_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
+import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant } from '@/utils/shopVariants.js';
+import {
+  parseCheckoutLinkParams, normaliseSku, shopRowToCartLine, listingRowToCartLine,
+  CHECKOUT_LINK_ID_PARAM, CHECKOUT_LINK_QUANTITY_PARAM,
+} from '@/utils/checkoutLink.js';
 import { Link } from 'react-router-dom';
 
 // The typed-in details survive a reload or a detour through sign-in. Per-tab
@@ -152,6 +159,78 @@ const CheckoutPage = () => {
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per restore link
+  }, []);
+
+  // ?id=<sku or uuid>&quantity=<n> — Google Merchant Center's checkout link
+  // (template in utils/checkoutLink.js): a Shopping ad / free listing lands
+  // here with the product already chosen. Look it up — a shop product by SKU
+  // or id, a colour variant by its SKU, else an active buy-now listing by id —
+  // add it to the cart, then drop the params so a refresh can't add it twice.
+  // Everything is re-priced server-side at checkout; this only fills the cart.
+  const linkedRef = useRef(false);
+  useEffect(() => {
+    const link = parseCheckoutLinkParams(searchParams);
+    if (!link || linkedRef.current) return;
+    linkedRef.current = true;
+    let cancelled = false;
+    const resolveShop = async () => {
+      const productSelect = `${SHOP_CARD_COLUMNS}, ${VARIANTS_SELECT}`;
+      let q = supabase.from('shop_products').select(productSelect).in('status', PURCHASABLE_SHOP_STATUSES);
+      q = link.isUuid ? q.eq('id', link.id) : q.eq('sku', normaliseSku(link.id));
+      const { data: row } = await q.maybeSingle();
+      if (row) {
+        const variants = activeVariants(row);
+        const variant = variants.length > 0 ? pickDefaultVariant(row) : null;
+        return shopRowToCartLine(row, {
+          variant, quantity: link.quantity, resolveImage: resolveImg,
+          preorderFields: preorderCartFields, isUnlimited: hasUnlimitedStock, toCartVariant,
+        });
+      }
+      if (link.isUuid) return null;
+      // A colour variant's own SKU → its product with that colour chosen.
+      const { data: v } = await supabase
+        .from('shop_product_variants')
+        .select(`id, sku, barcode, colour, colour_hex, stock_quantity, price_aud, status, sort_order, product:shop_products!product_id(${SHOP_CARD_COLUMNS})`)
+        .eq('sku', normaliseSku(link.id))
+        .eq('status', 'active')
+        .maybeSingle();
+      const product = v?.product;
+      if (!product || !PURCHASABLE_SHOP_STATUSES.includes(product.status)) return null;
+      return shopRowToCartLine(product, {
+        variant: v, quantity: link.quantity, resolveImage: resolveImg,
+        preorderFields: preorderCartFields, isUnlimited: hasUnlimitedStock, toCartVariant,
+      });
+    };
+    const resolveListing = async () => {
+      if (!link.isUuid) return null;
+      const { data: listing } = await supabase
+        .from('listings')
+        .select('id, status, listing_type, price_aud, seller:profiles!seller_id(is_admin), vault_item:vault_items!vault_item_id(card_name, set_name, grading_company, grade, card_image, card_images)')
+        .eq('id', link.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      return listingRowToCartLine(listing, { resolveImage: resolveImg });
+    };
+    (async () => {
+      try {
+        const line = (await resolveShop()) || (await resolveListing());
+        if (cancelled) return;
+        if (!line) { toast.error("That product isn't available right now."); return; }
+        const already = cartItems.some((i) => (i.variant?.id || i.product?.id) === (line.variant?.id || line.product.id));
+        if (already) return;
+        await addToCart(line.product, line.variant, line.quantity, line.availableQuantity);
+        if (!cancelled) toast.success(`${line.product.title} added to your cart.`);
+      } catch (e) {
+        if (!cancelled) toast.error(e?.message || 'Could not add that product to your cart.');
+      } finally {
+        if (cancelled) return;
+        const next = new URLSearchParams(searchParams);
+        next.delete(CHECKOUT_LINK_ID_PARAM); next.delete(CHECKOUT_LINK_QUANTITY_PARAM);
+        setSearchParams(next, { replace: true });
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per checkout link
   }, []);
 
   useEffect(() => {
@@ -474,10 +553,11 @@ const CheckoutPage = () => {
       toast.error('Please enter a valid email address for your receipt.');
       return false;
     }
-    // When Amazon Location autocomplete is active, the address must be one the
-    // user picked from the suggestions (verified) — not free-typed. Skipped if
-    // it couldn't load; the server still validates the address before charging.
-    if (AMAZON_LOCATION_ENABLED && !placesUnavailable && !verified) {
+    // When address autocomplete (Google Places / Amazon Location) is active, the
+    // address must be one the user picked from the suggestions (verified) — not
+    // free-typed. Skipped if it couldn't load; the server still validates the
+    // address before charging.
+    if (ADDRESS_AUTOCOMPLETE_ENABLED && !placesUnavailable && !verified) {
       toast.error('Please select your address from the suggestions so we can verify it.');
       return false;
     }
@@ -707,7 +787,7 @@ const CheckoutPage = () => {
       <div className="container-default">
 
         <header className="mb-8">
-          <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure checkout</h1>
+          <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure Checkout</h1>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
             <Lock className="h-3.5 w-3.5" /> Encrypted &amp; processed by Stripe — you never leave this page.
           </p>

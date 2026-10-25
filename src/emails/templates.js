@@ -25,12 +25,25 @@ export function esc(v) {
     .replace(/'/g, '&#39;');
 }
 
+// The brand logo at the top of every email. A trimmed copy of the official
+// lockup (card icon · CardPop™ · AUSTRALIA on its near-black ground) served
+// from the site at 2× so it stays crisp on retina inboxes. /images/ is cached
+// immutable for a year, so a new artwork needs a new -vN filename, never an
+// overwrite. The band behind it matches the artwork's own background so the
+// PNG's edges are invisible; the alt text (styled white) is what a client that
+// blocks remote images shows instead, so the header never reads as empty.
+export const EMAIL_LOGO_URL = 'https://cardpop.com.au/images/email/cardpop-logo-v1.png';
+const EMAIL_LOGO_BG = '#0A0A0A';
+const EMAIL_LOGO_WIDTH = 220; // 440px source ÷ 2
+
 export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaText, footerNote) {
   const cta = ctaUrl
     ? `<div style="text-align:center;margin:32px 0 0"><a href="${ctaUrl}" style="background:#E63946;color:#FFFFFF;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block;letter-spacing:-0.3px">${ctaText}</a></div>`
     : '';
+  // The title band sits directly under the near-black logo header, so it is
+  // brand red (as the header used to be) rather than charcoal-on-black.
   const titleRow = titleBand
-    ? `<tr><td style="background:#1C1C1E;padding:20px 40px;"><p style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.3;">${titleBand}</p></td></tr>`
+    ? `<tr><td style="background:#E63946;padding:20px 40px;"><p style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.3;">${titleBand}</p></td></tr>`
     : '';
   const greetingRow = greeting
     ? `<p style="margin:0 0 20px;font-size:17px;font-weight:600;color:#111827;">${greeting}</p>`
@@ -45,9 +58,8 @@ export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaTex
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F0F5;padding:40px 16px;">
 <tr><td align="center">
 <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
-<tr><td style="background:#E63946;border-radius:12px 12px 0 0;padding:28px 40px 24px;text-align:center;">
-<p style="margin:0;font-size:30px;font-weight:900;color:#FFFFFF;letter-spacing:-1px;">CardPop</p>
-<p style="margin:6px 0 0;font-size:11px;color:rgba(255,255,255,0.75);letter-spacing:2.5px;text-transform:uppercase;">Australia's Card Marketplace</p>
+<tr><td style="background:${EMAIL_LOGO_BG};border-radius:12px 12px 0 0;padding:24px 40px;text-align:center;">
+<a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-size:26px;font-weight:900;color:#FFFFFF;letter-spacing:-1px;text-align:center;"></a>
 </td></tr>
 ${titleRow}
 <tr><td style="background:#FFFFFF;padding:40px;">
@@ -476,6 +488,34 @@ ${summaryTable([
     `Identity verification needs review: ${esc(userName) || 'A user'}`,
     'Identity Review Needed',
     'A verification needs your review',
+    body,
+    `https://cardpop.com.au/admin/users/${userId}`,
+    'Review in Admin',
+    'You received this because you are a CardPop admin.',
+  );
+}
+
+// ─── Sole trader mode changed (admin) ─────────────────────────────────────────
+
+// Internal heads-up when a member switches Sole Trader mode on or off in
+// Account → Sole Trader, so admins know a dealer store page appeared or went.
+export function soleTraderChangedEmail({ userId, userName, userEmail, enabled, businessName, abn, storeSlug }) {
+  const state = enabled ? 'switched ON' : 'switched OFF';
+  const body = `<p>A member has ${state} Sole Trader mode on their account.</p>
+${summaryTable([
+  ['Member', esc(userName) || '—'],
+  ['Email', esc(userEmail) || '—'],
+  ['Status', enabled ? 'Sole trader (store page live)' : 'Not a sole trader (store page hidden)'],
+  ['Business name', esc(businessName) || '—'],
+  ['ABN', esc(abn) || '—'],
+  ['Store URL', storeSlug ? `https://cardpop.com.au/dealer/${esc(storeSlug)}` : '—'],
+])}
+<p>Open the member's admin page to review or verify the business.</p>`;
+
+  return cpEmail(
+    `Sole trader mode ${enabled ? 'enabled' : 'disabled'}: ${esc(userName) || 'A member'}`,
+    'Sole Trader Change',
+    `Sole trader mode ${enabled ? 'enabled' : 'disabled'}`,
     body,
     `https://cardpop.com.au/admin/users/${userId}`,
     'Review in Admin',
@@ -970,5 +1010,32 @@ ${centred('It’s applied automatically at checkout when you’re signed in.')}`
     'https://cardpop.com.au/marketplace',
     'Find Your First Card',
     'This one-time offer was generated for your CardPop account and can’t be transferred.',
+  );
+}
+
+// Sent on Stripe's `customer.subscription.trial_will_end` (3 days before the
+// first charge) so a member who forgot about the trial can cancel before it
+// bills — and knows exactly where to do it.
+export function membershipTrialEndingEmail({ name, planName, amountAud, chargeDate }) {
+  const when = new Date(chargeDate);
+  const whenStr = when.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const daysLeft = Math.max(1, Math.ceil((when.getTime() - Date.now()) / 86400000));
+  const price = amountAud != null ? `${money(amountAud)}/month` : 'the monthly price';
+  const body = `${heroBadge('⏱', TILE.charcoal)}
+${heroHeading('Your free trial ends soon', `Hi ${esc(name || 'there')} — here’s what happens next.`)}
+${statRow([
+  { glyph: '★', colour: TILE.red, value: esc(planName), caption: 'Your trial plan', small: true },
+  { glyph: '⏱', colour: TILE.charcoal, value: String(daysLeft), caption: `${plural(daysLeft, 'Day', 'Days')} left · ${esc(whenStr)}` },
+])}
+${centred(`On ${esc(whenStr)} your card will be charged ${esc(price)} to keep CardPop ${esc(planName)}.`)}
+${centred('Don’t want it? Cancel any time before then from Account → Membership and you won’t be charged. Your account stays on the free Hobby plan — buying and selling still work.')}`;
+  return cpEmail(
+    `Your CardPop ${esc(planName)} trial ends ${esc(whenStr)}.`,
+    '',
+    '',
+    body,
+    'https://cardpop.com.au/account/membership',
+    'Manage Membership',
+    'You’re receiving this because you started a free trial of a CardPop membership.',
   );
 }

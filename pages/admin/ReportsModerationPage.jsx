@@ -139,7 +139,7 @@ const ReportsModerationPage = () => {
   const pendingActionCfg = ACTIONS.find(a => a.value === pendingAction);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <Helmet><title>Reports & Moderation | Admin</title></Helmet>
 
       <AdminPageHeader

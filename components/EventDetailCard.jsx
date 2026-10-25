@@ -7,6 +7,9 @@ import { formatEntryFee, eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } fro
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
+import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
+import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
+import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { toast } from 'sonner';
 
@@ -16,6 +19,11 @@ const EventDetailCard = ({ event, isPast = false }) => {
   const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
   const fbEmbedUrl = facebookEmbedUrl(event.facebook_video_url);
   const ytFrameRef = useRef(null);
+  // Member ticket code + referral link (lib/eventTicketOffers.js). Finished
+  // events show no tickets, so don't ask.
+  const ticketOffer = useEventTicketOffer(event.id, { enabled: !isPast });
+  const ticketLink = ticketDestination(event, ticketOffer);
+  const countTicketClick = () => { if (ticketOffer) recordEventTicketClick(event.id); };
 
   // Start the YouTube video automatically 10 seconds after the page loads.
   // Uses the iframe player API via postMessage (enabled by ?enablejsapi=1 on
@@ -260,9 +268,16 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
             {!isPast && (
             <div className="space-y-3 pt-4">
-              {event.ticketLink ? (
+              <EventTicketOffer eventId={event.id} offer={ticketOffer} />
+              {ticketLink ? (
                 <Button className="w-full h-12 text-base font-bold shadow-lg shadow-primary/20" asChild>
-                  <a href={event.ticketLink} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={ticketLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={countTicketClick}
+                    onAuxClick={countTicketClick}
+                  >
                     <Ticket className="w-5 h-5 mr-2" /> Get Tickets
                   </a>
                 </Button>

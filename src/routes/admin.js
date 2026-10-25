@@ -17,6 +17,7 @@ import logger from '../utils/logger.js';
 import { runSupplierPriceWatch } from '../services/supplierPriceWatchService.js';
 import { syncSiteTraffic, Ga4NotConfiguredError } from '../services/siteTrafficService.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
+import { grantAdminComplimentaryMembership, revokeAdminComplimentaryMembership } from '../services/subscriptionService.js';
 
 const router = Router();
 
@@ -63,6 +64,13 @@ router.post('/user-emails', async (req, res) => {
 });
 
 // ─── Set a user's admin flag ──────────────────────────────────────────────────
+// Admin access includes the Ultimate plan, free (docs/SUBSCRIPTION_SETUP.md →
+// Complimentary memberships). Promotion first cancels any Stripe subscription
+// the account was paying for — the one step the DB trigger
+// (trg_sync_admin_complimentary_membership) can't do — then flips is_admin;
+// demotion takes the complimentary plan away again. A failure in the plan step
+// is reported as a failure: an admin left paying for a plan they now hold free
+// is exactly the bill this rule exists to prevent.
 router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), validateRequestBody(setUserRoleBodySchema), async (req, res) => {
   const { userId } = req.params;
   const { is_admin } = req.body;
@@ -73,6 +81,11 @@ router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), va
   }
 
   try {
+    let cancelledStripeSubscription = null;
+    if (is_admin) {
+      ({ cancelledStripeSubscription } = await grantAdminComplimentaryMembership(userId));
+    }
+
     const { data, error } = await supabase
       .from('profiles')
       .update({ is_admin })
@@ -81,16 +94,21 @@ router.patch('/users/:userId/role', validateRequestParams(setUserRoleSchema), va
       .single();
     if (error) throw error;
 
+    if (!is_admin) await revokeAdminComplimentaryMembership(userId);
+
     await supabase.from('audit_logs').insert({
       user_id: req.user.id,
       event_type: 'update_user_admin',
-      description: `Set is_admin=${is_admin} for user ${userId}`,
+      description: is_admin
+        ? `Set is_admin=true for user ${userId} (complimentary Ultimate granted${cancelledStripeSubscription ? `, Stripe ${cancelledStripeSubscription} cancelled` : ''})`
+        : `Set is_admin=false for user ${userId} (complimentary membership revoked)`,
       status: 'success',
     }).then(() => {}, () => {});
 
     logger.info(`[ADMIN] ${req.user.id} set is_admin=${is_admin} for ${userId}`);
-    res.json({ success: true, user: data });
+    res.json({ success: true, user: data, cancelledStripeSubscription });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error(`[ADMIN] Failed to update admin flag: ${err.message}`);
     res.status(500).json({ error: 'Failed to update admin status' });
   }

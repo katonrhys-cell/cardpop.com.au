@@ -212,7 +212,7 @@ const ShopPage = () => {
             <p className="font-bold text-lg">{error}</p>
             <Button variant="outline" className="mt-4" onClick={() => fetchRef.current?.(0, { append: false })}>Retry</Button>
           </div>
-        ) : loading ? (
+        ) : loading && products.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
             {Array(8).fill(0).map((_, i) => (
               <div key={i} className="space-y-4">

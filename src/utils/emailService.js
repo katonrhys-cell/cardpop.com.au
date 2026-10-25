@@ -12,6 +12,7 @@ import {
   launchWelcomeEmail,
   eventSubmittedEmail,
   identityReviewNeededEmail,
+  soleTraderChangedEmail,
   orderAdminNoticeEmail,
   contactMessageEmail,
   offerReceivedEmail,
@@ -27,6 +28,7 @@ import {
   savedSearchMatchesEmail,
   backInStockEmail,
   welcomeOfferReminderEmail,
+  membershipTrialEndingEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -287,6 +289,16 @@ export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail
   });
 }
 
+// Admin heads-up when a member switches Sole Trader mode on or off. `to` may be
+// a single address or an array.
+export async function sendSoleTraderChanged({ to, enabled, userName, ...details }) {
+  return send({
+    to,
+    subject: `Sole trader mode ${enabled ? 'enabled' : 'disabled'}: ${userName || 'A member'}`,
+    html: soleTraderChangedEmail({ enabled, userName, ...details }),
+  });
+}
+
 /**
  * Tells the buyer their parcel arrived, starts the Buyer Protection clock in
  * writing and asks for a seller rating.
@@ -326,4 +338,8 @@ export async function sendBackInStock({ to, productTitle, priceAud, url }) {
 
 export async function sendWelcomeOfferReminder({ to, name, code, discountPct, expiresAt }) {
   return send({ to, subject: `Your ${Number(discountPct)}% welcome code expires soon`, html: welcomeOfferReminderEmail({ name, code, discountPct, expiresAt }) });
+}
+
+export async function sendMembershipTrialEnding({ to, name, planName, amountAud, chargeDate }) {
+  return send({ to, subject: `Your CardPop ${planName} free trial ends soon`, html: membershipTrialEndingEmail({ name, planName, amountAud, chargeDate }) });
 }

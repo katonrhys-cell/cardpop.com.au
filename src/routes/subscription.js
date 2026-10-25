@@ -3,12 +3,20 @@ import express from 'express';
 import stripe from '../utils/stripeClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { requireAal2 } from '../middleware/requireAal2.js';
 import { invalidReturnUrl } from '../utils/returnUrl.js';
 import {
   getOrCreateStripeCustomer,
   applyPaypalSubscription,
   mapPaypalStatus,
   getSubscriptionStatus,
+  changeStripeSubscriptionTier,
+  assertCanStartPaidMembership,
+  getStripeMembershipDetails,
+  cancelStripeMembership,
+  resumeStripeMembership,
+  createMembershipCardSession,
+  confirmMembershipCard,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -55,6 +63,9 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
     const userId = req.user.id;
+    // Admins hold Ultimate free and complimentary members already have their
+    // plan — never bill either (a subscription the profile ignores).
+    await assertCanStartPaidMembership(userId);
     const customerId = await getOrCreateStripeCustomer(userId, req.user.email);
 
     // Partner referral: the partner's % comes off the first invoice (a 'once'
@@ -110,8 +121,89 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     logger.info(`[SUB] Stripe subscription checkout created for ${userId}: ${session.id}`);
     res.json({ url: session.url });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error(`[SUB] /stripe/checkout error: ${err.message}`);
     res.status(500).json({ error: 'Could not start Stripe checkout' });
+  }
+});
+
+// ─── POST /stripe/change-tier ────────────────────────────────────────────────
+// Move an existing Stripe-billed membership to another paid tier, up or down,
+// in place (re-prices the subscription with prorations; no new trial). Hobby members
+// and anyone without an active Stripe subscription get a 409 and should start
+// a plan through /stripe/checkout instead. MFA-gated like the other routes
+// that change what the member's card is charged.
+router.post('/stripe/change-tier', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    const result = await changeStripeSubscriptionTier(req.user.id, req.body?.tier);
+    res.json(result);
+  } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+    logger.error(`[SUB] /stripe/change-tier error: ${err.message}`);
+    res.status(500).json({ error: 'Could not change your plan' });
+  }
+});
+
+// ─── Membership self-service (Account → Membership) ──────────────────────────
+// Members must be able to leave without emailing support: before these routes
+// existed the only way out of a trial was to ask, and an unpaid trial
+// conversion kept retrying the card while the account read "Hobby".
+function relayError(res, err, label, fallback) {
+  if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+  logger.error(`[SUB] ${label} error: ${err.message}`);
+  return res.status(500).json({ error: fallback });
+}
+
+// GET /stripe/details — live billing state from Stripe (scheduled cancellation,
+// when the period / trial ends, price). `null` when there's no Stripe membership.
+router.get('/stripe/details', authMiddleware, async (req, res) => {
+  try {
+    res.json({ membership: await getStripeMembershipDetails(req.user.id) });
+  } catch (err) {
+    relayError(res, err, '/stripe/details', 'Could not load your membership');
+  }
+});
+
+// POST /stripe/cancel — trialing/active: cancel at period end (a trial ends
+// uncharged); failing payment: cancel now and void the unpaid invoice.
+router.post('/stripe/cancel', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    res.json({ membership: await cancelStripeMembership(req.user.id) });
+  } catch (err) {
+    relayError(res, err, '/stripe/cancel', 'Could not cancel your membership');
+  }
+});
+
+// POST /stripe/resume — undo a scheduled cancellation before the period ends.
+router.post('/stripe/resume', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    res.json({ membership: await resumeStripeMembership(req.user.id) });
+  } catch (err) {
+    relayError(res, err, '/stripe/resume', 'Could not keep your membership');
+  }
+});
+
+// POST /stripe/update-card — start a card change for the membership (hosted
+// card step in setup mode, no charge). Returns the URL to send the member to.
+router.post('/stripe/update-card', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    const { successUrl, cancelUrl } = req.body || {};
+    if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+    const bad = invalidReturnUrl({ successUrl, cancelUrl });
+    if (bad) return res.status(400).json({ error: bad });
+    res.json({ url: await createMembershipCardSession(req.user.id, { successUrl, cancelUrl }) });
+  } catch (err) {
+    relayError(res, err, '/stripe/update-card', 'Could not start the card update');
+  }
+});
+
+// POST /stripe/update-card/confirm — the return leg: make the new card the
+// membership's payment method (and retry an overdue invoice on it).
+router.post('/stripe/update-card/confirm', authMiddleware, async (req, res) => {
+  try {
+    res.json({ membership: await confirmMembershipCard(req.user.id, req.body?.sessionId) });
+  } catch (err) {
+    relayError(res, err, '/stripe/update-card/confirm', 'Could not update your card');
   }
 });
 
@@ -129,6 +221,7 @@ router.post('/paypal/create', authMiddleware, async (req, res) => {
     const badPaypalUrl = invalidReturnUrl({ returnUrl, cancelUrl });
     if (badPaypalUrl) return res.status(400).json({ error: badPaypalUrl });
 
+    await assertCanStartPaidMembership(req.user.id);
     const tier = normalizePaidTier(req.body?.tier);
     const { id, approveUrl } = await createPaypalSubscription({
       userId: req.user.id,
@@ -150,6 +243,7 @@ router.post('/paypal/create', authMiddleware, async (req, res) => {
     logger.info(`[SUB] PayPal subscription created for ${req.user.id}: ${id}`);
     res.json({ id, approveUrl });
   } catch (err) {
+    if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error(`[SUB] /paypal/create error: ${err.message}`);
     res.status(500).json({ error: 'Could not start PayPal checkout' });
   }

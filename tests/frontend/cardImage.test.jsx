@@ -143,4 +143,33 @@ describe('CardImage', () => {
     completeSpy.mockRestore();
     widthSpy.mockRestore();
   });
+  it('starts a remount on an already-loaded url visible, with no shimmer or fade replay', () => {
+    const { unmount, container } = render(<CardImage src="https://cdn/object/seen.jpg" alt="Seen" />);
+    fireEvent.load(screen.getByAltText('Seen'));
+    unmount();
+
+    // Navigating back to the grid remounts the card on the same url.
+    const again = render(<CardImage src="https://cdn/object/seen.jpg" alt="Seen" />);
+    expect(screen.getByAltText('Seen').className).toContain('opacity-100');
+    expect(again.container.querySelector('.animate-pulse')).toBeNull();
+    expect(container.querySelector('.animate-pulse')).toBeNull();
+  });
+
+  it('steps from a dead thumbnail to the primary, and later cards skip the dead thumb', () => {
+    const props = {
+      thumbSrc: 'https://cdn/object/dead.thumb.webp',
+      src: 'https://cdn/render/dead.jpg?w=400',
+      fallbackSrc: 'https://cdn/object/dead.jpg',
+    };
+    render(<CardImage {...props} alt="First" />);
+    expect(screen.getByAltText('First').getAttribute('src')).toBe(props.thumbSrc);
+    fireEvent.error(screen.getByAltText('First'));
+    // Next source is the primary, not the untransformed fallback.
+    expect(screen.getByAltText('First').getAttribute('src')).toBe(props.src);
+
+    render(<CardImage {...props} alt="Second" />);
+    expect(screen.getByAltText('Second').getAttribute('src')).toBe(props.src);
+    // The first card did not get re-indexed onto a different source.
+    expect(screen.getByAltText('First').getAttribute('src')).toBe(props.src);
+  });
 });

@@ -18,7 +18,7 @@ const ProductReviews = ({ title, stats, reviews, loading }) => {
   const average = formatAverageRating(stats?.average_rating);
 
   return (
-    <section className="mt-14 max-w-3xl" id="reviews" aria-labelledby="reviews-heading">
+    <section className="mt-14" id="reviews" aria-labelledby="reviews-heading">
       <h2 id="reviews-heading" className="text-2xl font-bold text-foreground">Customer reviews</h2>
 
       {count === 0 || !average ? (

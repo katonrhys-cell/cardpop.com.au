@@ -5,6 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import CardImage from '@/components/CardImage.jsx';
+import { getCardImage } from '@/utils/imageUrl.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import SizePicker from '@/components/shop/SizePicker.jsx';
 import useSizeStock from '@/hooks/useSizeStock.js';
 import { sizeGroupFor, sizeProductPath } from '@/utils/shopSizes.js';
-import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
 import { colourListText, familyAsVariants, familyHasPurchasable, productImages, sortColourNames } from '@/utils/shopFamily.js';
 import ColourSwatch from '@/components/shop/ColourSwatch.jsx';
 import useShopLine from '@/hooks/useShopLine.js';
@@ -128,7 +129,7 @@ const ShopProductPage = () => {
 
   const handleAddToCart = () => {
     if (!row || !isPurchasable) return;
-    if (variants.length > 0 && !chosenVariant) { toast.error('Please choose a colour first.'); return; }
+    if (variants.length > 0 && !chosenVariant) { toast.error(`Please choose a ${variantKind(row).toLowerCase()} first.`); return; }
     if (!inStock) return;
     const unitPrice = chosenVariant ? variantPrice({ price_aud: price }, chosenVariant) : price;
     const cartVariant = chosenVariant
@@ -223,7 +224,7 @@ const ShopProductPage = () => {
         structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
 
-      <div className="container mx-auto px-4 py-6 md:py-10">
+      <div className="container-default py-6 md:py-10">
         <Breadcrumb items={[
           { label: 'Home', path: '/' },
           { label: 'Shop', path: '/shop' },
@@ -232,7 +233,13 @@ const ShopProductPage = () => {
         ]} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
-          <div><ProductImageCarousel key={row?.id || 'line'} images={images} /></div>
+          <div>
+            {loading ? (
+              <Skeleton className="w-full aspect-[4/5] md:aspect-square rounded-3xl" />
+            ) : (
+              <ProductImageCarousel key={row?.id || 'line'} images={images} />
+            )}
+          </div>
 
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -413,20 +420,6 @@ const ShopProductPage = () => {
               </div>
             ))}
 
-            {highlights.length > 0 && (
-              <div className="mt-8">
-                <h2 className="text-lg font-bold text-foreground">Why collectors pick this one</h2>
-                <ul className="mt-3 space-y-2">
-                  {highlights.map((point) => (
-                    <li key={point} className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground">
-                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
-                      <span>{point}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
             {category.choosing && (
               <div className="mt-8">
                 <h2 className="text-lg font-bold text-foreground">Choosing the right one</h2>
@@ -436,20 +429,40 @@ const ShopProductPage = () => {
           </div>
         </div>
 
-        {product.details?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
-            <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
-            <div className="mt-4 space-y-4">
-              {product.details.map((paragraph) => (
-                <p key={paragraph.slice(0, 40)} className="text-base leading-relaxed text-muted-foreground">{paragraph}</p>
-              ))}
-            </div>
+        {/* The long-form copy sits under the photo at the page's full width: the
+            "About" paragraphs alongside the highlight list, so a reader who
+            scrolls past the price gets the whole pitch in one band. */}
+        {(product.details?.length > 0 || highlights.length > 0) && (
+          <section className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-3 lg:gap-12">
+            {product.details?.length > 0 && (
+              <div className="lg:col-span-2">
+                <h2 className="text-2xl font-bold text-foreground">About the {product.shortTitle}</h2>
+                <div className="mt-4 space-y-4">
+                  {product.details.map((paragraph) => (
+                    <p key={paragraph.slice(0, 40)} className="text-base leading-relaxed text-muted-foreground">{paragraph}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+            {highlights.length > 0 && (
+              <div className={product.details?.length > 0 ? 'self-start rounded-2xl border border-border bg-card p-6' : 'lg:col-span-3'}>
+                <h2 className="text-lg font-bold text-foreground">Why collectors pick this one</h2>
+                <ul className="mt-3 space-y-2.5">
+                  {highlights.map((point) => (
+                    <li key={point} className="flex gap-2.5 text-sm leading-relaxed text-muted-foreground">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" aria-hidden="true" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </section>
         )}
 
         <ProductReviews title={product.shortTitle || product.title} stats={reviewStats} reviews={shopReviews} loading={reviewsLoading} />
 
-        <section className="mt-14 max-w-3xl">
+        <section className="mt-14">
           <h2 className="text-2xl font-bold text-foreground">Specifications</h2>
           <dl className="mt-4 divide-y divide-border rounded-2xl border border-border overflow-hidden">
             {specs.map((spec) => (
@@ -462,7 +475,7 @@ const ShopProductPage = () => {
         </section>
 
         {category.faqs?.length > 0 && (
-          <section className="mt-14 max-w-3xl">
+          <section className="mt-14">
             <h2 className="text-2xl font-bold text-foreground">Common questions</h2>
             <div className="mt-4 space-y-6">
               {category.faqs.map((faq) => (
@@ -488,7 +501,8 @@ const ShopProductPage = () => {
                   <div className="aspect-[4/3] bg-white dark:bg-zinc-950 overflow-hidden">
                     {other.imagePaths?.length > 0 && (
                       <CardImage
-                        src={palmsOffImages(other)[0]}
+                        {...getCardImage(palmsOffImages(other)[0], { widths: [240, 400, 600] })}
+                        sizes="(min-width: 1024px) 25vw, 50vw"
                         alt={palmsOffImageAlt(other, other.imagePaths[0])}
                         imgClassName="h-full w-full object-contain p-3 group-hover:scale-105 transition-transform duration-500"
                       />

@@ -42,7 +42,7 @@ const SellersManagementPage = () => {
     try {
       let query = supabase
         .from('profiles')
-        .select('id, display_name, username, business_name, avatar_url, profile_photo_or_character, is_admin, business_logo_url, is_featured_seller, is_verified, is_active, rating, reviews_count, seller_tier, location_state', { count: 'exact' })
+        .select('id, display_name, username, business_name, avatar_url, profile_photo_or_character, is_admin, business_logo_url, is_featured_seller, is_verified, is_active, rating, reviews_count, seller_tier, location_state, subscription_tier, subscription_status', { count: 'exact' })
         .eq('is_sole_trader', true)
         .eq('is_active', true)
         .order('is_featured_seller', { ascending: false })
@@ -111,6 +111,31 @@ const SellersManagementPage = () => {
     }
   };
 
+  // A complimentary Ultimate membership (tier 'ultimate' + status
+  // 'grandfathered') is how an admin gives someone a plan without a payment —
+  // switch it on or off here. Goes through an admin-only RPC because
+  // subscription_* can't be written from the browser.
+  const handleToggleComplimentary = async (sellerId, currentlyOn) => {
+    setUpdating(sellerId);
+    try {
+      const { data: status, error } = await supabase
+        .rpc('admin_set_complimentary_membership', { target_id: sellerId, enabled: !currentlyOn });
+      if (error) throw error;
+      if (!status) throw new Error('No change made — this member has a paid subscription or is a protected account.');
+
+      const on = status === 'grandfathered';
+      toast.success(on ? 'Complimentary Ultimate membership granted.' : 'Complimentary membership removed.');
+      logAdminAction('update_complimentary_membership', { sellerId, complimentary: on });
+      setSellers(sellers.map(s => s.id === sellerId
+        ? { ...s, subscription_tier: on ? 'ultimate' : 'free', subscription_status: status }
+        : s));
+    } catch (error) {
+      toast.error(error.message || 'Failed to update membership.');
+    } finally {
+      setUpdating(null);
+    }
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setFeaturedFilter('all');
@@ -119,7 +144,7 @@ const SellersManagementPage = () => {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet><title>Sellers Management | Admin Portal</title></Helmet>
 
       <AdminPageHeader
@@ -251,6 +276,11 @@ const SellersManagementPage = () => {
                             Verified
                           </Badge>
                         )}
+                        {seller.subscription_status === 'grandfathered' && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
+                            {seller.subscription_tier} · complimentary
+                          </Badge>
+                        )}
                         {seller.seller_tier && (
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize">
                             {seller.seller_tier}
@@ -290,6 +320,15 @@ const SellersManagementPage = () => {
                             onClick={() => navigate(`/admin/users/${seller.id}`)}
                           >
                             View Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            className="cursor-pointer"
+                            disabled={updating === seller.id}
+                            onClick={() => handleToggleComplimentary(seller.id, seller.subscription_status === 'grandfathered')}
+                          >
+                            {seller.subscription_status === 'grandfathered'
+                              ? 'Remove complimentary Ultimate'
+                              : 'Grant complimentary Ultimate'}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             className="cursor-pointer"

@@ -114,7 +114,7 @@ const MyVaultPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, filterCollection, page]);
+  }, [currentUser?.id, filterCollection, page]);
 
   useEffect(() => {
     fetchVault();
@@ -361,7 +361,8 @@ const MyVaultPage = () => {
           {/* totalCount is an estimate (count: 'estimated'), so drive next/prev
               off whether the current page came back full rather than off exact
               page math — otherwise an over/under-estimate traps users on empty
-              pages or hides real ones. The estimate is shown as ~approximate. */}
+              pages or hides real ones. The page total shown is the estimate (never
+              below the current page) with no "~" marker. */}
           {(page > 0 || cards.length === VAULT_PAGE_SIZE) && (
             <div className="flex items-center justify-center gap-4 mt-12">
               <Button
@@ -374,7 +375,7 @@ const MyVaultPage = () => {
               </Button>
               <span className="text-sm font-medium text-muted-foreground tabular-nums">
                 Page {page + 1}
-                {totalCount > 0 && ` of ~${Math.max(Math.ceil(totalCount / VAULT_PAGE_SIZE), page + 1)}`}
+                {totalCount > 0 && ` of ${Math.max(Math.ceil(totalCount / VAULT_PAGE_SIZE), page + 1)}`}
               </span>
               <Button
                 variant="outline"

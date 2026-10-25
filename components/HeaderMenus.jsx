@@ -442,7 +442,6 @@ const ShopDropdown = ({ onNavigate }) => {
           >
             <div className="min-w-0">
               <span className="text-sm font-bold text-foreground">Shop All Supplies</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Sleeves, binders, storage and display — sold by CardPop</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
@@ -1149,6 +1148,11 @@ const MobileAccountSection = ({ currentUser, isVerified, onNavigate, onLogout })
           <SheetClose asChild>
             <Link to="/account/shows" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
               <Tv2 className="w-4 h-4" /> My Shows
+            </Link>
+          </SheetClose>
+          <SheetClose asChild>
+            <Link to="/account/sole-trader" onClick={onNavigate} className="flex items-center gap-3 px-4 py-2.5 rounded-xl hover:bg-muted transition-colors text-sm font-medium">
+              <Store className="w-4 h-4" /> Sole Trader Store
             </Link>
           </SheetClose>
           <SheetClose asChild>

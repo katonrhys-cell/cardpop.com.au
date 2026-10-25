@@ -201,6 +201,13 @@ const CardPriceDetailPage = () => {
             {card.card_number ? ` · ${card.card_number}` : ''}
             {updatedOn ? ` · Updated ${updatedOn}` : ''}
           </p>
+          {card.player?.slug && (
+            <p className="mt-2 text-sm">
+              <Link to={`/players/${card.player.slug}`} className="font-bold text-primary hover:underline">
+                See every {card.player.name} card on CardPop →
+              </Link>
+            </p>
+          )}
         </header>
 
         {latest ? (

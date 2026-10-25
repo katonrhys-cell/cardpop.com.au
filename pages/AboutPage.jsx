@@ -15,7 +15,7 @@ const AboutPage = () => {
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,hsl(var(--primary)/0.05),transparent_50%)]" />
         </div>
-        <div className="max-w-[90rem] mx-auto px-4 relative z-10 text-center">
+        <div className="container-default relative z-10 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary mb-6 border border-primary/20">
             <Sparkles className="w-4 h-4" />
             <span className="text-sm font-bold tracking-wide uppercase">Our Story</span>

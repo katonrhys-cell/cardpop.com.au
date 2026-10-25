@@ -4,12 +4,21 @@ import { createLogger, defineConfig } from 'vite';
 
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { createRequire } from 'node:module';
 import Beasties from 'beasties';
 import { patchOpenCvSource } from './tools/opencvCspPatch.mjs';
 import { appShellFromHomeShell } from './tools/appShell.mjs';
+import { doctypeProblem } from './tools/doctype.mjs';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
-const allDeps = Object.keys(pkg.dependencies || {});
+// Pre-bundle every runtime dependency — except those with no root entry point.
+// @tiptap/pm only exports subpaths (@tiptap/pm/state, …); asking Vite to
+// optimise its bare name fails the whole dev server at startup with
+// '"." is not exported under the conditions […] from package @tiptap/pm'.
+const hasRootEntry = (dep) => {
+	try { createRequire(import.meta.url).resolve(dep); return true; } catch { return false; }
+};
+const allDeps = Object.keys(pkg.dependencies || {}).filter(hasRootEntry);
 
 // After the build, emit two HTML entries from one Vite-built index.html:
 //   • index.html — the "/"-only document, with the static hero shell injected
@@ -80,16 +89,21 @@ const allDeps = Object.keys(pkg.dependencies || {});
 // app always boots.
 //
 // Before any of that, synchronously (so it lands before the first paint), it
-// trims the static shell for returning visitors: the announcement bar is
-// removed when this session dismissed it or a Supabase session is cached (a
-// member never sees it), and the cookie banner when a consent choice is
-// stored. The storage keys mirror components/AnnouncementBar.jsx,
+// applies the saved/system dark theme to <html> (mirrors hooks/useDarkMode.js
+// — without it every dark-mode load painted light, then flipped dark once
+// React mounted the Header) and trims the static shell: the announcement bar is
+// removed when this session dismissed it, a Supabase session is cached (a
+// member never sees it) or the route is one the bar stays quiet on, and the
+// cookie banner when a consent choice is stored or the route is quiet for it
+// (otherwise both painted on e.g. /login or /checkout and vanished when React
+// mounted, jolting the page). The storage keys and route lists mirror
+// components/AnnouncementBar.jsx, components/CookieConsentBanner.jsx,
 // components/Header.jsx (optimisticAuth) and lib/consent.js — change them
-// together. This tag sits in <head> (Vite puts the entry there), i.e. before
+// together (tests/frontend/homeShell.test.js checks). This tag sits in <head> (Vite puts the entry there), i.e. before
 // the shell has parsed, so it hides by id via an injected <style> rule rather
 // than touching elements that don't exist yet; the rule is a no-op on a
 // document without those elements (the launch shell).
-const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head,done=0;try{var hid=[];if(sessionStorage.getItem("cardpop_announcement_dismissed")==="1"||localStorage.getItem("sb-vrfsaazuqjxotnieqlkd-auth-token"))hid.push("#cardpop-shell-announcement");if(localStorage.getItem("cardpop_cookie_consent")!==null)hid.push("#cardpop-shell-cookie");if(hid.length){var st=document.createElement("style");st.textContent=hid.join(",")+"{display:none}";h.appendChild(st)}}catch(e){}function v(p,x){return!!p&&p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-x.length)===x}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p,".js")){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}function rp(){var m=d.routePreload;if(!m)return;var p=location.pathname,b=null,r="";while(p.length>1&&p.slice(-1)==="/")p=p.slice(0,-1);m.split(";").forEach(function(e){var i=e.indexOf(":");if(i<0)return;var k=e.slice(0,i);if((k===p||(k.slice(-1)==="/"&&p.lastIndexOf(k,0)===0))&&(b===null||k.length>b.length)){b=k;r=e.slice(i+1)}});if(b!==null)ld(r.split(",").map(function(n){return"/assets/"+n+".js"}).join(","),1)}function go(){if(done)return;done=1;var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;if(v(d.css,".css")){var p=document.createElement("link");p.rel="preload";p.as="style";p.href=d.css;p.crossOrigin="";h.appendChild(p);var c=document.createElement("link");c.rel="stylesheet";c.href=d.css;c.media="print";c.crossOrigin="";c.setAttribute("data-async-style","");h.appendChild(c)}ld(d.preload);rp();if(v(d.entry,".js")){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)}if(document.visibilityState==="hidden"||!window.requestAnimationFrame)go();else{requestAnimationFrame(function(){setTimeout(go,0)});setTimeout(go,1500)}})()';
+const CSP_BOOTSTRAP = '(function(){var s=document.currentScript,d=s.dataset,h=document.head,done=0;var th=null;try{th=localStorage.getItem("cardpop-theme")}catch(e){}try{if(th==="dark"||(th===null&&window.matchMedia&&matchMedia("(prefers-color-scheme: dark)").matches))document.documentElement.classList.add("dark")}catch(e){}try{var hid=[],lp=location.pathname,qp=function(l){return l.split(",").some(function(x){return lp===x||lp.lastIndexOf(x+"/",0)===0})};if(qp("/checkout,/checkout-success,/success,/launch,/admin,/login,/signup,/welcome,/verify-identity")||sessionStorage.getItem("cardpop_announcement_dismissed")==="1"||localStorage.getItem("sb-vrfsaazuqjxotnieqlkd-auth-token"))hid.push("#cardpop-shell-announcement");if(qp("/checkout,/checkout-success,/success,/scan,/admin,/launch")||localStorage.getItem("cardpop_cookie_consent")!==null)hid.push("#cardpop-shell-cookie");if(hid.length){var st=document.createElement("style");st.textContent=hid.join(",")+"{display:none}";h.appendChild(st)}}catch(e){}function v(p,x){return!!p&&p.lastIndexOf("/assets/",0)===0&&p.indexOf("..")<0&&p.slice(-x.length)===x}function ld(t,lo){(t||"").split(",").forEach(function(p){if(v(p,".js")){var l=document.createElement("link");l.rel="modulepreload";l.href=p;l.crossOrigin="";if(lo)l.fetchPriority="low";h.appendChild(l)}})}function rp(){var m=d.routePreload;if(!m)return;var p=location.pathname,b=null,r="";while(p.length>1&&p.slice(-1)==="/")p=p.slice(0,-1);m.split(";").forEach(function(e){var i=e.indexOf(":");if(i<0)return;var k=e.slice(0,i);if((k===p||(k.slice(-1)==="/"&&p.lastIndexOf(k,0)===0))&&(b===null||k.length>b.length)){b=k;r=e.slice(i+1)}});if(b!==null)ld(r.split(",").map(function(n){return"/assets/"+n+".js"}).join(","),1)}function go(){if(done)return;done=1;var tt=window.trustedTypes,pol=tt&&tt.createPolicy?tt.createPolicy("cardpop#bootstrap",{createScriptURL:function(u){return u}}):null;if(v(d.css,".css")){var p=document.createElement("link");p.rel="preload";p.as="style";p.href=d.css;p.crossOrigin="";h.appendChild(p);var c=document.createElement("link");c.rel="stylesheet";c.href=d.css;c.media="print";c.crossOrigin="";c.setAttribute("data-async-style","");h.appendChild(c)}ld(d.preload);rp();if(v(d.entry,".js")){var m=document.createElement("script");m.type="module";m.crossOrigin="";m.src=pol?pol.createScriptURL(d.entry):d.entry;h.appendChild(m)}ld(d.preloadLow,1)}if(document.visibilityState==="hidden"||!window.requestAnimationFrame)go();else{requestAnimationFrame(function(){setTimeout(go,0)});setTimeout(go,1500)}})()';
 
 const ENTRY_SCRIPT_RE = /<script type="module" crossorigin src="([^"]+)"><\/script>/;
 
@@ -125,6 +139,17 @@ function verifyCspBootstrap(ctx, htmlFiles) {
 		if (emitted[1] !== CSP_BOOTSTRAP) {
 			ctx.error(`csp-bootstrap: inline bootstrap in ${file} was altered post-transform — its hash no longer matches vercel.json`);
 		}
+	}
+}
+
+// Google Customer Reviews reads the order-confirmation page (served from
+// app.html) and rejects the integration if anything precedes <!DOCTYPE html>.
+// Checked on the emitted documents because the shell injection and critical-CSS
+// inlining above run after Vite's own HTML transform (tools/doctype.mjs).
+function verifyDoctype(ctx, htmlFiles) {
+	for (const file of htmlFiles) {
+		const problem = doctypeProblem(readFileSync(file, 'utf-8'));
+		if (problem) ctx.error(`doctype: ${path.basename(file)} — ${problem}; Google Customer Reviews requires <!DOCTYPE html> as the first bytes`);
 	}
 }
 
@@ -315,6 +340,12 @@ async function inlineCriticalCss(html, outDir, label, warn) {
 			// 'Syne Fallback' comment in index.css).
 			inlineFonts: true,
 			preloadFonts: false,
+			// Keep the dark theme's variable block. Nothing in the shell
+			// carries .dark at build time, so beasties would drop it — and the
+			// CSP bootstrap adds the class before first paint for dark-mode
+			// visitors, who would otherwise see a light shell that flips dark
+			// when the full stylesheet lands.
+			allowRules: [/^\.dark$/],
 			logLevel: 'silent',
 		});
 		const processed = await beasties.process(html);
@@ -405,6 +436,7 @@ function homeShellPlugin() {
 				this.warn('home-shell: `<div id="root"></div>` not found — shells not injected');
 				writeFileSync(appPath, baseHtml, 'utf-8');
 				verifyCspBootstrap(this, [indexPath, appPath]);
+			verifyDoctype(this, [indexPath, appPath]);
 				return;
 			}
 
@@ -426,6 +458,7 @@ function homeShellPlugin() {
 
 			writeFileSync(indexPath, indexHtml, 'utf-8');
 			verifyCspBootstrap(this, [indexPath, appPath]);
+			verifyDoctype(this, [indexPath, appPath]);
 		},
 	};
 }

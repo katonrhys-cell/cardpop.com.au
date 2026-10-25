@@ -38,10 +38,52 @@ A tier can be granted with no Stripe/PayPal subscription behind it by setting
 is in `ENTITLED_STATUSES`, so the app treats the account as a paying member of
 that tier, and **no provider webhook ever emits it**, so nothing external flips
 it back. Both `subscription_tier` and `subscription_status` are locked against
-self-writes, so the grant has to be made service-side — by migration, which is
-the repeatable, production-applied way (never the SQL editor; see CLAUDE.md).
+self-writes, so the grant has to be made service-side.
 
-Current grants (all **Ultimate**, the top tier, at no cost):
+### Every admin holds Ultimate, free
+
+Admin access **includes the Ultimate plan at no charge**. This is a rule, not a
+per-account grant (`20261023032430_admins_hold_complimentary_ultimate.sql`):
+
+- **Database** — `trg_sync_admin_complimentary_membership` (BEFORE INSERT /
+  UPDATE OF `is_admin` on `profiles`) sets `subscription_tier = 'ultimate'`,
+  `subscription_status = 'grandfathered'` and clears `trial_ends_at` whenever
+  `is_admin` is written as `true`, and on demotion (`true → false`) returns a
+  *complimentary* member to Hobby (`'free'` / `'none'`). A real paid
+  subscription (any other status) is never touched by a demotion. The
+  migration backfilled every existing admin. Test:
+  `tests/db/run-admin-membership-migration.sh`.
+- **Server** — the part a trigger can't do: an admin must never be *billed*.
+  `PATCH /admin/users/:id/role` (Admin → Users → Make Admin) calls
+  `grantAdminComplimentaryMembership()` (`src/services/subscriptionService.js`)
+  **before** flipping `is_admin`: it cancels any live Stripe subscription the
+  account was paying for (immediately, `invoice_now: false`, so no final
+  charge), clears `stripe_subscription_id`, and writes the plan columns. If
+  the cancel fails the promotion fails with it — an admin left paying for a
+  plan they now hold free is exactly the bill the rule exists to prevent.
+  Demotion calls `revokeAdminComplimentaryMembership()`. A live **PayPal**
+  subscription can't be cancelled from here (PayPal billing is switched off);
+  it is logged as an error to cancel in the PayPal dashboard.
+- **Checkout** — `POST /subscription/stripe/checkout` and
+  `/subscription/paypal/create` answer **409** for an admin or any
+  complimentary member (`assertCanStartPaidMembership()`), so a plan can't be
+  bought by an account that already holds the top tier for free. (Before this
+  the checkout created a Stripe subscription the profile then ignored — a bill
+  for nothing.) `/stripe/change-tier` already refused complimentary members.
+- **UI** — Account → Dashboard (`components/AccountPlanBanner.jsx`) and Account
+  → Membership show "complimentary" / "Included free" instead of the $150/mo
+  the member never pays, and offer no trial or upgrade.
+
+If an existing admin was mid-way through a paid Stripe subscription when the
+migration landed, the backfill granted Ultimate but the DB could not cancel
+Stripe — find them with
+`select id, stripe_subscription_id from profiles where is_admin and stripe_subscription_id is not null`
+and cancel in the Stripe dashboard.
+
+### Per-account comps
+
+The earlier per-email grants are still in the repo and still valid, and are
+now also covered by the admin rule (all three accounts are admins):
 
 | Account | Migration |
 |---|---|
@@ -49,18 +91,17 @@ Current grants (all **Ultimate**, the top tier, at no cost):
 | `rfkates09@hotmail.com` (owner) | `20261004064733_grant_admin_accounts_ultimate_membership.sql` |
 | `admin@cardpop.com.au` (platform store + admin login) | `20260806064711_…` (Premium) raised to Ultimate by `20261004064733_…` |
 
-To comp another account, add a new migration in the same shape (keyed on
-`lower(auth.users.email)`, idempotent). `applyStripeSubscription` /
+To comp a **non-admin** account, add a new migration in the same shape (keyed
+on `lower(auth.users.email)`, idempotent). `applyStripeSubscription` /
 `applyPaypalSubscription` (`src/services/subscriptionService.js`) skip any
 profile whose status is `grandfathered` (`COMPLIMENTARY_STATUS`), so a provider
 event about a comped account — a stray cancel, a PayPal `create` — can never
-downgrade it. To *revoke* a comp, a migration sets the status back to `'none'`
-and the tier to `'free'`.
+downgrade it. To *revoke* a non-admin comp, a migration sets the status back to
+`'none'` and the tier to `'free'` (an admin's comp is revoked by removing admin
+access).
 
-Note that being an admin (`profiles.is_admin`) does **not** by itself confer a
-tier — admin access and membership are separate grants. The only admin
-exemptions in the tier system are the monthly listing quota trigger and the
-Whatnot-shows insert policy.
+Besides the plan itself, admins are exempt from the monthly listing quota
+trigger and the Whatnot-shows insert policy.
 
 ## Where to change the offer
 
@@ -115,7 +156,7 @@ supabase db push
 3. Add these webhook events to your existing Stripe webhook endpoint
    (`/api/stripe/webhook`): `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`,
-   `customer.subscription.trial_will_end`.
+   `customer.subscription.trial_will_end`, **`invoice.payment_failed`**.
 
 ## 3. PayPal — currently switched OFF
 
@@ -160,6 +201,56 @@ marketplace checkout and are reused here.
   Checkout (subscription mode, `trial_period_days`, the tier's price, `tier`
   stamped in the subscription metadata) or PayPal approval (the tier's plan).
   No card data touches CardPop.
+- **Upgrading an existing paid tier** (Account → Dashboard "Upgrade your
+  plan" → `/account/membership?tier=…` → `POST /subscription/stripe/change-tier`,
+  `changeStripeSubscriptionTier()` in `src/services/subscriptionService.js`):
+  the dashboard's plan card (`components/AccountPlanBanner.jsx`) shows the
+  whole ladder with the member's step marked and an **Upgrade your plan**
+  button for everyone but Ultimate (`isTopPlan()` / `nextPlanFor()` in
+  `config/plans.js`). A paid Stripe member upgrades *in place*: the existing
+  subscription's item is re-priced with `create_prorations` and its `tier`
+  metadata rewritten, so they keep their billing anchor, trial and card — no
+  second subscription, no second trial. Hobby members take the trial checkout
+  instead; a PayPal-billed or complimentary (`grandfathered`) membership gets a
+  409 and a message. The route is MFA-gated (`requireAal2`) like the other
+  routes that change what the member's card is charged.
+- **Downgrading** goes through the same route and the membership page's
+  *Change your plan* grid (every other paid tier, labelled Upgrade/Downgrade):
+  the item is re-priced with `create_prorations`, so the unused part of the
+  dearer plan is credited against the next invoice. Dropping to Hobby is a
+  cancellation, not a tier change.
+- **Cancelling** (Account → Membership → *Cancel membership* →
+  `POST /subscription/stripe/cancel`, `cancelStripeMembership()`): a trialing
+  or active member is cancelled **at the end of the period they already have**
+  (`cancel_at_period_end` — a trial ends without ever being charged) and can
+  undo it until then (*Keep my membership* → `/stripe/resume`); a member whose
+  payment is failing is cancelled **immediately** and the unpaid invoice
+  voided, so the retries stop. The page reads the live state from
+  `GET /subscription/stripe/details`. Members never get Stripe access — every
+  action is a call to our API, which makes the change in Stripe.
+- **Updating the card** (*Update card* → `POST /subscription/stripe/update-card`,
+  `createMembershipCardSession()`): a Checkout Session in `setup` mode (the same
+  hosted card step as the trial sign-up, no charge). On return the page calls
+  `/stripe/update-card/confirm`, and the `checkout.session.completed` webhook
+  does the same (`applyMembershipCardFromSession()`, idempotent): the card
+  becomes the customer's and the subscription's default payment method, and a
+  `past_due` membership's open invoice is retried on it at once so the plan is
+  restored straight away. Stripe's own Customer portal is not used. The
+  writes are MFA-gated (`requireAal2`).
+- **Trial reminder**: `customer.subscription.trial_will_end` (3 days out)
+  emails the member the charge date, the amount and where to cancel
+  (`membershipTrialEndingEmail`) — skipped once they've cancelled.
+- **A failed first charge ends the membership** (`endFailedTrialConversion()`):
+  when a subscription goes `past_due` and has never collected a payment (the
+  trial converted and the card declined), it is cancelled and its open invoice
+  voided rather than left on Stripe's retry schedule. Before this the profile
+  dropped to Hobby while Stripe kept retrying the card for days — members saw
+  "payment failed" notices for a plan their account said they weren't on
+  (support case, 2026-10-25). A member who has paid before keeps Stripe's
+  retries on a failed renewal, and the membership page shows them *Payment
+  failed* with *Update card* / *Cancel membership*. `invoice.payment_failed`
+  re-applies the subscription so this runs on every retry, not only on a
+  status change.
 - **State sync** (`src/services/subscriptionService.js`): provider webhooks
   mirror the subscription status onto `profiles.subscription_status` /
   `trial_ends_at`, and the purchased tier onto `profiles.subscription_tier`.

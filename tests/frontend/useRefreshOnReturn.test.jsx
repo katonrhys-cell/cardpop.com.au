@@ -41,12 +41,27 @@ describe('useRefreshOnReturn', () => {
   });
 
   it('treats window blur / focus like hidden / visible', () => {
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
     const refresh = vi.fn();
     renderHook(() => useRefreshOnReturn(refresh, { staleMs: 1000 }));
     act(() => { window.dispatchEvent(new Event('blur')); });
     vi.advanceTimersByTime(5000);
     act(() => { window.dispatchEvent(new Event('focus')); });
     expect(refresh).toHaveBeenCalledTimes(1);
+    document.hasFocus.mockRestore();
+  });
+
+  it('does not refresh when focus only moved into an embedded iframe', () => {
+    // The window blurs when a Stripe/Turnstile/YouTube frame takes focus, but
+    // the document still has focus — the visitor never left the page.
+    vi.spyOn(document, 'hasFocus').mockReturnValue(true);
+    const refresh = vi.fn();
+    renderHook(() => useRefreshOnReturn(refresh, { staleMs: 1000 }));
+    act(() => { window.dispatchEvent(new Event('blur')); });
+    vi.advanceTimersByTime(5000);
+    act(() => { window.dispatchEvent(new Event('focus')); });
+    expect(refresh).not.toHaveBeenCalled();
+    document.hasFocus.mockRestore();
   });
 
   it('calls the latest refresh function and can be disabled', () => {

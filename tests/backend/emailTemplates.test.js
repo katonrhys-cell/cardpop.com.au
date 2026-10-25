@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import {
+  EMAIL_LOGO_URL,
   esc,
   orderConfirmedEmail,
   itemSoldEmail,
@@ -66,6 +69,34 @@ describe('email template escaping', () => {
     const html = offerReceivedEmail({ sellerName: XSS, buyerName: XSS, cardName: XSS, amountAud: 600, message: XSS });
     expect(html).not.toContain('<a href="https://evil.example">click</a>');
     expect(html).toContain('&lt;a href=');
+  });
+});
+
+// The brand logo heads every email — all of them go through cpEmail(), so one
+// representative of each family is enough to prove the shared header carries
+// the hosted artwork (and a text fallback for clients that block images).
+describe('email header branding', () => {
+  const samples = {
+    offerReceived: () => offerReceivedEmail({ sellerName: 'Kat', cardName: 'Nikola Jokic', amountAud: 600 }),
+    offerAdmin: () => offerAdminNoticeEmail({ offerId: '5bb420d5-0000', cardName: 'Nikola Jokic', amountAud: 600 }),
+    offerUpdate: () => offerUpdateEmail({ kind: 'declined', audience: 'buyer', cardName: 'x', amountAud: 1 }),
+    orderConfirmed: () => orderConfirmedEmail({ buyerName: 'Ash', cardName: 'x', itemPrice: 1, total: 1, orderId: 'o' }),
+    shipped: () => orderShippedEmail({ buyerName: 'Ash', orderRef: 'A', carrier: 'auspost', trackingNumber: '33AB1234' }),
+    welcome: () => welcomeOfferEmail({ name: 'Ash', code: 'POP-1', trialDays: 30, discountPct: 10, expiresAt: '2026-11-03T00:00:00Z' }),
+  };
+
+  it.each(Object.entries(samples))('%s carries the hosted logo with alt text', (_name, build) => {
+    const html = build();
+    expect(html).toContain(EMAIL_LOGO_URL);
+    expect(EMAIL_LOGO_URL).toMatch(/^https:\/\/cardpop\.com\.au\/images\/email\/cardpop-logo-v\d+\.png$/);
+    expect(html).toMatch(/<img [^>]*src="https:\/\/cardpop\.com\.au\/images\/email\/cardpop-logo-v\d+\.png"[^>]*alt="CardPop Australia"/);
+    // The band behind the PNG matches its baked-in background.
+    expect(html).toMatch(/background:#0A0A0A;[^"]*"\s*>\s*<a href="https:\/\/cardpop\.com\.au"/);
+  });
+
+  it('ships the artwork the header points at', () => {
+    const file = new URL(EMAIL_LOGO_URL).pathname;
+    expect(existsSync(join(process.cwd(), 'public', file))).toBe(true);
   });
 });
 

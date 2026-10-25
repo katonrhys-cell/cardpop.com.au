@@ -411,15 +411,20 @@ const HomePage = () => {
         <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
-        {/* ── Animated card showcase — shelf → stand (desktop only) ── */}
-        {isDesktop && (
-          <Suspense fallback={null}>
-            <HeroCardShowcase cards={heroCards} />
-          </Suspense>
-        )}
-
         {/* ── Hero text ── */}
-        <div className="max-w-5xl mx-auto w-full relative z-10 lg:pr-[460px] xl:pr-[480px]">
+        <div className="max-w-[90rem] mx-auto w-full relative z-10 lg:pr-[500px] xl:pr-[560px]">
+          {/* ── Animated card showcase — shelf → stand (desktop only) ──
+              Lives INSIDE the hero column, anchored to its right edge, so it
+              sits in the padding reserved for it (lg:pr-[500px] xl:pr-[560px])
+              beside the headline. The column is the same max-w-[90rem] +
+              gutters as the header, so the text starts flush with the logo and
+              the shelf's right edge lines up with the header's right edge. */}
+          {isDesktop && (
+            <Suspense fallback={null}>
+              <HeroCardShowcase cards={heroCards} />
+            </Suspense>
+          )}
+
           {/* NOTE: the hero text block is intentionally NOT wrapped in a
               motion fade. It contains the LCP <h1>, which must paint the moment
               HomePage renders — gating it behind a framer-motion opacity:0→1

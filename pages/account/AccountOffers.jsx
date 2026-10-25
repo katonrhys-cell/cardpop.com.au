@@ -314,7 +314,7 @@ const AccountOffers = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   useEffect(() => { fetchOffers(); }, [fetchOffers]);
 

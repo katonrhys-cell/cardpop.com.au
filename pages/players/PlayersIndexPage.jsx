@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import usePlayers from '@/hooks/usePlayers.js';
 import { PlayerAvatar } from '@/components/PlayerPicker.jsx';
-import { groupPlayersBySport, matchPlayers, playerPath, playerSubtitle } from '@/utils/players.js';
+import { groupPlayersBySport, matchPlayers, playerPath, playerSubtitle, PLAYERS_INDEX_SEO } from '@/utils/players.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -51,8 +51,8 @@ const PlayersIndexPage = () => {
   return (
     <div className="container-default section-padding">
       <SEOHead
-        title="Players — Trading Cards of the Most Collected Athletes | CardPop"
-        description="Player pages for the athletes collectors chase most: a short profile, their key rookie cards, live Australian-dollar prices and every card of theirs listed on CardPop."
+        title={PLAYERS_INDEX_SEO.title}
+        description={PLAYERS_INDEX_SEO.description}
         canonicalUrl={`${SITE_ORIGIN}/players`}
         structuredData={structuredData}
       />

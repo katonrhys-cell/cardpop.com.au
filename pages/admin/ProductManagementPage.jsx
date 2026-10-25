@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload } from 'lucide-react';
+import { Search, Plus, Save, DollarSign, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload, ExternalLink } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,8 @@ import ShopCategoryManager from '@/components/admin/ShopCategoryManager.jsx';
 import BulkProductImport from '@/components/admin/BulkProductImport.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
+import { shopProductPath } from '@/utils/shopProductUrl.js';
+import { variantKind } from '@/utils/shopVariants.js';
 import {
   SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
 } from '@/utils/adminProductList.js';
@@ -38,7 +40,7 @@ const COLUMNS = [
   { key: 'title', label: 'Product Name' },
   { key: 'sku', label: 'SKU' },
   { key: 'category', label: 'Category' },
-  { key: 'price', label: 'Price', numeric: true },
+  { key: 'price', label: 'Sale price', numeric: true },
   { key: 'rrp', label: 'RRP', numeric: true },
   { key: 'cost', label: 'Cost (inc)', numeric: true },
   { key: 'margin', label: 'Margin', numeric: true },
@@ -50,9 +52,12 @@ const COLUMNS = [
 // shared link keeps the admin where they were.
 const PARAM_DEFAULTS = { q: '', section: 'all', category: 'all', status: 'all', brand: 'all', sort: 'title', dir: 'asc', view: 'sections' };
 
-// Which section / category headers the admin has collapsed in the Sections
-// view. A per-browser convenience, so it lives in localStorage (which can
-// throw or be empty in private windows — fall back to everything open).
+// Which section headers the admin has collapsed in the Sections view. A
+// per-browser convenience, so it lives in localStorage (which can throw or be
+// empty in private windows — fall back to every section open). Category rows
+// are not persisted: they start closed on every open so the page lands as a
+// compact index of sections and categories with their counts, and the admin
+// opens only the category they came for.
 const COLLAPSED_STORAGE_KEY = 'cardpop.admin.products.collapsed';
 const loadCollapsed = () => {
   try {
@@ -103,7 +108,8 @@ const ProductManagementPage = () => {
   // Built-in + admin-added categories, minus removed ones.
   const { groups: categoryGroups } = useShopCategoryGroups();
   const isMounted = useRef(true);
-  // Keys are `section` or `section/category`.
+  // Sections the admin has collapsed (persisted) and the `section/category`
+  // keys they have opened this visit (every category starts closed).
   const [collapsed, setCollapsed] = useState(loadCollapsed);
   const updateCollapsed = (fn) => setCollapsed((prev) => {
     const next = new Set(prev);
@@ -112,6 +118,12 @@ const ProductManagementPage = () => {
     return next;
   });
   const toggleCollapsed = (key) => updateCollapsed((set) => (set.has(key) ? set.delete(key) : set.add(key)));
+  const [openCategories, setOpenCategories] = useState(() => new Set());
+  const toggleCategory = (key) => setOpenCategories((prev) => {
+    const next = new Set(prev);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   const fetchProducts = async () => {
     if (!isMounted.current) return;
@@ -160,6 +172,91 @@ const ProductManagementPage = () => {
     }
   };
 
+  // ── Inline price editing ────────────────────────────────────────────────
+  // `drafts[id]` holds only the fields the admin has touched, as input
+  // strings: { price, rrp, cost } (cost = inc GST). A field equal to the saved
+  // value is dropped, so the Save button counts real changes only.
+  const [priceEdit, setPriceEdit] = useState(false);
+  const [drafts, setDrafts] = useState({});
+  const [saving, setSaving] = useState(false);
+  const money = (v) => (v == null || v === '' ? '' : Number(v).toFixed(2));
+  const savedField = (p, field) => field === 'price' ? money(p.price_aud)
+    : field === 'rrp' ? money(p.retail_price_aud)
+    : money(costs[p.id]?.wholesale_inc_gst_aud);
+  const fieldValue = (p, field) => drafts[p.id]?.[field] ?? savedField(p, field);
+  const setDraft = (p, field, value) => setDrafts((prev) => {
+    const row = { ...prev[p.id], [field]: value };
+    const same = (f) => row[f] === undefined || row[f].trim() === savedField(p, f)
+      || (row[f].trim() !== '' && savedField(p, f) !== '' && Number(row[f]) === Number(savedField(p, f)));
+    for (const f of ['price', 'rrp', 'cost']) if (same(f)) delete row[f];
+    const next = { ...prev };
+    if (Object.keys(row).length) next[p.id] = row; else delete next[p.id];
+    return next;
+  });
+  const dirtyCount = Object.keys(drafts).length;
+  const leavePriceEdit = () => {
+    if (dirtyCount && !window.confirm(`Discard ${dirtyCount} unsaved price change${dirtyCount === 1 ? '' : 's'}?`)) return;
+    setDrafts({});
+    setPriceEdit(false);
+  };
+
+  const savePrices = async () => {
+    const parsed = [];
+    for (const [id, d] of Object.entries(drafts)) {
+      const p = products.find((x) => x.id === id);
+      const row = { id, title: p?.title };
+      for (const f of ['price', 'rrp', 'cost']) {
+        if (d[f] === undefined) continue;
+        const raw = d[f].trim();
+        const n = raw === '' ? null : Number(raw);
+        if (n !== null && (Number.isNaN(n) || n < 0)) return toast.error(`"${p?.title}": ${f === 'price' ? 'sale price' : f === 'rrp' ? 'RRP' : 'cost'} must be a valid amount`);
+        if (f === 'price' && n === null) return toast.error(`"${p?.title}": a sale price is required`);
+        row[f] = n;
+      }
+      parsed.push(row);
+    }
+    setSaving(true);
+    const failed = [];
+    const now = new Date().toISOString();
+    const updatedProducts = {};
+    const updatedCosts = {};
+    await Promise.all(parsed.map(async (r) => {
+      try {
+        const patch = {};
+        if ('price' in r) patch.price_aud = r.price;
+        if ('rrp' in r) patch.retail_price_aud = r.rrp;
+        if (Object.keys(patch).length) {
+          patch.updated_at = now;
+          const { error: e } = await supabase.from('shop_products').update(patch).eq('id', r.id);
+          if (e) throw e;
+          updatedProducts[r.id] = patch;
+        }
+        if ('cost' in r) {
+          // Same GST rule as the product form: the ex-GST figure is derived at 10%.
+          const inc = r.cost;
+          const ex = inc === null ? null : Math.round((inc / 1.1) * 100) / 100;
+          if (inc === null && !costs[r.id]) { /* nothing stored, nothing to clear */ } else {
+            const { error: e } = await supabase.from('shop_product_costs')
+              .upsert({ product_id: r.id, wholesale_ex_gst_aud: ex, wholesale_inc_gst_aud: inc, updated_at: now }, { onConflict: 'product_id' });
+            if (e) throw e;
+            updatedCosts[r.id] = { ...costs[r.id], product_id: r.id, wholesale_ex_gst_aud: ex, wholesale_inc_gst_aud: inc };
+          }
+        }
+      } catch (err) {
+        failed.push(r.id);
+        toast.error(`"${r.title}" not saved: ${err.message}`);
+      }
+    }));
+    if (isMounted.current) {
+      setProducts((prev) => prev.map((p) => (updatedProducts[p.id] ? { ...p, ...updatedProducts[p.id] } : p)));
+      setCosts((prev) => ({ ...prev, ...updatedCosts }));
+      setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => failed.includes(id))));
+      setSaving(false);
+    }
+    const saved = parsed.length - failed.length;
+    if (saved) toast.success(`Saved ${saved} product${saved === 1 ? '' : 's'}.`);
+  };
+
   const handleEdit = (product) => {
     setEditingProduct(product);
     setIsAddModalOpen(true);
@@ -180,10 +277,28 @@ const ProductManagementPage = () => {
   const brandChoices = useMemo(() => brandOptions(products), [products]);
   const activeFilterCount = ['section', 'category', 'status', 'brand'].filter((k) => filters[k] !== 'all').length + (searchTerm ? 1 : 0);
 
-  const allGroupKeys = sections.flatMap(({ section, categories }) => [section, ...categories.map(({ category }) => `${section}/${category}`)]);
-  const anyCollapsed = allGroupKeys.some((k) => collapsed.has(k));
-  const collapseAll = () => updateCollapsed((set) => sections.forEach(({ section }) => set.add(section)));
-  const expandAll = () => updateCollapsed((set) => allGroupKeys.forEach((k) => set.delete(k)));
+  const allCategoryKeys = sections.flatMap(({ section, categories }) => categories.map(({ category }) => `${section}/${category}`));
+  // A search or filter has already narrowed the table to what the admin is
+  // looking for, so show those rows rather than making them open each
+  // category; clearing it returns to the compact closed-category index.
+  // Re-run when the filter changes and once the catalogue first arrives (a
+  // shared link can carry a filter before there are rows to open) — not on
+  // every refetch after an edit, which would snap the admin's open category shut.
+  const filterSignature = `${searchTerm}|${filters.section}|${filters.category}|${filters.status}|${filters.brand}`;
+  const hasProducts = products.length > 0;
+  useEffect(() => {
+    setOpenCategories(activeFilterCount > 0 ? new Set(allCategoryKeys) : new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterSignature, hasProducts]);
+  const anyCollapsed = sections.some(({ section }) => collapsed.has(section)) || allCategoryKeys.some((k) => !openCategories.has(k));
+  const collapseAll = () => {
+    updateCollapsed((set) => sections.forEach(({ section }) => set.add(section)));
+    setOpenCategories(new Set());
+  };
+  const expandAll = () => {
+    updateCollapsed((set) => sections.forEach(({ section }) => set.delete(section)));
+    setOpenCategories(new Set(allCategoryKeys));
+  };
 
   const toggleSort = (col) => {
     if (sortKey === col.key) setParams({ dir: sortDir === 'asc' ? 'desc' : 'asc' });
@@ -202,25 +317,63 @@ const ProductManagementPage = () => {
 
   const renderRow = (product) => (
     <TableRow key={product.id}>
-      <TableCell className="font-bold text-foreground">{product.title}</TableCell>
+      <TableCell className="font-bold text-foreground">
+        {/* The name opens the product's public page in a new tab — the same
+            canonical URL shoppers use (utils/shopProductUrl.js), so a draft
+            or archived row shows the admin exactly what the shop would. */}
+        <a
+          href={shopProductPath(product)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open product page in a new tab"
+          className="inline-flex items-center gap-1.5 hover:text-primary hover:underline underline-offset-2"
+        >
+          {product.title}
+          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </a>
+      </TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">
         {product.sku || <span className="text-destructive">missing</span>}
         {(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length > 0 && (
-          <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} colours</span>
+          <span className="ml-1.5 font-sans text-[10px] font-semibold text-foreground/70">+{(variantsByProduct[product.id] || []).filter((v) => v.status !== 'archived').length} {variantKind({ variants: variantsByProduct[product.id] }).toLowerCase()}s</span>
         )}
       </TableCell>
       <TableCell className="text-muted-foreground">{product.category || '-'}</TableCell>
-      <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
-      <TableCell className="tabular-nums text-muted-foreground">
-        {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
-      </TableCell>
-      <TableCell className="tabular-nums text-muted-foreground">
-        {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
-      </TableCell>
+      {priceEdit ? (
+        ['price', 'rrp', 'cost'].map((field) => (
+          <TableCell key={field}>
+            <div className="relative w-24">
+              <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">$</span>
+              <Input
+                type="number" inputMode="decimal" min="0" step="0.01"
+                aria-label={`${field === 'price' ? 'Sale price' : field === 'rrp' ? 'RRP' : 'Cost inc GST'} for ${product.title}`}
+                className={`h-8 pl-5 pr-1 tabular-nums ${drafts[product.id]?.[field] !== undefined ? 'border-primary bg-primary/5' : ''}`}
+                value={fieldValue(product, field)}
+                onChange={(e) => setDraft(product, field, e.target.value)}
+              />
+            </div>
+          </TableCell>
+        ))
+      ) : (
+        <>
+          <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
+          <TableCell className="tabular-nums text-muted-foreground">
+            {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
+          </TableCell>
+          <TableCell className="tabular-nums text-muted-foreground">
+            {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
+          </TableCell>
+        </>
+      )}
       <TableCell className="tabular-nums">
         {(() => {
           // Ex-GST gross margin: (price ÷ 1.1 − cost ex GST) ÷ (price ÷ 1.1).
-          const m = grossMargin(product.price_aud, costs[product.id]?.wholesale_ex_gst_aud);
+          // While editing, it follows the unsaved sale price and cost.
+          const dp = drafts[product.id];
+          const costInc = dp?.cost !== undefined ? (dp.cost.trim() === '' ? null : Number(dp.cost)) : null;
+          const price = dp?.price !== undefined && dp.price.trim() !== '' ? Number(dp.price) : product.price_aud;
+          const costEx = dp?.cost !== undefined ? (costInc == null ? null : costInc / 1.1) : costs[product.id]?.wholesale_ex_gst_aud;
+          const m = grossMargin(price, costEx);
           if (m == null) return <span className="text-muted-foreground">—</span>;
           const cls = m < 0 ? 'text-destructive' : m < 0.2 ? 'text-amber-600' : 'text-emerald-600';
           return <span className={`font-semibold ${cls}`}>{(m * 100).toFixed(0)}%</span>;
@@ -256,7 +409,7 @@ const ProductManagementPage = () => {
   );
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet><title>Official Shop Management | Admin</title></Helmet>
 
       <AdminPageHeader
@@ -264,6 +417,9 @@ const ProductManagementPage = () => {
         title="Shop Products"
         subtitle="Manage official catalog and inventory."
       >
+        <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" aria-pressed={priceEdit} onClick={() => (priceEdit ? leavePriceEdit() : setPriceEdit(true))}>
+          <DollarSign className="w-4 h-4" /> {priceEdit ? 'Done editing' : 'Edit prices'}
+        </Button>
         <Button variant="outline" className="gap-2 font-bold rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white" onClick={() => setIsCategoriesOpen(true)}>
           <FolderTree className="w-4 h-4" /> Categories
         </Button>
@@ -419,12 +575,12 @@ const ProductManagementPage = () => {
                         </TableRow>
                         {sectionOpen && categories.map(({ category, products: rows }) => {
                           const key = `${section}/${category}`;
-                          const categoryOpen = !collapsed.has(key);
+                          const categoryOpen = openCategories.has(key);
                           return (
                             <React.Fragment key={key}>
                               <TableRow className="bg-muted/20 hover:bg-muted/40">
                                 <TableCell colSpan={10} className="p-0">
-                                  <button type="button" onClick={() => toggleCollapsed(key)} aria-expanded={categoryOpen}
+                                  <button type="button" onClick={() => toggleCategory(key)} aria-expanded={categoryOpen}
                                     className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 text-left text-xs font-semibold text-muted-foreground">
                                     <ChevronRight aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 transition-transform ${categoryOpen ? 'rotate-90' : ''}`} />
                                     {category} · {rows.length}
@@ -446,6 +602,18 @@ const ProductManagementPage = () => {
           </Table>
         </div>
       </Card>
+
+      {priceEdit && (
+        <div className="sticky bottom-4 z-20 mx-auto flex w-fit max-w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
+          <span className="text-sm text-muted-foreground">
+            {dirtyCount ? `${dirtyCount} product${dirtyCount === 1 ? '' : 's'} changed` : 'Edit sale price, RRP or cost (inc GST), then save'}
+          </span>
+          <Button variant="ghost" size="sm" disabled={!dirtyCount || saving} onClick={() => setDrafts({})}>Reset</Button>
+          <Button size="sm" className="gap-1.5 font-bold" disabled={!dirtyCount || saving} onClick={savePrices}>
+            <Save className="w-4 h-4" /> {saving ? 'Saving…' : `Save ${dirtyCount || ''} change${dirtyCount === 1 ? '' : 's'}`.replace('  ', ' ')}
+          </Button>
+        </div>
+      )}
 
       <ShopCategoryManager open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} products={products} />
 

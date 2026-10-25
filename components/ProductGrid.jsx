@@ -9,7 +9,10 @@ const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
   // block layout and each stretched to the full container width.)
   const gridClass = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6';
 
-  if (loading) {
+  // Skeletons only while there is nothing to show yet: a refetch (filter,
+  // return to the tab) keeps the current cards on screen instead of flashing
+  // the whole grid back to placeholders.
+  if (loading && !items?.length) {
     return (
       <div className={gridClass}>
         {[...Array(8)].map((_, i) => (

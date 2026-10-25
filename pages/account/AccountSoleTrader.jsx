@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Upload, Trash2, Store, ExternalLink, Building2, ShieldCheck } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
 import { compressImage } from '@/utils/compressImage.js';
+import { AVATAR_MAX_BYTES, checkImageFile, describeUploadError } from '@/utils/storageUploadError.js';
+import UploadErrorDialog from '@/components/account/UploadErrorDialog.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +48,8 @@ const AccountSoleTrader = () => {
   const [pageLoading, setPageLoading]   = useState(true);
 
   const [isSoleTrader, setIsSoleTrader] = useState(false);
+  // Last value saved to the DB — a save that flips it emails the admins.
+  const [savedSoleTrader, setSavedSoleTrader] = useState(false);
   const [formData, setFormData]         = useState({
     business_name: '',
     business_tagline: '',
@@ -59,6 +64,7 @@ const AccountSoleTrader = () => {
   const [removeLogo, setRemoveLogo]     = useState(false);
   const [existingLogoUrl, setExistingLogoUrl] = useState(null);
   const [storeSlug, setStoreSlug]       = useState(null);
+  const [saveError, setSaveError]       = useState(null);
 
   useEffect(() => {
     if (!currentUser?.id) { setPageLoading(false); return; }
@@ -70,6 +76,7 @@ const AccountSoleTrader = () => {
       .then(({ data }) => {
         if (cancelled || !data) return;
         setIsSoleTrader(data.is_sole_trader ?? false);
+        setSavedSoleTrader(data.is_sole_trader ?? false);
         setFormData({
           business_name:          data.business_name          ?? '',
           business_tagline:       data.business_tagline       ?? '',
@@ -93,8 +100,8 @@ const AccountSoleTrader = () => {
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('Please upload a valid image file.'); return; }
-    if (file.size > 10 * 1024 * 1024) { toast.error('Logo exceeds 10MB limit.'); return; }
+    const problem = checkImageFile(file, { what: 'business logo', maxSourceBytes: 10 * 1024 * 1024 });
+    if (problem) { setSaveError(problem); e.target.value = ''; return; }
     setLogoFile(file);
     setRemoveLogo(false);
     const reader = new FileReader();
@@ -126,12 +133,21 @@ const AccountSoleTrader = () => {
 
       if (logoFile) {
         const compressed = await compressImage(logoFile, { maxDimension: 512, quality: 0.85 });
+        if (compressed.size > AVATAR_MAX_BYTES) {
+          setSaveError(describeUploadError({ message: 'The object exceeded the maximum allowed size', statusCode: '413' }, { what: 'business logo', sizeBytes: compressed.size }));
+          return;
+        }
         const ext  = compressed.name.split('.').pop();
         // Timestamped name (not a fixed per-user path) so the file is
-        // immutable and can carry a long-lived cache header.
+        // immutable and can carry a long-lived cache header. The bucket's
+        // INSERT policy admits `business-logos/<uid>-…` — keep the two in step
+        // (supabase/migrations/20261023231611_fix_avatars_bucket_upload_policy.sql).
         const path = `business-logos/${currentUser.id}-${Date.now()}.${ext}`;
         const { error: uploadErr } = await supabase.storage.from('avatars').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
-        if (uploadErr) throw uploadErr;
+        if (uploadErr) {
+          setSaveError(describeUploadError(uploadErr, { what: 'business logo', sizeBytes: compressed.size }));
+          return;
+        }
         business_logo_url = supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl;
       } else if (removeLogo) {
         business_logo_url = null;
@@ -172,10 +188,20 @@ const AccountSoleTrader = () => {
       setExistingLogoUrl(business_logo_url);
       setStoreSlug(finalSlug);
       toast.success('Business profile saved!');
+      // Switching sole trader mode on or off tells the admins. Best-effort —
+      // the profile is already saved, so a failed notice never surfaces.
+      if (isSoleTrader !== savedSoleTrader) {
+        apiServerClient.fetch('/stores/sole-trader-change', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: isSoleTrader }),
+        }).catch(() => {});
+      }
+      setSavedSoleTrader(isSoleTrader);
       // No realtime push for profiles any more — refresh AuthContext's copy.
       Promise.resolve(refetchProfile?.()).catch(() => {});
     } catch (err) {
-      toast.error(err.message || 'Failed to save business profile.');
+      setSaveError(describeUploadError(err, { what: 'business logo' }));
     } finally {
       setLoading(false);
     }
@@ -240,6 +266,8 @@ const AccountSoleTrader = () => {
         ) : null
       }
     >
+      <UploadErrorDialog error={saveError} onClose={() => setSaveError(null)} />
+
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Enable toggle */}

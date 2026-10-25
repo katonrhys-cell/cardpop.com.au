@@ -5,7 +5,7 @@ import { CONSENT_ALL, CONSENT_ESSENTIAL, getConsent, onConsentChange, setConsent
 
 // Routes where a sticky bar would get in the way of the thing the visitor is
 // doing (paying, scanning a card) — the banner waits for the next page.
-const QUIET_PREFIXES = ['/checkout', '/checkout-success', '/success', '/scan', '/admin', '/launch'];
+export const QUIET_PREFIXES = ['/checkout', '/checkout-success', '/success', '/scan', '/admin', '/launch'];
 
 // Small bottom bar: "Accept all" turns on the advertising tags (Google Ads
 // conversion tracking, Meta Pixel); "Essentials only" keeps just the first-party
