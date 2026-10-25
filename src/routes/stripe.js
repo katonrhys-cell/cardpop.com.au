@@ -34,7 +34,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { reconcilePendingOrders } from '../services/pendingOrderAlertService.js';
-import { applyStripeSubscription, handleSubscriptionInvoiceFailed, sendTrialEndingReminder } from '../services/subscriptionService.js';
+import { applyStripeSubscription, handleSubscriptionInvoiceFailed, sendTrialEndingReminder, applyMembershipCardFromSession } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress, checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
@@ -845,6 +845,11 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
             } else {
               logger.info(`[STRIPE] Card-setup session ${session.id} completed — payment method saved (user ${savedUserId})`);
             }
+          }
+          // Account → Membership → "Update card": the new card also becomes the
+          // membership's payment method. Idempotent with the return-page call.
+          if (session.metadata?.membershipCard === 'true') {
+            await applyMembershipCardFromSession(session);
           }
         } else if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);

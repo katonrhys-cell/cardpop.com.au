@@ -394,25 +394,84 @@ export async function resumeStripeMembership(userId) {
 }
 
 /**
- * Stripe Billing Portal session for updating the card on file. Needs the
- * portal configured once in the Stripe Dashboard (Settings → Billing →
- * Customer portal); until then Stripe refuses and the route answers 503.
+ * Account → Membership → "Update card". A Checkout Session in `setup` mode
+ * collects the new card (no charge, no card data on CardPop — the same hosted
+ * card step as the trial sign-up); on return the card becomes the
+ * membership's payment method (applyMembershipCardFromSession). Members never
+ * see Stripe's own billing portal.
  */
-export async function createBillingPortalSession(userId, returnUrl) {
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('stripe_customer_id')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  if (!profile?.stripe_customer_id) throw httpError(409, 'No billing details on file.');
-  try {
-    const session = await stripe.billingPortal.sessions.create({ customer: profile.stripe_customer_id, return_url: returnUrl });
-    return session.url;
-  } catch (err) {
-    logger.error(`[SUB] Billing portal session failed for ${userId}: ${err.message}`);
-    throw httpError(503, 'Card updates aren’t available right now — contact support@cardpop.com.au.');
+export async function createMembershipCardSession(userId, { successUrl, cancelUrl }) {
+  const { profile, subscription } = await loadOwnStripeSubscription(userId);
+  if (!['trialing', 'active', 'past_due'].includes(subscription.status)) {
+    throw httpError(409, 'Your membership has ended — start a plan below.');
   }
+  const session = await stripe.checkout.sessions.create({
+    mode: 'setup',
+    payment_method_types: ['card'],
+    customer: profile.stripe_customer_id || subscription.customer,
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    // saveCard: the webhook's setup branch also mirrors has_saved_card.
+    metadata: { userId, saveCard: 'true', membershipCard: 'true', subscriptionId: subscription.id },
+  });
+  if (!session?.url) throw new Error('Stripe returned a session without a URL');
+  return session.url;
+}
+
+/**
+ * Make the card from a completed membership-card setup session the
+ * subscription's payment method, and — if the membership is past_due — retry
+ * the unpaid invoice on it straight away so the plan is restored now rather
+ * than at Stripe's next retry. Idempotent: called from the return page and the
+ * `checkout.session.completed` webhook, whichever lands first.
+ */
+export async function applyMembershipCardFromSession(session) {
+  const subscriptionId = session?.metadata?.subscriptionId;
+  const setupIntentId = typeof session?.setup_intent === 'string' ? session.setup_intent : session?.setup_intent?.id;
+  if (!subscriptionId || !setupIntentId || session.status !== 'complete') return null;
+
+  const setupIntent = await stripe.setupIntents.retrieve(setupIntentId);
+  const paymentMethod = typeof setupIntent.payment_method === 'string' ? setupIntent.payment_method : setupIntent.payment_method?.id;
+  if (!paymentMethod) return null;
+  const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+
+  if (customerId) {
+    await stripe.customers.update(customerId, { invoice_settings: { default_payment_method: paymentMethod } });
+  }
+  let subscription = await stripe.subscriptions.update(subscriptionId, { default_payment_method: paymentMethod });
+
+  if (subscription.status === 'past_due') {
+    const open = await stripe.invoices.list({ subscription: subscriptionId, status: 'open', limit: 10 });
+    for (const invoice of open?.data || []) {
+      try {
+        await stripe.invoices.pay(invoice.id, { payment_method: paymentMethod });
+        logger.info(`[SUB] Paid overdue invoice ${invoice.id} with the new card (${subscriptionId})`);
+      } catch (err) {
+        logger.warn(`[SUB] Overdue invoice ${invoice.id} still declined on the new card: ${err.message}`);
+      }
+    }
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  }
+
+  await applyStripeSubscription(subscription);
+  return describeStripeMembership(subscription);
+}
+
+/** The return leg of "Update card": confirm the session is this member's, then apply it. */
+export async function confirmMembershipCard(userId, sessionId) {
+  if (!sessionId || typeof sessionId !== 'string') throw httpError(400, 'sessionId is required.');
+  let session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId);
+  } catch (err) {
+    if (isStripeObjectMissing(err)) throw httpError(404, 'Card update not found.');
+    throw err;
+  }
+  if (session?.metadata?.userId !== userId || session.metadata?.membershipCard !== 'true') {
+    throw httpError(404, 'Card update not found.');
+  }
+  if (session.status !== 'complete') throw httpError(409, 'The card update wasn’t completed.');
+  return applyMembershipCardFromSession(session);
 }
 
 /**
@@ -479,20 +538,23 @@ export function mapPaypalStatus(paypalStatus) {
 
 
 /**
- * Move a member's existing Stripe subscription onto a higher paid tier
- * (Account → Dashboard / Membership → "Upgrade your plan"). The subscription's
- * single item is re-priced in place with prorations, so the member keeps
- * their billing anchor, trial and payment method — no second subscription,
- * no second trial. The webhook mirrors the change too, but the profile is
- * updated here as well so the UI reflects the new tier straight away.
+ * Move a member's existing Stripe subscription to another paid tier, up or
+ * down (Account → Membership → "Change your plan"). The subscription's single
+ * item is re-priced in place with prorations — an upgrade bills the
+ * difference on the next invoice, a downgrade credits the unused part of the
+ * dearer plan against it — so the member keeps their billing anchor, trial and
+ * payment method: no second subscription, no second trial. Dropping to Hobby
+ * is a cancellation (cancelStripeMembership), not a tier change. The webhook
+ * mirrors the change too, but the profile is updated here as well so the UI
+ * reflects the new tier straight away.
  *
- * Throws an Error with `statusCode` for the route to relay: 400 for a tier
- * that isn't a step up, 409 when there is no Stripe subscription to change
- * (Hobby, PayPal-billed, complimentary or lapsed), 503 when the target
- * tier's price isn't configured.
+ * Throws an Error with `statusCode` for the route to relay: 400 for the
+ * member's current tier or a non-paid one, 409 when there is no Stripe
+ * subscription to change (Hobby, PayPal-billed, complimentary or lapsed), 503
+ * when the target tier's price isn't configured.
  */
 export async function changeStripeSubscriptionTier(userId, tier) {
-  if (!PAID_TIER_ORDER.includes(tier)) throw httpError(400, 'Choose a paid plan to upgrade to.');
+  if (!PAID_TIER_ORDER.includes(tier)) throw httpError(400, 'Choose a paid plan to switch to.');
   const priceId = process.env[ENV.stripePriceIds[tier]];
   if (!priceId) {
     logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
@@ -516,8 +578,8 @@ export async function changeStripeSubscriptionTier(userId, tier) {
   if (!profile.stripe_subscription_id) {
     throw httpError(409, 'No active membership to change — start a plan below.');
   }
-  if (PAID_TIER_ORDER.indexOf(tier) <= PAID_TIER_ORDER.indexOf(profile.subscription_tier)) {
-    throw httpError(400, 'Choose a plan above your current one.');
+  if (tier === profile.subscription_tier) {
+    throw httpError(400, 'You’re already on that plan.');
   }
 
   const current = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
@@ -536,7 +598,8 @@ export async function changeStripeSubscriptionTier(userId, tier) {
   });
 
   await applyStripeSubscription(updated);
-  logger.info(`[SUB] ${userId} upgraded ${profile.subscription_tier} → ${tier} (stripe ${updated.id})`);
+  const direction = PAID_TIER_ORDER.indexOf(tier) > PAID_TIER_ORDER.indexOf(profile.subscription_tier) ? 'upgraded' : 'downgraded';
+  logger.info(`[SUB] ${userId} ${direction} ${profile.subscription_tier} → ${tier} (stripe ${updated.id})`);
   return { tier: tierFromStripeSubscription(updated), status: mapStripeStatus(updated.status) };
 }
 

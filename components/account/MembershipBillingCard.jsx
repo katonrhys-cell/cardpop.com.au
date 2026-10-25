@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, CalendarClock, CreditCard, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import apiServerClient from '@/lib/apiServerClient.js';
@@ -22,7 +23,8 @@ const formatDate = (iso) =>
 /**
  * Account → Membership billing controls for a Stripe-billed member: when the
  * trial ends / the next charge is due, Cancel membership (with undo until the
- * period ends), and Update card. A member whose payment is failing is told so
+ * period ends), and Update card. Every action goes through our API, which
+ * makes the change in Stripe — members never see a Stripe dashboard or portal. A member whose payment is failing is told so
  * plainly — before this card existed the page showed them the trial sign-up as
  * if they'd never subscribed while Stripe kept retrying their card.
  *
@@ -36,14 +38,50 @@ export default function MembershipBillingCard({ subscriptionStatus, onChanged })
   // From the subscription itself: a past_due member's profile already reads Hobby.
   const planName = PLANS[membership?.tier]?.name || 'Pro';
 
+  const [params, setParams] = useSearchParams();
+
   useEffect(() => {
     let cancelled = false;
-    apiServerClient.fetch('/subscription/stripe/details')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => { if (!cancelled) setMembership(data?.membership || null); })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setLoaded(true); });
+    const load = async () => {
+      // Back from the hosted card step: make the new card the membership's
+      // payment method before reading the state (the webhook does it too).
+      const cardReturn = params.get('card');
+      const sessionId = params.get('session_id');
+      if (cardReturn) {
+        setParams((prev) => {
+          const next = new URLSearchParams(prev);
+          next.delete('card');
+          next.delete('session_id');
+          return next;
+        }, { replace: true });
+      }
+      if (cardReturn === 'updated' && sessionId) {
+        try {
+          const res = await apiServerClient.fetch('/subscription/stripe/update-card/confirm', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || 'We couldn’t update your card.');
+          toast.success(data.membership?.status === 'past_due'
+            ? 'Card saved, but the overdue payment was declined again — try another card.'
+            : 'Your card has been updated.');
+          await onChanged?.();
+        } catch (err) {
+          toast.error(err.message);
+        }
+      }
+      try {
+        const res = await apiServerClient.fetch('/subscription/stripe/details');
+        const data = res.ok ? await res.json() : null;
+        if (!cancelled) setMembership(data?.membership || null);
+      } catch { /* leave the card hidden */ }
+      if (!cancelled) setLoaded(true);
+    };
+    load();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subscriptionStatus]);
 
   const call = async (action, path, body) => {
@@ -84,7 +122,11 @@ export default function MembershipBillingCard({ subscriptionStatus, onChanged })
   };
 
   const handleUpdateCard = async () => {
-    const data = await call('portal', '/subscription/stripe/portal', { returnUrl: window.location.href });
+    const base = `${window.location.origin}${window.location.pathname}`;
+    const data = await call('card', '/subscription/stripe/update-card', {
+      successUrl: `${base}?card=updated&session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${base}?card=cancelled`,
+    });
     if (data?.url) window.location.assign(data.url);
   };
 
@@ -165,7 +207,7 @@ export default function MembershipBillingCard({ subscriptionStatus, onChanged })
           </AlertDialog>
         )}
         <Button type="button" variant={pastDue ? 'default' : 'ghost'} onClick={handleUpdateCard} disabled={busy != null}>
-          {busy === 'portal' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CreditCard className="mr-2 h-4 w-4" />Update card</>}
+          {busy === 'card' ? <Loader2 className="h-4 w-4 animate-spin" /> : <><CreditCard className="mr-2 h-4 w-4" />Update card</>}
         </Button>
       </div>
     </div>

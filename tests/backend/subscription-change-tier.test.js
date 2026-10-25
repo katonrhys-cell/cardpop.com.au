@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 
 // POST /subscription/stripe/change-tier — the in-place upgrade behind the
-// dashboard's "Upgrade your plan". It must re-price the member's EXISTING
+// membership page's "Change your plan" (up or down). It must re-price the member's EXISTING
 // subscription (no second subscription, no second trial) and refuse anyone
 // without a Stripe subscription to change.
 
@@ -114,11 +114,25 @@ describe('POST /subscription/stripe/change-tier', () => {
     }));
   });
 
-  it('refuses a sideways or downward move', async () => {
+  it('refuses a move to the plan the member is already on', async () => {
     expect((await change('pro')).status).toBe(400);
-    mockMaybeSingle.mockResolvedValue({ data: { ...proProfile, subscription_tier: 'elite' }, error: null });
-    expect((await change('premium')).status).toBe(400);
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('downgrades in place with prorations, crediting the unused part of the dearer plan', async () => {
+    mockMaybeSingle.mockResolvedValue({ data: { ...proProfile, subscription_tier: 'elite' }, error: null });
+    mockRetrieve.mockResolvedValue({
+      id: 'sub_123', status: 'active', customer: 'cus_1',
+      metadata: { userId: 'user-1', tier: 'elite' },
+      items: { data: [{ id: 'si_1', price: { id: 'price_elite' } }] },
+    });
+    const res = await change('premium');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ tier: 'premium', status: 'active' });
+    const [, params] = mockUpdate.mock.calls[0];
+    expect(params.items).toEqual([{ id: 'si_1', price: 'price_premium' }]);
+    expect(params.proration_behavior).toBe('create_prorations');
+    expect(mockProfileUpdate).toHaveBeenCalledWith(expect.objectContaining({ subscription_tier: 'premium' }));
   });
 
   it('refuses an unknown tier', async () => {

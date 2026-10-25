@@ -9,8 +9,10 @@ import request from 'supertest';
 
 const stripeMock = vi.hoisted(() => ({
   subscriptions: { retrieve: vi.fn(), update: vi.fn(), cancel: vi.fn() },
-  invoices: { list: vi.fn(), voidInvoice: vi.fn() },
-  billingPortal: { sessions: { create: vi.fn() } },
+  invoices: { list: vi.fn(), voidInvoice: vi.fn(), pay: vi.fn() },
+  checkout: { sessions: { create: vi.fn(), retrieve: vi.fn() } },
+  setupIntents: { retrieve: vi.fn() },
+  customers: { update: vi.fn() },
 }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
 const mockProfileUpdate = vi.hoisted(() => vi.fn());
@@ -154,17 +156,60 @@ describe('GET /subscription/stripe/details', () => {
   });
 });
 
-describe('POST /subscription/stripe/portal', () => {
-  it('rejects a return URL off the site', async () => {
-    const res = await request(app).post('/subscription/stripe/portal').send({ returnUrl: 'https://evil.example/' });
-    expect(res.status).toBe(400);
-    expect(stripeMock.billingPortal.sessions.create).not.toHaveBeenCalled();
+describe('Update card (in-site, no Stripe portal)', () => {
+  const urls = { successUrl: 'https://cardpop.com.au/account/membership?card=updated&session_id={CHECKOUT_SESSION_ID}', cancelUrl: 'https://cardpop.com.au/account/membership?card=cancelled' };
+  const completed = (overrides = {}) => ({
+    id: 'cs_1', status: 'complete', customer: 'cus_1', setup_intent: 'seti_1',
+    metadata: { userId: 'user-1', membershipCard: 'true', subscriptionId: 'sub_1' }, ...overrides,
   });
 
-  it('answers 503 when the portal is not configured in Stripe', async () => {
-    stripeMock.billingPortal.sessions.create.mockRejectedValue(new Error('No configuration provided'));
-    const res = await request(app).post('/subscription/stripe/portal').send({ returnUrl: 'https://cardpop.com.au/account/membership' });
-    expect(res.status).toBe(503);
+  beforeEach(() => {
+    stripeMock.setupIntents.retrieve.mockResolvedValue({ id: 'seti_1', payment_method: 'pm_new' });
+    stripeMock.subscriptions.update.mockImplementation(async () => sub({ status: 'active' }));
+  });
+
+  it('starts a no-charge card setup tied to the membership', async () => {
+    stripeMock.subscriptions.retrieve.mockResolvedValue(sub({ status: 'active' }));
+    stripeMock.checkout.sessions.create.mockResolvedValue({ id: 'cs_1', url: 'https://checkout.stripe.com/c/cs_1' });
+    const res = await request(app).post('/subscription/stripe/update-card').send(urls);
+    expect(res.status).toBe(200);
+    expect(res.body.url).toBe('https://checkout.stripe.com/c/cs_1');
+    expect(stripeMock.checkout.sessions.create).toHaveBeenCalledWith(expect.objectContaining({
+      mode: 'setup', customer: 'cus_1',
+      metadata: expect.objectContaining({ userId: 'user-1', membershipCard: 'true', subscriptionId: 'sub_1' }),
+    }));
+  });
+
+  it('rejects return URLs off the site', async () => {
+    const res = await request(app).post('/subscription/stripe/update-card').send({ ...urls, successUrl: 'https://evil.example/' });
+    expect(res.status).toBe(400);
+    expect(stripeMock.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('makes the new card the membership\'s payment method on return', async () => {
+    stripeMock.checkout.sessions.retrieve.mockResolvedValue(completed());
+    const res = await request(app).post('/subscription/stripe/update-card/confirm').send({ sessionId: 'cs_1' });
+    expect(res.status).toBe(200);
+    expect(stripeMock.customers.update).toHaveBeenCalledWith('cus_1', { invoice_settings: { default_payment_method: 'pm_new' } });
+    expect(stripeMock.subscriptions.update).toHaveBeenCalledWith('sub_1', { default_payment_method: 'pm_new' });
+    expect(stripeMock.invoices.pay).not.toHaveBeenCalled();
+  });
+
+  it('retries an overdue invoice on the new card straight away', async () => {
+    stripeMock.checkout.sessions.retrieve.mockResolvedValue(completed());
+    stripeMock.subscriptions.update.mockResolvedValue(sub({ status: 'past_due' }));
+    stripeMock.subscriptions.retrieve.mockResolvedValue(sub({ status: 'active' }));
+    stripeMock.invoices.list.mockResolvedValue({ data: [{ id: 'in_overdue' }] });
+    const res = await request(app).post('/subscription/stripe/update-card/confirm').send({ sessionId: 'cs_1' });
+    expect(stripeMock.invoices.pay).toHaveBeenCalledWith('in_overdue', { payment_method: 'pm_new' });
+    expect(res.body.membership.status).toBe('active');
+  });
+
+  it('refuses another member\'s session', async () => {
+    stripeMock.checkout.sessions.retrieve.mockResolvedValue(completed({ metadata: { userId: 'someone-else', membershipCard: 'true', subscriptionId: 'sub_9' } }));
+    const res = await request(app).post('/subscription/stripe/update-card/confirm').send({ sessionId: 'cs_1' });
+    expect(res.status).toBe(404);
+    expect(stripeMock.subscriptions.update).not.toHaveBeenCalled();
   });
 });
 

@@ -15,7 +15,8 @@ import {
   getStripeMembershipDetails,
   cancelStripeMembership,
   resumeStripeMembership,
-  createBillingPortalSession,
+  createMembershipCardSession,
+  confirmMembershipCard,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -127,8 +128,8 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /stripe/change-tier ────────────────────────────────────────────────
-// Upgrade an existing Stripe-billed membership to a higher tier in place
-// (re-prices the subscription with prorations; no new trial). Hobby members
+// Move an existing Stripe-billed membership to another paid tier, up or down,
+// in place (re-prices the subscription with prorations; no new trial). Hobby members
 // and anyone without an active Stripe subscription get a 409 and should start
 // a plan through /stripe/checkout instead. MFA-gated like the other routes
 // that change what the member's card is charged.
@@ -182,16 +183,27 @@ router.post('/stripe/resume', authMiddleware, requireAal2, async (req, res) => {
   }
 });
 
-// POST /stripe/portal — Stripe Billing Portal for updating the card on file.
-router.post('/stripe/portal', authMiddleware, requireAal2, async (req, res) => {
+// POST /stripe/update-card — start a card change for the membership (hosted
+// card step in setup mode, no charge). Returns the URL to send the member to.
+router.post('/stripe/update-card', authMiddleware, requireAal2, async (req, res) => {
   try {
-    const { returnUrl } = req.body || {};
-    if (!returnUrl) return res.status(400).json({ error: 'returnUrl is required' });
-    const bad = invalidReturnUrl({ returnUrl });
+    const { successUrl, cancelUrl } = req.body || {};
+    if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+    const bad = invalidReturnUrl({ successUrl, cancelUrl });
     if (bad) return res.status(400).json({ error: bad });
-    res.json({ url: await createBillingPortalSession(req.user.id, returnUrl) });
+    res.json({ url: await createMembershipCardSession(req.user.id, { successUrl, cancelUrl }) });
   } catch (err) {
-    relayError(res, err, '/stripe/portal', 'Could not open billing');
+    relayError(res, err, '/stripe/update-card', 'Could not start the card update');
+  }
+});
+
+// POST /stripe/update-card/confirm — the return leg: make the new card the
+// membership's payment method (and retry an overdue invoice on it).
+router.post('/stripe/update-card/confirm', authMiddleware, async (req, res) => {
+  try {
+    res.json({ membership: await confirmMembershipCard(req.user.id, req.body?.sessionId) });
+  } catch (err) {
+    relayError(res, err, '/stripe/update-card/confirm', 'Could not update your card');
   }
 });
 
