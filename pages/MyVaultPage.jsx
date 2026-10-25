@@ -114,7 +114,7 @@ const MyVaultPage = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentUser, filterCollection, page]);
+  }, [currentUser?.id, filterCollection, page]);
 
   useEffect(() => {
     fetchVault();

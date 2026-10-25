@@ -214,7 +214,7 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-300">
+    <div className="space-y-10">
       <AdminPageHeader
         icon={LayoutDashboard}
         title="Platform Overview"

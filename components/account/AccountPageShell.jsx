@@ -33,7 +33,7 @@ const AccountPageShell = ({
   actions,
   children,
 }) => (
-  <div className="w-full max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-8 animate-in fade-in duration-300">
+  <div className="w-full max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-6 md:py-8 space-y-8">
     {documentTitle && (
       <Helmet>
         <title>{documentTitle}</title>

@@ -64,7 +64,7 @@ const ProductReviewsAdminPage = () => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <Helmet><title>Product Reviews | Admin</title></Helmet>
 
       <AdminPageHeader

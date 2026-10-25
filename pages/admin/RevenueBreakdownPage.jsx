@@ -216,7 +216,7 @@ const RevenueBreakdownPage = () => {
   const rangeLabel = RANGE_OPTIONS.find((r) => r.value === range)?.label || 'All time';
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="space-y-6">
       <Helmet><title>Revenue Breakdown | Admin</title></Helmet>
 
       <AdminPageHeader

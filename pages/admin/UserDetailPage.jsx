@@ -188,7 +188,7 @@ const UserDetailPage = () => {
   const displayName = user.display_name || user.username || user.email || 'User';
 
   return (
-    <div className="w-full space-y-8 animate-in fade-in duration-300 py-6 px-5 sm:px-8 md:px-12 xl:px-16 max-w-[90rem] mx-auto">
+    <div className="w-full space-y-8 py-6 px-5 sm:px-8 md:px-12 xl:px-16 max-w-[90rem] mx-auto">
       <Helmet><title>{displayName} | User Details</title></Helmet>
 
       <AdminPageHeader

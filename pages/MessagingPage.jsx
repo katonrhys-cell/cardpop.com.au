@@ -104,7 +104,7 @@ const MessagingPage = () => {
       setLoading(false);
     }
     return () => { isMounted.current = false; };
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // Handle incoming state (starting new chat). Pages link here with
   // { state: { recipientId, prefill } } — e.g. "Request Trade" on a listing.
@@ -286,7 +286,7 @@ const MessagingPage = () => {
     } catch (error) {
       if (isMounted.current) setLoading(false);
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   const loadThread = async (otherId) => {
     setSelectedUserId(otherId);

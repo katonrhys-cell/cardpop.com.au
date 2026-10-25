@@ -52,7 +52,7 @@ const clearStaleBodyStyles = () => {
 export { TCG_COLLECTIONS, SPORTS_COLLECTIONS, COLLECTIONS_LIST } from '@/data/collections.js';
 
 const Header = () => {
-  const { isAuthenticated, currentUser, isAdmin, logout, isVerified, loading: authLoading } = useAuth();
+  const { isAuthenticated, currentUser, isAdmin, logout, isVerified, loading: authLoading, profileLoading } = useAuth();
   const { settings } = usePlatformSettings();
   const { cartItems, setIsCartOpen } = useCart();
   const location = useLocation();
@@ -368,6 +368,11 @@ const Header = () => {
                     <div className="h-9 w-[74px] rounded-xl bg-muted animate-pulse" />
                   </div>
                 )
+              ) : isAuthenticated && profileLoading ? (
+                // The session resolves before the profile: rendering the
+                // dropdown now showed a "C" (the "Collector" fallback) that
+                // then swapped to the member's photo and name.
+                <div className="h-10 w-10 rounded-full bg-muted animate-pulse" aria-hidden="true" />
               ) : isAuthenticated ? (
                 <Suspense fallback={<div className="h-10 w-10 rounded-full bg-muted animate-pulse" aria-hidden="true" />}>
                   <VaultDropdown isMobile={false} />

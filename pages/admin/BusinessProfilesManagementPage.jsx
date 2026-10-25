@@ -130,7 +130,7 @@ const BusinessProfilesManagementPage = () => {
   });
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-8">
       <Helmet><title>Business Profiles | Admin</title></Helmet>
 
       <AdminPageHeader icon={Store} title="Business Profiles" subtitle="Curated physical retail locations shown on the Retailers directory and Community Map.">
