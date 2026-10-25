@@ -12,6 +12,10 @@ import {
   getSubscriptionStatus,
   changeStripeSubscriptionTier,
   assertCanStartPaidMembership,
+  getStripeMembershipDetails,
+  cancelStripeMembership,
+  resumeStripeMembership,
+  createBillingPortalSession,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -136,6 +140,58 @@ router.post('/stripe/change-tier', authMiddleware, requireAal2, async (req, res)
     if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
     logger.error(`[SUB] /stripe/change-tier error: ${err.message}`);
     res.status(500).json({ error: 'Could not change your plan' });
+  }
+});
+
+// ─── Membership self-service (Account → Membership) ──────────────────────────
+// Members must be able to leave without emailing support: before these routes
+// existed the only way out of a trial was to ask, and an unpaid trial
+// conversion kept retrying the card while the account read "Hobby".
+function relayError(res, err, label, fallback) {
+  if (err.statusCode) return res.status(err.statusCode).json({ error: err.message });
+  logger.error(`[SUB] ${label} error: ${err.message}`);
+  return res.status(500).json({ error: fallback });
+}
+
+// GET /stripe/details — live billing state from Stripe (scheduled cancellation,
+// when the period / trial ends, price). `null` when there's no Stripe membership.
+router.get('/stripe/details', authMiddleware, async (req, res) => {
+  try {
+    res.json({ membership: await getStripeMembershipDetails(req.user.id) });
+  } catch (err) {
+    relayError(res, err, '/stripe/details', 'Could not load your membership');
+  }
+});
+
+// POST /stripe/cancel — trialing/active: cancel at period end (a trial ends
+// uncharged); failing payment: cancel now and void the unpaid invoice.
+router.post('/stripe/cancel', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    res.json({ membership: await cancelStripeMembership(req.user.id) });
+  } catch (err) {
+    relayError(res, err, '/stripe/cancel', 'Could not cancel your membership');
+  }
+});
+
+// POST /stripe/resume — undo a scheduled cancellation before the period ends.
+router.post('/stripe/resume', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    res.json({ membership: await resumeStripeMembership(req.user.id) });
+  } catch (err) {
+    relayError(res, err, '/stripe/resume', 'Could not keep your membership');
+  }
+});
+
+// POST /stripe/portal — Stripe Billing Portal for updating the card on file.
+router.post('/stripe/portal', authMiddleware, requireAal2, async (req, res) => {
+  try {
+    const { returnUrl } = req.body || {};
+    if (!returnUrl) return res.status(400).json({ error: 'returnUrl is required' });
+    const bad = invalidReturnUrl({ returnUrl });
+    if (bad) return res.status(400).json({ error: bad });
+    res.json({ url: await createBillingPortalSession(req.user.id, returnUrl) });
+  } catch (err) {
+    relayError(res, err, '/stripe/portal', 'Could not open billing');
   }
 });
 

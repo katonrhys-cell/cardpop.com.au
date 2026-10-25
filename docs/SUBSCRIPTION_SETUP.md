@@ -156,7 +156,10 @@ supabase db push
 3. Add these webhook events to your existing Stripe webhook endpoint
    (`/api/stripe/webhook`): `customer.subscription.created`,
    `customer.subscription.updated`, `customer.subscription.deleted`,
-   `customer.subscription.trial_will_end`.
+   `customer.subscription.trial_will_end`, **`invoice.payment_failed`**.
+4. Turn on the **Customer portal** (Stripe Dashboard → Settings → Billing →
+   Customer portal → save once) — the membership page's **Update card** button
+   opens it. Until it's saved, `POST /subscription/stripe/portal` answers 503.
 
 ## 3. PayPal — currently switched OFF
 
@@ -215,6 +218,29 @@ marketplace checkout and are reused here.
   409 and a message. The route is MFA-gated (`requireAal2`) like the other
   routes that change what the member's card is charged. Downgrades are not
   offered — cancel and re-subscribe.
+- **Cancelling** (Account → Membership → *Cancel membership* →
+  `POST /subscription/stripe/cancel`, `cancelStripeMembership()`): a trialing
+  or active member is cancelled **at the end of the period they already have**
+  (`cancel_at_period_end` — a trial ends without ever being charged) and can
+  undo it until then (*Keep my membership* → `/stripe/resume`); a member whose
+  payment is failing is cancelled **immediately** and the unpaid invoice
+  voided, so the retries stop. The page reads the live state from
+  `GET /subscription/stripe/details`. *Update card* opens the Stripe Customer
+  portal (`/stripe/portal`). All three writes are MFA-gated (`requireAal2`).
+- **Trial reminder**: `customer.subscription.trial_will_end` (3 days out)
+  emails the member the charge date, the amount and where to cancel
+  (`membershipTrialEndingEmail`) — skipped once they've cancelled.
+- **A failed first charge ends the membership** (`endFailedTrialConversion()`):
+  when a subscription goes `past_due` and has never collected a payment (the
+  trial converted and the card declined), it is cancelled and its open invoice
+  voided rather than left on Stripe's retry schedule. Before this the profile
+  dropped to Hobby while Stripe kept retrying the card for days — members saw
+  "payment failed" notices for a plan their account said they weren't on
+  (support case, 2026-10-25). A member who has paid before keeps Stripe's
+  retries on a failed renewal, and the membership page shows them *Payment
+  failed* with *Update card* / *Cancel membership*. `invoice.payment_failed`
+  re-applies the subscription so this runs on every retry, not only on a
+  status change.
 - **State sync** (`src/services/subscriptionService.js`): provider webhooks
   mirror the subscription status onto `profiles.subscription_status` /
   `trial_ends_at`, and the purchased tier onto `profiles.subscription_tier`.
