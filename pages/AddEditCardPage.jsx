@@ -78,6 +78,11 @@ import PlayerPicker from '@/components/PlayerPicker.jsx';
 import { SPORTS_COLLECTIONS } from '@/data/collections.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
+// Raw phone photos run 3–8 MB (more for ProRAW/48MP). They're resized and
+// re-encoded in the browser before upload (utils/compressImage.js), so this only
+// guards against absurd files rather than capping what ends up stored.
+const MAX_RAW_PHOTO_BYTES = 25 * 1024 * 1024;
+
 const GRADING_COMPANIES = [
   { value: 'raw',   label: 'Raw',   sub: 'Ungraded',      activeClass: 'border-slate-500 bg-slate-500/10 text-slate-700 dark:text-slate-300' },
   { value: 'psa',   label: 'PSA',   sub: 'PSA Grading',   activeClass: 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-400' },
@@ -789,7 +794,7 @@ const AddEditCardPage = () => {
   // the mobile camera input, or the live scanner.
   const acceptMainImage = (file) => {
     if (!file) return;
-    if (file.size > 5242880) { toast.error('Image must be less than 5MB'); return; }
+    if (file.size > MAX_RAW_PHOTO_BYTES) { toast.error('Image must be less than 25MB'); return; }
     setImageFile(file);
     const reader = new FileReader();
     reader.onloadend = () => setImagePreview(reader.result);
@@ -1738,7 +1743,7 @@ const AddEditCardPage = () => {
                     <div className="text-center p-6">
                       <ImageIcon className="w-12 h-12 text-muted-foreground mx-auto mb-3 opacity-50 group-hover:text-primary group-hover:opacity-100 transition-colors" />
                       <p className="text-sm font-medium text-foreground mb-1">Drag & drop or click</p>
-                      <p className="text-xs text-muted-foreground">JPG, PNG, WebP up to 5MB</p>
+                      <p className="text-xs text-muted-foreground">JPG, PNG, WebP up to 25MB — photos are compressed automatically</p>
                     </div>
                   )}
                   <input
@@ -1882,7 +1887,7 @@ const AddEditCardPage = () => {
                               onChange={(e) => {
                                 const file = e.target.files[0];
                                 if (!file) return;
-                                if (file.size > 5242880) { toast.error('Image must be less than 5MB'); return; }
+                                if (file.size > MAX_RAW_PHOTO_BYTES) { toast.error('Image must be less than 25MB'); return; }
                                 const nf = [...extraFiles]; nf[idx] = file;
                                 setExtraFiles(nf);
                                 const reader = new FileReader();
