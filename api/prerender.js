@@ -22,6 +22,7 @@ import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
+import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
@@ -1336,7 +1337,7 @@ const eventIsoDate = (date, time) => {
 const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
-  'entry_fee_aud, presale_fee_aud, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
+  'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
   'created_at, updated_at';
 
 // YouTube video id from any common URL shape — mirrors lib/eventSeo.js.
@@ -1427,7 +1428,8 @@ function buildEventLd(event) {
 
 // One Offer for the general-admission price, plus a second when a separate
 // presale/early-bird price is known — or the presale Offer alone when the GA
-// price hasn't been published yet (mirrors lib/eventSeo.js).
+// price hasn't been published yet — then one per extra ticket price
+// (utils/eventTicketPrices.js). Mirrors lib/eventSeo.js.
 function buildEventOffers(event, canonical, startDate) {
   const mkOffer = (price, name) => ({
     '@type': 'Offer',
@@ -1439,13 +1441,18 @@ function buildEventOffers(event, canonical, startDate) {
     ...(name ? { name } : {}),
   });
   const presaleFee = Number(event.presale_fee_aud) > 0 ? Number(event.presale_fee_aud) : null;
-  if (!presaleFee) {
+  const extraOffers = event.is_free ? [] : cleanTicketPrices(event.ticket_prices)
+    .map(row => mkOffer(row.price_aud.toFixed(2), ticketPriceOfferName(row)));
+  if (!presaleFee && !extraOffers.length) {
     return mkOffer(event.is_free ? '0' : (Number(event.entry_fee_aud) > 0 ? Number(event.entry_fee_aud).toFixed(2) : '0'));
   }
-  const presaleOffer = mkOffer(presaleFee.toFixed(2), 'Presale / early bird');
   const gaKnown = event.is_free || Number(event.entry_fee_aud) > 0;
-  if (!gaKnown) return presaleOffer;
-  return [mkOffer(event.is_free ? '0' : Number(event.entry_fee_aud).toFixed(2), 'General admission'), presaleOffer];
+  const offers = [
+    ...(gaKnown ? [mkOffer(event.is_free ? '0' : Number(event.entry_fee_aud).toFixed(2), 'General admission')] : []),
+    ...(presaleFee ? [mkOffer(presaleFee.toFixed(2), 'Presale / early bird')] : []),
+    ...extraOffers,
+  ];
+  return offers.length === 1 ? offers[0] : offers;
 }
 
 async function renderEventsLanding(supabase, categorySlug) {
@@ -1557,6 +1564,7 @@ async function renderEvent(supabase, param) {
     ${location ? `<li>Location: ${esc(location)}</li>` : ''}
     ${event.address ? `<li>Address: ${esc(event.address)}</li>` : ''}
     ${feeLine ? `<li>${esc(feeLine)}</li>` : ''}
+    ${event.is_free ? '' : ticketPriceLines(event.ticket_prices).map(({ label, price }) => `<li>${esc(label)}: ${esc(price)}</li>`).join('')}
     ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
   </ul>
   ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}

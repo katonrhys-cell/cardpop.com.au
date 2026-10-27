@@ -601,6 +601,20 @@ describe('prerender events', () => {
     expect(body).toContain('"name":"Presale / early bird"');
   });
 
+  it('emits an offer and a body line per extra ticket price', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'tiered-show', title: 'Tiered Show', status: 'approved',
+      start_date: '2026-10-01', entry_fee_aud: 15, is_free: false,
+      ticket_prices: [{ type: 'vip', price_aud: 60 }, { type: 'group', group_size: 4, price_aud: 50 }],
+    } };
+    const { body } = await run('/events/tiered-show');
+    expect(body).toContain('"name":"General admission"');
+    expect(body).toContain('"name":"VIP ticket"');
+    expect(body).toContain('"price":"60.00"');
+    expect(body).toContain('"name":"Group ticket (4 people)"');
+    expect(body).toContain('<li>Group of 4: $50.00</li>');
+  });
+
   it('always emits offers, image, organizer, eventStatus and description for a sparse event', async () => {
     state.result = { data: {
       id: UUID, slug: 'tiny-meetup', title: 'Tiny Meetup', status: 'approved',

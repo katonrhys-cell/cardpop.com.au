@@ -16,6 +16,8 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
 import EventGalleryEditor from '@/components/events/EventGalleryEditor.jsx';
+import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
+import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
 import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx';
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { toast } from 'sonner';
@@ -76,6 +78,9 @@ const INITIAL_STATE = {
   facebook_video_url: '',
   entry_fee_aud: '',
   presale_fee_aud: '',
+  // Child / VIP / GA early & late access / group prices (utils/eventTicketPrices.js),
+  // held as { type, price_aud, group_size } with string inputs.
+  ticket_prices: [],
   is_free: true,
   capacity: '',
   registration_required: false,
@@ -119,10 +124,18 @@ const TagInput = ({ value = [], onChange, placeholder }) => {
 };
 
 const NUMBER_FIELDS = ['entry_fee_aud', 'presale_fee_aud', 'capacity'];
+
+// Saved ticket prices → the editor's string inputs.
+const ticketPricesToForm = (rows) => cleanTicketPrices(rows).map(r => ({
+  type: r.type,
+  price_aud: String(r.price_aud),
+  ...(r.type === 'group' ? { group_size: String(r.group_size) } : {}),
+}));
 const isBlankFormValue = (v) => v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
 
 // DB row value → the shape the form state holds (numbers as strings, HH:MM times).
 const toFormValue = (field, value) => {
+  if (field === 'ticket_prices') return ticketPricesToForm(value);
   if (Array.isArray(INITIAL_STATE[field])) return value || [];
   if (typeof INITIAL_STATE[field] === 'boolean') return Boolean(value);
   if (value === null || value === undefined) return '';
@@ -288,6 +301,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
+        ticket_prices:       ticketPricesToForm(event.ticket_prices),
         is_free:             event.is_free ?? true,
         capacity:            event.capacity != null ? String(event.capacity) : '',
         registration_required: event.registration_required || false,
@@ -368,6 +382,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       return;
     }
 
+    const ticketPriceError = formData.is_free ? null : ticketPricesFormError(formData.ticket_prices);
+    if (ticketPriceError) {
+      toast.error(ticketPriceError);
+      setActiveTab('organiser');
+      return;
+    }
+
     const offerError = isUserMode ? null : validateOfferForm(offerForm);
     if (offerError) {
       toast.error(offerError);
@@ -443,6 +464,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         facebook_video_url:  formData.facebook_video_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
+        ticket_prices:       formData.is_free ? [] : cleanTicketPrices(formData.ticket_prices),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
         registration_required: formData.registration_required,
@@ -814,7 +836,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 <div className="pt-2 border-t border-border space-y-5">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Entry & Capacity</p>
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); } }} disabled={loading} />
+                    <Switch checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} />
                     <div>
                       <p className="text-sm font-semibold">Free Entry</p>
                       <p className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
@@ -831,6 +853,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                         <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
                       </div>
                     </div>
+                  )}
+                  {!formData.is_free && (
+                    <TicketPricesEditor value={formData.ticket_prices} onChange={v => set('ticket_prices', v)} disabled={loading} />
                   )}
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-2">

@@ -104,6 +104,26 @@ describe('buildEventJsonLd offers', () => {
     expect(ld.offers[1]).toMatchObject({ name: 'Presale / early bird', price: 25 });
   });
 
+  it('adds an offer per extra ticket price, after GA and presale', () => {
+    const ld = buildEventJsonLd({
+      ...base, entry_fee_aud: 15, presale_fee_aud: 12,
+      ticket_prices: [{ type: 'group', group_size: 5, price_aud: 60 }, { type: 'child', price_aud: 5 }],
+    });
+    expect(ld.offers.map(o => [o.name, o.price])).toEqual([
+      ['General admission', 15], ['Presale / early bird', 12], ['Child ticket', 5], ['Group ticket (5 people)', 60],
+    ]);
+  });
+
+  it('lists only the extra prices when no GA price is published', () => {
+    const ld = buildEventJsonLd({ ...base, entry_fee_aud: 0, is_free: false, ticket_prices: [{ type: 'vip', price_aud: 80 }] });
+    expect(ld.offers).toMatchObject({ name: 'VIP ticket', price: 80 });
+  });
+
+  it('ignores extra prices on a free event', () => {
+    const ld = buildEventJsonLd({ ...base, is_free: true, ticket_prices: [{ type: 'vip', price_aud: 80 }] });
+    expect(ld.offers).toMatchObject({ name: 'General admission', price: 0 });
+  });
+
   it('emits the presale offer alone when the GA price is unpublished', () => {
     const ld = buildEventJsonLd({ ...base, entry_fee_aud: 0, is_free: false, presale_fee_aud: 40 });
     expect(ld.offers).toMatchObject({ '@type': 'Offer', name: 'Presale / early bird', price: 40 });

@@ -165,3 +165,27 @@ describe('EventDetailCard — photo gallery', () => {
     expect(screen.queryAllByRole('button', { name: /^Open photo/ })).toHaveLength(0);
   });
 });
+
+describe('EventDetailCard — ticket prices', () => {
+  it('lists the extra ticket prices under Entry', () => {
+    renderCard({
+      ...baseEvent, entry_fee_aud: 15,
+      ticket_prices: [{ type: 'child', price_aud: 5 }, { type: 'group', group_size: 4, price_aud: 50 }],
+    });
+    expect(screen.getByText('$15.00 AUD')).toBeInTheDocument();
+    expect(screen.getByText('Child')).toBeInTheDocument();
+    expect(screen.getByText('$5.00')).toBeInTheDocument();
+    expect(screen.getByText('Group of 4')).toBeInTheDocument();
+    expect(screen.getByText('$50.00')).toBeInTheDocument();
+  });
+
+  it('drops "see organiser" when only extra prices are set, and hides them on a free event', () => {
+    const { unmount } = renderCard({ ...baseEvent, ticket_prices: [{ type: 'vip', price_aud: 80 }] });
+    expect(screen.queryByText('See organiser for ticket pricing')).not.toBeInTheDocument();
+    expect(screen.getByText('VIP')).toBeInTheDocument();
+    unmount();
+    renderCard({ ...baseEvent, is_free: true, ticket_prices: [{ type: 'vip', price_aud: 80 }] });
+    expect(screen.getByText('Free entry')).toBeInTheDocument();
+    expect(screen.queryByText('VIP')).not.toBeInTheDocument();
+  });
+});

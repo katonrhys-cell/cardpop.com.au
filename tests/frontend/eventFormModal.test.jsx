@@ -73,3 +73,38 @@ describe('EventFormModal — photo gallery', () => {
     expect(screen.getByText('2/24')).toBeInTheDocument();
   });
 });
+
+describe('EventFormModal — ticket prices', () => {
+  const openOrganiser = () => {
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Organiser' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Organiser' }));
+  };
+
+  it('offers every ticket type once entry is not free', () => {
+    renderForm('user');
+    openOrganiser();
+    expect(screen.queryByText('Other Ticket Prices')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('switch')[0]); // Free Entry off
+    for (const name of ['Child ticket', 'VIP ticket', 'GA Early Access ticket', 'GA Late Access ticket', 'Group tickets']) {
+      expect(screen.getByRole('switch', { name })).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole('switch', { name: 'Group tickets' }));
+    expect(screen.getByLabelText('People')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Add another group price/ }));
+    expect(screen.getAllByLabelText('People')).toHaveLength(2);
+  });
+
+  it("loads an existing event's ticket prices", () => {
+    render(
+      <EventFormModal
+        isOpen={true} onClose={() => {}} scrapedData={null} onSaved={() => {}} mode="user"
+        event={{ id: 'evt-1', title: 'Show', is_free: false, ticket_prices: [{ type: 'vip', price_aud: 60 }, { type: 'group', group_size: 4, price_aud: 50 }] }}
+      />,
+    );
+    openOrganiser();
+    expect(screen.getByRole('switch', { name: 'VIP ticket' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByLabelText('Price (AUD)')).toHaveValue(60);
+    expect(screen.getByLabelText('People')).toHaveValue(4);
+    expect(screen.getByLabelText('Price for the group (AUD)')).toHaveValue(50);
+  });
+});
