@@ -15,7 +15,8 @@ import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
-import EventGalleryEditor from '@/components/events/EventGalleryEditor.jsx';
+import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
+import { cleanGalleryAlbums, flattenGalleryAlbums } from '@/utils/eventGallery.js';
 import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
 import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
 import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx';
@@ -167,7 +168,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
-  // Photo gallery: { url } saved, { file, preview } uploaded on save.
+  // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
+  // { url } (saved) or { file, preview } (uploaded on save).
   const [gallery, setGallery] = useState([]);
   const fileInputRef = useRef(null);
   // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
@@ -312,7 +314,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         source_url:          event.source_url || '',
       });
       setImagePreview(event.image_url || null);
-      setGallery((event.gallery_images || []).filter(Boolean).map(url => ({ url })));
+      setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
+        .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
       setActiveTab('details');
 
       if (!isUserMode) {
@@ -334,7 +337,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setActiveTab('details');
     }
 
-    if (!event?.id || scrapedData) setGallery([]);
+    if (!event?.id || scrapedData) setGallery([emptyAlbum()]);
     setImageFile(null);
     setRemoveExistingImage(false);
 
@@ -413,20 +416,28 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       }
 
       // Gallery photos picked this session go up now, each under its own
-      // immutable path; saved ones keep their URL. Order is the editor's.
-      const gallery_images = [];
-      for (const [i, photo] of gallery.entries()) {
-        if (photo.url) { gallery_images.push(photo.url); continue; }
-        const compressed = await compressImage(photo.file);
-        const ext = compressed.name.split('.').pop() || 'jpg';
-        const path = `events/gallery/${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-        const { error: galErr } = await supabase.storage.from('events').upload(path, compressed, { cacheControl: '31536000' });
-        if (galErr) throw galErr;
-        gallery_images.push(supabase.storage.from('events').getPublicUrl(path).data.publicUrl);
+      // immutable path; saved ones keep their URL. Album and photo order are
+      // the editor's. Empty albums are dropped.
+      const uploadedAlbums = [];
+      for (const [a, album] of gallery.entries()) {
+        const images = [];
+        for (const [i, photo] of album.photos.entries()) {
+          if (photo.url) { images.push(photo.url); continue; }
+          const compressed = await compressImage(photo.file);
+          const ext = compressed.name.split('.').pop() || 'jpg';
+          const path = `events/gallery/${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+          const { error: galErr } = await supabase.storage.from('events').upload(path, compressed, { cacheControl: '31536000' });
+          if (galErr) throw galErr;
+          images.push(supabase.storage.from('events').getPublicUrl(path).data.publicUrl);
+        }
+        uploadedAlbums.push({ title: album.title.trim(), images });
       }
       // Uploaded photos become saved ones, so a retry after a later failure
       // doesn't upload them twice.
-      setGallery(gallery_images.map(url => ({ url })));
+      setGallery(uploadedAlbums.map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
+      const gallery_albums = uploadedAlbums.filter(a => a.images.length > 0);
+      // gallery_images stays the flattened copy of every album.
+      const gallery_images = flattenGalleryAlbums(gallery_albums);
 
       const payload = {
         title:               formData.title.trim(),
@@ -441,6 +452,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         is_featured:         isUserMode ? false : formData.is_featured,
         image_url,
         gallery_images,
+        gallery_albums,
         // Venue
         venue_name:          formData.venue_name.trim() || null,
         address:             formData.address.trim() || null,

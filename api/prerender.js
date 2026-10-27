@@ -23,6 +23,7 @@ import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
+import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
@@ -1338,7 +1339,30 @@ const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
   'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
-  'created_at, updated_at';
+  'gallery_images, gallery_albums, created_at, updated_at';
+
+// Event photo albums (events.gallery_albums, utils/eventGallery.js). Bots
+// get the real photos as <figure>s under one heading per album — the
+// gallery is page content, not decoration, and a reviewer crawling without
+// JS should see it. Only http(s) URLs are emitted.
+const MAX_JSON_LD_GALLERY_IMAGES = 8;
+const eventGalleryAlbums = (event) => cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
+  .map((a) => ({ ...a, images: a.images.map(absUrl).filter((u) => /^https?:\/\//.test(u)) }))
+  .filter((a) => a.images.length > 0);
+const eventGalleryUrls = (event) => eventGalleryAlbums(event).flatMap((a) => a.images);
+const eventGalleryHtml = (event, name) => {
+  const albums = eventGalleryAlbums(event);
+  if (albums.length === 0) return '';
+  const sections = albums.map((album, i) => {
+    const label = albums.length > 1 ? albumLabel(album, i) : '';
+    const figures = album.images.map((url, j) => {
+      const alt = `${esc(name)}${label ? ` — ${esc(label)}` : ''} photo ${j + 1}`;
+      return `<figure><img src="${esc(url)}" alt="${alt}" loading="lazy" /></figure>`;
+    }).join('');
+    return `${label ? `<h3>${esc(label)}</h3>` : ''}${figures}`;
+  }).join('');
+  return `<section><h2>Event Photos</h2>${sections}</section>`;
+};
 
 // YouTube video id from any common URL shape — mirrors lib/eventSeo.js.
 const youTubeVideoId = (url) => {
@@ -1396,7 +1420,7 @@ function buildEventLd(event) {
     '@type': 'Event',
     name,
     description,
-    image: [absUrl(event.image_url) || `${BASE_URL}/og-image.jpg`],
+    image: [absUrl(event.image_url) || `${BASE_URL}/og-image.jpg`, ...eventGalleryUrls(event).slice(0, MAX_JSON_LD_GALLERY_IMAGES)],
     eventStatus: 'https://schema.org/EventScheduled',
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     ...(startDate ? { startDate } : {}),
@@ -1568,6 +1592,7 @@ async function renderEvent(supabase, param) {
     ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
   </ul>
   ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}
+  ${eventGalleryHtml(event, name)}
   ${videoId ? `<p><a href="https://www.youtube.com/watch?v=${esc(videoId)}">Watch the event video</a></p>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
 </main>`;

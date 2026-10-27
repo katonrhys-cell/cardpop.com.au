@@ -4,13 +4,12 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { cleanGallery } from '@/utils/eventReview.js';
 
-// Photo gallery from the day: a responsive tile grid that opens a simple
-// keyboard-navigable lightbox. Images are stored as canonical Supabase URLs and
-// rewritten onto the image CDN at render time (utils/imageUrl.js).
-// `headingId` keeps the section's aria-labelledby unique when the gallery is
-// reused elsewhere (the event page's own photo gallery).
-const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId = 'event-review-gallery' }) => {
-  const photos = cleanGallery(gallery);
+// Tile grid + keyboard-navigable lightbox, shared by the review gallery below
+// and the event page's albums (components/events/EventPhotoAlbums.jsx).
+// `photos` are already cleaned ({ url, caption?, alt? }). `lightboxTitle` is
+// read out (and shown when there is no caption) so a visitor flicking
+// through an album knows which one they are in.
+export const EventPhotoGrid = ({ photos, lightboxTitle = '' }) => {
   const [open, setOpen] = useState(null); // index or null
 
   const step = useCallback((dir) => {
@@ -31,12 +30,7 @@ const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId 
   const current = open != null ? photos[open] : null;
 
   return (
-    <section aria-labelledby={headingId} className="space-y-4">
-      <div className="flex items-center gap-2">
-        <Camera className="w-4 h-4 text-brand-red" aria-hidden="true" />
-        <h2 id={headingId} className="font-heading text-xl font-bold text-foreground">{title}</h2>
-        <span className="text-xs text-muted-foreground">({photos.length})</span>
-      </div>
+    <>
       <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3 list-none p-0 m-0">
         {photos.map((p, i) => (
           <li key={`${p.url}-${i}`} className={i === 0 && photos.length >= 3 ? 'col-span-2 row-span-2' : ''}>
@@ -65,7 +59,7 @@ const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId 
 
       <Dialog open={open != null} onOpenChange={(o) => !o && setOpen(null)}>
         <DialogContent className="max-w-5xl w-[96vw] p-0 bg-black border-none overflow-hidden rounded-2xl">
-          <DialogTitle className="sr-only">{current?.caption || current?.alt || 'Event photo'}</DialogTitle>
+          <DialogTitle className="sr-only">{current?.caption || current?.alt || lightboxTitle || 'Event photo'}</DialogTitle>
           {current && (
             <figure className="relative m-0">
               <img
@@ -73,9 +67,9 @@ const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId 
                 alt={current.alt || current.caption || 'Event photo'}
                 className="block w-full max-h-[82vh] object-contain bg-black"
               />
-              {(current.caption || photos.length > 1) && (
+              {(current.caption || lightboxTitle || photos.length > 1) && (
                 <figcaption className="flex items-center justify-between gap-3 px-4 py-3 text-sm text-white/90 bg-black">
-                  <span className="min-w-0 truncate">{current.caption || ''}</span>
+                  <span className="min-w-0 truncate">{current.caption || lightboxTitle || ''}</span>
                   <span className="shrink-0 text-xs text-white/50 tabular-nums">{open + 1} / {photos.length}</span>
                 </figcaption>
               )}
@@ -95,6 +89,26 @@ const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId 
           )}
         </DialogContent>
       </Dialog>
+    </>
+  );
+};
+
+// Photo gallery from the day: heading + EventPhotoGrid. Images are stored as
+// canonical Supabase URLs and rewritten onto the image CDN at render time
+// (utils/imageUrl.js). `headingId` keeps the section's aria-labelledby unique
+// when the gallery is reused elsewhere.
+const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId = 'event-review-gallery' }) => {
+  const photos = cleanGallery(gallery);
+  if (photos.length === 0) return null;
+
+  return (
+    <section aria-labelledby={headingId} className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Camera className="w-4 h-4 text-brand-red" aria-hidden="true" />
+        <h2 id={headingId} className="font-heading text-xl font-bold text-foreground">{title}</h2>
+        <span className="text-xs text-muted-foreground">({photos.length})</span>
+      </div>
+      <EventPhotoGrid photos={photos} />
     </section>
   );
 };

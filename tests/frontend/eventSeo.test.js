@@ -7,6 +7,7 @@ import {
   buildVideoJsonLd,
   buildEventJsonLd,
   formatEntryFee,
+  MAX_JSON_LD_GALLERY_IMAGES,
 } from '@/lib/eventSeo.js';
 
 describe('youTubeVideoId', () => {
@@ -86,6 +87,30 @@ describe('formatEntryFee', () => {
       .toBe('$15.00 AUD (presale/early bird $25.00)');
     expect(formatEntryFee({ presale_fee_aud: 40 })).toBe('Presale/early bird $40.00 AUD');
     expect(formatEntryFee({})).toBe('See organiser for ticket pricing');
+  });
+});
+
+describe('buildEventJsonLd image', () => {
+  const base = { slug: 'test-show', title: 'Test Show', start_date: '2026-10-01' };
+
+  it('lists the cover first, then the gallery photos across albums, capped', () => {
+    const ld = buildEventJsonLd({
+      ...base,
+      image_url: 'https://cdn.test/cover.jpg',
+      gallery_albums: [
+        { title: '2025', images: Array.from({ length: 6 }, (_, i) => `https://cdn.test/25-${i}.jpg`) },
+        { title: '2024', images: Array.from({ length: 6 }, (_, i) => `https://cdn.test/24-${i}.jpg`) },
+      ],
+    });
+    expect(ld.image[0]).toBe('https://cdn.test/cover.jpg');
+    expect(ld.image).toHaveLength(1 + MAX_JSON_LD_GALLERY_IMAGES);
+    expect(ld.image[1]).toBe('https://cdn.test/25-0.jpg');
+    expect(ld.image.at(-1)).toBe('https://cdn.test/24-1.jpg');
+  });
+
+  it('falls back to the flat gallery list and the site image', () => {
+    expect(buildEventJsonLd({ ...base, gallery_images: ['https://cdn.test/a.jpg'] }).image)
+      .toEqual(['https://cardpop.com.au/og-image.jpg', 'https://cdn.test/a.jpg']);
   });
 });
 
