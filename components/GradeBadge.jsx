@@ -4,8 +4,8 @@ import { cn } from '@/lib/utils';
 export const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
   bgs:   'bg-blue-700 text-white',
-  cgc:   'bg-green-600 text-white',
-  ace:   'bg-orange-500 text-white',
+  cgc:   'bg-green-700 text-white',
+  ace:   'bg-orange-700 text-white',
   sgc:   'bg-purple-600 text-white',
   other: 'bg-slate-600 text-white',
 };
