@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Clock, Info, Ticket, ExternalLink, Accessibility, ShieldAlert, History } from 'lucide-react';
+import { Calendar, MapPin, Clock, DollarSign, Info, Ticket, ExternalLink, Accessibility, ShieldAlert, History } from 'lucide-react';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import EventEntryPrices from '@/components/events/EventEntryPrices.jsx';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
@@ -88,6 +89,16 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Location</p>
                 <p className="text-sm font-semibold text-foreground">{formattedLocation}</p>
                 {event.address && <p className="text-xs text-muted-foreground">{event.address}</p>}
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 sm:col-span-2">
+              <div className="p-2 bg-background rounded-lg shadow-sm shrink-0 text-primary">
+                <DollarSign className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0 max-w-xs">
+                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Entry</p>
+                <EventEntryPrices event={event} className="text-sm font-semibold text-foreground" valueClassName="font-semibold text-foreground" />
               </div>
             </div>
           </div>
