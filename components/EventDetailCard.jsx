@@ -12,6 +12,7 @@ import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { ticketPriceLines } from '@/utils/eventTicketPrices.js';
 import { toast } from 'sonner';
 
 // `isPast` — the event has finished (utils/eventPast.js): the RSVP, ticket
@@ -25,6 +26,8 @@ const EventDetailCard = ({ event, isPast = false }) => {
   const ticketOffer = useEventTicketOffer(event.id, { enabled: !isPast });
   const ticketLink = ticketDestination(event, ticketOffer);
   const countTicketClick = () => { if (ticketOffer) recordEventTicketClick(event.id); };
+  // Child / VIP / early & late access / group prices; none on a free event.
+  const ticketLines = event.is_free ? [] : ticketPriceLines(event.ticket_prices);
 
   // Start the YouTube video automatically 10 seconds after the page loads.
   // Uses the iframe player API via postMessage (enabled by ?enablejsapi=1 on
@@ -238,7 +241,20 @@ const EventDetailCard = ({ event, isPast = false }) => {
                 </div>
                 <div>
                   <p className="font-bold text-foreground">Entry</p>
-                  <p className="text-muted-foreground leading-snug">{formatEntryFee(event)}</p>
+                  {/* "See organiser for pricing" would contradict a list of prices. */}
+                  {(!ticketLines.length || Number(event.entry_fee_aud) > 0 || Number(event.presale_fee_aud) > 0) && (
+                    <p className="text-muted-foreground leading-snug">{formatEntryFee(event)}</p>
+                  )}
+                  {ticketLines.length > 0 && (
+                    <dl className="mt-1 space-y-0.5 text-muted-foreground leading-snug" aria-label="Ticket prices">
+                      {ticketLines.map(({ label, price }) => (
+                        <div key={label} className="flex justify-between gap-4">
+                          <dt>{label}</dt>
+                          <dd className="font-semibold text-foreground tabular-nums">{price}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                 </div>
               </div>
 
