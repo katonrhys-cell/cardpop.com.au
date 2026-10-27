@@ -1,11 +1,14 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 
+// White 11px text needs a 4.5:1 background (WCAG AA): green-600 (3.3:1) and
+// orange-500 (2.8:1) failed the e2e axe check once a CGC slab reached
+// /marketplace, so CGC and ACE use the 700 shades.
 export const GRADE_BADGE = {
   psa:   'bg-red-600 text-white',
   bgs:   'bg-blue-700 text-white',
-  cgc:   'bg-green-600 text-white',
-  ace:   'bg-orange-500 text-white',
+  cgc:   'bg-green-700 text-white',
+  ace:   'bg-orange-700 text-white',
   sgc:   'bg-purple-600 text-white',
   other: 'bg-slate-600 text-white',
 };
