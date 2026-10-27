@@ -9,6 +9,7 @@ import EventReviewScorecard from '@/components/reviews/EventReviewScorecard.jsx'
 import EventReviewQuickFacts from '@/components/reviews/EventReviewQuickFacts.jsx';
 import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
 import EventReviewPickups from '@/components/reviews/EventReviewPickups.jsx';
+import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
 import HalfStars from '@/components/reviews/HalfStars.jsx';
 import StarInput from '@/components/admin/StarInput.jsx';
 
@@ -101,6 +102,28 @@ describe('EventReviewGallery', () => {
   it('drops unsafe urls and renders nothing when empty', () => {
     const { container } = wrap(<EventReviewGallery gallery={[{ url: 'javascript:alert(1)' }]} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('EventReviewVideo', () => {
+  it('plays an uploaded clip natively with its poster and caption', () => {
+    const url = 'https://x.supabase.co/storage/v1/object/public/media/event-reviews/videos/1-a.mp4';
+    const { container } = wrap(<EventReviewVideo video={{ url, poster_url: 'https://x.test/p.jpg', caption: 'The main hall' }} />);
+    const video = container.querySelector('video');
+    expect(video).not.toBeNull();
+    expect(video.getAttribute('src')).toBe(url);
+    expect(video.hasAttribute('controls')).toBe(true);
+    expect(screen.getByText('The main hall')).toBeInTheDocument();
+  });
+
+  it('embeds a YouTube link through the no-cookie host', () => {
+    const { container } = wrap(<EventReviewVideo video={{ url: 'https://youtu.be/dQw4w9WgXcQ' }} />);
+    expect(container.querySelector('iframe').getAttribute('src')).toMatch(/^https:\/\/www\.youtube-nocookie\.com\/embed\/dQw4w9WgXcQ/);
+  });
+
+  it('renders nothing for a missing or unsupported video', () => {
+    expect(wrap(<EventReviewVideo video={null} />).container).toBeEmptyDOMElement();
+    expect(wrap(<EventReviewVideo video={{ url: 'https://example.com/page' }} />).container).toBeEmptyDOMElement();
   });
 });
 

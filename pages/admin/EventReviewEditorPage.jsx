@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner';
 import {
   ClipboardPen, CalendarDays, MapPin, Search, X, ImagePlus, Trash2, ArrowUp, ArrowDown, Plus, Save, Send,
-  ExternalLink, Loader2, Sparkles, Camera, ShoppingBag, Star, Eye,
+  ExternalLink, Loader2, Sparkles, Camera, ShoppingBag, Star, Eye, Video, Link2,
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import RichTextEditor from '@/components/admin/RichTextEditor.jsx';
@@ -20,7 +20,8 @@ import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { toCdnUrl } from '@/utils/imageUrl.js';
-import { uploadReviewImage } from '@/utils/uploadReviewImage.js';
+import { uploadReviewImage, uploadReviewVideo } from '@/utils/uploadReviewImage.js';
+import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
 import { EVENT_REVIEWS_CATEGORY } from '@/data/blogCategories.js';
 import {
   SCORE_CATEGORIES,
@@ -32,14 +33,17 @@ import {
   normalizeReview,
   reviewPublishProblems,
   formatAud,
+  cleanVideo,
+  REVIEW_VIDEO_ACCEPT,
 } from '@/utils/eventReview.js';
 
 // Admin → Event Reviews → editor. One page writes two rows: the story is a
 // blog_articles row (category `event-reviews`, so it appears in The Parallel
 // Report like any article) and the structured parts are an event_reviews row
-// (scorecard, quick facts, gallery, pickups) linked to the event. Drafts save
-// with anything filled in; publishing needs a title, a body, an event and an
-// overall rating. See docs/event-reviews.md.
+// (scorecard, quick facts, gallery, video, pickups) linked to the event. The
+// star rating, photos, video and written report are each optional on their
+// own: drafts save with anything, and publishing needs a title, the event and
+// at least one of those four (reviewPublishProblems). See docs/event-reviews.md.
 
 const slugify = (text) =>
   String(text || '').toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
@@ -137,6 +141,9 @@ const EventReviewEditorPage = () => {
 
   const galleryInputRef = useRef(null);
   const coverInputRef = useRef(null);
+  const videoInputRef = useRef(null);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoLink, setVideoLink] = useState('');
 
   const setA = (patch) => setArticle((a) => ({ ...a, ...patch }));
   const setR = (patch) => setReview((r) => ({ ...r, ...patch }));
@@ -204,6 +211,7 @@ const EventReviewEditorPage = () => {
           crowd_level: data.crowd_level,
           headline_pickup: data.headline_pickup || '',
           gallery: Array.isArray(data.gallery) ? data.gallery : [],
+          video: data.video && typeof data.video === 'object' ? data.video : null,
           pickups: Array.isArray(data.pickups) ? data.pickups : [],
         });
         setOverallOverride(isValidScore(data.overall_rating) && computeOverall(data.scores) !== Number(data.overall_rating));
@@ -317,6 +325,33 @@ const EventReviewEditorPage = () => {
   });
   const removeGallery = (i) => setReview((r) => ({ ...r, gallery: r.gallery.filter((_, j) => j !== i) }));
 
+  const onVideoFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setVideoUploading(true);
+    const id = toast.loading('Uploading video…');
+    try {
+      const { url, poster_url } = await uploadReviewVideo(file);
+      setReview((r) => ({ ...r, video: { url, poster_url, caption: r.video?.caption || '' } }));
+      toast.success('Video uploaded', { id });
+    } catch (err) {
+      toast.error(err.message || 'Video upload failed', { id });
+    } finally {
+      setVideoUploading(false);
+    }
+  };
+
+  const onVideoLink = () => {
+    const v = cleanVideo({ url: videoLink });
+    if (!v) {
+      toast.error('Paste a YouTube or Vimeo link, e.g. https://youtu.be/…');
+      return;
+    }
+    setReview((r) => ({ ...r, video: { url: v.url, poster_url: null, caption: r.video?.caption || '' } }));
+    setVideoLink('');
+  };
+
   const addPickup = () => setReview((r) => ({ ...r, pickups: [...r.pickups, { name: '', price_aud: '', url: '', image_url: '', note: '' }] }));
   const updatePickup = (i, patch) => setReview((r) => ({ ...r, pickups: r.pickups.map((p, j) => (j === i ? { ...p, ...patch } : p)) }));
   const movePickup = (i, dir) => setReview((r) => {
@@ -340,6 +375,10 @@ const EventReviewEditorPage = () => {
 
   const save = async ({ publish }) => {
     if (saving) return;
+    if (videoUploading) {
+      toast.error('Wait for the video to finish uploading before saving.');
+      return;
+    }
     const willPublish = publish ?? article.is_published;
     if (willPublish && publishProblems.length) {
       publishProblems.forEach((p) => toast.error(p));
@@ -434,7 +473,7 @@ const EventReviewEditorPage = () => {
       <AdminPageHeader
         icon={ClipboardPen}
         title={isNew ? 'Write an event review' : 'Edit event review'}
-        subtitle="Rate the day, tell the story, add your photos and pickups. Saved as a draft until you publish."
+        subtitle="Rate the day, add photos, a video and the written report — each part stands on its own, so fill in whichever you have. Saved as a draft until you publish."
         backTo="/admin/event-reviews"
       >
         <Badge variant={article.is_published ? 'default' : 'outline'} className={`text-[10px] font-bold uppercase tracking-wider ${article.is_published ? '' : 'border-white/30 text-white'}`}>
@@ -512,7 +551,7 @@ const EventReviewEditorPage = () => {
       </Section>
 
       {/* ── 2. The story ───────────────────────────────────────────── */}
-      <Section id="story" icon={ClipboardPen} title="The story" hint="This is the article readers see in The Parallel Report.">
+      <Section id="story" icon={ClipboardPen} title="The story" hint="The title is required. The written report is optional — publish with just the stars, photos or video if you like.">
         <div className="grid gap-5 md:grid-cols-[1fr_16rem]">
           <div className="space-y-5 min-w-0">
             <div>
@@ -566,14 +605,14 @@ const EventReviewEditorPage = () => {
           </div>
         </div>
         <div>
-          <Label>Review</Label>
+          <Label>Report <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
           <p className="text-xs text-muted-foreground mt-0.5 mb-2">Getting there, the floor, the vendors, prices, what you bought, who you met, the verdict. Use section headings so readers can jump around.</p>
           <RichTextEditor value={article.content} onChange={(html) => setA({ content: html })} onUploadImage={uploadInto('body')} />
         </div>
       </Section>
 
       {/* ── 3. Scorecard ───────────────────────────────────────────── */}
-      <Section id="scores" icon={Star} title="Scorecard" hint="Click the left half of a star for a half score. The overall is the average unless you set it yourself.">
+      <Section id="scores" icon={Star} title="Star rating" hint="Out of 5 stars. Click the left half of a star for a half score. Rate the categories, or just switch on “Set the overall myself” and give one rating.">
         <div className="grid gap-5 md:grid-cols-2">
           {SCORE_CATEGORIES.map((cat) => (
             <div key={cat.id} className="rounded-xl border border-border p-4">
@@ -677,7 +716,53 @@ const EventReviewEditorPage = () => {
         )}
       </Section>
 
-      {/* ── 6. Pickups ─────────────────────────────────────────────── */}
+      {/* ── 6. Video ───────────────────────────────────────────────── */}
+      <Section id="video" icon={Video} title="Video" hint="One video from the day, shown under the story. Upload a clip (MP4, MOV or WebM, up to 50 MB) or paste a YouTube / Vimeo link for anything longer.">
+        {cleanVideo(review.video) ? (
+          <div className="space-y-3">
+            <EventReviewVideo video={review.video} title="Preview" />
+            <Input
+              value={review.video?.caption || ''}
+              onChange={(e) => setR({ video: { ...review.video, caption: e.target.value } })}
+              maxLength={200}
+              placeholder="Caption (optional)"
+              className="rounded-xl"
+              aria-label="Video caption"
+            />
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" className="rounded-lg" onClick={() => videoInputRef.current?.click()} disabled={videoUploading}>
+                {videoUploading ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Video className="w-4 h-4 mr-1" />} Replace with an upload
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="rounded-lg text-destructive" onClick={() => setR({ video: null })}>
+                <Trash2 className="w-4 h-4 mr-1" /> Remove video
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-xl border border-dashed border-border p-4 flex flex-col items-start gap-2">
+              <p className="text-sm font-semibold text-foreground">Upload a clip</p>
+              <p className="text-xs text-muted-foreground">Straight from your phone. Up to 50 MB.</p>
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => videoInputRef.current?.click()} disabled={videoUploading}>
+                {videoUploading ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Video className="w-4 h-4 mr-1.5" />} {videoUploading ? 'Uploading…' : 'Choose video'}
+              </Button>
+            </div>
+            <div className="rounded-xl border border-dashed border-border p-4 space-y-2">
+              <Label htmlFor="video-link" className="text-sm font-semibold">Or paste a link</Label>
+              <p className="text-xs text-muted-foreground">YouTube or Vimeo — best for longer walkthroughs.</p>
+              <div className="flex gap-2">
+                <Input id="video-link" value={videoLink} onChange={(e) => setVideoLink(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onVideoLink(); } }} placeholder="https://youtu.be/…" className="rounded-xl" />
+                <Button type="button" variant="outline" className="rounded-xl" onClick={onVideoLink} disabled={!videoLink.trim()}>
+                  <Link2 className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        <input ref={videoInputRef} type="file" accept={REVIEW_VIDEO_ACCEPT} className="hidden" onChange={onVideoFile} />
+      </Section>
+
+      {/* ── 7. Pickups ─────────────────────────────────────────────── */}
       <Section id="pickups" icon={ShoppingBag} title="Pickups" hint="What came home with you. Link a pickup to its CardPop listing, price page or shop product if it has one.">
         {review.pickups.length === 0 && <p className="text-sm text-muted-foreground">Nothing listed yet.</p>}
         {review.pickups.length > 0 && (
@@ -711,7 +796,7 @@ const EventReviewEditorPage = () => {
         <Button type="button" variant="outline" className="rounded-xl" onClick={addPickup}><Plus className="w-4 h-4 mr-1.5" /> Add a pickup</Button>
       </Section>
 
-      {/* ── 7. Publishing ──────────────────────────────────────────── */}
+      {/* ── 8. Publishing ──────────────────────────────────────────── */}
       <Section id="publish" icon={Send} title="Publishing" hint="Tags and search settings. Publishing lists the review in The Parallel Report and on the event's page.">
         <div className="grid gap-5 md:grid-cols-2">
           <div>

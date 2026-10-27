@@ -16,7 +16,8 @@ import EventReviewScorecard from '@/components/reviews/EventReviewScorecard.jsx'
 import EventReviewQuickFacts from '@/components/reviews/EventReviewQuickFacts.jsx';
 import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
 import EventReviewPickups from '@/components/reviews/EventReviewPickups.jsx';
-import { buildEventReviewJsonLd, hasScorecard, hasQuickFacts } from '@/utils/eventReview.js';
+import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
+import { buildEventReviewJsonLd, hasScorecard, hasQuickFacts, cleanVideo } from '@/utils/eventReview.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -587,15 +588,18 @@ const BlogArticlePage = () => {
               dangerouslySetInnerHTML={{ __html: contentHtml }}
             ></div>
           </div>
-        ) : (
+        ) : eventReview ? null : (
+          // An event review may be published without a written report (just
+          // the rating, photos or video), so it never shows this placeholder.
           <div className="container-default max-w-[90rem] mx-auto">
             <p className="text-muted-foreground italic">No content available for this article.</p>
           </div>
         )}
       </div>
 
-      {eventReview && (eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
+      {eventReview && (cleanVideo(eventReview.video) || eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
         <div className="container-default max-w-4xl mx-auto -mt-10 mb-16 space-y-12">
+          <EventReviewVideo video={eventReview.video} />
           <EventReviewGallery gallery={eventReview.gallery} />
           <EventReviewPickups pickups={eventReview.pickups} />
         </div>
