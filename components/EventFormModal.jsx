@@ -15,6 +15,7 @@ import { compressImage } from '@/utils/compressImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
+import EventGalleryEditor from '@/components/events/EventGalleryEditor.jsx';
 import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx';
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { toast } from 'sonner';
@@ -153,6 +154,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
+  // Photo gallery: { url } saved, { file, preview } uploaded on save.
+  const [gallery, setGallery] = useState([]);
   const fileInputRef = useRef(null);
   // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
   // existing watch's on/off state replaces the default once it loads.
@@ -295,6 +298,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         source_url:          event.source_url || '',
       });
       setImagePreview(event.image_url || null);
+      setGallery((event.gallery_images || []).filter(Boolean).map(url => ({ url })));
       setActiveTab('details');
 
       if (!isUserMode) {
@@ -316,6 +320,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setActiveTab('details');
     }
 
+    if (!event?.id || scrapedData) setGallery([]);
     setImageFile(null);
     setRemoveExistingImage(false);
 
@@ -386,6 +391,22 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         image_url = null;
       }
 
+      // Gallery photos picked this session go up now, each under its own
+      // immutable path; saved ones keep their URL. Order is the editor's.
+      const gallery_images = [];
+      for (const [i, photo] of gallery.entries()) {
+        if (photo.url) { gallery_images.push(photo.url); continue; }
+        const compressed = await compressImage(photo.file);
+        const ext = compressed.name.split('.').pop() || 'jpg';
+        const path = `events/gallery/${Date.now()}-${i}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+        const { error: galErr } = await supabase.storage.from('events').upload(path, compressed, { cacheControl: '31536000' });
+        if (galErr) throw galErr;
+        gallery_images.push(supabase.storage.from('events').getPublicUrl(path).data.publicUrl);
+      }
+      // Uploaded photos become saved ones, so a retry after a later failure
+      // doesn't upload them twice.
+      setGallery(gallery_images.map(url => ({ url })));
+
       const payload = {
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
@@ -398,6 +419,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         featured_card_games: formData.featured_card_games.length ? formData.featured_card_games : null,
         is_featured:         isUserMode ? false : formData.is_featured,
         image_url,
+        gallery_images,
         // Venue
         venue_name:          formData.venue_name.trim() || null,
         address:             formData.address.trim() || null,
@@ -675,6 +697,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <input type="file" ref={fileInputRef} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={e => e.target.files[0] && processFile(e.target.files[0])} disabled={loading} />
                   </div>
                 </div>
+
+                <EventGalleryEditor value={gallery} onChange={setGallery} disabled={loading} />
               </TabsContent>
 
               {/* ── TAB 2: VENUE & DATES ── */}

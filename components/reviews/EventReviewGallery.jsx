@@ -7,7 +7,9 @@ import { cleanGallery } from '@/utils/eventReview.js';
 // Photo gallery from the day: a responsive tile grid that opens a simple
 // keyboard-navigable lightbox. Images are stored as canonical Supabase URLs and
 // rewritten onto the image CDN at render time (utils/imageUrl.js).
-const EventReviewGallery = ({ gallery, title = 'Photos from the day' }) => {
+// `headingId` keeps the section's aria-labelledby unique when the gallery is
+// reused elsewhere (the event page's own photo gallery).
+const EventReviewGallery = ({ gallery, title = 'Photos from the day', headingId = 'event-review-gallery' }) => {
   const photos = cleanGallery(gallery);
   const [open, setOpen] = useState(null); // index or null
 
@@ -29,10 +31,10 @@ const EventReviewGallery = ({ gallery, title = 'Photos from the day' }) => {
   const current = open != null ? photos[open] : null;
 
   return (
-    <section aria-labelledby="event-review-gallery" className="space-y-4">
+    <section aria-labelledby={headingId} className="space-y-4">
       <div className="flex items-center gap-2">
         <Camera className="w-4 h-4 text-brand-red" aria-hidden="true" />
-        <h2 id="event-review-gallery" className="font-heading text-xl font-bold text-foreground">{title}</h2>
+        <h2 id={headingId} className="font-heading text-xl font-bold text-foreground">{title}</h2>
         <span className="text-xs text-muted-foreground">({photos.length})</span>
       </div>
       <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3 list-none p-0 m-0">
