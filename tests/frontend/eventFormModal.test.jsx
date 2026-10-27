@@ -49,3 +49,27 @@ describe('EventFormModal — user/admin field parity', () => {
     expect(screen.getByLabelText(/Facebook Public Post \/ Reel URL/i)).toBeInTheDocument();
   });
 });
+
+describe('EventFormModal — photo gallery', () => {
+  it('offers the gallery uploader in both modes', () => {
+    for (const mode of ['admin', 'user']) {
+      const { unmount } = renderForm(mode);
+      expect(screen.getByText(/Photo Gallery/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Add photos/ })).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("loads an existing event's saved photos in order", () => {
+    // User mode skips the admin-only ticket-offer load.
+    render(
+      <EventFormModal
+        isOpen={true} onClose={() => {}} scrapedData={null} onSaved={() => {}} mode="user"
+        event={{ id: 'evt-1', title: 'Show', gallery_images: ['https://example.com/a.jpg', 'https://example.com/b.jpg'] }}
+      />,
+    );
+    const imgs = screen.getAllByAltText(/^Gallery photo/);
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg']);
+    expect(screen.getByText('2/24')).toBeInTheDocument();
+  });
+});

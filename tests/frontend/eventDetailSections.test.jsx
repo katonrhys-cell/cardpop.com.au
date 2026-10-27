@@ -139,3 +139,29 @@ describe('EventDetailModal — accessibility & age restriction sections', () => 
     expect(screen.getByText('All ages — under 15s must be accompanied by an adult')).toBeInTheDocument();
   });
 });
+
+describe('EventDetailCard — photo gallery', () => {
+  it('shows no gallery when the event has no photos', () => {
+    renderCard({ ...baseEvent, gallery_images: [] });
+    expect(screen.queryByText('Event Photos')).not.toBeInTheDocument();
+  });
+
+  it('shows the photos directly below About This Event, before the other sections', () => {
+    renderCard({
+      ...baseEvent,
+      accessibility_info: 'Step-free entry',
+      gallery_images: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+    });
+    const heading = screen.getByText('Event Photos');
+    expect(screen.getAllByRole('button', { name: /^Open photo/ })).toHaveLength(2);
+    const about = screen.getByText('About This Event');
+    const access = screen.getByText('Accessibility');
+    expect(about.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(heading.compareDocumentPosition(access) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('drops unsafe URLs', () => {
+    renderCard({ ...baseEvent, gallery_images: ['javascript:alert(1)'] });
+    expect(screen.queryAllByRole('button', { name: /^Open photo/ })).toHaveLength(0);
+  });
+});
