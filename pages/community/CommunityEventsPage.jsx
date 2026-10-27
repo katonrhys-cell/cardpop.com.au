@@ -34,7 +34,7 @@ export const EVENT_CARD_COLUMNS = [
   'id', 'slug', 'event_type', 'status', 'title', 'description', 'short_description', 'image_url',
   'venue_name', 'address', 'suburb', 'state', 'postcode',
   'start_date', 'end_date', 'start_time', 'end_time',
-  'entry_fee_aud', 'presale_fee_aud', 'is_free', 'website_url', 'ticket_url',
+  'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'website_url', 'ticket_url',
   'is_cardpop_verified', 'is_featured', 'registration_required', 'capacity',
   'tags', 'featured_card_games', 'organizer_name',
   'instagram_url', 'facebook_url', 'youtube_url', 'facebook_video_url',

@@ -189,3 +189,23 @@ describe('EventDetailCard — ticket prices', () => {
     expect(screen.queryByText('VIP')).not.toBeInTheDocument();
   });
 });
+
+describe('EventDetailModal — ticket prices', () => {
+  it('shows the entry fee and the extra ticket prices', () => {
+    renderModal({
+      ...baseEvent, entry_fee_aud: 15,
+      ticket_prices: [{ type: 'vip', price_aud: 60 }, { type: 'group', group_size: 4, price_aud: 50 }],
+    });
+    expect(screen.getByText('Entry')).toBeInTheDocument();
+    expect(screen.getByText('$15.00 AUD')).toBeInTheDocument();
+    expect(screen.getByText('VIP')).toBeInTheDocument();
+    expect(screen.getByText('$60.00')).toBeInTheDocument();
+    expect(screen.getByText('Group of 4')).toBeInTheDocument();
+  });
+
+  it('shows Free entry and no price list on a free event', () => {
+    renderModal({ ...baseEvent, is_free: true, ticket_prices: [{ type: 'vip', price_aud: 60 }] });
+    expect(screen.getByText('Free entry')).toBeInTheDocument();
+    expect(screen.queryByText('VIP')).not.toBeInTheDocument();
+  });
+});
