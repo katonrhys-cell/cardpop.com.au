@@ -7,7 +7,8 @@ import { eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } from '@/lib/eventSe
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
-import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
+import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
+import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
@@ -129,15 +130,14 @@ const EventDetailCard = ({ event, isPast = false }) => {
               {event.description}
             </p>
 
-            {event.gallery_images?.length > 0 && (
-              <div className="mt-10">
-                <EventReviewGallery
-                  gallery={event.gallery_images.map(url => ({ url, alt: `Photo from ${event.name}` }))}
-                  title="Event Photos"
-                  headingId="event-photo-gallery"
-                />
-              </div>
-            )}
+            {(() => {
+              const albums = cleanGalleryAlbums(event.gallery_albums, event.gallery_images);
+              return albums.length > 0 && (
+                <div className="mt-10">
+                  <EventPhotoAlbums albums={albums} eventName={event.name} />
+                </div>
+              );
+            })()}
 
             <InArticleAd className="my-10" />
 

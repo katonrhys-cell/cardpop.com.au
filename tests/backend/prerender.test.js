@@ -578,6 +578,36 @@ describe('prerender events', () => {
     expect(body).not.toContain('noindex');
   });
 
+  it('renders the photo albums for bots, with gallery photos in the Event image list', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'hobby-hangout', title: 'Hobby Hangout', status: 'completed',
+      start_date: '2025-09-06', image_url: 'https://cdn.test/cover.jpg',
+      gallery_images: ['https://cdn.test/25-a.jpg', 'https://cdn.test/24-a.jpg'],
+      gallery_albums: [
+        { title: '2025', images: ['https://cdn.test/25-a.jpg', 'javascript:alert(1)'] },
+        { title: '2024', images: ['https://cdn.test/24-a.jpg'] },
+      ],
+    } };
+    const { body } = await run('/events/hobby-hangout');
+    expect(body).toContain('<h2>Event Photos</h2>');
+    expect(body).toContain('<h3>2025</h3>');
+    expect(body).toContain('<h3>2024</h3>');
+    expect(body).toContain('<img src="https://cdn.test/25-a.jpg" alt="Hobby Hangout — 2025 photo 1" loading="lazy" />');
+    expect(body).not.toContain('javascript:');
+    expect(body).toContain('"image":["https://cdn.test/cover.jpg","https://cdn.test/25-a.jpg","https://cdn.test/24-a.jpg"]');
+  });
+
+  it('renders a single untitled album without an album heading', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'one-album', title: 'One Album', status: 'approved',
+      start_date: '2026-10-01', gallery_images: ['https://cdn.test/a.jpg'],
+    } };
+    const { body } = await run('/events/one-album');
+    expect(body).toContain('<h2>Event Photos</h2>');
+    expect(body).not.toContain('<h3>');
+    expect(body).toContain('alt="One Album photo 1"');
+  });
+
   it('emits GA and presale offers when the event has both prices', async () => {
     state.result = { data: {
       id: UUID, slug: 'presale-show', title: 'Presale Show', status: 'approved',

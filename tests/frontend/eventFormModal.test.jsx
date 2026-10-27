@@ -71,6 +71,44 @@ describe('EventFormModal — photo gallery', () => {
     const imgs = screen.getAllByAltText(/^Gallery photo/);
     expect(imgs.map((i) => i.getAttribute('src'))).toEqual(['https://example.com/a.jpg', 'https://example.com/b.jpg']);
     expect(screen.getByText('2/24')).toBeInTheDocument();
+    // Pre-album photos load as one untitled album.
+    expect(screen.getAllByRole('button', { name: /Add photos/ })).toHaveLength(1);
+    expect(screen.getByLabelText('Album 1 title')).toHaveValue('');
+  });
+
+  it("loads an existing event's albums with their titles, in order", () => {
+    render(
+      <EventFormModal
+        isOpen={true} onClose={() => {}} scrapedData={null} onSaved={() => {}} mode="user"
+        event={{
+          id: 'evt-1', title: 'Show',
+          gallery_images: ['https://example.com/a.jpg', 'https://example.com/b.jpg'],
+          gallery_albums: [
+            { title: '2025', images: ['https://example.com/a.jpg'] },
+            { title: '2024', images: ['https://example.com/b.jpg'] },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByLabelText('Album 1 title')).toHaveValue('2025');
+    expect(screen.getByLabelText('Album 2 title')).toHaveValue('2024');
+    expect(screen.getAllByRole('button', { name: /Add photos/ })).toHaveLength(2);
+    expect(screen.getByText('2 photos')).toBeInTheDocument();
+  });
+
+  it('adds, retitles and removes albums', () => {
+    renderForm('user');
+    fireEvent.click(screen.getByRole('button', { name: /Add another album/ }));
+    expect(screen.getAllByRole('button', { name: /Add photos/ })).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText('Album 2 title'), { target: { value: '2024' } });
+    expect(screen.getByLabelText('Album 2 title')).toHaveValue('2024');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove album 1' }));
+    // The surviving album moves up and keeps its title; an editor always shows at least one album.
+    expect(screen.getAllByRole('button', { name: /Add photos/ })).toHaveLength(1);
+    expect(screen.getByLabelText('Album 1 title')).toHaveValue('2024');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove album 1' }));
+    expect(screen.getAllByRole('button', { name: /Add photos/ })).toHaveLength(1);
+    expect(screen.getByLabelText('Album 1 title')).toHaveValue('');
   });
 });
 

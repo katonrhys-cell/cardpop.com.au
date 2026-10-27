@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, within, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { vi, describe, it, expect, afterEach } from 'vitest';
 
@@ -163,6 +163,43 @@ describe('EventDetailCard — photo gallery', () => {
   it('drops unsafe URLs', () => {
     renderCard({ ...baseEvent, gallery_images: ['javascript:alert(1)'] });
     expect(screen.queryAllByRole('button', { name: /^Open photo/ })).toHaveLength(0);
+  });
+
+  it('shows album chips when the photos are grouped, and switches between them', () => {
+    renderCard({
+      ...baseEvent,
+      gallery_images: ['https://example.com/2025-a.jpg', 'https://example.com/2025-b.jpg', 'https://example.com/2024-a.jpg'],
+      gallery_albums: [
+        { title: '2025', images: ['https://example.com/2025-a.jpg', 'https://example.com/2025-b.jpg'] },
+        { title: '2024', images: ['https://example.com/2024-a.jpg'] },
+      ],
+    });
+    expect(screen.getByText('(3)')).toBeInTheDocument(); // total across albums
+    const chips = screen.getByRole('group', { name: 'Photo albums' });
+    const chip2025 = within(chips).getByRole('button', { name: /^2025/ });
+    const chip2024 = within(chips).getByRole('button', { name: /^2024/ });
+    expect(chip2025).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getAllByRole('button', { name: /^Open photo/ })).toHaveLength(2);
+    expect(screen.getAllByRole('img')[1]).toHaveAttribute('alt', expect.stringContaining('2025'));
+
+    fireEvent.click(chip2024);
+    expect(chip2024).toHaveAttribute('aria-pressed', 'true');
+    expect(chip2025).toHaveAttribute('aria-pressed', 'false');
+    const open = screen.getAllByRole('button', { name: /^Open photo/ });
+    expect(open).toHaveLength(1);
+    expect(open[0].querySelector('img')).toHaveAttribute('src', 'https://example.com/2024-a.jpg');
+  });
+
+  it('shows no chips for a single album, and prefers albums over the flat list', () => {
+    renderCard({
+      ...baseEvent,
+      gallery_images: ['https://example.com/stale.jpg'],
+      gallery_albums: [{ title: '2025', images: ['https://example.com/a.jpg'] }],
+    });
+    expect(screen.queryByRole('group', { name: 'Photo albums' })).not.toBeInTheDocument();
+    const open = screen.getAllByRole('button', { name: /^Open photo/ });
+    expect(open).toHaveLength(1);
+    expect(open[0].querySelector('img')).toHaveAttribute('src', 'https://example.com/a.jpg');
   });
 });
 
