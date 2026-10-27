@@ -3,13 +3,15 @@
 //
 // A review is a blog article (category `event-reviews`) plus an `event_reviews`
 // row holding the structured parts: the star scorecard, the quick-facts panel,
-// the photo gallery and the pickups list. This module is the single source of
+// the photo gallery, the video and the pickups list. This module is the single source of
 // truth for the scorecard categories, the quick-fact vocabularies, the
 // overall-score arithmetic, the shape a row must have before it is saved, and
 // the Review JSON-LD — so the admin editor, the article page, the event page
 // teaser and api/prerender.js all agree. Keep it free of React and Supabase
 // imports: the prerenderer runs it in a bare Node function.
 // See docs/event-reviews.md.
+
+import { parseVideoUrl } from './videoEmbed.js';
 
 // The five things a show gets marked on. `id` is the key inside
 // event_reviews.scores; `label` is what readers see; `hint` prompts the admin.
@@ -125,6 +127,52 @@ export const cleanPickups = (pickups) => {
     .filter((p) => p.name);
 };
 
+// The review video: an upload to the media bucket (played in a <video>) or a
+// YouTube / Vimeo link (embedded). The bucket caps an object at 50 MB, so a
+// longer clip goes up as a link.
+export const REVIEW_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
+export const REVIEW_VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime';
+const VIDEO_FILE_RE = /\.(mp4|webm|mov|m4v)$/i;
+
+// 'file' | 'embed' | null for a stored video URL.
+export const videoKind = (url) => {
+  const safe = safeLink(url);
+  if (!safe) return null;
+  if (parseVideoUrl(safe)) return 'embed';
+  let path = safe;
+  try { path = new URL(safe, 'https://cardpop.com.au').pathname; } catch { /* keep raw */ }
+  return VIDEO_FILE_RE.test(path) ? 'file' : null;
+};
+
+// Picked File → error message, or null when it can be uploaded.
+export const reviewVideoFileError = (file) => {
+  if (!file) return 'No video selected.';
+  const typeOk = /^video\/(mp4|webm|quicktime)$/i.test(file.type) || (!file.type && VIDEO_FILE_RE.test(file.name || ''));
+  if (!typeOk) return 'Video must be an MP4, MOV or WebM file.';
+  if (file.size > REVIEW_VIDEO_MAX_BYTES) {
+    return `Video must be under ${Math.round(REVIEW_VIDEO_MAX_BYTES / 1048576)} MB — upload it to YouTube and paste the link instead.`;
+  }
+  return null;
+};
+
+// { url, poster_url, caption } or null. Anything that isn't a playable upload
+// or a supported YouTube/Vimeo link is dropped.
+export const cleanVideo = (video) => {
+  if (!video || typeof video !== 'object') return null;
+  const url = safeLink(video.url);
+  if (!url || !videoKind(url)) return null;
+  return {
+    url,
+    poster_url: safeLink(video.poster_url),
+    caption: trimOrNull(video.caption),
+  };
+};
+
+// Plain text of the report body, for "has the admin written anything?".
+const reportText = (html) => String(html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+export const REPORT_MIN_CHARS = 40;
+export const hasReport = (html) => reportText(html).length >= REPORT_MIN_CHARS;
+
 // Empty form state for the editor.
 export const emptyReview = () => ({
   event_id: null,
@@ -138,6 +186,7 @@ export const emptyReview = () => ({
   crowd_level: null,
   headline_pickup: '',
   gallery: [],
+  video: null,
   pickups: [],
 });
 
@@ -161,20 +210,29 @@ export const normalizeReview = (input = {}) => {
     crowd_level: CROWD_LEVEL_MAP[input.crowd_level] ? input.crowd_level : null,
     headline_pickup: trimOrNull(input.headline_pickup),
     gallery: cleanGallery(input.gallery),
+    video: cleanVideo(input.video),
     pickups: cleanPickups(input.pickups),
   };
 };
 
 // What must be true before a review can be published. Drafts may be saved with
-// anything; publishing needs the parts readers will see.
+// anything. The star rating, the photos, the video and the written report are
+// each optional on their own — a review can be just a rating, just a gallery,
+// just a video or just the report — but it has to carry at least one of them.
 export const reviewPublishProblems = ({ article = {}, review = {} } = {}) => {
   const problems = [];
   if (!trimOrNull(article.title)) problems.push('Give the review a title.');
-  if (!trimOrNull(article.content) || article.content.replace(/<[^>]*>/g, '').trim().length < 40) {
-    problems.push('Write the review body (a few sentences at least).');
-  }
   if (!review.event_id) problems.push('Pick the event this review is about.');
-  if (!isValidScore(review.overall_rating)) problems.push('Set an overall star rating.');
+  const text = reportText(article.content);
+  if (text.length > 0 && text.length < REPORT_MIN_CHARS) {
+    problems.push('The report is very short — write a few sentences, or clear it to publish without one.');
+  }
+  const hasSomething =
+    isValidScore(review.overall_rating) ||
+    cleanGallery(review.gallery).length > 0 ||
+    Boolean(cleanVideo(review.video)) ||
+    text.length >= REPORT_MIN_CHARS;
+  if (!hasSomething) problems.push('Add at least one of: a star rating, photos, a video or the written report.');
   return problems;
 };
 

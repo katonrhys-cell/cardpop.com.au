@@ -11,6 +11,10 @@ import {
   cleanPickups,
   normalizeReview,
   reviewPublishProblems,
+  videoKind,
+  cleanVideo,
+  reviewVideoFileError,
+  REVIEW_VIDEO_MAX_BYTES,
   hasScorecard,
   hasQuickFacts,
   formatAud,
@@ -123,6 +127,7 @@ describe('normalizeReview', () => {
       crowd_level: 'busy',
       headline_pickup: null,
       gallery: [],
+      video: null,
       pickups: [],
     });
     expect(row).not.toHaveProperty('extra');
@@ -140,22 +145,61 @@ describe('normalizeReview', () => {
 });
 
 describe('publishing rules', () => {
-  const good = {
-    article: { title: 'Vault Melbourne review', content: '<p>' + 'A long enough body of text for a review. '.repeat(3) + '</p>' },
-    review: { event_id: 'evt', overall_rating: 4 },
-  };
+  const body = '<p>' + 'A long enough body of text for a review. '.repeat(3) + '</p>';
+  const video = { url: 'https://youtu.be/dQw4w9WgXcQ' };
+  const photo = { url: 'https://x.supabase.co/storage/v1/object/public/media/event-reviews/gallery/1-a.webp' };
 
   it('passes a complete review', () => {
-    expect(reviewPublishProblems(good)).toEqual([]);
+    expect(reviewPublishProblems({ article: { title: 'T', content: body }, review: { event_id: 'evt', overall_rating: 4 } })).toEqual([]);
+  });
+
+  it('publishes any one part on its own: stars, photos, video or the report', () => {
+    const base = { article: { title: 'T', content: '' } };
+    expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', overall_rating: 4 } })).toEqual([]);
+    expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', gallery: [photo] } })).toEqual([]);
+    expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', video } })).toEqual([]);
+    expect(reviewPublishProblems({ article: { title: 'T', content: body }, review: { event_id: 'evt' } })).toEqual([]);
   });
 
   it('names each missing piece', () => {
-    const problems = reviewPublishProblems({ article: { title: '', content: '<p>hi</p>' }, review: {} });
-    expect(problems).toHaveLength(4);
+    const problems = reviewPublishProblems({ article: { title: '', content: '' }, review: {} });
+    expect(problems).toHaveLength(3);
     expect(problems.join(' ')).toMatch(/title/);
-    expect(problems.join(' ')).toMatch(/body/);
     expect(problems.join(' ')).toMatch(/event/);
-    expect(problems.join(' ')).toMatch(/star/);
+    expect(problems.join(' ')).toMatch(/star rating, photos, a video or the written report/);
+  });
+
+  it('flags a report that was started but is too short to stand on its own', () => {
+    const problems = reviewPublishProblems({ article: { title: 'T', content: '<p>hi</p>' }, review: { event_id: 'evt', overall_rating: 4 } });
+    expect(problems).toEqual([expect.stringMatching(/very short/)]);
+  });
+});
+
+describe('review video', () => {
+  const upload = 'https://x.supabase.co/storage/v1/object/public/media/event-reviews/videos/1-abc-floor.mp4';
+
+  it('tells uploads from YouTube/Vimeo links and refuses anything else', () => {
+    expect(videoKind(upload)).toBe('file');
+    expect(videoKind('https://youtu.be/dQw4w9WgXcQ')).toBe('embed');
+    expect(videoKind('https://vimeo.com/123456789')).toBe('embed');
+    expect(videoKind('https://example.com/page')).toBeNull();
+    expect(videoKind('javascript:alert(1)//.mp4')).toBeNull();
+  });
+
+  it('cleans the stored shape', () => {
+    expect(cleanVideo({ url: upload, poster_url: 'javascript:x', caption: '  The floor  ', extra: 1 }))
+      .toEqual({ url: upload, poster_url: null, caption: 'The floor' });
+    expect(cleanVideo({ url: 'https://example.com/page' })).toBeNull();
+    expect(cleanVideo(null)).toBeNull();
+    expect(normalizeReview({ video: { url: upload } }).video).toEqual({ url: upload, poster_url: null, caption: null });
+    expect(normalizeReview({}).video).toBeNull();
+  });
+
+  it('checks a picked file before upload', () => {
+    expect(reviewVideoFileError({ type: 'video/mp4', size: 10 * 1048576, name: 'a.mp4' })).toBeNull();
+    expect(reviewVideoFileError({ type: 'video/quicktime', size: 1, name: 'a.mov' })).toBeNull();
+    expect(reviewVideoFileError({ type: 'image/png', size: 1, name: 'a.png' })).toMatch(/MP4, MOV or WebM/);
+    expect(reviewVideoFileError({ type: 'video/mp4', size: REVIEW_VIDEO_MAX_BYTES + 1, name: 'a.mp4' })).toMatch(/YouTube/);
   });
 });
 
