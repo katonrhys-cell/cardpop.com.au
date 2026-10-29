@@ -137,6 +137,29 @@ describe('buildEventJsonLd image', () => {
   });
 });
 
+describe('buildEventJsonLd organizer sameAs', () => {
+  const base = { id: 'e1', slug: 'show', title: 'Show', start_date: '2026-10-01' };
+
+  it('lists every organiser profile the form collects, skipping blanks', () => {
+    const ld = buildEventJsonLd({
+      ...base,
+      instagram_url: 'https://instagram.com/a',
+      facebook_url: '',
+      youtube_channel_url: 'https://youtube.com/@a',
+      tiktok_url: 'https://tiktok.com/@a',
+      x_url: 'https://x.com/a',
+      discord_url: 'https://discord.gg/a',
+    });
+    expect(ld.organizer.sameAs).toEqual([
+      'https://instagram.com/a', 'https://youtube.com/@a', 'https://tiktok.com/@a', 'https://x.com/a', 'https://discord.gg/a',
+    ]);
+  });
+
+  it('omits sameAs when there are no profiles', () => {
+    expect(buildEventJsonLd(base).organizer.sameAs).toBeUndefined();
+  });
+});
+
 describe('buildEventJsonLd offers', () => {
   const base = { slug: 'test-show', title: 'Test Show', start_date: '2026-10-01' };
 

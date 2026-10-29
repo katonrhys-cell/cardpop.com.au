@@ -6,8 +6,9 @@
 -- public URL. NULL = no logo, the title keeps the full width.
 --
 -- events_public is recreated to expose the column (appended — `create or
--- replace view` can't drop or reorder). Everything else is exactly
--- 20261029005944_event_videos.sql.
+-- replace view` can't drop or reorder, so the five organiser-link columns
+-- 20261029020720_event_organiser_links.sql added must stay in the list).
+-- Everything else is exactly that migration.
 
 alter table public.events
   add column if not exists organizer_logo_url text;
@@ -71,6 +72,11 @@ select
   ticket_prices,
   gallery_albums,
   event_videos,
+  youtube_channel_url,
+  tiktok_url,
+  x_url,
+  discord_url,
+  vendor_application_url,
   organizer_logo_url
 from public.events
 where status in ('approved'::event_status, 'completed'::event_status);

@@ -221,6 +221,12 @@ export const THUMB_SUFFIX = '.thumb.webp';
 // line merely serves the full image (harmless), whereas the reverse would 404.
 export const THUMBNAILS_SINCE = 1784500000000; // 2026-07-19T23:06:40Z
 
+// Event pictures (cover/poster, gallery, stall layout) live in the `events`
+// bucket and all go through utils/uploadEventImage.js, which writes the same
+// `.thumb.webp` companion from this cutoff onward.
+export const EVENTS_BUCKET = 'events';
+export const EVENT_THUMBNAILS_SINCE = 1793318400000; // 2026-10-30T00:00:00Z
+
 // Shop product photos converted by scripts/optimize-shop-images.mjs are stored
 // as `<name>.opt.webp` with a companion `<name>.opt.thumb.webp`. The script
 // writes both before any product row points at the `.opt.webp`, so the marker
@@ -244,15 +250,20 @@ function uploadTimestamp(path) {
 function hasThumbnail(path, bucket) {
   if (typeof path !== 'string' || path.endsWith(THUMB_SUFFIX)) return false;
   if (path.endsWith(OPTIMIZED_SUFFIX)) return true;
-  // Companion `.thumb.webp` files are only ever written for card uploads in the
-  // vault-images bucket (AddEditCardPage.uploadThumbnail). Other upload sites
-  // (hero showcase / media library → `media`, shop products → `shop-products`,
-  // Whatnot shows) produce timestamped filenames with NO thumb, so inferring
-  // one from the timestamp alone made getCardImage emit a thumbSrc that 404s on
-  // every render. Gate on the bucket that actually has thumbnails.
-  if (bucket !== DEFAULT_BUCKET) return false;
+  // Companion `.thumb.webp` files are only written by two upload sites: card
+  // uploads in the vault-images bucket (AddEditCardPage.uploadThumbnail) and
+  // event pictures in the events bucket (utils/uploadEventImage.js), each from
+  // its own cutoff. Other upload sites (hero showcase / media library →
+  // `media`, shop products → `shop-products`, Whatnot shows) produce
+  // timestamped filenames with NO thumb, so inferring one from the timestamp
+  // alone made getCardImage emit a thumbSrc that 404s on every render. Gate on
+  // the buckets that actually have thumbnails.
+  const since = bucket === DEFAULT_BUCKET ? THUMBNAILS_SINCE
+    : bucket === EVENTS_BUCKET ? EVENT_THUMBNAILS_SINCE
+    : null;
+  if (since === null) return false;
   const ts = uploadTimestamp(path);
-  return ts !== null && ts >= THUMBNAILS_SINCE;
+  return ts !== null && ts >= since;
 }
 
 /**

@@ -1341,7 +1341,29 @@ const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
   'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, organizer_logo_url, seo_title, seo_description, ' +
+  'instagram_url, facebook_url, youtube_channel_url, tiktok_url, x_url, discord_url, vendor_application_url, ' +
   'gallery_images, gallery_albums, event_videos, created_at, updated_at';
+
+// Organiser links from the event form's Organiser tab (migration
+// 20261029020720_event_organiser_links.sql): one list of outbound profile /
+// application links so a no-JS reader gets the same "Follow the Organiser"
+// block the SPA shows. Every href is escaped; a non-http(s) value is dropped.
+const ORGANISER_LINKS = [
+  ['instagram_url', 'Instagram'],
+  ['facebook_url', 'Facebook'],
+  ['youtube_channel_url', 'YouTube'],
+  ['tiktok_url', 'TikTok'],
+  ['x_url', 'X (Twitter)'],
+  ['discord_url', 'Discord'],
+  ['vendor_application_url', 'Apply for a trader table'],
+];
+const organiserLinksHtml = (event) => {
+  const links = ORGANISER_LINKS
+    .map(([key, label]) => [typeof event[key] === 'string' ? event[key].trim() : '', label])
+    .filter(([url]) => /^https?:\/\//i.test(url));
+  if (!links.length) return '';
+  return `<section><h2>Follow the Organiser</h2><ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul></section>`;
+};
 
 // Event photo albums (events.gallery_albums, utils/eventGallery.js). Bots
 // get the real photos as <figure>s under one heading per album — the
@@ -1615,6 +1637,7 @@ async function renderEvent(supabase, param) {
   ${eventGalleryHtml(event, name)}
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
+  ${organiserLinksHtml(event)}
 </main>`;
 
   return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...videoLds], bodyHtml });

@@ -356,6 +356,38 @@ describe('EventDetailCard — ticket prices', () => {
   });
 });
 
+describe('EventDetailCard — organiser links', () => {
+  it('hides "Follow the Organiser" and the trader button when no links are set', () => {
+    renderCard(baseEvent);
+    expect(screen.queryByText('Follow the Organiser')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
+  });
+
+  it('links every organiser profile and the trader application page', () => {
+    renderCard({
+      ...baseEvent,
+      youtube_channel_url: 'https://youtube.com/@collectitcon',
+      tiktok_url: 'https://tiktok.com/@collectitcon',
+      x_url: 'https://x.com/collectitcon',
+      discord_url: 'https://discord.gg/collectitcon',
+      vendor_application_url: 'https://collectitcon.com.au/traders',
+    });
+    expect(screen.getByText('Follow the Organiser')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /YouTube/ })).toHaveAttribute('href', 'https://youtube.com/@collectitcon');
+    expect(screen.getByRole('link', { name: /TikTok/ })).toHaveAttribute('href', 'https://tiktok.com/@collectitcon');
+    expect(screen.getByRole('link', { name: /X \(Twitter\)/ })).toHaveAttribute('href', 'https://x.com/collectitcon');
+    expect(screen.getByRole('link', { name: /Discord/ })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
+    expect(screen.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
+  });
+
+  it('keeps the trader button off a past event', () => {
+    render(
+      <MemoryRouter><EventDetailCard event={{ ...baseEvent, vendor_application_url: 'https://collectitcon.com.au/traders' }} isPast /></MemoryRouter>,
+    );
+    expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('EventDetailModal — ticket prices', () => {
   it('shows the entry fee and the extra ticket prices', () => {
     renderModal({

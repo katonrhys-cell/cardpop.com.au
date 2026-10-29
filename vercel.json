@@ -22,6 +22,10 @@
     },
     "api/event-scan.js": {
       "maxDuration": 300
+    },
+    "api/grade-estimate.js": {
+      "maxDuration": 300,
+      "includeFiles": "node_modules/@img/sharp-*linux-x64/**"
     }
   },
   "redirects": [
@@ -447,6 +451,10 @@
     {
       "source": "/cron/event-scan",
       "destination": "/api/event-scan"
+    },
+    {
+      "source": "/grade-estimate/:path*",
+      "destination": "/api/grade-estimate"
     },
     {
       "source": "/hcgi/api/:path*",

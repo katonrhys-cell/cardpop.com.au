@@ -313,6 +313,16 @@ server-side for the slab-template route (`createThumbnailBuffer` in
 `src/utils/imageProcessor.js`), and are best-effort — a thumb failure never
 fails the upload.
 
+Event pictures get the same treatment from `EVENT_THUMBNAILS_SINCE`: the cover
+/ poster and gallery photos (`components/EventFormModal.jsx`) and the stall
+layout plan (`components/events/EventInfoBoard.jsx`) all upload through
+`utils/uploadEventImage.js`, which writes the full image and its `.thumb.webp`
+companion into the `events` bucket. `getCardImage` infers the thumb from the
+bucket + upload timestamp, so **every** writer to that bucket must go through
+the helper — a timestamped upload with no thumb makes the Community hub tiles
+and the events grid (`cardThumbUrl` in `EventCard`) chase a 404 before falling
+back to the full poster.
+
 ## Optimized shop product photos
 
 Supplier photo sets arrive at print resolution — the Palms Off Gaming range was
