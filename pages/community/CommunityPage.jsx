@@ -13,6 +13,7 @@ import { COMMUNITY_ITEMS, EVENT_ITEMS, READS_ITEM, badgeStyle } from '@/lib/comm
 import { EVENT_CARD_COLUMNS } from '@/pages/community/CommunityEventsPage.jsx';
 import { BLOG_CARD_COLUMNS } from '@/pages/blog/BlogPage.jsx';
 import { eventPath, formatEventDate, formatEventLocation, eventTypeLabel, eventTypeStyle, toLocalDateStr } from '@/lib/eventSeo.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { isVerified } from '@/utils/verification.js';
 import {
@@ -27,6 +28,36 @@ import { Badge } from '@/components/ui/badge';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 
 const TOTAL_SLIDES = 3;
+
+// The little picture on an upcoming-event tile: the event's own poster/logo
+// (`events.image_url`, routed through the image CDN like every stored image),
+// falling back to the event-type icon only when there is no picture or it
+// fails to load. Posters are uploaded without a thumbnail companion, so the
+// browser downscales the full image — fine for a 40 px tile that is cached
+// by the service worker after the first visit.
+function EventThumb({ event, style }) {
+  const src = publicImageUrl(event?.image_url || null);
+  const [failed, setFailed] = useState(false);
+  if (src && !failed) {
+    return (
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border bg-muted shadow-sm"
+        data-testid="event-thumb"
+      />
+    );
+  }
+  if (!style) return null;
+  return (
+    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br ${style.gradient} shrink-0 shadow-sm`}>
+      <style.Icon className="w-5 h-5 text-white" />
+    </span>
+  );
+}
 
 // Explicit projections — the hub shows a handful of rows from each area, so
 // it reads only what the preview renders (never `*`).
@@ -350,11 +381,7 @@ const CommunityPage = () => {
                     className="group flex flex-col gap-2 bg-card border border-border p-5 rounded-2xl hover:shadow-md hover:-translate-y-0.5 transition-all"
                   >
                     <div className="flex items-center gap-2">
-                      {style && (
-                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${style.gradient} shrink-0 shadow-sm`}>
-                          <style.Icon className="w-4 h-4 text-white" />
-                        </span>
-                      )}
+                      <EventThumb event={event} style={style} />
                       <Badge variant="secondary" className="text-[10px] uppercase tracking-wide font-bold">{eventTypeLabel(event)}</Badge>
                     </div>
                     <h3 className="font-bold line-clamp-2 group-hover:text-primary transition-colors">{event.title}</h3>
