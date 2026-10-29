@@ -58,7 +58,7 @@ export const HeroSearchForm = ({ className = '' }) => {
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 px-5 sm:px-8 lg:px-12 xl:px-16 overflow-hidden bg-zinc-950">
+    <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 overflow-hidden bg-zinc-950">
 
       {/* Stage floor gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />
@@ -101,7 +101,9 @@ const HeroSection = () => {
       <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="max-w-[90rem] mx-auto w-full relative z-10 lg:pr-[500px] xl:pr-[560px]">
+      {/* Gutters inside the 90rem box, exactly like the header, so the hero
+          content edges match it at every width. */}
+      <div className="max-w-[90rem] mx-auto w-full px-5 sm:px-8 lg:px-12 xl:px-16 relative z-10 lg:pr-[548px] xl:pr-[624px]">
         <div className="text-center lg:text-left">
           <div
             className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"

@@ -366,7 +366,7 @@ const HomePage = () => {
       />
 
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="relative lg:min-h-[92dvh] flex items-start justify-center pt-8 sm:pt-14 pb-10 sm:pb-16 px-5 sm:px-8 lg:px-12 xl:px-16 overflow-hidden bg-zinc-950">
+      <section className="relative lg:min-h-[92dvh] flex items-start justify-center pt-8 sm:pt-14 pb-10 sm:pb-16 overflow-hidden bg-zinc-950">
 
         {/* Stage floor gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />
@@ -411,113 +411,120 @@ const HomePage = () => {
         <div className="absolute top-1/3 right-[28%] w-[36rem] h-[36rem] bg-primary/8 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-[10%] w-[28rem] h-[28rem] bg-blue-600/8 rounded-full blur-3xl pointer-events-none" />
 
-        {/* ── Hero text ── */}
-        <div className="max-w-[90rem] mx-auto w-full relative z-10 lg:pr-[500px] xl:pr-[560px]">
-          {/* ── Animated card showcase — shelf → stand (desktop only) ──
-              Lives INSIDE the hero column, anchored to its right edge, so it
-              sits in the padding reserved for it (lg:pr-[500px] xl:pr-[560px])
-              beside the headline. The column is the same max-w-[90rem] +
-              gutters as the header, so the text starts flush with the logo and
-              the shelf's right edge lines up with the header's right edge. */}
-          {isDesktop && (
-            <Suspense fallback={null}>
-              <HeroCardShowcase cards={heroCards} />
-            </Suspense>
-          )}
-
-          {/* NOTE: the hero text block is intentionally NOT wrapped in a
-              motion fade. It contains the LCP <h1>, which must paint the moment
-              HomePage renders — gating it behind a framer-motion opacity:0→1
-              animation delayed LCP until the JS loaded and the tween ran. Only
-              the small, non-LCP badge and trust chips animate below. */}
-          <div className="text-center lg:text-left">
-            {/* LIVE show badge */}
-            <div
-              className="anim-pop-in inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase"
-              style={{
-                animationDelay: '0.15s',
-                background: 'rgba(220,38,38,0.12)',
-                borderColor: 'rgba(220,38,38,0.35)',
-                color: '#f87171',
-                boxShadow: '0 0 24px rgba(220,38,38,0.2)',
-              }}
-            >
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
-              CardPop™
-              <span className="text-white/30 font-normal">·</span>
-              <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
-            </div>
-
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
-              Buy and Sell Trading Cards{' '}
-              <br className="hidden sm:block" />
-              <span
-                className="text-transparent bg-clip-text"
-                style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
-              >
-                with Collectors Across Australia
-              </span>
-            </h1>
-
-            <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
-              Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.
-            </p>
-
-            <div className="mb-6 flex justify-center lg:justify-start">
-              <HeroSearchForm />
-            </div>
-
-            <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
-              <Button
-                asChild
-                size="lg"
-                className="w-full sm:w-auto h-14 px-8 rounded-2xl font-black text-lg transition-all hover:-translate-y-0.5"
+        {/* ── Hero text ──
+            Same wrapper as the header and every other section: the 90rem box
+            carries the gutters INSIDE it, so the content edges match the
+            header's at every viewport width. (With the gutters on the section
+            and a bare 90rem box inside, the hero ran 2 × gutter wider than the
+            header once the screen passed 1440px.) */}
+        <div className="max-w-[90rem] mx-auto w-full px-5 sm:px-8 lg:px-12 xl:px-16 relative z-10">
+          <div className="relative lg:pr-[500px] xl:pr-[560px]">
+            {/* ── Animated card showcase — shelf → stand (desktop only) ──
+                Lives INSIDE the hero column, anchored to its right edge, so it
+                sits in the padding reserved for it (lg:pr-[500px] xl:pr-[560px])
+                beside the headline. The column is the header's content box, so
+                the text starts flush with the logo and the shelf's right edge
+                lines up with the header's right edge. */}
+            {isDesktop && (
+              <Suspense fallback={null}>
+                <HeroCardShowcase cards={heroCards} />
+              </Suspense>
+            )}
+  
+            {/* NOTE: the hero text block is intentionally NOT wrapped in a
+                motion fade. It contains the LCP <h1>, which must paint the moment
+                HomePage renders — gating it behind a framer-motion opacity:0→1
+                animation delayed LCP until the JS loaded and the tween ran. Only
+                the small, non-LCP badge and trust chips animate below. */}
+            <div className="text-center lg:text-left">
+              {/* LIVE show badge */}
+              <div
+                className="anim-pop-in inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase"
                 style={{
-                  background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-                  boxShadow: '0 8px 32px rgba(220,38,38,0.4)',
-                  color: '#fff',
-                  border: 'none',
+                  animationDelay: '0.15s',
+                  background: 'rgba(220,38,38,0.12)',
+                  borderColor: 'rgba(220,38,38,0.35)',
+                  color: '#f87171',
+                  boxShadow: '0 0 24px rgba(220,38,38,0.2)',
                 }}
               >
-                <Link to="/marketplace">
-                  Shop Cards <ArrowRight className="ml-2 w-5 h-5" />
-                </Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                size="lg"
-                className="w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg transition-all hover:-translate-y-0.5"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1.5px solid rgba(255,255,255,0.15)',
-                  color: '#e4e4e7',
-                }}
-              >
-                <Link to="/signup?next=%2Fvault%2Fadd">
-                  Sell for Free
-                </Link>
-              </Button>
-            </div>
-
-            {/* Trust chips */}
-            <div
-              className="anim-fade-in flex flex-wrap items-center justify-center lg:justify-start gap-3"
-              style={{ animationDelay: '0.5s' }}
-            >
-              {[
-                { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protection on every order' },
-                { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD prices, Australian sellers' },
-                { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live market data' },
-              ].map(({ icon, label }) => (
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse flex-shrink-0" />
+                CardPop™
+                <span className="text-white/30 font-normal">·</span>
+                <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
+              </div>
+  
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
+                Buy and Sell Trading Cards{' '}
+                <br className="hidden sm:block" />
                 <span
-                  key={label}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#a1a1aa' }}
+                  className="text-transparent bg-clip-text"
+                  style={{ backgroundImage: 'linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)' }}
                 >
-                  {icon}{label}
+                  with Collectors Across Australia
                 </span>
-              ))}
+              </h1>
+  
+              <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
+                Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.
+              </p>
+  
+              <div className="mb-6 flex justify-center lg:justify-start">
+                <HeroSearchForm />
+              </div>
+  
+              <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
+                <Button
+                  asChild
+                  size="lg"
+                  className="w-full sm:w-auto h-14 px-8 rounded-2xl font-black text-lg transition-all hover:-translate-y-0.5"
+                  style={{
+                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                    boxShadow: '0 8px 32px rgba(220,38,38,0.4)',
+                    color: '#fff',
+                    border: 'none',
+                  }}
+                >
+                  <Link to="/marketplace">
+                    Shop Cards <ArrowRight className="ml-2 w-5 h-5" />
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="lg"
+                  className="w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg transition-all hover:-translate-y-0.5"
+                  style={{
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1.5px solid rgba(255,255,255,0.15)',
+                    color: '#e4e4e7',
+                  }}
+                >
+                  <Link to="/signup?next=%2Fvault%2Fadd">
+                    Sell for Free
+                  </Link>
+                </Button>
+              </div>
+  
+              {/* Trust chips */}
+              <div
+                className="anim-fade-in flex flex-wrap items-center justify-center lg:justify-start gap-3"
+                style={{ animationDelay: '0.5s' }}
+              >
+                {[
+                  { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protection on every order' },
+                  { icon: <Zap className="w-3.5 h-3.5" />, label: 'AUD prices, Australian sellers' },
+                  { icon: <TrendingUp className="w-3.5 h-3.5" />, label: 'Live market data' },
+                ].map(({ icon, label }) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold"
+                    style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.10)', color: '#a1a1aa' }}
+                  >
+                    {icon}{label}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
         </div>

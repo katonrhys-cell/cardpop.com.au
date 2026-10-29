@@ -106,6 +106,15 @@ export async function requestGradeEstimate({ apiKey, imageBlocks }) {
 	return data.content?.[0]?.text ?? '';
 }
 
+/** Throws when the reply doesn't carry the grades object the page renders. */
+function checkGrades(content) {
+	const data = parseGradeJson(content);
+	if (!data?.grades || typeof data.grades !== 'object') {
+		throw new Error('Grade estimate reply carried no grades object');
+	}
+	return data;
+}
+
 /**
  * Runs the estimate and checks the reply carries the grades the page renders.
  *
@@ -116,9 +125,91 @@ export async function requestGradeEstimate({ apiKey, imageBlocks }) {
  */
 export async function runGradeEstimate({ apiKey, imageBlocks }) {
 	const content = await requestGradeEstimate({ apiKey, imageBlocks });
-	const data = parseGradeJson(content);
-	if (!data?.grades || typeof data.grades !== 'object') {
-		throw new Error('Grade estimate reply carried no grades object');
+	return { content, data: checkGrades(content) };
+}
+
+/**
+ * Pulls the text deltas out of one chunk of the Anthropic SSE stream.
+ * Exported for tests. Returns { texts, rest } — `rest` is the trailing
+ * partial event to prepend to the next chunk.
+ */
+export function parseAnthropicSseChunk(buffer) {
+	const events = buffer.split('\n\n');
+	const rest = events.pop() ?? '';
+	const texts = [];
+	let error = null;
+	for (const event of events) {
+		for (const line of event.split('\n')) {
+			if (!line.startsWith('data:')) continue;
+			let payload;
+			try { payload = JSON.parse(line.slice(5).trim()); } catch { continue; }
+			if (payload?.type === 'content_block_delta' && payload.delta?.type === 'text_delta') {
+				texts.push(payload.delta.text ?? '');
+			} else if (payload?.type === 'error') {
+				error = payload.error?.message || 'stream error';
+			}
+		}
 	}
-	return { content, data };
+	return { texts, rest, error };
+}
+
+/**
+ * The same call, streamed: the model's reply is handed to `onText` as it is
+ * produced, so the route can forward it to the browser while the answer is
+ * still being written. That keeps bytes moving on a reply that takes a
+ * minute — Cloudflare drops an origin response that is silent for 100 s, and
+ * the member sees progress instead of a spinner.
+ *
+ * @param {object} args
+ * @param {string} args.apiKey
+ * @param {Array<{type: string, source: object}>} args.imageBlocks
+ * @param {(text: string) => void} [args.onText]
+ * @returns {Promise<{ content: string, data: object }>}
+ */
+export async function streamGradeEstimate({ apiKey, imageBlocks, onText }) {
+	const res = await fetch('https://api.anthropic.com/v1/messages', {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			'x-api-key': apiKey,
+			'anthropic-version': '2023-06-01',
+		},
+		body: JSON.stringify({
+			model: GRADE_MODEL,
+			max_tokens: 3000,
+			stream: true,
+			system: GradeEstimatorPrompt,
+			messages: [{
+				role: 'user',
+				content: [
+					{ type: 'text', text: buildGradePromptText(imageBlocks.length) },
+					...imageBlocks,
+				],
+			}],
+		}),
+		// Covers the whole stream, not just the headers: aborting the signal
+		// rejects the pending body read too.
+		signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.anthropicGrade),
+	});
+
+	if (!res.ok) {
+		const errBody = await res.text().catch(() => '');
+		throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+	}
+	if (!res.body) throw new Error('Anthropic API returned no body');
+
+	const decoder = new TextDecoder();
+	let buffer = '';
+	let content = '';
+	for await (const chunk of res.body) {
+		buffer += decoder.decode(chunk, { stream: true });
+		const { texts, rest, error } = parseAnthropicSseChunk(buffer);
+		buffer = rest;
+		if (error) throw new Error(`Anthropic stream error: ${error}`);
+		for (const text of texts) {
+			content += text;
+			onText?.(text);
+		}
+	}
+	return { content, data: checkGrades(content) };
 }

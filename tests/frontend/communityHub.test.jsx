@@ -76,4 +76,29 @@ describe('CommunityPage', () => {
     }
     expect(fetch).toHaveBeenCalledWith('/api/points/leaderboard');
   });
+
+  it('shows the event poster as the tile thumbnail, and the type icon only when there is none', async () => {
+    const rowsQuery = (rows) => {
+      const q = emptyQuery();
+      q.then = (resolve) => Promise.resolve({ data: rows, error: null }).then(resolve);
+      return q;
+    };
+    from.mockImplementation((table) => (table === 'events_public'
+      ? rowsQuery([
+        { id: 'e1', slug: 'hobby-hangout', event_type: 'card_show', title: 'The Hobby Hangout XL', start_date: '2099-11-01', suburb: 'Eveleigh', state: 'NSW', image_url: 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/1.webp' },
+        { id: 'e2', slug: 'no-poster', event_type: 'card_show', title: 'Poster-less Show', start_date: '2099-11-02', suburb: 'Keilor Park', state: 'VIC', image_url: null },
+      ])
+      : emptyQuery()));
+
+    render(<MemoryRouter><CommunityPage /></MemoryRouter>);
+    const withPoster = (await screen.findByText('The Hobby Hangout XL')).closest('a');
+    const thumb = withPoster.querySelector('[data-testid="event-thumb"]');
+    expect(thumb).toBeTruthy();
+    expect(thumb.getAttribute('src')).toContain('/events/events/1.webp');
+    expect(thumb.getAttribute('alt')).toBe(''); // decorative — the title is the accessible name
+
+    const withoutPoster = screen.getByText('Poster-less Show').closest('a');
+    expect(withoutPoster.querySelector('[data-testid="event-thumb"]')).toBeNull();
+    expect(withoutPoster.querySelector('svg')).toBeTruthy(); // falls back to the type icon
+  });
 });
