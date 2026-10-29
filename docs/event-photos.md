@@ -26,3 +26,5 @@ organiser can split one weekend into "Day 1" / "Day 2" / "Vendors".
   image CDN at render (`toCdnUrl`) — never store a CDN host.
 - Alt text is generated (`<event> — <album> (n of N)`); there are no per-photo
   captions on event galleries (the admin **event review** gallery has them).
+
+Videos sit directly below the gallery — see `docs/event-videos.md`.

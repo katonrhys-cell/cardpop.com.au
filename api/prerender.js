@@ -24,6 +24,7 @@ import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../u
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
+import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
@@ -1339,7 +1340,7 @@ const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
   'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
-  'gallery_images, gallery_albums, created_at, updated_at';
+  'gallery_images, gallery_albums, event_videos, created_at, updated_at';
 
 // Event photo albums (events.gallery_albums, utils/eventGallery.js). Bots
 // get the real photos as <figure>s under one heading per album — the
@@ -1365,36 +1366,29 @@ const eventGalleryHtml = (event, name) => {
   return `<section><h2>Event Photos</h2>${sections}</section>`;
 };
 
-// YouTube video id from any common URL shape — mirrors lib/eventSeo.js.
-const youTubeVideoId = (url) => {
-  if (!url) return null;
-  const match = String(url).match(
-    /(?:youtube(?:-nocookie)?\.com\/(?:watch\?(?:[^#]*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/,
-  );
-  return match ? match[1] : null;
-};
-
-// schema.org VideoObject for an event's YouTube video — video rich results.
-// Google requires uploadDate; the closest truthful value we hold is when the
-// listing was last updated (i.e. when the video link was added).
-function buildEventVideoLd(event) {
-  const id = youTubeVideoId(event.youtube_url);
-  if (!id) return null;
+// schema.org VideoObject per YouTube video (utils/eventVideos.js; a bare
+// youtube_url still counts as one) — video rich results. Google requires
+// uploadDate; the closest truthful value we hold is when the listing was
+// last updated (i.e. when the video link was added).
+function buildEventVideoLds(event) {
+  const videos = cleanEventVideos(event.event_videos, event.youtube_url);
+  if (videos.length === 0) return [];
   const name = event.title || 'Trading Card Event';
-  return {
+  const description = toText(
+    event.short_description || event.description
+      || `Video for ${name}, a trading card event listed on CardPop Australia.`,
+    500,
+  );
+  return videos.map((video, i) => ({
     '@context': 'https://schema.org',
     '@type': 'VideoObject',
-    name: `${name} — Event Video`,
-    description: toText(
-      event.short_description || event.description
-        || `Video for ${name}, a trading card event listed on CardPop Australia.`,
-      500,
-    ),
-    thumbnailUrl: [`https://i.ytimg.com/vi/${id}/hqdefault.jpg`],
+    name: video.title ? `${name} — ${video.title}` : `${name} — Event Video${videos.length > 1 ? ` ${i + 1}` : ''}`,
+    description,
+    thumbnailUrl: [ytThumbUrl(video.id)],
     uploadDate: event.updated_at || event.created_at || event.start_date,
-    contentUrl: `https://www.youtube.com/watch?v=${id}`,
-    embedUrl: `https://www.youtube-nocookie.com/embed/${id}`,
-  };
+    contentUrl: youTubeWatchUrl(video.id),
+    embedUrl: ytEmbedUrl(video.id),
+  }));
 }
 
 // Full schema.org Event for a Supabase event record. Every field Google's
@@ -1576,8 +1570,8 @@ async function renderEvent(supabase, param) {
     || `${name}${location ? ` at ${location}` : ''}${when ? ` on ${when}` : ''} — a trading card event listed on CardPop Australia.`;
 
   const eventLd = { ...buildEventLd(event), description: toText(description, 500) };
-  const videoLd = buildEventVideoLd(event);
-  const videoId = youTubeVideoId(event.youtube_url);
+  const videoLds = buildEventVideoLds(event);
+  const videos = cleanEventVideos(event.event_videos, event.youtube_url);
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -1604,11 +1598,11 @@ async function renderEvent(supabase, param) {
   </ul>
   ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}
   ${eventGalleryHtml(event, name)}
-  ${videoId ? `<p><a href="https://www.youtube.com/watch?v=${esc(videoId)}">Watch the event video</a></p>` : ''}
+  ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...(videoLd ? [videoLd] : [])], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...videoLds], bodyHtml });
 }
 
 // Ranked local grader lists are shown identically on /grading/local-graders and

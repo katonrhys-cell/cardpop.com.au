@@ -37,7 +37,7 @@ export const EVENT_CARD_COLUMNS = [
   'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'website_url', 'ticket_url',
   'is_cardpop_verified', 'is_featured', 'registration_required', 'capacity',
   'tags', 'featured_card_games', 'organizer_name',
-  'instagram_url', 'facebook_url', 'youtube_url', 'facebook_video_url',
+  'instagram_url', 'facebook_url', 'youtube_url', 'event_videos', 'facebook_video_url',
   'accessibility_info', 'age_restrictions', 'created_at', 'updated_at',
 ].join(',');
 

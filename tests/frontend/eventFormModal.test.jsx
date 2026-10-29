@@ -40,13 +40,31 @@ describe('EventFormModal — user/admin field parity', () => {
     expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO']);
   });
 
-  it('shows the video URL fields (YouTube + Facebook) in user mode', () => {
+  it('shows the video fields in user mode: the YouTube list on Details, Facebook on Organiser', () => {
     renderForm('user');
+    expect(screen.getByText(/Event Videos/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Video 1 YouTube URL')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add another video/ })).toBeInTheDocument();
     // Radix only mounts the active tab's content — switch to Organiser first.
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Organiser' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Organiser' }));
-    expect(screen.getByLabelText(/YouTube Video URL/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Facebook Public Post \/ Reel URL/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/YouTube Video URL/i)).not.toBeInTheDocument();
+  });
+
+  it('flags a non-YouTube video link and adds / removes video rows', () => {
+    renderForm('admin');
+    const url = screen.getByLabelText('Video 1 YouTube URL');
+    fireEvent.change(url, { target: { value: 'https://vimeo.com/123' } });
+    expect(screen.getByText(/Not a YouTube link/)).toBeInTheDocument();
+    fireEvent.change(url, { target: { value: 'https://youtu.be/dQw4w9WgXcQ' } });
+    expect(screen.getByText(/YouTube video found/)).toBeInTheDocument();
+    expect(screen.getByText('1 video')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Add another video/ }));
+    expect(screen.getByLabelText('Video 2 YouTube URL')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove video 2' }));
+    expect(screen.queryByLabelText('Video 2 YouTube URL')).not.toBeInTheDocument();
   });
 });
 

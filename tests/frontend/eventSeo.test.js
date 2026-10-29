@@ -5,6 +5,7 @@ import {
   youTubeThumbnailUrl,
   facebookEmbedUrl,
   buildVideoJsonLd,
+  buildVideoJsonLds,
   buildEventJsonLd,
   formatEntryFee,
   MAX_JSON_LD_GALLERY_IMAGES,
@@ -76,6 +77,28 @@ describe('buildVideoJsonLd', () => {
     expect(buildVideoJsonLd({ ...event, youtube_url: null })).toBeNull();
     expect(buildVideoJsonLd({ ...event, youtube_url: 'https://vimeo.com/1' })).toBeNull();
     expect(buildVideoJsonLd(null)).toBeNull();
+  });
+
+  it('builds one VideoObject per event_videos entry, titled, and ignores youtube_url when the list is set', () => {
+    const lds = buildVideoJsonLds({
+      ...event,
+      youtube_url: 'https://youtu.be/zzzzzzzzzzz',
+      event_videos: [
+        { title: '2025 recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+        { title: '', url: 'https://youtu.be/abcdefghijk' },
+        { title: 'bad', url: 'https://vimeo.com/1' },
+      ],
+    });
+    expect(lds).toHaveLength(2);
+    expect(lds[0]).toMatchObject({
+      '@type': 'VideoObject',
+      name: 'Brisbane Card Show — 2025 recap',
+      contentUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      embedUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+      thumbnailUrl: ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'],
+    });
+    expect(lds[1]).toMatchObject({ name: 'Brisbane Card Show — Event Video 2', contentUrl: 'https://www.youtube.com/watch?v=abcdefghijk' });
+    expect(buildVideoJsonLds({ ...event, youtube_url: null, event_videos: [] })).toEqual([]);
   });
 });
 
