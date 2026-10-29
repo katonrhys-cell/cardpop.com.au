@@ -37,7 +37,8 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
           the copy gets the whole screen instead of the strip left over under a
           fixed poster + title + three stacked buttons. From `sm` up it is the
           usual centred card capped at 90vh. */}
-      <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden gap-0 border-none shadow-xl flex flex-col h-[100vh] supports-[height:100dvh]:h-[100dvh] max-h-none supports-[height:100dvh]:max-h-none sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-lg">
+      <DialogContent className="sm:max-w-[650px] p-0 overflow-hidden gap-0 border-none shadow-xl flex flex-col h-[100vh] supports-[height:100dvh]:h-[100dvh] max-h-none supports-[height:100dvh]:max-h-none sm:h-auto sm:max-h-[90vh] rounded-none sm:rounded-lg"
+        closeClassName="z-10 rounded-full bg-background/90 p-1.5 shadow-md ring-1 ring-border opacity-100 data-[state=open]:bg-background/90 data-[state=open]:text-foreground">
         <DialogHeader className="sr-only">
           <DialogTitle>Event Details: {eventTitle}</DialogTitle>
           <DialogDescription>Full details for {eventTitle}</DialogDescription>
@@ -164,9 +165,9 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
         {/* Equal-width columns so every action reads as the same size — the
             dialog's own X is the only way out, so there's no Close button. */}
         <DialogFooter className="p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-4 bg-muted/20 border-t border-border grid grid-cols-2 sm:grid-flow-col sm:auto-cols-fr gap-2 sm:space-x-0 shrink-0">
-          {!past && <AddToCalendarButton event={event} className={`h-11 font-semibold ${ticketLink ? '' : 'col-span-2 sm:col-span-1'}`} />}
+          {!past && <AddToCalendarButton event={event} className={`h-11 px-2 sm:px-4 max-[374px]:text-xs max-[374px]:[&>svg]:mr-1 max-[359px]:[&>svg]:hidden font-semibold ${ticketLink ? '' : 'col-span-2 sm:col-span-1'}`} />}
           {!past && ticketLink && (
-            <Button variant="secondary" className="w-full h-11 font-semibold" asChild>
+            <Button variant="secondary" className="w-full h-11 px-2 sm:px-4 max-[374px]:text-xs max-[374px]:[&>svg]:mr-1 font-semibold" asChild>
               <a href={ticketLink} target="_blank" rel="noopener noreferrer" onClick={countTicketClick} onAuxClick={countTicketClick}>
                 <Ticket className="w-4 h-4 mr-2" /> Tickets & Info
               </a>
