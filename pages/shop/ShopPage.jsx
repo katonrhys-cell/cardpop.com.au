@@ -17,7 +17,7 @@ import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
-import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
 
@@ -75,25 +75,20 @@ const ShopPage = () => {
           return;
         }
 
-        let query = supabase
-          .from('shop_products')
-          .select(SHOP_CARD_COLUMNS)
-          .in('status', PUBLIC_SHOP_STATUSES)
-          .range(from, from + PAGE_LIMIT - 1);
+        const build = () => {
+          let query = supabase
+            .from('shop_products')
+            .select(SHOP_CARD_COLUMNS)
+            .in('status', PUBLIC_SHOP_STATUSES)
+            .range(from, from + PAGE_LIMIT - 1);
+          if (searchTerm) {
+            query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
+          }
+          return query;
+        };
 
-        if (searchTerm) {
-          query = query.ilike('title', `%${escapeLike(searchTerm)}%`);
-        }
-
-        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
-        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
-        else query = query.order('created_at', { ascending: false });
-        // Every sort needs a unique tie-breaker: without one, rows with equal
-        // prices or timestamps can come back in a different order per page, so
-        // the same product shows up twice across pages (or never at all).
-        query = query.order('id', { ascending: true });
-
-        const { data, error: fetchError } = await query;
+        // In-stock products lead whatever the sort (see applyShopSort).
+        const { data, error: fetchError } = await orderedShopQuery(build, sort);
         if (fetchError) throw fetchError;
 
         if (!cancelled) {

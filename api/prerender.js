@@ -1233,16 +1233,34 @@ const LANDINGS = {
   },
 };
 
+/**
+ * Up to 50 shop products in the order the storefront grids show them: what can
+ * be bought first (`shop_products.availability_rank`, the generated column from
+ * migration 20261029204324 — 0 in stock, 1 pre-order, 2 coming soon, 3 sold
+ * out), then newest. `build()` returns a fresh unordered query. Until the
+ * column has landed the sample falls back to newest-first rather than coming
+ * back empty, so a bot never sees a bare category page over a deploy.
+ */
+async function shopProductSample(build) {
+  const first = await build().order('availability_rank', { ascending: true }).order('created_at', { ascending: false }).limit(50);
+  if (!first.error) return first.data || [];
+  if (!/availability_rank/.test(`${first.error.message || ''} ${first.error.details || ''}`)) return [];
+  const { data } = await build().order('created_at', { ascending: false }).limit(50);
+  return data || [];
+}
+
 async function renderLanding(supabase, path) {
   const cfg = LANDINGS[path];
   const canonical = `${BASE_URL}${path}`;
 
   let items = [];
   if (cfg.source === 'shop') {
-    let q = supabase.from('shop_products').select('id, title, slug, category, colour, family_sku, price_aud, images, image_url').in('status', PUBLIC_SHOP_STATUSES);
-    if (cfg.productType) q = q.eq('product_type', cfg.productType);
-    const { data } = await q.order('created_at', { ascending: false }).limit(50);
-    items = (data || []).map(p => ({
+    const data = await shopProductSample(() => {
+      let q = supabase.from('shop_products').select('id, title, slug, category, colour, family_sku, price_aud, images, image_url').in('status', PUBLIC_SHOP_STATUSES);
+      if (cfg.productType) q = q.eq('product_type', cfg.productType);
+      return q;
+    });
+    items = data.map(p => ({
       name: p.title || 'Product',
       url: `${BASE_URL}${shopProductPath(p)}`,
       price: p.price_aud,
@@ -3480,14 +3498,11 @@ async function renderShopCollection(supabase, rawSlug) {
   // Best-effort product sample — match shop_products.category against any leaf
   // category name in the group. An empty result only trims the list.
   const orClause = cfg.subs.map((s) => `category.ilike.%${s.name}%`).join(',');
-  const { data } = await supabase
+  const products = await shopProductSample(() => supabase
     .from('shop_products')
     .select('id, title, slug, category, colour, family_sku, price_aud, images, image_url')
     .in('status', PUBLIC_SHOP_STATUSES)
-    .or(orClause)
-    .order('created_at', { ascending: false })
-    .limit(50);
-  const products = data || [];
+    .or(orClause));
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -3573,14 +3588,11 @@ async function renderShopCategory(supabase, rawSlug) {
   // Same match the category page uses (shop_products.category ILIKE name).
   // Category names are restricted to plain characters by the shop_categories
   // CHECK constraint, so no LIKE escaping is needed.
-  const { data } = await supabase
+  const products = await shopProductSample(() => supabase
     .from('shop_products')
     .select('id, title, slug, category, colour, family_sku, price_aud, images, image_url')
     .in('status', PUBLIC_SHOP_STATUSES)
-    .ilike('category', `%${leaf.name}%`)
-    .order('created_at', { ascending: false })
-    .limit(50);
-  const products = data || [];
+    .ilike('category', `%${leaf.name}%`));
 
   const breadcrumb = {
     '@context': 'https://schema.org',

@@ -243,15 +243,79 @@ export function matchesSearch(row, term) {
   return !q || norm(row.title).includes(q);
 }
 
-/** Sort facet rows the way the grids' server queries do. */
+/**
+ * Browse tier of a product — the position of its `availability()` in the
+ * AVAILABILITY list: 0 in stock, 1 pre-order, 2 coming soon, 3 sold out. Every
+ * shop grid sorts by this before the shopper's chosen sort so what can be
+ * bought leads and sold-out products sit at the end, whatever the sort. The
+ * database keeps the same number in `shop_products.availability_rank` (a
+ * generated column, migration 20261029204324) for the unfiltered grids, which
+ * sort server-side; keep the two in step.
+ */
+export function availabilityRank(p) {
+  const i = AVAILABILITY.findIndex((a) => a.value === availability(p));
+  return i < 0 ? AVAILABILITY.length : i;
+}
+
+/** The generated column `applyShopSort` orders by first. */
+export const AVAILABILITY_RANK_COLUMN = 'availability_rank';
+
+/**
+ * Sort the facet rows the way the server sorts an unfiltered grid: buyable
+ * first (availabilityRank), then `sort` — 'price_asc' | 'price_desc' |
+ * 'oldest' | anything else = newest — then id, so paging is stable.
+ */
 export function sortFacetRows(rows, sort) {
   const price = (p) => Number(p.price_aud) || 0;
   const time = (p) => Date.parse(p.created_at) || 0;
   const list = [...(rows || [])];
-  if (sort === 'price_asc') return list.sort((a, b) => price(a) - price(b));
-  if (sort === 'price_desc') return list.sort((a, b) => price(b) - price(a));
-  if (sort === 'oldest') return list.sort((a, b) => time(a) - time(b));
-  return list.sort((a, b) => time(b) - time(a));
+  let by;
+  if (sort === 'price_asc') by = (a, b) => price(a) - price(b);
+  else if (sort === 'price_desc') by = (a, b) => price(b) - price(a);
+  else if (sort === 'oldest') by = (a, b) => time(a) - time(b);
+  else by = (a, b) => time(b) - time(a);
+  return list.sort(
+    (a, b) => availabilityRank(a) - availabilityRank(b) || by(a, b) || String(a.id).localeCompare(String(b.id)),
+  );
+}
+
+/**
+ * Apply a shop grid's ordering to a shop_products query: buyable first
+ * (`availability_rank`, unless `stockFirst` is false), then the shopper's
+ * `sort` ('price_asc' | 'price_desc' | 'oldest' | anything else = newest),
+ * then `id`. Every sort needs that unique tie-breaker: without one, rows with
+ * equal prices or timestamps can come back in a different order per page, so
+ * the same product shows up twice across pages (or never at all).
+ */
+export function applyShopSort(query, sort, { stockFirst = true } = {}) {
+  let q = query;
+  if (stockFirst) q = q.order(AVAILABILITY_RANK_COLUMN, { ascending: true });
+  if (sort === 'price_asc') q = q.order('price_aud', { ascending: true });
+  else if (sort === 'price_desc') q = q.order('price_aud', { ascending: false });
+  else if (sort === 'oldest') q = q.order('created_at', { ascending: true });
+  else q = q.order('created_at', { ascending: false });
+  return q.order('id', { ascending: true });
+}
+
+/** PostgREST's answer when `availability_rank` isn't on the table yet. */
+function missingRankColumn(error) {
+  if (!error) return false;
+  const text = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`;
+  return (error.code === '42703' || /does not exist|could not find/i.test(text)) && text.includes(AVAILABILITY_RANK_COLUMN);
+}
+
+/**
+ * Run a shop grid query with `applyShopSort`. `build()` returns a fresh
+ * (unordered) query each time it's called — a builder can't be re-ordered
+ * once ordered. If the database doesn't have `availability_rank` yet (the app
+ * deployed ahead of migration 20261029204324), the query is retried with the
+ * plain sort so the grid still loads. Resolves to supabase's `{ data, error,
+ * count }`; the caller checks `error`.
+ */
+export async function orderedShopQuery(build, sort) {
+  const first = await applyShopSort(build(), sort);
+  if (!missingRankColumn(first.error)) return first;
+  return applyShopSort(build(), sort, { stockFirst: false });
 }
 
 /** Full rows for `ids`, returned in the same order. */

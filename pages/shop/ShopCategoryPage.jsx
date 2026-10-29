@@ -18,7 +18,7 @@ import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
-import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
@@ -104,26 +104,23 @@ const ShopCategoryPage = () => {
         // which need an accurate total — an estimated count would render buttons for
         // empty pages or hide real ones. The active shop catalogue per category is
         // small, so the exact count is inexpensive.
-        let query = supabase
-          .from('shop_products')
-          // `estimated` is exact below PostgREST's 1,000-row cap (the whole
-          // catalogue today) and stops costing a second scan beyond it.
-          .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
-          .in('status', PUBLIC_SHOP_STATUSES);
+        const build = () => {
+          let query = supabase
+            .from('shop_products')
+            // `estimated` is exact below PostgREST's 1,000-row cap (the whole
+            // catalogue today) and stops costing a second scan beyond it.
+            .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
+            .in('status', PUBLIC_SHOP_STATUSES);
 
-        // shop_products stores a free-text category; match the resolved
-        // subcategory/category name against it.
-        if (categoryName) query = query.ilike('category', `%${escapeLike(categoryName)}%`);
-        if (debouncedSearch) query = query.ilike('title', `%${escapeLike(debouncedSearch)}%`);
+          // shop_products stores a free-text category; match the resolved
+          // subcategory/category name against it.
+          if (categoryName) query = query.ilike('category', `%${escapeLike(categoryName)}%`);
+          if (debouncedSearch) query = query.ilike('title', `%${escapeLike(debouncedSearch)}%`);
+          return query.range(from, from + PER_PAGE - 1);
+        };
 
-        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
-        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
-        else if (sort === 'oldest') query = query.order('created_at', { ascending: true });
-        else query = query.order('created_at', { ascending: false });
-
-        query = query.range(from, from + PER_PAGE - 1);
-
-        const { data, count, error } = await query;
+        // In-stock products lead whatever the sort (see applyShopSort).
+        const { data, count, error } = await orderedShopQuery(build, sort);
         if (cancelled) return;
         if (error) throw error;
 

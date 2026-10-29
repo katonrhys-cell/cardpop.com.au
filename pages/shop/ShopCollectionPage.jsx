@@ -19,7 +19,7 @@ import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import { isSoldOut, isComingSoon, isPreorder, PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
-import { DEFAULT_FACET_KEYS, filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import { DEFAULT_FACET_KEYS, filterFacetRows, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { toast } from 'sonner';
@@ -245,23 +245,20 @@ const ShopCollectionPage = () => {
         return;
       }
 
-      let q = supabase
-        .from('shop_products')
-        .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
-        .in('status', PUBLIC_SHOP_STATUSES);
+      const build = () => {
+        let q = supabase
+          .from('shop_products')
+          .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
+          .in('status', PUBLIC_SHOP_STATUSES);
 
-      // A selected pill narrows to one leaf category; otherwise match the group.
-      if (activeSub) q = q.ilike('category', `%${activeSub}%`);
-      else q = q.or(buildGroupOr());
+        // A selected pill narrows to one leaf category; otherwise match the group.
+        if (activeSub) q = q.ilike('category', `%${activeSub}%`);
+        else q = q.or(buildGroupOr());
+        return q.range(from, from + PER_PAGE - 1);
+      };
 
-      if (sort === 'price_asc') q = q.order('price_aud', { ascending: true });
-      else if (sort === 'price_desc') q = q.order('price_aud', { ascending: false });
-      else if (sort === 'oldest') q = q.order('created_at', { ascending: true });
-      else q = q.order('created_at', { ascending: false });
-
-      q = q.range(from, from + PER_PAGE - 1);
-
-      const { data, error, count } = await q;
+      // In-stock products lead whatever the sort (see applyShopSort).
+      const { data, error, count } = await orderedShopQuery(build, sort);
       if (!isCurrent()) return;
       if (error) throw error;
 
