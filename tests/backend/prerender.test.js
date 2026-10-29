@@ -608,6 +608,19 @@ describe('prerender events', () => {
     expect(body).toContain('alt="One Album photo 1"');
   });
 
+  it('renders a single titled album under its own heading', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'named-album', title: 'Named Album', status: 'completed',
+      start_date: '2025-10-01',
+      gallery_images: ['https://cdn.test/a.jpg'],
+      gallery_albums: [{ title: 'October 2025', images: ['https://cdn.test/a.jpg'] }],
+    } };
+    const { body } = await run('/events/named-album');
+    expect(body).toContain('<h2>Event Photos</h2>');
+    expect(body).toContain('<h3>October 2025</h3>');
+    expect(body).toContain('alt="Named Album — October 2025 photo 1"');
+  });
+
   it('emits GA and presale offers when the event has both prices', async () => {
     state.result = { data: {
       id: UUID, slug: 'presale-show', title: 'Presale Show', status: 'approved',
