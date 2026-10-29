@@ -340,6 +340,20 @@ describe('grid thumbnails (thumbSrc)', () => {
     expect(getCardImage(`u/${NEW_TS}.thumb.webp`).thumbSrc).toBeNull();
   });
 
+  it('infers a thumb for events-bucket uploads from their own cutoff', () => {
+    // EVENT_THUMBNAILS_SINCE is 1793318400000 (2026-10-30T00:00:00Z).
+    const EVENT_TS = '1793400000000';
+    const cover = `https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/${EVENT_TS}.webp`;
+    expect(getCardImage(cover).thumbSrc).toBe(`https://cdn/object/events/events/${EVENT_TS}.thumb.webp`);
+    const gallery = `https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/gallery/${EVENT_TS}-0-1-ab12c.jpg`;
+    expect(getCardImage(gallery).thumbSrc).toBe(`https://cdn/object/events/events/gallery/${EVENT_TS}-0-1-ab12c.thumb.webp`);
+    // Posters uploaded before the helper existed have no companion.
+    const legacy = `https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/${NEW_TS}.webp`;
+    expect(getCardImage(legacy).thumbSrc).toBeNull();
+    // The cutoff is per bucket — a media-library upload at the same time has none.
+    expect(getCardImage(`hero/${EVENT_TS}.webp`, { bucket: 'media' }).thumbSrc).toBeNull();
+  });
+
   it('derives thumbSrc from stored absolute Supabase object URLs too', () => {
     const stored = `https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/vault-images/u/${NEW_TS}.jpg`;
     expect(getCardImage(stored).thumbSrc).toBe(`https://cdn/object/vault-images/u/${NEW_TS}.thumb.webp`);
