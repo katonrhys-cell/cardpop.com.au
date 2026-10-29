@@ -161,6 +161,8 @@ const CardPriceDetailPage = lazy(() => import('@/pages/prices/CardPriceDetailPag
 // Player pages — one public page per collected athlete (docs/players.md)
 const PlayersIndexPage = lazy(() => import('@/pages/players/PlayersIndexPage.jsx'));
 const PlayerPage = lazy(() => import('@/pages/players/PlayerPage.jsx'));
+// Giveaways — Instagram-led promotions whose entries and draw live here (docs/giveaways.md)
+const GiveawayPage = lazy(() => import('@/pages/community/GiveawayPage.jsx'));
 const BuyingGuidesPage = lazy(() => import('@/pages/analytics/BuyingGuidesPage.jsx'));
 const BuyingGuideDetailPage = lazy(() => import('@/pages/analytics/BuyingGuideDetailPage.jsx'));
 
@@ -244,6 +246,7 @@ const EventReviewEditorPage = lazy(() => import('@/pages/admin/EventReviewEditor
 const BusinessAffiliateLinksAdminPage = lazy(() => import('@/pages/admin/BusinessAffiliateLinksAdminPage.jsx'));
 const ShopAffiliateProductsAdminPage = lazy(() => import('@/pages/admin/ShopAffiliateProductsAdminPage.jsx'));
 const CardArtManagementPage = lazy(() => import('@/pages/admin/CardArtManagementPage.jsx'));
+const GiveawaysAdminPage = lazy(() => import('@/pages/admin/GiveawaysAdminPage.jsx'));
 const ListingsManagementPage = lazy(() => import('@/pages/ListingsManagementPage.jsx'));
 
 // Previously-orphaned pages now wired up
@@ -451,6 +454,8 @@ const App = () => {
                         {/* Player pages — the most collected athletes (SEO) */}
                         <Route path="/players" element={<PlayersIndexPage />} />
                         <Route path="/players/:slug" element={<PlayerPage />} />
+                        <Route path="/giveaway" element={<GiveawayPage />} />
+                        <Route path="/giveaways/:slug" element={<GiveawayPage />} />
 
                         {/* Partner program */}
                         <Route path="/partners" element={<PartnersPage />} />
@@ -576,6 +581,7 @@ const App = () => {
                           <Route path="building-your-business" element={<BusinessAffiliateLinksAdminPage />} />
                           <Route path="shop-affiliate-products" element={<ShopAffiliateProductsAdminPage />} />
                           <Route path="card-art" element={<CardArtManagementPage />} />
+                          <Route path="giveaways" element={<GiveawaysAdminPage />} />
                         </Route>
                         
                         {/* --- CATCH-ALL 404 ROUTE --- */}
