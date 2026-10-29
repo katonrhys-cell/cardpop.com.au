@@ -1354,7 +1354,8 @@ const eventGalleryHtml = (event, name) => {
   const albums = eventGalleryAlbums(event);
   if (albums.length === 0) return '';
   const sections = albums.map((album, i) => {
-    const label = albums.length > 1 ? albumLabel(album, i) : '';
+    // A lone album only gets a heading when the admin named it.
+    const label = albums.length > 1 || album.title ? albumLabel(album, i) : '';
     const figures = album.images.map((url, j) => {
       const alt = `${esc(name)}${label ? ` — ${esc(label)}` : ''} photo ${j + 1}`;
       return `<figure><img src="${esc(url)}" alt="${alt}" loading="lazy" /></figure>`;
