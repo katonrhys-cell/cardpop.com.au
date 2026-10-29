@@ -6,7 +6,7 @@ import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { getCardImage, publicImageUrl, publicVideoUrl } from '@/utils/imageUrl.js';
-import { videoPosterPath } from '@/utils/cardVideo.js';
+import { videoPosterPath, hasVideoExtension } from '@/utils/cardVideo.js';
 import CardMicroscope from '@/components/CardMicroscope.jsx';
 
 // The detail-page hero image is the LCP on listing/product pages, so it's loaded
@@ -67,10 +67,17 @@ const ProductImageCarousel = ({ images = [], video = null, record = null, displa
     return typeof img === 'string' ? img : null;
   };
 
-  const validImages = Array.isArray(images) ? images : (images ? [images] : []);
+  const rawImages = Array.isArray(images) ? images : (images ? [images] : []);
+  // A clip that reached the photo list (a seller picking an MP4 in a photo
+  // slot — the file picker's accept filter is advisory) can't render through
+  // <img>: the hero sat blank while iOS happened to animate the thumbnail.
+  // Route any such entry to the video slot instead of the photo strip.
+  const strayVideos = rawImages.filter((img) => hasVideoExtension(typeof img === 'string' ? img : null));
+  const validImages = rawImages.filter((img) => !strayVideos.includes(img));
+  const videoPath = video || strayVideos[0] || null;
   // The video, when there is one, is the last slot after the photos. Its index
   // equals validImages.length, so photo indices are unchanged.
-  const videoIndex = video && validImages.length > 0 ? validImages.length : -1;
+  const videoIndex = videoPath && validImages.length > 0 ? validImages.length : -1;
   const slotCount = validImages.length + (videoIndex !== -1 ? 1 : 0);
   const videoActive = videoIndex !== -1 && activeIndex === videoIndex;
   const mainSource = validImages.length > 0 && !videoActive ? sourceFor(validImages[activeIndex]) : null;
@@ -102,9 +109,9 @@ const ProductImageCarousel = ({ images = [], video = null, record = null, displa
       {videoActive ? (
         <div className="relative w-full aspect-[4/5] md:aspect-square rounded-3xl border border-border overflow-hidden bg-black shadow-sm">
           <video
-            key={video}
-            src={publicVideoUrl(video)}
-            poster={publicImageUrl(videoPosterPath(video)) || undefined}
+            key={videoPath}
+            src={publicVideoUrl(videoPath)}
+            poster={publicImageUrl(videoPosterPath(videoPath)) || undefined}
             controls
             autoPlay
             loop
@@ -237,7 +244,7 @@ const ProductImageCarousel = ({ images = [], video = null, record = null, displa
           })}
           {videoIndex !== -1 && (
             <VideoThumb
-              videoPath={video}
+              videoPath={videoPath}
               frameClassName={frameClassName}
               active={videoActive}
               onClick={() => setActiveIndex(videoIndex)}

@@ -52,7 +52,7 @@ import DisplayStylePicker from '@/components/vault/DisplayStylePicker.jsx';
 import { normalizeTier } from '@/lib/displayStyles.js';
 import { publicImageUrl, publicVideoUrl, thumbStoragePath } from '@/utils/imageUrl.js';
 import {
-  CARD_VIDEO_ACCEPT, CARD_VIDEO_MAX_SECONDS, videoFileError, videoDurationError,
+  CARD_VIDEO_ACCEPT, CARD_VIDEO_MAX_SECONDS, videoFileError, videoDurationError, hasVideoExtension,
   readVideoDuration, captureVideoPoster, videoPosterPath,
 } from '@/utils/cardVideo.js';
 import SellingRequirementsNotice from '@/components/SellingRequirementsNotice.jsx';
@@ -794,6 +794,7 @@ const AddEditCardPage = () => {
   // the mobile camera input, or the live scanner.
   const acceptMainImage = (file) => {
     if (!file) return;
+    if (claimVideoFromPhotoSlot(file)) return;
     if (file.size > MAX_RAW_PHOTO_BYTES) { toast.error('Image must be less than 25MB'); return; }
     setImageFile(file);
     const reader = new FileReader();
@@ -1431,24 +1432,47 @@ const AddEditCardPage = () => {
     }
   };
 
-  const handleVideoPicked = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = '';
-    if (!file) return;
+  // Validate a picked clip (type, size, length) and make it the card's video.
+  const acceptVideoFile = async (file) => {
     const fileProblem = videoFileError(file);
-    if (fileProblem) { toast.error(fileProblem); return; }
+    if (fileProblem) { toast.error(fileProblem); return false; }
     setCheckingVideo(true);
     try {
       let seconds;
       try { seconds = await readVideoDuration(file); } catch { seconds = NaN; }
       const durationProblem = videoDurationError(seconds);
-      if (durationProblem) { toast.error(durationProblem); return; }
+      if (durationProblem) { toast.error(durationProblem); return false; }
       if (videoPreview && videoFile) URL.revokeObjectURL(videoPreview);
       setVideoFile(file);
       setVideoPreview(URL.createObjectURL(file));
+      return true;
     } finally {
       setCheckingVideo(false);
     }
+  };
+
+  const handleVideoPicked = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await acceptVideoFile(file);
+  };
+
+  // A clip dropped into a photo slot. The picker's `accept` list is only a
+  // hint (iOS Files and drag-and-drop ignore it), and a video saved as a
+  // "photo" renders blank on the listing page, so route it to the video slot
+  // instead. Returns true when the file was a video and has been dealt with.
+  const claimVideoFromPhotoSlot = (file) => {
+    const isVideo = /^video\//i.test(file?.type || '') || (!file?.type && hasVideoExtension(file?.name));
+    if (!isVideo) return false;
+    if (videoFile || videoPath) {
+      toast.error('One video per card — remove the current video first to replace it.');
+      return true;
+    }
+    acceptVideoFile(file).then((ok) => {
+      if (ok) toast.success('Videos go in the Video slot — added as this card\'s video.');
+    });
+    return true;
   };
 
   const removeVideo = () => {
@@ -1886,7 +1910,9 @@ const AddEditCardPage = () => {
                               className="sr-only"
                               onChange={(e) => {
                                 const file = e.target.files[0];
+                                e.target.value = '';
                                 if (!file) return;
+                                if (claimVideoFromPhotoSlot(file)) return;
                                 if (file.size > MAX_RAW_PHOTO_BYTES) { toast.error('Image must be less than 25MB'); return; }
                                 const nf = [...extraFiles]; nf[idx] = file;
                                 setExtraFiles(nf);

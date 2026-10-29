@@ -257,3 +257,24 @@ describe('card_video', () => {
     expect(build({ card_video: null }, { isEdit: true }).row.card_video).toBeNull();
   });
 });
+
+describe('buildVaultItemRow — clips in card_images', () => {
+  it('moves a clip uploaded through a photo slot into card_video', () => {
+    const { row, pathErrors } = build({
+      card_images: [`${USER}/1-extra-a.webp`, `${USER}/2-extra-b.mp4`],
+    });
+    expect(row.card_images).toEqual([`${USER}/1-extra-a.webp`]);
+    expect(row.card_video).toBe(`${USER}/2-extra-b.mp4`);
+    expect(pathErrors).toEqual([]);
+  });
+
+  it('keeps an explicit card_video and drops a second clip from the photos', () => {
+    const { row, pathErrors } = build({
+      card_video: `${USER}/9-video.mov`,
+      card_images: [`${USER}/2-extra-b.mp4`, `${USER}/1-extra-a.webp`],
+    });
+    expect(row.card_images).toEqual([`${USER}/1-extra-a.webp`]);
+    expect(row.card_video).toBe(`${USER}/9-video.mov`);
+    expect(pathErrors.some((e) => /only one video/.test(e))).toBe(true);
+  });
+});

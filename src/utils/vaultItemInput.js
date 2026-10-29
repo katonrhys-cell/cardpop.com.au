@@ -140,6 +140,16 @@ export const buildVaultItemRow = (raw, { userId, tier, isEdit }) => {
       pathErrors.push('card_images entries must be storage paths inside your own folder');
       return false;
     });
+    // A clip uploaded through a photo slot belongs in card_video: the listing
+    // page renders photos through <img>, which leaves a video blank. The first
+    // stray clip fills an empty video slot; any other is dropped rather than
+    // stored as a "photo".
+    const strayVideos = row.card_images.filter(hasVideoExtension);
+    if (strayVideos.length) {
+      row.card_images = row.card_images.filter((p) => !hasVideoExtension(p));
+      if (row.card_video == null) row.card_video = strayVideos[0];
+      else pathErrors.push('only one video per card — extra clips in card_images were dropped');
+    }
   }
 
   // ── Derivations (mirror pages/AddEditCardPage.jsx handleSubmit) ───────────
