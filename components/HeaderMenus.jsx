@@ -26,6 +26,7 @@ import { SheetClose } from '@/components/ui/sheet';
 import SearchBar from '@/components/SearchBar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
+import { COMMUNITY_ITEMS, EVENT_ITEMS, READS_ITEM, badgeStyle } from '@/lib/communityNav.js';
 
 export const NAV_LINKS = [
   // `icon` (where present) matches the lucide icon in that page's own hero/heading,
@@ -70,21 +71,8 @@ const ADMIN_LINKS = [
   { label: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
-const COMMUNITY_ITEMS = [
-  { href: '/community/forum',          label: 'Forum',                 desc: 'Discussions and community posts',        Icon: MessageSquare, gradient: 'from-violet-500 to-purple-600'  },
-  { href: '/community/leaderboard',    label: 'Leaderboard',           desc: 'Monthly points for active collectors',   Icon: Award,         gradient: 'from-amber-500 to-orange-500'   },
-  { href: '/community/profiles',       label: 'Profiles',              desc: 'Browse collector profiles',              Icon: Users,         gradient: 'from-emerald-500 to-teal-600'   },
-  { href: '/community/local-traders',  label: 'Local Traders',         desc: 'Endorsed sellers near you',              Icon: BadgeCheck,    gradient: 'from-blue-500 to-cyan-600'    },
-  { href: '/community/map',            label: 'Community Map',         desc: 'Stores, shows & traders near you',       Icon: MapPin,        gradient: 'from-blue-500 to-indigo-600'   },
-  { href: '/community/whatnot',        label: 'Whatnot',               desc: 'Live buying and selling shows',          Icon: WhatnotIcon,   gradient: 'from-green-500 to-emerald-600', isWhatnot: true },
-];
-
-const EVENT_ITEMS = [
-  { href: '/events/card-shows',       label: 'Card Shows',       desc: 'Trading card fairs and expos',        Icon: Ticket,    gradient: 'from-red-500 to-rose-600'      },
-  { href: '/events/trade-events',     label: 'Trade Events',     desc: 'Swap meets and trading nights',       Icon: Handshake, gradient: 'from-blue-500 to-indigo-600'   },
-  { href: '/events/community-events', label: 'Community Events', desc: 'Collector meetups and community fun', Icon: Users,     gradient: 'from-violet-500 to-purple-600' },
-  { href: '/events/store-events',     label: 'Store Events',     desc: 'Local game store tournaments',        Icon: Store,     gradient: 'from-amber-500 to-orange-500'  },
-];
+// The Community / Events / Reads lists live in lib/communityNav.js, shared
+// with the Community Hub page so the hub always mirrors this menu.
 
 const ANALYTICS_ITEMS = [
   { href: '/scan',                     label: 'Card Scanner',     desc: 'Scan any card for an instant price check', Icon: ScanLine, gradient: 'from-red-500 to-rose-600' },
@@ -586,8 +574,8 @@ const CommunityDropdown = ({ onNavigate }) => {
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                 >
                   <span
-                    className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${item.isWhatnot ? 'bg-black' : (item.label === 'Local Traders' ? '' : `bg-gradient-to-br ${item.gradient}`)}`}
-                    style={item.label === 'Local Traders' ? { backgroundImage: `linear-gradient(to bottom right, hsl(var(--verified-badge)), hsl(199 95% 35%))` } : {}}
+                    className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${badgeStyle(item).className}`}
+                    style={badgeStyle(item).style}
                   >
                     <item.Icon className="w-4 h-4 text-white" />
                   </span>
@@ -624,12 +612,12 @@ const CommunityDropdown = ({ onNavigate }) => {
                     onClick={() => { setOpen(false); onNavigate?.(); }}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                   >
-                    <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shrink-0 shadow-sm">
-                      <BookOpen className="w-4 h-4 text-white" />
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${READS_ITEM.gradient} shrink-0 shadow-sm`}>
+                      <READS_ITEM.Icon className="w-4 h-4 text-white" />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">The Parallel Report</p>
-                      <p className="text-[11px] text-muted-foreground truncate">Guides, news and card stories</p>
+                      <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{READS_ITEM.label}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{READS_ITEM.desc}</p>
                     </div>
                   </Link>
                 </>
@@ -939,7 +927,10 @@ const MobileCommunitySection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg shrink-0 overflow-hidden ${item.isWhatnot ? 'bg-black' : `bg-gradient-to-br ${item.gradient}`}`}>
+                <span
+                  className={`inline-flex items-center justify-center w-6 h-6 rounded-lg shrink-0 overflow-hidden ${badgeStyle(item).className}`}
+                  style={badgeStyle(item).style}
+                >
                   <item.Icon className="w-3.5 h-3.5 text-white" />
                 </span>
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
@@ -978,10 +969,10 @@ const MobileCommunitySection = ({ onNavigate }) => {
               onClick={onNavigate}
               className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
             >
-              <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 shrink-0">
-                <BookOpen className="w-3.5 h-3.5 text-white" />
+              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${READS_ITEM.gradient} shrink-0`}>
+                <READS_ITEM.Icon className="w-3.5 h-3.5 text-white" />
               </span>
-              <span className="text-xs font-semibold text-foreground truncate">The Parallel Report</span>
+              <span className="text-xs font-semibold text-foreground truncate">{READS_ITEM.label}</span>
             </Link>
           </SheetClose>
         </div>

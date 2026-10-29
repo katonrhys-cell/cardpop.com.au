@@ -2112,21 +2112,31 @@ const STATIC_CONTENT = {
 
   '/community': {
     title: 'Community Hub | CardPop',
-    description: 'Connect with Australian trading card collectors. Join discussions, share your collection and trade cards on CardPop.',
+    description: 'The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, the community map, card shows and events, Whatnot shows and The Parallel Report.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Community', path: '/community' }],
-    h1: "The Collector's Hub",
-    intro: 'Discuss market trends, connect with verified collectors, and discover authorized retailers shaping the hobby.',
+    h1: 'Community Hub',
+    intro: 'A home for collectors. Talk cards on the forum, climb the monthly leaderboard, find traders and shows near you, and keep up with The Parallel Report — all in one place.',
+    // Mirrors lib/communityNav.js — one section per area of the Community menu.
     sections: [
-      { h2: 'List free for 30 days', paras: ['List and sell cards completely free for 30 days, no card required. Join Australia’s fastest-growing trading card community.'] },
-      { h2: 'Promote your Whatnot shows', paras: ['Got live pack breaks and auctions? List your shows on CardPop and reach Australian collectors before you go live.'] },
-      { h2: 'Recent discussions', paras: ['Join the forum to talk market trends, pulls and deals with collectors across Australia.'] },
-      { h2: 'Verified collectors', paras: ['Browse collectors who have built a public presence on CardPop.'] },
+      { h2: 'Forum', paras: ['Discussions and community posts. Talk market trends, pulls and deals with collectors across Australia.'] },
+      { h2: 'Leaderboard', paras: ['Monthly points for active collectors — earned for showing up, listing, trading and attending events.'] },
+      { h2: 'Profiles', paras: ['Browse collectors who have built a public presence on CardPop.'] },
+      { h2: 'Local Traders', paras: ['Endorsed sellers near you, vouched for by the community.'] },
+      { h2: 'Community Map', paras: ['Stores, shows and traders near you on one map.'] },
+      { h2: 'Whatnot', paras: ['Live buying and selling shows from Australian sellers — or list your own before you go live.'] },
+      { h2: 'Events', paras: ['Card shows, trade events, community meetups and local game store tournaments across Australia.'] },
+      { h2: 'The Parallel Report', paras: ['Guides, news and card stories from the CardPop desk.'] },
       { h2: 'Retailers & suppliers', paras: ['Authorized retailers and suppliers trusted by the CardPop community.'] },
     ],
     links: [
+      { text: 'Forum', href: '/community/forum' },
+      { text: 'Leaderboard', href: '/community/leaderboard' },
+      { text: 'Profiles', href: '/community/profiles' },
       { text: 'Local Traders', href: '/community/local-traders' },
+      { text: 'Community Map', href: '/community/map' },
       { text: 'Whatnot Shows', href: '/community/whatnot' },
       { text: 'Trading Card Events', href: '/events' },
+      { text: 'The Parallel Report', href: '/blog' },
     ],
   },
 
