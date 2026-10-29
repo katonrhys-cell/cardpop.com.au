@@ -104,7 +104,7 @@ const AreaTile = ({ item, compact = false }) => {
 
 // ─── Section chrome shared by every preview ──────────────────────────────────
 const SectionHeading = ({ Icon, title, blurb, to, cta = 'See all', action }) => (
-  <div className="flex items-end justify-between gap-4 mb-5">
+  <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4 mb-5">
     <div className="min-w-0">
       <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
         {Icon && <Icon className="w-5 h-5 text-primary shrink-0" aria-hidden="true" />}
