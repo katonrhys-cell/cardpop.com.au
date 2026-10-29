@@ -36,6 +36,7 @@ import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import contactRouter from './contact.js';
 import shopEnquiryRouter from './shop-enquiry.js';
+import giveawaysRouter from './giveaways.js';
 import dataDeletionRouter from './data-deletion.js';
 import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
@@ -238,6 +239,11 @@ export default () => {
     // Sold-out shop product enquiry → admin inbox (Resend)
     router.use('/shop-enquiry', apiLimiter);
     router.use('/shop-enquiry', shopEnquiryRouter);
+
+    // Giveaways: public read + member entry (caller-scoped), admin management
+    // under /giveaways/admin (service role behind requireAdmin) — docs/giveaways.md
+    router.use('/giveaways', apiLimiter);
+    router.use('/giveaways', giveawaysRouter);
 
     // Meta (Facebook) data deletion request callback + public status lookup.
     // No auth: the callback is called server-to-server by Facebook and is

@@ -29,6 +29,7 @@ import {
   backInStockEmail,
   welcomeOfferReminderEmail,
   membershipTrialEndingEmail,
+  giveawayWinnerEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -342,4 +343,8 @@ export async function sendWelcomeOfferReminder({ to, name, code, discountPct, ex
 
 export async function sendMembershipTrialEnding({ to, name, planName, amountAud, chargeDate }) {
   return send({ to, subject: `Your CardPop ${planName} free trial ends soon`, html: membershipTrialEndingEmail({ name, planName, amountAud, chargeDate }) });
+}
+
+export async function sendGiveawayWinner({ to, name, giveawayTitle, prizeLabel, prizeDetail, instagramHandle, claimDays, url }) {
+  return send({ to, subject: `You won the ${giveawayTitle}`, html: giveawayWinnerEmail({ name, giveawayTitle, prizeLabel, prizeDetail, instagramHandle, claimDays, url }) });
 }

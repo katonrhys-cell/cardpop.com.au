@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen } from 'lucide-react';
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen, Gift } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -286,6 +286,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
           <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />
           <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
+          <ManagementBox title="Giveaways" description="Instagram giveaways: prizes, entries, comment verification and the recorded random draw." icon={Gift} link="/admin/giveaways" />
         </div>
       </div>
 

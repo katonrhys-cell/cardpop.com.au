@@ -1039,3 +1039,25 @@ ${centred('Don’t want it? Cancel any time before then from Account → Members
     'You’re receiving this because you started a free trial of a CardPop membership.',
   );
 }
+
+// ─── Giveaway winner ───────────────────────────────────────────────────────────
+
+export function giveawayWinnerEmail({ name, giveawayTitle, prizeLabel, prizeDetail, instagramHandle, claimDays = 7, url }) {
+  const body = `${heroBadge('★')}
+${heroHeading('You won!', `Your entry came out of the hat for <strong>${esc(giveawayTitle)}</strong>.`)}
+${statRow([
+  { glyph: '♦', colour: TILE.red, value: esc(prizeLabel || 'Your prize'), caption: esc(prizeDetail || 'Your pick'), small: true },
+  { glyph: '@', colour: TILE.charcoal, value: esc(instagramHandle ? `@${instagramHandle}` : '—'), caption: 'Entered as', small: true },
+])}
+${centred(`Reply to this email, or DM <strong>@cardpop.au</strong> from your entered account, with the Australian postal address you'd like the card sent to. You have ${claimDays} ${plural(claimDays, 'day', 'days')} to claim it, after which we redraw.`)}
+${centred('We never ask a winner to pay postage or share card details. If an account that is not @cardpop.au tells you otherwise, it is not us.')}`;
+  return cpEmail(
+    `You won the ${esc(giveawayTitle)}.`,
+    '',
+    `Hi ${esc(name || 'there')},`,
+    body,
+    esc(url || 'https://cardpop.com.au/giveaway'),
+    'See the result',
+    'You’re receiving this because you entered a CardPop giveaway with this account.',
+  );
+}
