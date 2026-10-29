@@ -169,6 +169,13 @@ node scripts/optimize-shop-images.mjs --bucket media   # add --apply to commit
   unfiltered query and the facet-filtered path. It previously fetched a flat 50
   with no way to reach anything past it — a larger catalogue was simply
   invisible to shoppers.
+- Every grid orders by `shop_products.availability_rank` first — a generated
+  column (0 in stock, 1 pre-order, 2 coming soon, 3 sold out) — so whatever
+  sort the shopper picks, what can be bought leads and sold-out products sit at
+  the end. `orderedShopQuery()` / `applyShopSort()` in `utils/shopFacets.js`
+  build the order for the server path and `sortFacetRows()` mirrors it for the
+  filtered path; `tests/db/run-availability-rank-migration.sh` checks the
+  column against `availability()`.
 - Every paged query carries `id` as a final tie-breaker. Without one, rows with
   equal prices or timestamps can reorder between pages, and products appear
   twice or not at all.

@@ -10,7 +10,7 @@ import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { useCart } from '@/hooks/useCart.jsx';
 import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
-import { filterFacetRows, sortFacetRows, fetchShopProductsByIds } from '@/utils/shopFacets.js';
+import { filterFacetRows, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
 
@@ -69,25 +69,25 @@ const ShopSinglesPage = () => {
           return;
         }
 
-        let query = supabase
-          .from('shop_products')
-          .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
-          .in('status', PUBLIC_SHOP_STATUSES)
-          .eq('product_type', 'single')
-          .limit(PAGE_LIMIT);
+        const build = () => {
+          let query = supabase
+            .from('shop_products')
+            .select(SHOP_CARD_COLUMNS, { count: 'estimated' })
+            .in('status', PUBLIC_SHOP_STATUSES)
+            .eq('product_type', 'single')
+            .limit(PAGE_LIMIT);
 
-        if (minPrice && !isNaN(minPrice)) {
-          query = query.gte('price_aud', Number(minPrice));
-        }
-        if (maxPrice && !isNaN(maxPrice)) {
-          query = query.lte('price_aud', Number(maxPrice));
-        }
+          if (minPrice && !isNaN(minPrice)) {
+            query = query.gte('price_aud', Number(minPrice));
+          }
+          if (maxPrice && !isNaN(maxPrice)) {
+            query = query.lte('price_aud', Number(maxPrice));
+          }
+          return query;
+        };
 
-        if (sort === 'price_asc') query = query.order('price_aud', { ascending: true });
-        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
-        else query = query.order('created_at', { ascending: false });
-
-        const { data, count, error } = await query;
+        // In-stock products lead whatever the sort (see applyShopSort).
+        const { data, count, error } = await orderedShopQuery(build, sort);
         if (error) throw error;
 
         if (isMounted) {

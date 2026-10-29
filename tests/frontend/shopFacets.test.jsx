@@ -4,7 +4,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import {
   typeLabel, typeKey, pocketCount, capacitySlots, priceBand, availability, onSale,
   buildFacetOptions, readSelection, filterFacetRows, facetCounts, sortFacetRows, matchesSearch,
-  fetchShopProductsByIds,
+  fetchShopProductsByIds, availabilityRank, applyShopSort, orderedShopQuery, AVAILABILITY_RANK_COLUMN,
 } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 
@@ -118,6 +118,68 @@ describe('selection + filtering', () => {
     expect(sortFacetRows(ROWS, 'oldest')[0].id).toBe('ring');
     expect(matchesSearch(ROWS[0], '4-POCKET')).toBe(true);
     expect(matchesSearch(ROWS[0], 'ring')).toBe(false);
+  });
+
+  it('ranks what can be bought ahead of what cannot, mirroring the DB column', () => {
+    expect(availabilityRank({ status: 'active', stock_quantity: 5 })).toBe(0);
+    expect(availabilityRank({ status: 'preorder', stock_quantity: 0 })).toBe(1);
+    expect(availabilityRank({ status: 'coming_soon', stock_quantity: 0 })).toBe(2);
+    expect(availabilityRank({ status: 'active', stock_quantity: 0 })).toBe(3);
+  });
+
+  it('puts in-stock products first whatever the sort, sold out last', () => {
+    // ROWS: 2 is coming soon, 3 is sold out (stock 0); the rest ship now.
+    const soldOutLast = (sort) => {
+      const ids = sortFacetRows(ROWS, sort).map((p) => p.id);
+      expect(ids.slice(-2)).toEqual(['2', '3']);
+      return ids;
+    };
+    // The sold-out 12-pocket (id 3, $49.95) is cheaper than the $59.95 blue one
+    // but still sorts after it; the coming-soon black binder is the newest after
+    // id 5 yet never leads.
+    expect(soldOutLast('price_asc')).toEqual(['ring', '1', '5', '4', '2', '3']);
+    expect(soldOutLast('price_desc')).toEqual(['4', '5', '1', 'ring', '2', '3']);
+    expect(soldOutLast('newest')).toEqual(['5', '4', '1', 'ring', '2', '3']);
+    expect(soldOutLast('oldest')).toEqual(['ring', '1', '4', '5', '2', '3']);
+    expect(soldOutLast('created_at_desc')).toEqual(['5', '4', '1', 'ring', '2', '3']);
+  });
+
+  it('orders a server query by availability_rank, then the sort, then id', () => {
+    const calls = [];
+    const q = { order: vi.fn((col, opts) => { calls.push([col, opts.ascending]); return q; }) };
+    applyShopSort(q, 'price_desc');
+    expect(calls).toEqual([[AVAILABILITY_RANK_COLUMN, true], ['price_aud', false], ['id', true]]);
+    calls.length = 0;
+    applyShopSort(q, 'created_at_desc', { stockFirst: false });
+    expect(calls).toEqual([['created_at', false], ['id', true]]);
+    calls.length = 0;
+    applyShopSort(q, 'oldest');
+    expect(calls).toEqual([[AVAILABILITY_RANK_COLUMN, true], ['created_at', true], ['id', true]]);
+  });
+
+  it('falls back to the plain sort while the DB has no availability_rank column', async () => {
+    const results = [
+      { data: null, error: { code: '42703', message: 'column shop_products.availability_rank does not exist' } },
+      { data: [{ id: 'a' }], error: null },
+    ];
+    const orders = [];
+    const build = () => {
+      const q = {
+        order: vi.fn((col) => { orders.push(col); return q; }),
+        then: (res) => res(results.shift()),
+      };
+      return q;
+    };
+    const out = await orderedShopQuery(build, 'newest');
+    expect(out.data).toEqual([{ id: 'a' }]);
+    expect(orders).toEqual([AVAILABILITY_RANK_COLUMN, 'created_at', 'id', 'created_at', 'id']);
+
+    // Any other error is the caller's to handle — no retry.
+    const other = { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
+    let builds = 0;
+    const failing = () => { builds += 1; const q = { order: () => q, then: (res) => res(other) }; return q; };
+    expect(await orderedShopQuery(failing, 'newest')).toBe(other);
+    expect(builds).toBe(1);
   });
 
   it('fetches full rows by id in the requested order', async () => {
