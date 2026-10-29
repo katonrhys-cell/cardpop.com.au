@@ -3,6 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 const mockStream = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/integratedAiClient', () => ({ integratedAiClient: { stream: mockStream } }));
+vi.mock('@/utils/compressImage.js', () => ({ compressImage: vi.fn(async (f) => f) }));
 
 import { useGradeEstimator } from '@/hooks/useGradeEstimator.js';
 

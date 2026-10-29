@@ -32,6 +32,7 @@ export const OUTBOUND_TIMEOUT_MS = Object.freeze({
   aiProxy: 35_000,
   // Anthropic SDK clients (`new Anthropic({ timeout })`), per function budget.
   anthropicShort: 20_000, // supplier price read, inside the 40 s function
+  anthropicGrade: 30_000, // grade estimator vision call (two photos), inside the 40 s function
   anthropicScan: 180_000, // event scan / page extraction, 300 s function
   anthropicDraft: 240_000, // blog draft stream, 300 s function
   // Stripe SDK (`new Stripe(key, { timeout })`); Stripe's default is 80 s.

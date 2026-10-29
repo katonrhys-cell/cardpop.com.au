@@ -56,6 +56,15 @@ const GRADERS = [
     border: 'border-slate-600/30',
     light: 'bg-slate-50 dark:bg-slate-950/30',
   },
+  {
+    key: 'TAG',
+    name: 'TAG',
+    full: 'TAG Grading',
+    color: 'text-emerald-600',
+    bg: 'bg-emerald-600',
+    border: 'border-emerald-600/30',
+    light: 'bg-emerald-50 dark:bg-emerald-950/30',
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -375,7 +384,7 @@ function ResultsView({ result, onReset }) {
           <p className="text-sm text-muted-foreground mb-4">
             AI-generated estimates only. Actual grades may differ. See disclaimer above.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {GRADERS.map((grader) => (
               <GraderCard key={grader.key} grader={grader} gradeData={grades[grader.key]} />
             ))}
@@ -395,7 +404,7 @@ function ResultsView({ result, onReset }) {
             </p>
             <p>
               CardPop Australia Pty Ltd accepts no responsibility or liability for actual grades returned by PSA,
-              BGS, CGC, ACE Grading, SGC, or any other grading company. Grade outcomes depend on physical
+              BGS, CGC, ACE Grading, SGC, TAG, or any other grading company. Grade outcomes depend on physical
               examination, proprietary standards, and grader discretion that cannot be replicated by image
               analysis alone.
             </p>
@@ -439,8 +448,8 @@ const GradeEstimatorPage = () => {
     <div className="min-h-screen bg-background">
       <SEOHead
         title="Card Grade Estimator | CardPop — AI Grading Guide for Australian Collectors"
-        description="Upload photos of your trading card and get AI-powered preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC. A guide only — always consult a professional grader."
-        keywords="card grade estimator, PSA grade estimate, trading card grading australia, BGS estimate, CGC grade, ACE grading australia, card condition checker"
+        description="Upload photos of your trading card and get AI-powered preliminary grade estimates across PSA, BGS, CGC, ACE, SGC and TAG. A guide only — always consult a professional grader."
+        keywords="card grade estimator, PSA grade estimate, trading card grading australia, BGS estimate, CGC grade, ACE grading australia, SGC grade, TAG grading, card condition checker"
       />
 
       {/* Hero */}
@@ -450,7 +459,7 @@ const GradeEstimatorPage = () => {
           <h1 className="text-4xl md:text-5xl font-bold mb-4">Grade Estimator</h1>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
             Upload photos of your trading card and receive AI-generated preliminary grade estimates
-            across five major grading services. A guide to help you self-assess before professional submission.
+            across six major grading services. A guide to help you self-assess before professional submission.
           </p>
         </div>
       </section>
@@ -560,7 +569,7 @@ const GradeEstimatorPage = () => {
                 {[
                   { step: '1', title: 'Upload Photos', body: 'Upload clear photos of your card front and optionally the back for a more complete assessment.' },
                   { step: '2', title: 'AI Analysis', body: 'Our AI examines centering, corners, edges, and surface condition against grading standards for each company.' },
-                  { step: '3', title: 'Review Estimates', body: 'Receive preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC alongside a condition breakdown.' },
+                  { step: '3', title: 'Review Estimates', body: 'Receive preliminary grade estimates across PSA, BGS, CGC, ACE, SGC and TAG alongside a condition breakdown.' },
                 ].map(({ step, title, body }) => (
                   <div key={step} className="bg-card border border-border rounded-2xl p-5">
                     <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-4">

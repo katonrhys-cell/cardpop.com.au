@@ -20,6 +20,7 @@ const FETCH_SITES = [
   'src/utils/ebayClient.js',
   'src/utils/exchangeRates.js',
   'src/utils/ga4Client.js',
+  'src/utils/gradeEstimator.js',
   'src/utils/newsletter.js',
   'src/utils/paypalClient.js',
   'src/utils/psaApiClient.js',
@@ -82,7 +83,7 @@ describe('outbound timeouts', () => {
 
   it('keeps every budget inside the function that runs it', () => {
     const FUNCTION_40S = 40_000;
-    for (const key of ['verify', 'geocode', 'hibp', 'newsletter', 'ebay', 'psa', 'paypal', 'exchangeRate', 'aiProxy', 'anthropicShort', 'stripe']) {
+    for (const key of ['verify', 'geocode', 'hibp', 'newsletter', 'ebay', 'psa', 'paypal', 'exchangeRate', 'aiProxy', 'anthropicShort', 'anthropicGrade', 'stripe']) {
       expect(OUTBOUND_TIMEOUT_MS[key], key).toBeGreaterThan(0);
       expect(OUTBOUND_TIMEOUT_MS[key], key).toBeLessThan(FUNCTION_40S);
     }

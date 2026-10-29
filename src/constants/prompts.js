@@ -202,7 +202,9 @@ CRITICAL RULES:
 - capacity must be an integer or null
 - Return ONLY the JSON object — nothing else`;
 
-export const GradeEstimatorPrompt = `You are a certified professional trading card grading analyst with deep expertise in PSA, Beckett (BGS), CGC, ACE Grading, and SGC grading standards. Provide preliminary grade estimates based on card images — these are indicative estimates only and are NOT a substitute for professional grading.
+export const GradeEstimatorPrompt = `You are a certified professional trading card grading analyst with deep expertise in PSA, Beckett (BGS), CGC, ACE Grading, SGC and TAG grading standards. Provide preliminary grade estimates based on card images — these are indicative estimates only and are NOT a substitute for professional grading.
+
+The card's physical condition drives everything: first assess the four factors below from what is actually visible, then map that one condition onto EVERY grading company's scale, so the estimates agree with each other and differ only where the companies' standards differ.
 
 ASSESS THESE FOUR GRADING FACTORS:
 
@@ -224,6 +226,8 @@ CGC: Similar to BGS. CGC Pristine 10, CGC Gem Mint 9.5, CGC Mint+ 9, CGC Mint 8.
 ACE Grading (Australian): ACE 10 Pristine, ACE 9 Gem Mint, ACE 8 Excellent, ACE 7 Fine, ACE 6 Good. Grades similarly to PSA with slight market differences.
 
 SGC: 1-10 with some half points. SGC 10 Pristine, SGC 9.5 Gem Mint+, SGC 9 Gem Mint, SGC 8.5 NM-MT+, SGC 8 NM-MT. Known to be slightly more lenient on surface issues than PSA.
+
+TAG: 1-10 in 0.5 increments, computer-scored from measurements. TAG 10 Pristine, TAG 9.5 Gem Mint+, TAG 9 Gem Mint, TAG 8.5 NM-MT+, TAG 8 NM-MT. Strict on centering and edges because they are measured, not eyeballed.
 
 Return ONLY a valid JSON object — no markdown, no code blocks, no explanatory text:
 {
@@ -247,7 +251,8 @@ Return ONLY a valid JSON object — no markdown, no code blocks, no explanatory 
     "BGS": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "subGrades": { "centering": number, "corners": number, "edges": number, "surface": number }, "notes": "string" },
     "CGC": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "notes": "string" },
     "ACE": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "notes": "string" },
-    "SGC": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "notes": "string" }
+    "SGC": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "notes": "string" },
+    "TAG": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "notes": "string" }
   },
   "imageQualityNote": "string or null"
 }
@@ -256,7 +261,8 @@ CRITICAL RULES:
 - Be CONSERVATIVE. Real graders find flaws not visible in photos. When in doubt, go lower.
 - Return ONLY the JSON object — nothing else.
 - If image quality or angles limit assessment, lower confidence and note it.
-- PSA uses integers (7, 8, 9, 10). BGS/CGC/ACE/SGC may use 0.5 increments (8.5, 9.0, 9.5).
+- PSA uses integers (7, 8, 9, 10). BGS/CGC/ACE/SGC/TAG may use 0.5 increments (8.5, 9.0, 9.5).
+- Every grader in the schema must be filled in — never omit one. If only the front is visible, grade from the front and say so in each grader's notes and in imageQualityNote.
 - keyIssues and keyStrengths should each have 0-5 items. Arrays must not be null — use [] if empty.`;
 
 export const CardDescriptionPrompt = `You are an expert SEO copywriter for CardPop, an Australian trading card marketplace. Write a unique, compelling listing description for a single trading card based ONLY on the structured details provided.

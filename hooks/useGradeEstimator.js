@@ -1,6 +1,12 @@
 import { useState, useCallback } from 'react';
 import { integratedAiClient } from '@/lib/integratedAiClient';
 import { useIsMounted } from '@/hooks/useIsMounted.js';
+import { compressImage } from '@/utils/compressImage.js';
+
+// Vercel rejects a request body over 4.5 MB before Express runs, and two
+// phone photos are easily 8 MB together. Shrink them in the browser first —
+// 2000 px on the long edge keeps corner and surface detail for the model.
+const GRADE_IMAGE_OPTIONS = { maxDimension: 2000, quality: 0.88, mimeType: 'image/jpeg' };
 
 const SSEEventType = {
   Content: 'content',
@@ -22,9 +28,12 @@ export function useGradeEstimator() {
     setError(null);
 
     try {
+      const images = await Promise.all(
+        Array.from(imageFiles).map((file) => compressImage(file, GRADE_IMAGE_OPTIONS)),
+      );
       const response = await integratedAiClient.stream('/grade-estimator/estimate', {
         body: { message: [{ text: 'Analyse this card.', type: 'text' }] },
-        images: Array.from(imageFiles),
+        images,
       });
 
       const reader = response.body.getReader();
