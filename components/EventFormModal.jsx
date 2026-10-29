@@ -77,6 +77,13 @@ const INITIAL_STATE = {
   ticket_url: '',
   instagram_url: '',
   facebook_url: '',
+  // Organiser's channel / profiles (links only — embedded videos are `videos`).
+  youtube_channel_url: '',
+  tiktok_url: '',
+  x_url: '',
+  discord_url: '',
+  // Where traders book a table.
+  vendor_application_url: '',
   facebook_video_url: '',
   entry_fee_aud: '',
   presale_fee_aud: '',
@@ -302,6 +309,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         ticket_url:          event.ticket_url || '',
         instagram_url:       event.instagram_url || '',
         facebook_url:        event.facebook_url || '',
+        youtube_channel_url: event.youtube_channel_url || '',
+        tiktok_url:          event.tiktok_url || '',
+        x_url:               event.x_url || '',
+        discord_url:         event.discord_url || '',
+        vendor_application_url: event.vendor_application_url || '',
         facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
@@ -482,6 +494,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         instagram_url:       formData.instagram_url.trim() || null,
         facebook_url:        formData.facebook_url.trim() || null,
         youtube_url:         event_videos[0]?.url || null,
+        youtube_channel_url: formData.youtube_channel_url.trim() || null,
+        tiktok_url:          formData.tiktok_url.trim() || null,
+        x_url:               formData.x_url.trim() || null,
+        discord_url:         formData.discord_url.trim() || null,
+        vendor_application_url: formData.vendor_application_url.trim() || null,
         facebook_video_url:  formData.facebook_video_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
@@ -836,6 +853,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Label htmlFor="ticket_url" className="font-bold">Tickets / Registration URL</Label>
                     <Input id="ticket_url" name="ticket_url" type="url" value={formData.ticket_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
                   </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
+                    <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                    <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a trader table" on the event page until the event has passed.</p>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="instagram_url" className="font-bold">Instagram URL</Label>
                     <Input id="instagram_url" name="instagram_url" type="url" value={formData.instagram_url} onChange={handleChange} className={inputCls} placeholder="https://instagram.com/..." disabled={loading} />
@@ -843,6 +865,23 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="space-y-2">
                     <Label htmlFor="facebook_url" className="font-bold">Facebook URL</Label>
                     <Input id="facebook_url" name="facebook_url" type="url" value={formData.facebook_url} onChange={handleChange} className={inputCls} placeholder="https://facebook.com/..." disabled={loading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="youtube_channel_url" className="font-bold">YouTube Channel URL</Label>
+                    <Input id="youtube_channel_url" name="youtube_channel_url" type="url" value={formData.youtube_channel_url} onChange={handleChange} className={inputCls} placeholder="https://youtube.com/@..." disabled={loading} />
+                    <p className="text-xs text-muted-foreground">The organiser's channel. Videos to embed on the page go in Event Videos on the Details tab.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tiktok_url" className="font-bold">TikTok URL</Label>
+                    <Input id="tiktok_url" name="tiktok_url" type="url" value={formData.tiktok_url} onChange={handleChange} className={inputCls} placeholder="https://tiktok.com/@..." disabled={loading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="x_url" className="font-bold">X (Twitter) URL</Label>
+                    <Input id="x_url" name="x_url" type="url" value={formData.x_url} onChange={handleChange} className={inputCls} placeholder="https://x.com/..." disabled={loading} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="discord_url" className="font-bold">Discord URL</Label>
+                    <Input id="discord_url" name="discord_url" type="url" value={formData.discord_url} onChange={handleChange} className={inputCls} placeholder="https://discord.gg/..." disabled={loading} />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="facebook_video_url" className="font-bold">Facebook Public Post / Reel URL</Label>

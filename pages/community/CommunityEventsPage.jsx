@@ -38,6 +38,7 @@ export const EVENT_CARD_COLUMNS = [
   'is_cardpop_verified', 'is_featured', 'registration_required', 'capacity',
   'tags', 'featured_card_games', 'organizer_name',
   'instagram_url', 'facebook_url', 'youtube_url', 'event_videos', 'facebook_video_url',
+  'youtube_channel_url', 'tiktok_url', 'x_url', 'discord_url', 'vendor_application_url',
   'accessibility_info', 'age_restrictions', 'created_at', 'updated_at',
 ].join(',');
 
