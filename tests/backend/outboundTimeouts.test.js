@@ -83,11 +83,13 @@ describe('outbound timeouts', () => {
 
   it('keeps every budget inside the function that runs it', () => {
     const FUNCTION_40S = 40_000;
-    for (const key of ['verify', 'geocode', 'hibp', 'newsletter', 'ebay', 'psa', 'paypal', 'exchangeRate', 'aiProxy', 'anthropicShort', 'anthropicGrade', 'stripe']) {
+    for (const key of ['verify', 'geocode', 'hibp', 'newsletter', 'ebay', 'psa', 'paypal', 'exchangeRate', 'aiProxy', 'anthropicShort', 'stripe']) {
       expect(OUTBOUND_TIMEOUT_MS[key], key).toBeGreaterThan(0);
       expect(OUTBOUND_TIMEOUT_MS[key], key).toBeLessThan(FUNCTION_40S);
     }
-    for (const key of ['anthropicScan', 'anthropicDraft']) {
+    // These run in their own 300 s functions (api/event-scan.js,
+    // api/blog-generate.js, api/grade-estimate.js).
+    for (const key of ['anthropicScan', 'anthropicDraft', 'anthropicGrade']) {
       expect(OUTBOUND_TIMEOUT_MS[key], key).toBeLessThan(300_000);
     }
   });
