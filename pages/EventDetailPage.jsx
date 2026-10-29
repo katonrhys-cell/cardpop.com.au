@@ -20,7 +20,7 @@ import {
   formatEventLocation,
   buildEventJsonLd,
   buildBreadcrumbJsonLd,
-  buildVideoJsonLd,
+  buildVideoJsonLds,
   toLocalDateStr,
 } from '@/lib/eventSeo.js';
 
@@ -122,7 +122,7 @@ const EventDetailPage = () => {
         description={seoDescription}
         canonicalUrl={`${SITE_URL}/events/${event.slug || event.id}`}
         ogImage={event.image_url || undefined}
-        structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event), buildVideoJsonLd(event)].filter(Boolean)}
+        structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event), ...buildVideoJsonLds(event)].filter(Boolean)}
       />
 
       <div className="flex-1 container-default py-12 w-full">

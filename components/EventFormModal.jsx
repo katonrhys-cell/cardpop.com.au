@@ -16,6 +16,8 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
+import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
+import { cleanEventVideos, emptyVideo } from '@/utils/eventVideos.js';
 import { cleanGalleryAlbums, flattenGalleryAlbums } from '@/utils/eventGallery.js';
 import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
 import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
@@ -75,7 +77,6 @@ const INITIAL_STATE = {
   ticket_url: '',
   instagram_url: '',
   facebook_url: '',
-  youtube_url: '',
   facebook_video_url: '',
   entry_fee_aud: '',
   presale_fee_aud: '',
@@ -171,6 +172,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
   // { url } (saved) or { file, preview } (uploaded on save).
   const [gallery, setGallery] = useState([]);
+  // [{ title, url }] — YouTube videos in display order (utils/eventVideos.js).
+  const [videos, setVideos] = useState([]);
   const fileInputRef = useRef(null);
   // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
   // existing watch's on/off state replaces the default once it loads.
@@ -299,7 +302,6 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         ticket_url:          event.ticket_url || '',
         instagram_url:       event.instagram_url || '',
         facebook_url:        event.facebook_url || '',
-        youtube_url:         event.youtube_url || '',
         facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
@@ -316,6 +318,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setImagePreview(event.image_url || null);
       setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
         .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
+      setVideos(cleanEventVideos(event.event_videos, event.youtube_url).map(v => ({ title: v.title, url: v.url })));
       setActiveTab('details');
 
       if (!isUserMode) {
@@ -338,6 +341,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     }
 
     if (!event?.id || scrapedData) setGallery([emptyAlbum()]);
+    if (!event?.id || scrapedData) setVideos([emptyVideo()]);
     setImageFile(null);
     setRemoveExistingImage(false);
 
@@ -439,6 +443,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       // gallery_images stays the flattened copy of every album.
       const gallery_images = flattenGalleryAlbums(gallery_albums);
 
+      // Videos: the list is the source of truth; youtube_url stays the first
+      // video's URL for readers that predate the list (SEO, older clients).
+      const event_videos = cleanEventVideos(videos).map(v => ({ title: v.title, url: v.url }));
+
       const payload = {
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
@@ -453,6 +461,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         image_url,
         gallery_images,
         gallery_albums,
+        event_videos,
         // Venue
         venue_name:          formData.venue_name.trim() || null,
         address:             formData.address.trim() || null,
@@ -472,7 +481,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         ticket_url:          formData.ticket_url.trim() || null,
         instagram_url:       formData.instagram_url.trim() || null,
         facebook_url:        formData.facebook_url.trim() || null,
-        youtube_url:         formData.youtube_url.trim() || null,
+        youtube_url:         event_videos[0]?.url || null,
         facebook_video_url:  formData.facebook_video_url.trim() || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
@@ -733,6 +742,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 </div>
 
                 <EventGalleryEditor value={gallery} onChange={setGallery} disabled={loading} />
+
+                <EventVideosEditor value={videos} onChange={setVideos} disabled={loading} />
               </TabsContent>
 
               {/* ── TAB 2: VENUE & DATES ── */}
@@ -834,14 +845,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Input id="facebook_url" name="facebook_url" type="url" value={formData.facebook_url} onChange={handleChange} className={inputCls} placeholder="https://facebook.com/..." disabled={loading} />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
-                    <Label htmlFor="youtube_url" className="font-bold">YouTube Video URL</Label>
-                    <Input id="youtube_url" name="youtube_url" type="url" value={formData.youtube_url} onChange={handleChange} className={inputCls} placeholder="https://www.youtube.com/watch?v=..." disabled={loading} />
-                    <p className="text-xs text-muted-foreground">Embedded on the event page and added to its structured data for video SEO.</p>
-                  </div>
-                  <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="facebook_video_url" className="font-bold">Facebook Public Post / Reel URL</Label>
                     <Input id="facebook_video_url" name="facebook_video_url" type="url" value={formData.facebook_video_url} onChange={handleChange} className={inputCls} placeholder="https://www.facebook.com/..." disabled={loading} />
-                    <p className="text-xs text-muted-foreground">Public Facebook video post or Reel — embedded on the event page under "About this event", below the YouTube video when both are set.</p>
+                    <p className="text-xs text-muted-foreground">Public Facebook video post or Reel — embedded on the event page in the Event Videos section (Details tab), after any YouTube videos.</p>
                   </div>
                 </div>
 

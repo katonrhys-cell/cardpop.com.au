@@ -597,6 +597,39 @@ describe('prerender events', () => {
     expect(body).toContain('"image":["https://cdn.test/cover.jpg","https://cdn.test/25-a.jpg","https://cdn.test/24-a.jpg"]');
   });
 
+  it('emits a VideoObject and a link per event video, titled, and skips non-YouTube links', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'video-show', title: 'Video Show', status: 'approved',
+      start_date: '2026-10-01', updated_at: '2026-09-01T00:00:00+00:00',
+      youtube_url: 'https://youtu.be/zzzzzzzzzzz',
+      event_videos: [
+        { title: '2025 recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+        { title: '', url: 'https://youtu.be/abcdefghijk' },
+        { title: 'bad', url: 'https://vimeo.com/1' },
+      ],
+    } };
+    const { body } = await run('/events/video-show');
+    expect(body).toContain('<h2>Event Videos</h2>');
+    expect(body).toContain('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">2025 recap</a>');
+    expect(body).toContain('<a href="https://www.youtube.com/watch?v=abcdefghijk">Watch video 2</a>');
+    expect(body).not.toContain('zzzzzzzzzzz');
+    expect(body).not.toContain('vimeo');
+    expect(body).toContain('"@type":"VideoObject","name":"Video Show — 2025 recap"');
+    expect(body).toContain('"@type":"VideoObject","name":"Video Show — Event Video 2"');
+    expect(body).toContain('"uploadDate":"2026-09-01T00:00:00+00:00"');
+  });
+
+  it('still emits the legacy single youtube_url as one video when the list is empty', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'legacy-video', title: 'Legacy Video', status: 'approved',
+      start_date: '2026-10-01', youtube_url: 'https://youtu.be/dQw4w9WgXcQ',
+    } };
+    const { body } = await run('/events/legacy-video');
+    expect(body).toContain('<h2>Event Video</h2>');
+    expect(body).toContain('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">Watch the event video</a>');
+    expect(body).toContain('"@type":"VideoObject","name":"Legacy Video — Event Video"');
+  });
+
   it('renders a single untitled album without an album heading', async () => {
     state.result = { data: {
       id: UUID, slug: 'one-album', title: 'One Album', status: 'approved',

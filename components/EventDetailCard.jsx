@@ -1,14 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert, History, MessageSquareQuote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { eventTypeStyle, youTubeEmbedUrl, facebookEmbedUrl } from '@/lib/eventSeo.js';
+import { eventTypeStyle, facebookEmbedUrl } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
+import EventVideos from '@/components/events/EventVideos.jsx';
+import { cleanEventVideos } from '@/utils/eventVideos.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
@@ -19,31 +21,15 @@ import { toast } from 'sonner';
 // `isPast` — the event has finished (utils/eventPast.js): the RSVP, ticket
 // and calendar actions give way to a pointer at the reviews section.
 const EventDetailCard = ({ event, isPast = false }) => {
-  const videoEmbedUrl = youTubeEmbedUrl(event.youtube_url);
+  // YouTube videos (utils/eventVideos.js) + the optional Facebook embed, shown
+  // below the photo gallery by EventVideos, which also starts the first one.
+  const videos = cleanEventVideos(event.event_videos, event.youtube_url);
   const fbEmbedUrl = facebookEmbedUrl(event.facebook_video_url);
-  const ytFrameRef = useRef(null);
   // Member ticket code + referral link (lib/eventTicketOffers.js). Finished
   // events show no tickets, so don't ask.
   const ticketOffer = useEventTicketOffer(event.id, { enabled: !isPast });
   const ticketLink = ticketDestination(event, ticketOffer);
   const countTicketClick = () => { if (ticketOffer) recordEventTicketClick(event.id); };
-
-  // Start the YouTube video automatically 10 seconds after the page loads.
-  // Uses the iframe player API via postMessage (enabled by ?enablejsapi=1 on
-  // the embed src) rather than swapping in an autoplay URL, so the frame never
-  // reloads — a visitor who already pressed play keeps watching uninterrupted.
-  // Muted first: browsers block programmatic autoplay with sound.
-  useEffect(() => {
-    if (!videoEmbedUrl) return;
-    const timer = setTimeout(() => {
-      const win = ytFrameRef.current?.contentWindow;
-      if (!win) return;
-      ['mute', 'playVideo'].forEach((func) =>
-        win.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*'),
-      );
-    }, 10_000);
-    return () => clearTimeout(timer);
-  }, [videoEmbedUrl]);
 
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
@@ -139,6 +125,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
               );
             })()}
 
+            {(videos.length > 0 || fbEmbedUrl) && (
+              <div className="mt-10">
+                <EventVideos videos={videos} fbEmbedUrl={fbEmbedUrl} eventName={event.name} />
+              </div>
+            )}
+
             <InArticleAd className="my-10" />
 
             {event.accessibility_info && (
@@ -163,38 +155,6 @@ const EventDetailCard = ({ event, isPast = false }) => {
               </div>
             )}
 
-            {(videoEmbedUrl || fbEmbedUrl) && (
-              <div className="mt-10">
-                <h2 className="font-serif text-2xl font-bold mb-4">{videoEmbedUrl && fbEmbedUrl ? 'Event Videos' : 'Event Video'}</h2>
-                {videoEmbedUrl && (
-                  <div className="aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md">
-                    <iframe
-                      ref={ytFrameRef}
-                      src={`${videoEmbedUrl}?enablejsapi=1`}
-                      title={`${event.name} — event video`}
-                      className="w-full h-full"
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-                {fbEmbedUrl && (
-                  <div className={`aspect-video w-full overflow-hidden rounded-2xl border border-border bg-muted shadow-md ${videoEmbedUrl ? 'mt-6' : ''}`}>
-                    <iframe
-                      src={fbEmbedUrl}
-                      title={`${event.name} — Facebook video`}
-                      className="w-full h-full"
-                      loading="lazy"
-                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                      referrerPolicy="strict-origin-when-cross-origin"
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Sidebar Details */}

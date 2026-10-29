@@ -91,6 +91,70 @@ describe('EventDetailCard — video embeds', () => {
   });
 });
 
+describe('EventDetailCard — event video list', () => {
+  const videos = [
+    { title: '2025 recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+    { title: '', url: 'https://youtu.be/abcdefghijk' },
+    { title: 'Not a video', url: 'https://vimeo.com/123' },
+  ];
+
+  it('embeds every YouTube video from event_videos, titled, in order, and skips non-YouTube links', () => {
+    renderCard({ ...baseEvent, event_videos: videos });
+    expect(screen.getByText('Event Videos')).toBeInTheDocument();
+    expect(screen.getByText('(2)')).toBeInTheDocument();
+    const first = screen.getByTitle('Test Card Show — 2025 recap');
+    const second = screen.getByTitle('Test Card Show — event video 2');
+    expect(first.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?enablejsapi=1');
+    expect(second.getAttribute('src')).toBe('https://www.youtube-nocookie.com/embed/abcdefghijk?enablejsapi=1');
+    expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByText('2025 recap')).toBeInTheDocument();
+    expect(screen.queryByTitle(/Not a video/)).not.toBeInTheDocument();
+  });
+
+  it('prefers event_videos over the legacy youtube_url, and falls back to it when the list is empty', () => {
+    const { unmount } = renderCard({ ...baseEvent, youtube_url: 'https://youtu.be/zzzzzzzzzzz', event_videos: videos.slice(0, 1) });
+    expect(screen.getByTitle('Test Card Show — 2025 recap')).toBeInTheDocument();
+    expect(screen.queryByTitle(/event video/)).not.toBeInTheDocument();
+    unmount();
+    renderCard({ ...baseEvent, youtube_url: 'https://youtu.be/zzzzzzzzzzz', event_videos: [] });
+    expect(screen.getByText('Event Video')).toBeInTheDocument();
+    expect(screen.getByTitle('Test Card Show — event video').getAttribute('src')).toContain('/embed/zzzzzzzzzzz');
+  });
+
+  it('puts the videos directly below the photo gallery, with the Facebook embed last', () => {
+    renderCard({
+      ...baseEvent,
+      gallery_albums: [{ title: '', images: ['https://example.com/a.jpg'] }],
+      event_videos: videos.slice(0, 1),
+      facebook_video_url: 'https://www.facebook.com/reel/123',
+      accessibility_info: 'Step-free entry',
+    });
+    const photos = screen.getByRole('heading', { name: 'Event Photos' });
+    const vids = screen.getByRole('heading', { name: 'Event Videos' });
+    const access = screen.getByText('Accessibility');
+    expect(photos.compareDocumentPosition(vids) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(vids.compareDocumentPosition(access) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const yt = screen.getByTitle('Test Card Show — 2025 recap');
+    const fb = screen.getByTitle('Test Card Show — Facebook video');
+    expect(yt.compareDocumentPosition(fb) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('only starts the first video automatically', () => {
+    vi.useFakeTimers();
+    renderCard({ ...baseEvent, event_videos: videos.slice(0, 2) });
+    const first = screen.getByTitle('Test Card Show — 2025 recap');
+    const second = screen.getByTitle('Test Card Show — event video 2');
+    const post1 = vi.fn();
+    const post2 = vi.fn();
+    Object.defineProperty(first, 'contentWindow', { value: { postMessage: post1 }, configurable: true });
+    Object.defineProperty(second, 'contentWindow', { value: { postMessage: post2 }, configurable: true });
+    act(() => { vi.advanceTimersByTime(10_000); });
+    expect(post1).toHaveBeenCalledTimes(2);
+    expect(post2).not.toHaveBeenCalled();
+    vi.useRealTimers();
+  });
+});
+
 describe('EventDetailCard — YouTube 10s autoplay', () => {
   afterEach(() => {
     vi.useRealTimers();
