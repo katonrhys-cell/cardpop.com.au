@@ -522,6 +522,20 @@ const ShopDropdown = ({ onNavigate }) => {
   );
 };
 
+// Column heading of the Community mega-menu — a link to the section's index
+// page (Community Hub / full event calendar / The Parallel Report), so the
+// heading itself takes the reader there rather than a separate "see all" row.
+const CommunityColumnHeading = ({ to, children, onClick, className = '' }) => (
+  <Link
+    to={to}
+    onClick={onClick}
+    className={`group/heading flex items-center gap-1 px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground hover:text-primary transition-colors ${className}`}
+  >
+    {children}
+    <ArrowRight className="w-3 h-3 opacity-0 -translate-x-0.5 group-hover/heading:opacity-100 group-hover/heading:translate-x-0 transition-all" aria-hidden="true" />
+  </Link>
+);
+
 // ─── Community mega-dropdown ──────────────────────────────────────────────────
 // Also hosts Events and the blog ("The Parallel Report") since the top-level
 // nav was consolidated to five sections.
@@ -563,7 +577,7 @@ const CommunityDropdown = ({ onNavigate }) => {
           </Link>
           <div className="p-3 grid grid-cols-2 gap-x-3">
             <div className="grid gap-0.5 content-start">
-              <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Community</p>
+              <CommunityColumnHeading to="/community" onClick={() => { setOpen(false); onNavigate?.(); }}>Community</CommunityColumnHeading>
               {COMMUNITY_ITEMS.map(item => (
                 <Link
                   key={item.label}
@@ -585,7 +599,7 @@ const CommunityDropdown = ({ onNavigate }) => {
               ))}
             </div>
             <div className="grid gap-0.5 content-start">
-              <p className="px-3 pt-1 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Events</p>
+              <CommunityColumnHeading to="/events" onClick={() => { setOpen(false); onNavigate?.(); }}>Events</CommunityColumnHeading>
               {EVENT_ITEMS.map(item => (
                 <Link
                   key={item.href}
@@ -602,16 +616,9 @@ const CommunityDropdown = ({ onNavigate }) => {
                   </div>
                 </Link>
               ))}
-              <Link
-                to="/events"
-                onClick={() => { setOpen(false); onNavigate?.(); }}
-                className="px-3 py-2 text-[13px] font-semibold text-primary hover:underline"
-              >
-                Full event calendar →
-              </Link>
               {settings.enable_blog !== false && (
                 <>
-                  <p className="px-3 pt-2 pb-1.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Reads</p>
+                  <CommunityColumnHeading to="/blog" className="mt-1" onClick={() => { setOpen(false); onNavigate?.(); }}>Reads</CommunityColumnHeading>
                   <Link
                     to="/blog"
                     onClick={() => { setOpen(false); onNavigate?.(); }}
