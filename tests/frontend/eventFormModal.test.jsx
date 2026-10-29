@@ -52,6 +52,18 @@ describe('EventFormModal — user/admin field parity', () => {
     expect(screen.queryByLabelText(/YouTube Video URL/i)).not.toBeInTheDocument();
   });
 
+  it('collects the organiser links on the Organiser tab', () => {
+    renderForm('admin');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Organiser' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Organiser' }));
+    for (const label of [
+      'Event Website', 'Tickets / Registration URL', 'Trader / Vendor Applications URL',
+      'Instagram URL', 'Facebook URL', 'YouTube Channel URL', 'TikTok URL', 'X (Twitter) URL', 'Discord URL',
+    ]) {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    }
+  });
+
   it('flags a non-YouTube video link and adds / removes video rows', () => {
     renderForm('admin');
     const url = screen.getByLabelText('Video 1 YouTube URL');

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Accessibility, ShieldAlert, History, MessageSquareQuote } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { eventTypeStyle, facebookEmbedUrl } from '@/lib/eventSeo.js';
@@ -266,10 +266,18 @@ const EventDetailCard = ({ event, isPast = false }) => {
               </Button>
 
               <AddToCalendarButton event={event} />
+
+              {event.vendor_application_url && (
+                <Button variant="outline" className="w-full h-12 border-border hover:bg-muted font-bold" asChild>
+                  <a href={event.vendor_application_url} target="_blank" rel="noopener noreferrer">
+                    <Store className="w-5 h-5 mr-2" /> Apply for a trader table
+                  </a>
+                </Button>
+              )}
             </div>
             )}
 
-            {(event.instagram_url || event.facebook_url || event.website_url) && (
+            {(event.instagram_url || event.facebook_url || event.youtube_channel_url || event.tiktok_url || event.x_url || event.discord_url || event.website_url) && (
               <div className="pt-6 border-t border-border">
                 <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Follow the Organiser</p>
                 <div className="flex flex-col gap-2">
@@ -284,6 +292,34 @@ const EventDetailCard = ({ event, isPast = false }) => {
                     <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
                       <a href={event.facebook_url} target="_blank" rel="noopener noreferrer">
                         <Facebook className="w-4 h-4 mr-2 text-blue-600" /> Facebook
+                      </a>
+                    </Button>
+                  )}
+                  {event.youtube_channel_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.youtube_channel_url} target="_blank" rel="noopener noreferrer">
+                        <Youtube className="w-4 h-4 mr-2 text-red-600" /> YouTube
+                      </a>
+                    </Button>
+                  )}
+                  {event.tiktok_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.tiktok_url} target="_blank" rel="noopener noreferrer">
+                        <Music2 className="w-4 h-4 mr-2" /> TikTok
+                      </a>
+                    </Button>
+                  )}
+                  {event.x_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.x_url} target="_blank" rel="noopener noreferrer">
+                        <Twitter className="w-4 h-4 mr-2" /> X (Twitter)
+                      </a>
+                    </Button>
+                  )}
+                  {event.discord_url && (
+                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
+                      <a href={event.discord_url} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="w-4 h-4 mr-2 text-indigo-500" /> Discord
                       </a>
                     </Button>
                   )}
