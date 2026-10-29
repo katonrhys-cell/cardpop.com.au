@@ -551,6 +551,24 @@ describe('prerender events', () => {
     expect(body).toContain('"performer":{"@type":"Organization"');
     expect(body).toContain('https://cardpop.com.au/og-image.jpg');
     expect(body).toContain('"description":"Melbourne Card Expo at Royal Exhibition Building, Carlton, VIC on 2026-08-01');
+    // No event has a cover yet → the landing still carries the site tile as
+    // its og:image, so Search Console / link previews show a thumbnail.
+    expect(body).toContain('<meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />');
+  });
+
+  it('uses the next event cover as the landing og:image and lists each cover', async () => {
+    state.listResult = { data: [
+      { id: UUID, slug: 'no-cover-show', title: 'No Cover Show', start_date: '2026-07-01' },
+      { id: UUID, slug: 'melbourne-card-expo', title: 'Melbourne Card Expo', start_date: '2026-08-01', image_url: 'https://cdn.test/expo.jpg' },
+      { id: UUID, slug: 'sydney-card-fair', title: 'Sydney Card Fair', start_date: '2026-09-01', image_url: '/events/sydney.jpg' },
+    ] };
+    const { status, body } = await run('/events');
+    expect(status).toBe(200);
+    expect(body).toContain('<meta property="og:image" content="https://cdn.test/expo.jpg" />');
+    expect(body).toContain('<meta property="og:image:alt" content="Melbourne Card Expo" />');
+    expect(body).toContain('<img src="https://cdn.test/expo.jpg" alt="Melbourne Card Expo"');
+    expect(body).toContain('<img src="https://cardpop.com.au/events/sydney.jpg" alt="Sydney Card Fair"');
+    expect(body).not.toContain('alt="No Cover Show"');
   });
 
   it('renders a category landing for a known slug', async () => {
@@ -639,6 +657,19 @@ describe('prerender events', () => {
     expect(body).toContain('<h2>Event Photos</h2>');
     expect(body).not.toContain('<h3>');
     expect(body).toContain('alt="One Album photo 1"');
+  });
+
+  it('renders a single titled album under its own heading', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'named-album', title: 'Named Album', status: 'completed',
+      start_date: '2025-10-01',
+      gallery_images: ['https://cdn.test/a.jpg'],
+      gallery_albums: [{ title: 'October 2025', images: ['https://cdn.test/a.jpg'] }],
+    } };
+    const { body } = await run('/events/named-album');
+    expect(body).toContain('<h2>Event Photos</h2>');
+    expect(body).toContain('<h3>October 2025</h3>');
+    expect(body).toContain('alt="Named Album — October 2025 photo 1"');
   });
 
   it('emits GA and presale offers when the event has both prices', async () => {

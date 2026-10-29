@@ -4,9 +4,11 @@ import { EventPhotoGrid } from '@/components/reviews/EventReviewGallery.jsx';
 import { albumLabel } from '@/utils/eventGallery.js';
 
 // The event page's photo gallery, grouped into albums (events.gallery_albums,
-// normalised by cleanGalleryAlbums). One album renders as a plain gallery;
-// more than one adds a row of chips — "2025 (6)", "2024 (12)" — above the
-// grid, and the lightbox cycles within the chosen album.
+// normalised by cleanGalleryAlbums). A single untitled album renders as a
+// plain gallery; a titled album, or more than one, adds a row of chips —
+// "2025 (6)", "2024 (12)" — above the grid (so the name an admin gave a
+// lone album is actually shown), and the lightbox cycles within the chosen
+// album.
 const EventPhotoAlbums = ({ albums = [], eventName = '', title = 'Event Photos', headingId = 'event-photo-gallery' }) => {
   const [selected, setSelected] = useState(0);
   if (albums.length === 0) return null;
@@ -14,6 +16,7 @@ const EventPhotoAlbums = ({ albums = [], eventName = '', title = 'Event Photos',
   const album = albums[index];
   const total = albums.reduce((sum, a) => sum + a.images.length, 0);
   const label = albumLabel(album, index);
+  const showChips = albums.length > 1 || Boolean(album.title);
   const altPrefix = eventName ? `Photo from ${eventName}` : 'Event photo';
   const photos = album.images.map((url, i) => ({
     url,
@@ -28,7 +31,7 @@ const EventPhotoAlbums = ({ albums = [], eventName = '', title = 'Event Photos',
         <span className="text-xs text-muted-foreground">({total})</span>
       </div>
 
-      {albums.length > 1 && (
+      {showChips && (
         <div role="group" aria-label="Photo albums" className="flex flex-wrap gap-2">
           {albums.map((a, i) => {
             const active = i === index;
@@ -52,7 +55,7 @@ const EventPhotoAlbums = ({ albums = [], eventName = '', title = 'Event Photos',
         </div>
       )}
 
-      <EventPhotoGrid key={index} photos={photos} lightboxTitle={albums.length > 1 ? `${label} — ${eventName || title}` : ''} />
+      <EventPhotoGrid key={index} photos={photos} lightboxTitle={showChips ? `${label} — ${eventName || title}` : ''} />
     </section>
   );
 };

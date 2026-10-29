@@ -254,16 +254,28 @@ describe('EventDetailCard — photo gallery', () => {
     expect(open[0].querySelector('img')).toHaveAttribute('src', 'https://example.com/2024-a.jpg');
   });
 
-  it('shows no chips for a single album, and prefers albums over the flat list', () => {
+  it('shows a single titled album\'s name as a chip, and prefers albums over the flat list', () => {
     renderCard({
       ...baseEvent,
       gallery_images: ['https://example.com/stale.jpg'],
       gallery_albums: [{ title: '2025', images: ['https://example.com/a.jpg'] }],
     });
-    expect(screen.queryByRole('group', { name: 'Photo albums' })).not.toBeInTheDocument();
+    const chips = screen.getByRole('group', { name: 'Photo albums' });
+    const chip = within(chips).getByRole('button', { name: /^2025/ });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
     const open = screen.getAllByRole('button', { name: /^Open photo/ });
     expect(open).toHaveLength(1);
     expect(open[0].querySelector('img')).toHaveAttribute('src', 'https://example.com/a.jpg');
+    expect(open[0].querySelector('img')).toHaveAttribute('alt', expect.stringContaining('2025'));
+  });
+
+  it('shows no chips for a single untitled album', () => {
+    renderCard({
+      ...baseEvent,
+      gallery_albums: [{ title: '', images: ['https://example.com/a.jpg'] }],
+    });
+    expect(screen.queryByRole('group', { name: 'Photo albums' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Open photo/ })).toHaveLength(1);
   });
 });
 

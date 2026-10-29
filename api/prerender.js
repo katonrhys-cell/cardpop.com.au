@@ -1355,7 +1355,8 @@ const eventGalleryHtml = (event, name) => {
   const albums = eventGalleryAlbums(event);
   if (albums.length === 0) return '';
   const sections = albums.map((album, i) => {
-    const label = albums.length > 1 ? albumLabel(album, i) : '';
+    // A lone album only gets a heading when the admin named it.
+    const label = albums.length > 1 || album.title ? albumLabel(album, i) : '';
     const figures = album.images.map((url, j) => {
       const alt = `${esc(name)}${label ? ` — ${esc(label)}` : ''} photo ${j + 1}`;
       return `<figure><img src="${esc(url)}" alt="${alt}" loading="lazy" /></figure>`;
@@ -1514,9 +1515,19 @@ async function renderEventsLanding(supabase, categorySlug) {
   const itemsHtml = events.map((ev) => {
     const when = eventDateLine(ev);
     const where = eventLocationLine(ev);
-    return `    <li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}"><strong>${esc(ev.title || 'Event')}</strong></a>`
+    const cover = absUrl(ev.image_url);
+    return `    <li>${cover ? `<img src="${esc(cover)}" alt="${esc(ev.title || 'Event')}" loading="lazy" /> ` : ''}`
+      + `<a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}"><strong>${esc(ev.title || 'Event')}</strong></a>`
       + `${when ? ` — ${esc(when)}` : ''}${where ? ` (${esc(where)})` : ''}</li>`;
   }).join('\n');
+
+  // og:image / twitter:image: the next event's cover, else the site tile.
+  // Search Console's page list and link previews show this thumbnail — with
+  // no image at all the row renders a blank placeholder beside every event
+  // page that has one.
+  const firstCover = events.find((ev) => ev.image_url);
+  const image = firstCover ? absUrl(firstCover.image_url) : `${BASE_URL}/og-image.jpg`;
+  const imageAlt = firstCover ? (firstCover.title || h1) : 'CardPop — trading card events across Australia';
 
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a>${cfg ? ` / ${esc(cfg.h1)}` : ''}</nav>
@@ -1528,7 +1539,7 @@ ${itemsHtml || '    <li>No upcoming events listed right now — check back soon.
   </ul>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, ogImageAlt: imageAlt, jsonLdItems: [breadcrumb, itemList], bodyHtml });
 }
 
 async function renderEvent(supabase, param) {
