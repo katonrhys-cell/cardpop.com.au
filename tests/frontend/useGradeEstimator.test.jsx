@@ -47,6 +47,16 @@ describe('useGradeEstimator', () => {
     expect(result.current.isAnalysing).toBe(false);
   });
 
+  it('posts to the estimator\'s own 300 s function, not the shared 40 s API', async () => {
+    mockStream.mockResolvedValue(streamResponse([
+      sse({ type: 'content', data: { content: '{"psa":9}' } }),
+      sse({ type: 'completed', data: {} }),
+    ]));
+    const { result } = renderHook(() => useGradeEstimator());
+    await act(async () => { await result.current.estimateGrade([file()]); });
+    expect(mockStream).toHaveBeenCalledWith('/estimate', expect.objectContaining({ baseUrl: '/grade-estimate' }));
+  });
+
   it('surfaces an error event from the stream', async () => {
     mockStream.mockResolvedValue(streamResponse([
       sse({ type: 'error', data: { content: 'model overloaded' } }),

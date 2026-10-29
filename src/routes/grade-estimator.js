@@ -5,7 +5,7 @@ import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { toImageBlocks } from '../utils/cardOcr.js';
 import { compressImageBuffer } from '../utils/compressImageBuffer.js';
-import { runGradeEstimate, describeGradeFailure } from '../utils/gradeEstimator.js';
+import { streamGradeEstimate, describeGradeFailure } from '../utils/gradeEstimator.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -23,6 +23,11 @@ function sseWrite(res, type, content) {
 	res.write(`data: ${JSON.stringify({ type, data: { content } })}\n\n`);
 }
 
+// Mounted by api/grade-estimate.js (its own 300 s function, reached at
+// /grade-estimate/estimate) rather than the 40 s api/index.js: a Sonnet
+// vision call that writes six graders' worth of JSON regularly runs past 30 s,
+// and inside the shared function every estimate died on the clock.
+//
 // The photos are sent to the model inline (base64) and never stored: a grade
 // estimate is a one-off read, not a listing.
 async function toCompressedImageBlocks(files) {
@@ -52,12 +57,18 @@ router.post('/estimate', integratedAiRateLimit, requireAuth, uploadFiles({
 	res.setHeader('Cache-Control', 'no-cache');
 	res.setHeader('Connection', 'keep-alive');
 	res.setHeader('X-Accel-Buffering', 'no');
+	// Send the status line now and keep bytes flowing: Cloudflare returns a
+	// 524 for an origin that is silent for 100 s, and a two-photo estimate
+	// can take a minute. An SSE comment is ignored by the hook's parser.
+	res.flushHeaders();
+	res.write(': analysing\n\n');
 
 	try {
 		const imageBlocks = await toCompressedImageBlocks(req.files);
-		const { content } = await runGradeEstimate({ apiKey, imageBlocks });
+		// Forward the reply as it is written — the hook concatenates `content`
+		// events, so the member sees the stream move rather than a spinner.
+		await streamGradeEstimate({ apiKey, imageBlocks, onText: (text) => sseWrite(res, 'content', text) });
 
-		sseWrite(res, 'content', content);
 		sseWrite(res, 'completed', '[COMPLETED]');
 		res.end();
 	} catch (err) {

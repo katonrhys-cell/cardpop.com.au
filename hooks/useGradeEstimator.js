@@ -31,7 +31,10 @@ export function useGradeEstimator() {
       const images = await Promise.all(
         Array.from(imageFiles).map((file) => compressImage(file, GRADE_IMAGE_OPTIONS)),
       );
-      const response = await integratedAiClient.stream('/grade-estimator/estimate', {
+      // Straight to the estimator's own 300 s function (api/grade-estimate.js),
+      // not the 40 s /hcgi/api one — a two-photo estimate takes up to a minute.
+      const response = await integratedAiClient.stream('/estimate', {
+        baseUrl: '/grade-estimate',
         body: { message: [{ text: 'Analyse this card.', type: 'text' }] },
         images,
       });

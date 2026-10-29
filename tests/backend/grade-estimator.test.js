@@ -3,11 +3,11 @@ import express from 'express';
 import request from 'supertest';
 
 const state = vi.hoisted(() => ({ userId: 'user-1', files: [] }));
-const mockRunGradeEstimate = vi.hoisted(() => vi.fn());
+const mockStreamGradeEstimate = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/gradeEstimator.js', async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, runGradeEstimate: mockRunGradeEstimate };
+  return { ...actual, streamGradeEstimate: mockStreamGradeEstimate };
 });
 vi.mock('../../src/utils/compressImageBuffer.js', () => ({
   compressImageBuffer: vi.fn(async (buffer, mimetype) => ({ buffer, contentType: mimetype })),
@@ -64,7 +64,7 @@ describe('POST /estimate', () => {
     const res = await request(app).post('/estimate');
     expect(res.status).toBe(503);
     expect(res.body.error).toMatch(/not configured/i);
-    expect(mockRunGradeEstimate).not.toHaveBeenCalled();
+    expect(mockStreamGradeEstimate).not.toHaveBeenCalled();
   });
 
   it('sends the photos inline as base64 image blocks and streams the grade JSON', async () => {
@@ -73,16 +73,24 @@ describe('POST /estimate', () => {
       { originalname: 'back.png', buffer: Buffer.from('back'), mimetype: 'image/png' },
     ];
     const reply = '{"grades":{"PSA":{"estimate":9}}}';
-    mockRunGradeEstimate.mockResolvedValue({ content: reply, data: JSON.parse(reply) });
+    // The model's reply arrives in pieces; each is forwarded as it lands.
+    mockStreamGradeEstimate.mockImplementation(async ({ onText }) => {
+      onText('{"grades":{"PSA":');
+      onText('{"estimate":9}}}');
+      return { content: reply, data: JSON.parse(reply) };
+    });
 
     const res = await request(app).post('/estimate');
     expect(res.status).toBe(200);
     expect(res.headers['content-type']).toMatch(/text\/event-stream/);
     expect(res.headers['cache-control']).toMatch(/no-cache/);
-    expect(res.text).toContain(`data: ${JSON.stringify({ type: 'content', data: { content: reply } })}`);
+    // Headers are flushed with a comment first so the proxy sees bytes at once.
+    expect(res.text.startsWith(': analysing\n\n')).toBe(true);
+    expect(res.text).toContain(`data: ${JSON.stringify({ type: 'content', data: { content: '{"grades":{"PSA":' } })}`);
+    expect(res.text).toContain(`data: ${JSON.stringify({ type: 'content', data: { content: '{"estimate":9}}}' } })}`);
     expect(res.text).toContain('"type":"completed"');
 
-    const { apiKey, imageBlocks } = mockRunGradeEstimate.mock.calls[0][0];
+    const { apiKey, imageBlocks } = mockStreamGradeEstimate.mock.calls[0][0];
     expect(apiKey).toBe('test-key');
     expect(imageBlocks).toEqual([
       { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: Buffer.from('front').toString('base64') } },
@@ -91,7 +99,7 @@ describe('POST /estimate', () => {
   });
 
   it('turns a provider failure into a safe SSE error, never the raw message', async () => {
-    mockRunGradeEstimate.mockRejectedValue(new Error('Anthropic API error 400: Your credit balance is too low'));
+    mockStreamGradeEstimate.mockRejectedValue(new Error('Anthropic API error 400: Your credit balance is too low'));
 
     const res = await request(app).post('/estimate');
     expect(res.status).toBe(200);
@@ -113,6 +121,48 @@ describe('gradeEstimator helpers', () => {
     const { parseGradeJson } = await import('../../src/utils/gradeEstimator.js');
     expect(parseGradeJson('Here you go:\n{"grades":{"PSA":{"estimate":8}}}\nDone.')).toEqual({ grades: { PSA: { estimate: 8 } } });
     expect(parseGradeJson('nothing')).toBeNull();
+  });
+
+  it('parseAnthropicSseChunk collects text deltas and keeps a trailing partial event', async () => {
+    const { parseAnthropicSseChunk } = await import('../../src/utils/gradeEstimator.js');
+    const chunk = [
+      'event: message_start\ndata: {"type":"message_start"}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\"gr"}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"ades\\":"}}\n\n',
+      'event: content_block_delta\ndata: {"type":"content_block_de',
+    ].join('');
+    const { texts, rest, error } = parseAnthropicSseChunk(chunk);
+    expect(texts).toEqual(['{"gr', 'ades":']);
+    expect(rest).toBe('event: content_block_delta\ndata: {"type":"content_block_de');
+    expect(error).toBeNull();
+    expect(parseAnthropicSseChunk('event: error\ndata: {"type":"error","error":{"message":"overloaded_error"}}\n\n').error).toBe('overloaded_error');
+  });
+
+  it('streamGradeEstimate forwards deltas as they arrive and returns the parsed grades', async () => {
+    // The module mock above swaps streamGradeEstimate for a stub; this case
+    // exercises the real one.
+    const { streamGradeEstimate } = await vi.importActual('../../src/utils/gradeEstimator.js');
+    const enc = new TextEncoder();
+    const events = [
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"{\\"grades\\":{\\"PSA\\":"}}\n\n',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"{\\"estimate\\":8}}}"}}\n\n',
+      'data: {"type":"message_stop"}\n\n',
+    ];
+    const body = new ReadableStream({
+      start(controller) { for (const e of events) controller.enqueue(enc.encode(e)); controller.close(); },
+    });
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true, body });
+    try {
+      const seen = [];
+      const out = await streamGradeEstimate({ apiKey: 'k', imageBlocks: [], onText: (t) => seen.push(t) });
+      expect(seen).toEqual(['{"grades":{"PSA":', '{"estimate":8}}}']);
+      expect(out.data).toEqual({ grades: { PSA: { estimate: 8 } } });
+      const [, init] = fetchSpy.mock.calls[0];
+      expect(JSON.parse(init.body).stream).toBe(true);
+      expect(init.signal).toBeInstanceOf(AbortSignal);
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 
   it('buildGradePromptText tells the model when the back is missing', async () => {
