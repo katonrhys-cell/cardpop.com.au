@@ -49,3 +49,34 @@ export default function EventOrganiserLogo({ event, className = '' }) {
     </figure>
   );
 }
+
+// The 40 px tile beside "Organiser" in Event Details: the logo in place of the
+// generic people icon, which `fallback` supplies for events with no logo (or
+// whose logo fails to load). A video loop plays muted here too.
+export function EventOrganiserLogoTile({ event, fallback = null, className = '' }) {
+  const url = safeLogoUrl(event?.organizer_logo_url);
+  const [failed, setFailed] = useState(false);
+  if (!url || failed) return fallback;
+  const alt = logoAltText(event);
+  const cls = 'w-10 h-10 rounded-xl object-contain bg-white border border-border shrink-0';
+  return isVideoLogoUrl(url) ? (
+    <video
+      src={publicVideoUrl(url)}
+      autoPlay muted loop playsInline
+      aria-label={alt}
+      onError={() => setFailed(true)}
+      className={`${cls} ${className}`}
+      data-testid="organiser-logo-tile-video"
+    />
+  ) : (
+    <img
+      src={publicImageUrl(url)}
+      alt={alt}
+      loading="lazy"
+      decoding="async"
+      onError={() => setFailed(true)}
+      className={`${cls} ${className}`}
+      data-testid="organiser-logo-tile"
+    />
+  );
+}

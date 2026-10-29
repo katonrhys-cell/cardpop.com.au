@@ -10,7 +10,7 @@ import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import EventVideos from '@/components/events/EventVideos.jsx';
-import EventOrganiserLogo from '@/components/events/EventOrganiserLogo.jsx';
+import EventOrganiserLogo, { EventOrganiserLogoTile } from '@/components/events/EventOrganiserLogo.jsx';
 import { safeLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
@@ -218,9 +218,14 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
               {event.organizer_name && (
                 <div className="flex gap-4 items-start">
-                  <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-                    <Users className="w-5 h-5 text-primary" />
-                  </div>
+                  <EventOrganiserLogoTile
+                    event={event}
+                    fallback={(
+                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                        <Users className="w-5 h-5 text-primary" />
+                      </div>
+                    )}
+                  />
                   <div>
                     <p className="font-bold text-foreground">Organiser</p>
                     <p className="text-muted-foreground leading-snug">{event.organizer_name}</p>

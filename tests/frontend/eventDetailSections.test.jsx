@@ -78,6 +78,18 @@ describe('EventDetailCard — organiser logo', () => {
     expect(h1.parentElement.parentElement).toContainElement(logo);
   });
 
+  it('uses the logo as the Organiser row tile in Event Details, and the people icon without one', () => {
+    const { unmount } = renderCard({ ...baseEvent, organizer_name: 'Collect-It Con', organizer_logo_url: 'https://cdn.test/logo.gif' });
+    const tile = screen.getByTestId('organiser-logo-tile');
+    expect(tile).toHaveAttribute('src', 'https://cdn.test/logo.gif');
+    expect(tile.closest('div')).toContainElement(screen.getByText('Organiser'));
+    unmount();
+
+    renderCard({ ...baseEvent, organizer_name: 'Collect-It Con' });
+    expect(screen.queryByTestId('organiser-logo-tile')).not.toBeInTheDocument();
+    expect(screen.getByText('Organiser')).toBeInTheDocument();
+  });
+
   it('plays a video loop muted and inline, never as an <img>', () => {
     renderCard({ ...baseEvent, organizer_logo_url: 'https://cdn.test/logo.mp4' });
     const video = screen.getByTestId('organiser-logo-video');
