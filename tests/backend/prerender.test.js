@@ -551,6 +551,24 @@ describe('prerender events', () => {
     expect(body).toContain('"performer":{"@type":"Organization"');
     expect(body).toContain('https://cardpop.com.au/og-image.jpg');
     expect(body).toContain('"description":"Melbourne Card Expo at Royal Exhibition Building, Carlton, VIC on 2026-08-01');
+    // No event has a cover yet → the landing still carries the site tile as
+    // its og:image, so Search Console / link previews show a thumbnail.
+    expect(body).toContain('<meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />');
+  });
+
+  it('uses the next event cover as the landing og:image and lists each cover', async () => {
+    state.listResult = { data: [
+      { id: UUID, slug: 'no-cover-show', title: 'No Cover Show', start_date: '2026-07-01' },
+      { id: UUID, slug: 'melbourne-card-expo', title: 'Melbourne Card Expo', start_date: '2026-08-01', image_url: 'https://cdn.test/expo.jpg' },
+      { id: UUID, slug: 'sydney-card-fair', title: 'Sydney Card Fair', start_date: '2026-09-01', image_url: '/events/sydney.jpg' },
+    ] };
+    const { status, body } = await run('/events');
+    expect(status).toBe(200);
+    expect(body).toContain('<meta property="og:image" content="https://cdn.test/expo.jpg" />');
+    expect(body).toContain('<meta property="og:image:alt" content="Melbourne Card Expo" />');
+    expect(body).toContain('<img src="https://cdn.test/expo.jpg" alt="Melbourne Card Expo"');
+    expect(body).toContain('<img src="https://cardpop.com.au/events/sydney.jpg" alt="Sydney Card Fair"');
+    expect(body).not.toContain('alt="No Cover Show"');
   });
 
   it('renders a category landing for a known slug', async () => {
