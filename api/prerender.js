@@ -3,6 +3,7 @@ import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd } from '../utils/eventReview.js';
+import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { PAID_TIERS, hasStorefront } from '../config/plans.js';
 import {
@@ -1339,7 +1340,7 @@ const eventIsoDate = (date, time) => {
 const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
-  'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, seo_title, seo_description, ' +
+  'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, organizer_logo_url, seo_title, seo_description, ' +
   'instagram_url, facebook_url, youtube_channel_url, tiktok_url, x_url, discord_url, vendor_application_url, ' +
   'gallery_images, gallery_albums, event_videos, created_at, updated_at';
 
@@ -1429,6 +1430,9 @@ function buildEventLd(event) {
     500,
   );
   const organizerName = event.organizer_name || 'CardPop';
+  // A still/animated image logo is an Organization.logo; a video loop isn't.
+  const organizerLogoUrl = safeLogoUrl(event.organizer_logo_url);
+  const organizerLogo = organizerLogoUrl && !isVideoLogoUrl(organizerLogoUrl) ? organizerLogoUrl : null;
   const startDate = eventIsoDate(event.start_date, event.start_time);
   const endDate = eventIsoDate(event.end_date || event.start_date, event.end_time);
 
@@ -1458,6 +1462,7 @@ function buildEventLd(event) {
     organizer: {
       '@type': 'Organization',
       name: organizerName,
+      ...(organizerLogo ? { logo: organizerLogo } : {}),
       url: event.website_url || canonical,
     },
     // Card shows have no headline act, so the organising entity stands in as
@@ -1564,6 +1569,15 @@ ${itemsHtml || '    <li>No upcoming events listed right now — check back soon.
   return htmlDoc({ title, description, canonical, ogImage: image, ogImageAlt: imageAlt, jsonLdItems: [breadcrumb, itemList], bodyHtml });
 }
 
+// The organiser's logo (events.organizer_logo_url) for a crawler: an image
+// logo as <img>; a video loop is skipped (nothing to index, and the prerender
+// never emits media).
+function organiserLogoHtml(event) {
+  const url = safeLogoUrl(event.organizer_logo_url);
+  if (!url || isVideoLogoUrl(url)) return '';
+  return `<p><img src="${esc(url)}" alt="${esc(logoAltText(event))}" loading="lazy" /></p>`;
+}
+
 async function renderEvent(supabase, param) {
   const byUuid = UUID_RE.test(param);
   let query = supabase.from('events').select(EVENT_FIELDS);
@@ -1618,6 +1632,7 @@ async function renderEvent(supabase, param) {
     ${event.is_free ? '' : ticketPriceLines(event.ticket_prices).map(({ label, price }) => `<li>${esc(label)}: ${esc(price)}</li>`).join('')}
     ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
   </ul>
+  ${organiserLogoHtml(event)}
   ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}
   ${eventGalleryHtml(event, name)}
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
