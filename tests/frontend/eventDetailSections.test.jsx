@@ -55,6 +55,47 @@ describe('EventDetailCard — accessibility & age restriction sections', () => {
   });
 });
 
+describe('EventDetailCard — organiser logo', () => {
+  it('keeps the title full-width and renders no logo when the event has none', () => {
+    renderCard(baseEvent);
+    expect(screen.queryByTestId('organiser-logo')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('organiser-logo-video')).not.toBeInTheDocument();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.parentElement.className).not.toContain('lg:col-span-2');
+  });
+
+  it('puts an image logo beside the title, with the title stopping at the column divider', () => {
+    renderCard({ ...baseEvent, organizer_name: 'Collect-It Con', organizer_logo_url: 'https://cdn.test/logo.gif' });
+    const logo = screen.getByTestId('organiser-logo');
+    expect(logo).toHaveAttribute('src', 'https://cdn.test/logo.gif');
+    expect(logo).toHaveAttribute('alt', 'Collect-It Con logo');
+    expect(screen.getByText('Presented by Collect-It Con')).toBeInTheDocument();
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1.parentElement.className).toContain('lg:col-span-2');
+    expect(h1.parentElement.className).toContain('lg:border-r');
+    // The logo sits in the row's third column, above Event Details.
+    expect(h1.parentElement.parentElement.className).toContain('lg:grid-cols-3');
+    expect(h1.parentElement.parentElement).toContainElement(logo);
+  });
+
+  it('plays a video loop muted and inline, never as an <img>', () => {
+    renderCard({ ...baseEvent, organizer_logo_url: 'https://cdn.test/logo.mp4' });
+    const video = screen.getByTestId('organiser-logo-video');
+    expect(video.tagName).toBe('VIDEO');
+    expect(video).toHaveAttribute('src', 'https://cdn.test/logo.mp4');
+    expect(video.muted).toBe(true);
+    expect(video).toHaveAttribute('loop');
+    expect(video).toHaveAttribute('playsinline');
+    expect(screen.queryByTestId('organiser-logo')).not.toBeInTheDocument();
+  });
+
+  it('ignores a logo that is not an http(s) URL', () => {
+    renderCard({ ...baseEvent, organizer_logo_url: 'javascript:alert(1)' });
+    expect(screen.queryByTestId('organiser-logo')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 }).parentElement.className).not.toContain('lg:col-span-2');
+  });
+});
+
 describe('EventDetailCard — video embeds', () => {
   it('shows no video section when neither URL is set', () => {
     renderCard(baseEvent);

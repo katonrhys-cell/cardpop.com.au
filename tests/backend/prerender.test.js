@@ -596,6 +596,22 @@ describe('prerender events', () => {
     expect(body).not.toContain('noindex');
   });
 
+  it('shows an image organiser logo to bots and puts it on the Organization, but never a video loop', async () => {
+    const base = { id: UUID, slug: 'con', title: 'Collect-It Con', status: 'approved', start_date: '2026-11-14', organizer_name: 'Collect-It' };
+    state.result = { data: { ...base, organizer_logo_url: 'https://cdn.test/logo.gif' } };
+    let { body } = await run('/events/con');
+    expect(body).toContain('<img src="https://cdn.test/logo.gif" alt="Collect-It logo" loading="lazy" />');
+    expect(body).toContain('"organizer":{"@type":"Organization","name":"Collect-It","logo":"https://cdn.test/logo.gif"');
+
+    state.result = { data: { ...base, organizer_logo_url: 'https://cdn.test/logo.mp4' } };
+    ({ body } = await run('/events/con'));
+    expect(body).not.toContain('logo.mp4');
+
+    state.result = { data: { ...base, organizer_logo_url: 'javascript:alert(1)' } };
+    ({ body } = await run('/events/con'));
+    expect(body).not.toContain('javascript:');
+  });
+
   it('renders the photo albums for bots, with gallery photos in the Event image list', async () => {
     state.result = { data: {
       id: UUID, slug: 'hobby-hangout', title: 'Hobby Hangout', status: 'completed',

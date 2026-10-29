@@ -10,6 +10,8 @@ import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import EventVideos from '@/components/events/EventVideos.jsx';
+import EventOrganiserLogo from '@/components/events/EventOrganiserLogo.jsx';
+import { safeLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
@@ -21,6 +23,7 @@ import { toast } from 'sonner';
 // `isPast` — the event has finished (utils/eventPast.js): the RSVP, ticket
 // and calendar actions give way to a pointer at the reviews section.
 const EventDetailCard = ({ event, isPast = false }) => {
+  const hasLogo = Boolean(safeLogoUrl(event?.organizer_logo_url));
   // YouTube videos (utils/eventVideos.js) + the optional Facebook embed, shown
   // below the photo gallery by EventVideos, which also starts the first one.
   const videos = cleanEventVideos(event.event_videos, event.youtube_url);
@@ -82,8 +85,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
           />
         </div>
 
-        {/* Title & type — placed below the image so the poster stays fully visible */}
-        <div className="px-5 pt-5 md:px-10 md:pt-8">
+        {/* Title & type — placed below the image so the poster stays fully visible.
+            With an organiser logo the row splits like the content below it: the
+            title stops at the divider between About This Event and Event Details,
+            and the logo sits in the sidebar column above Event Details. */}
+        <div className={hasLogo ? 'grid lg:grid-cols-3 gap-0' : ''}>
+        <div className={hasLogo ? 'lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
           {(() => {
             const style = eventTypeStyle(event);
             if (style) {
@@ -104,6 +111,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
           <h1 className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight tracking-tight mt-4">
             {event.name}
           </h1>
+        </div>
+        {hasLogo && (
+          <div className="px-5 pt-5 md:px-10 md:pt-8 lg:bg-muted/20 flex items-center justify-center lg:justify-center">
+            <EventOrganiserLogo event={event} />
+          </div>
+        )}
         </div>
 
         {/* Content Split */}

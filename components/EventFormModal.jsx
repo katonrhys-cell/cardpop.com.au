@@ -23,6 +23,8 @@ import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
 import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
 import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx';
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
+import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
+import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -169,6 +171,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [removeExistingImage, setRemoveExistingImage] = useState(false);
+  // Organiser logo (Organiser tab): a picked file waiting to upload, its
+  // preview (object URL or the saved URL), and whether to clear a saved one.
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const [logoIsVideo, setLogoIsVideo] = useState(false);
+  const [removeExistingLogo, setRemoveExistingLogo] = useState(false);
+  const logoInputRef = useRef(null);
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
   // { url } (saved) or { file, preview } (uploaded on save).
   const [gallery, setGallery] = useState([]);
@@ -316,6 +325,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         source_url:          event.source_url || '',
       });
       setImagePreview(event.image_url || null);
+      setLogoFile(null);
+      setLogoPreview(event.organizer_logo_url || null);
+      setLogoIsVideo(isVideoLogoUrl(event.organizer_logo_url));
+      setRemoveExistingLogo(false);
       setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
         .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
       setVideos(cleanEventVideos(event.event_videos, event.youtube_url).map(v => ({ title: v.title, url: v.url })));
@@ -337,6 +350,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     } else {
       setFormData(INITIAL_STATE);
       setImagePreview(null);
+      setLogoPreview(null);
+      setLogoIsVideo(false);
       setActiveTab('details');
     }
 
@@ -344,9 +359,27 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     if (!event?.id || scrapedData) setVideos([emptyVideo()]);
     setImageFile(null);
     setRemoveExistingImage(false);
+    setLogoFile(null);
+    setRemoveExistingLogo(false);
 
     return () => { cancelled = true; };
   }, [isOpen, event, scrapedData, isUserMode]);
+
+  const processLogoFile = (file) => {
+    const problem = logoFileError(file);
+    if (problem) { toast.error(problem); return; }
+    setLogoFile(file);
+    setLogoIsVideo(isVideoLogoFile(file));
+    setLogoPreview(URL.createObjectURL(file));
+    setRemoveExistingLogo(false);
+  };
+  const clearLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+    setLogoIsVideo(false);
+    setRemoveExistingLogo(true);
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
 
   const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
 
@@ -419,6 +452,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         image_url = null;
       }
 
+      let organizer_logo_url = event?.organizer_logo_url ?? null;
+      if (logoFile) {
+        organizer_logo_url = await uploadEventOrganiserLogo(logoFile); // throws — don't save without the logo the organiser picked
+      } else if (removeExistingLogo) {
+        organizer_logo_url = null;
+      }
+
       // Gallery photos picked this session go up now, each under its own
       // immutable path; saved ones keep their URL. Album and photo order are
       // the editor's. Empty albums are dropped.
@@ -475,6 +515,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         end_time:            formData.end_time || null,
         // Organiser
         organizer_name:      formData.organizer_name.trim() || null,
+        organizer_logo_url,
         organizer_email:     formData.organizer_email.trim() || null,
         organizer_phone:     formData.organizer_phone.trim() || null,
         website_url:         formData.website_url.trim() || null,
@@ -806,6 +847,37 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Label htmlFor="organizer_name" className="font-bold">Organizer Name</Label>
                     <Input id="organizer_name" name="organizer_name" value={formData.organizer_name} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
+                  <div className="sm:col-span-2 space-y-2">
+                    <Label className="font-bold">Organiser Logo <span className="text-muted-foreground font-normal text-xs">(optional — shown beside the event title, above Event Details)</span></Label>
+                    <div className="border-2 border-dashed rounded-2xl border-border bg-muted/20 hover:bg-muted/40 transition-all">
+                      {logoPreview ? (
+                        <div className="relative p-3 flex items-center justify-center min-h-[7rem]">
+                          {logoIsVideo ? (
+                            <video src={logoPreview} autoPlay muted loop playsInline className="max-h-28 w-auto max-w-full object-contain" aria-label="Organiser logo preview" />
+                          ) : (
+                            <img src={logoPreview} alt="Organiser logo preview" className="max-h-28 w-auto max-w-full object-contain" />
+                          )}
+                          <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow" onClick={clearLogo} aria-label="Remove organiser logo" disabled={loading}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Upload organiser logo — click or press Enter to choose a file"
+                          className="flex flex-col items-center justify-center py-6 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => logoInputRef.current?.click()}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); logoInputRef.current?.click(); } }}
+                        >
+                          <UploadCloud className="w-7 h-7 text-muted-foreground mb-2" aria-hidden="true" />
+                          <p className="text-sm font-semibold text-foreground">Click to upload the organiser's logo</p>
+                          <p className="text-xs text-muted-foreground">PNG, JPG, WebP or GIF — or a short MP4 / WebM loop for a moving logo. Max {LOGO_MAX_LABEL}</p>
+                        </div>
+                      )}
+                      <input type="file" ref={logoInputRef} className="hidden" accept={LOGO_ACCEPT} onChange={e => e.target.files[0] && processLogoFile(e.target.files[0])} disabled={loading} />
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="organizer_email" className="font-bold">Contact Email</Label>
                     <Input id="organizer_email" name="organizer_email" type="email" value={formData.organizer_email} onChange={handleChange} className={inputCls} disabled={loading} />
@@ -949,7 +1021,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
           <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row gap-3 sm:justify-between shrink-0">
             <Button
               type="button" variant="outline"
-              onClick={() => { setFormData(INITIAL_STATE); setImagePreview(null); setImageFile(null); setRemoveExistingImage(true); }}
+              onClick={() => { setFormData(INITIAL_STATE); setImagePreview(null); setImageFile(null); setRemoveExistingImage(true); clearLogo(); }}
               disabled={loading}
               className="rounded-xl font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-transparent hover:border-destructive/20"
             >

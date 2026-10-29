@@ -164,3 +164,35 @@ describe('EventFormModal — ticket prices', () => {
     expect(screen.getByLabelText('Price for the group (AUD)')).toHaveValue(50);
   });
 });
+
+describe('EventFormModal — organiser logo', () => {
+  const openOrganiserTab = () => {
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Organiser' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Organiser' }));
+  };
+
+  it('offers the logo uploader on the Organiser tab in both modes', () => {
+    for (const mode of ['admin', 'user']) {
+      const { unmount } = renderForm(mode);
+      openOrganiserTab();
+      expect(screen.getByText(/Organiser Logo/)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Upload organiser logo/ })).toBeInTheDocument();
+      expect(screen.getByText(/MP4 \/ WebM loop/)).toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("previews an existing event's saved logo and lets it be removed", () => {
+    render(
+      <EventFormModal
+        isOpen={true} onClose={() => {}} scrapedData={null} onSaved={() => {}} mode="user"
+        event={{ id: 'evt-1', title: 'Show', organizer_name: 'Collect-It', organizer_logo_url: 'https://example.com/logo.gif' }}
+      />,
+    );
+    openOrganiserTab();
+    expect(screen.getByAltText('Organiser logo preview')).toHaveAttribute('src', 'https://example.com/logo.gif');
+    fireEvent.click(screen.getByRole('button', { name: 'Remove organiser logo' }));
+    expect(screen.queryByAltText('Organiser logo preview')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload organiser logo/ })).toBeInTheDocument();
+  });
+});
