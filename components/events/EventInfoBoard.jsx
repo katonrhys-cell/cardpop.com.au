@@ -10,7 +10,7 @@ import {
   clampStallPosition,
 } from '@/lib/eventBoard.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
-import { compressImage } from '@/utils/compressImage.js';
+import { uploadEventImage } from '@/utils/uploadEventImage.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -170,14 +170,9 @@ const EventInfoBoard = ({ event }) => {
     if (!file) return;
     setUploadingLayout(true);
     try {
-      const compressed = await compressImage(file);
-      const ext = compressed.name.split('.').pop() || 'jpg';
       // Timestamped path: layout images are immutable uploads (see image-cdn
       // docs) — replacing the plan uploads a new object and repoints the row.
-      const path = `layouts/${eventId}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { cacheControl: '31536000' });
-      if (upErr) throw upErr;
-      const image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
+      const image_url = await uploadEventImage(file, { folder: 'layouts', stem: `${eventId}-${Date.now()}` });
       const { error } = await supabase
         .from('event_stall_layouts')
         .upsert({ event_id: eventId, image_url, updated_by: currentUser.id }, { onConflict: 'event_id' });

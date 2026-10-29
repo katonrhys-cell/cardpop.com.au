@@ -85,8 +85,11 @@ describe('CommunityPage', () => {
     };
     from.mockImplementation((table) => (table === 'events_public'
       ? rowsQuery([
-        { id: 'e1', slug: 'hobby-hangout', event_type: 'card_show', title: 'The Hobby Hangout XL', start_date: '2099-11-01', suburb: 'Eveleigh', state: 'NSW', image_url: 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/1.webp' },
+        // Uploaded after EVENT_THUMBNAILS_SINCE → the tile loads the thumb companion.
+        { id: 'e1', slug: 'hobby-hangout', event_type: 'card_show', title: 'The Hobby Hangout XL', start_date: '2099-11-01', suburb: 'Eveleigh', state: 'NSW', image_url: 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/1793400000000.webp' },
         { id: 'e2', slug: 'no-poster', event_type: 'card_show', title: 'Poster-less Show', start_date: '2099-11-02', suburb: 'Keilor Park', state: 'VIC', image_url: null },
+        // Legacy poster (before the cutoff) → the full image, no 404-chasing.
+        { id: 'e3', slug: 'old-poster', event_type: 'card_show', title: 'Legacy Poster Show', start_date: '2099-11-03', suburb: 'Brisbane', state: 'QLD', image_url: 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/1.webp' },
       ])
       : emptyQuery()));
 
@@ -94,8 +97,12 @@ describe('CommunityPage', () => {
     const withPoster = (await screen.findByText('The Hobby Hangout XL')).closest('a');
     const thumb = withPoster.querySelector('[data-testid="event-thumb"]');
     expect(thumb).toBeTruthy();
-    expect(thumb.getAttribute('src')).toContain('/events/events/1.webp');
+    expect(thumb.getAttribute('src')).toContain('events/1793400000000.thumb.webp');
     expect(thumb.getAttribute('alt')).toBe(''); // decorative — the title is the accessible name
+
+    const legacy = screen.getByText('Legacy Poster Show').closest('a').querySelector('[data-testid="event-thumb"]');
+    expect(legacy.getAttribute('src')).toContain('events/1.webp');
+    expect(legacy.getAttribute('src')).not.toContain('.thumb.webp');
 
     const withoutPoster = screen.getByText('Poster-less Show').closest('a');
     expect(withoutPoster.querySelector('[data-testid="event-thumb"]')).toBeNull();

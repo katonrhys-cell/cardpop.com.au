@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, UploadCloud, X, Wand2, Trash2, Plus, Tag } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient } from '@/lib/apiServerClient.js';
-import { compressImage } from '@/utils/compressImage.js';
+import { uploadEventImage } from '@/utils/uploadEventImage.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
@@ -409,12 +409,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       let image_url = event?.image_url ?? null;
 
       if (imageFile) {
-        const compressed = await compressImage(imageFile);
-        const ext = compressed.name.split('.').pop() || 'jpg';
-        const path = `events/${Date.now()}.${ext}`;
-        const { error: upErr } = await supabase.storage.from('events').upload(path, compressed, { upsert: true, cacheControl: '31536000' });
-        if (upErr) throw upErr; // don't silently save the event without its cover image
-        image_url = supabase.storage.from('events').getPublicUrl(path).data.publicUrl;
+        // Throws on failure — don't silently save the event without its cover
+        // image. Also writes the 480 px thumb the event tiles load.
+        image_url = await uploadEventImage(imageFile, { folder: 'events', stem: `${Date.now()}`, upsert: true });
       } else if (removeExistingImage) {
         image_url = null;
       }
@@ -427,12 +424,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         const images = [];
         for (const [i, photo] of album.photos.entries()) {
           if (photo.url) { images.push(photo.url); continue; }
-          const compressed = await compressImage(photo.file);
-          const ext = compressed.name.split('.').pop() || 'jpg';
-          const path = `events/gallery/${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-          const { error: galErr } = await supabase.storage.from('events').upload(path, compressed, { cacheControl: '31536000' });
-          if (galErr) throw galErr;
-          images.push(supabase.storage.from('events').getPublicUrl(path).data.publicUrl);
+          images.push(await uploadEventImage(photo.file, {
+            folder: 'events/gallery',
+            stem: `${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+          }));
         }
         uploadedAlbums.push({ title: album.title.trim(), images });
       }

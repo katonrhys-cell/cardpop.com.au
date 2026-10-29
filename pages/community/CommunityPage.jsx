@@ -13,7 +13,7 @@ import { COMMUNITY_ITEMS, EVENT_ITEMS, READS_ITEM, badgeStyle } from '@/lib/comm
 import { EVENT_CARD_COLUMNS } from '@/pages/community/CommunityEventsPage.jsx';
 import { BLOG_CARD_COLUMNS } from '@/pages/blog/BlogPage.jsx';
 import { eventPath, formatEventDate, formatEventLocation, eventTypeLabel, eventTypeStyle, toLocalDateStr } from '@/lib/eventSeo.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { isVerified } from '@/utils/verification.js';
 import {
@@ -30,22 +30,22 @@ import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 const TOTAL_SLIDES = 3;
 
 // The little picture on an upcoming-event tile: the event's own poster/logo
-// (`events.image_url`, routed through the image CDN like every stored image),
-// falling back to the event-type icon only when there is no picture or it
-// fails to load. Posters are uploaded without a thumbnail companion, so the
-// browser downscales the full image — fine for a 40 px tile that is cached
-// by the service worker after the first visit.
+// (`events.image_url`, routed through the image CDN like every stored image).
+// Loads the 480 px `.thumb.webp` companion when the upload has one
+// (utils/uploadEventImage.js), falls back to the full poster if the thumb
+// fails, and to the event-type icon only when there is no picture at all or
+// it fails to load.
 function EventThumb({ event, style }) {
-  const src = publicImageUrl(event?.image_url || null);
-  const [failed, setFailed] = useState(false);
-  if (src && !failed) {
+  const full = publicImageUrl(event?.image_url || null);
+  const [src, setSrc] = useState(() => cardThumbUrl(event?.image_url || null));
+  if (src && full) {
     return (
       <img
         src={src}
         alt=""
         loading="lazy"
         decoding="async"
-        onError={() => setFailed(true)}
+        onError={() => setSrc(src !== full ? full : null)}
         className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border bg-muted shadow-sm"
         data-testid="event-thumb"
       />

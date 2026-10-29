@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventTime, formatEventLocation, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import HalfStars from '@/components/reviews/HalfStars.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import { isPastEvent } from '@/utils/eventPast.js';
 
 // `reviewStats` ({ review_count, average_rating }) is the past grid's star
@@ -22,19 +22,22 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
 
   // Posters are stored as canonical Supabase URLs; route them through the
   // image CDN like every other stored image instead of billing Supabase egress.
+  // The 192 px-tall card loads the 480 px thumb companion when the upload has
+  // one (utils/uploadEventImage.js) and falls back to the full poster.
   const rawImageUrl = publicImageUrl(event.image_url || event.image || null);
-  const [imgError, setImgError] = useState(false);
+  const [imgSrc, setImgSrc] = useState(() => cardThumbUrl(event.image_url || event.image || null));
+  const imgError = !imgSrc;
 
   return (
     <Card className="flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group border-border">
       <div className="relative h-48 w-full overflow-hidden bg-muted flex items-center justify-center">
         {rawImageUrl && !imgError ? (
           <img
-            src={rawImageUrl}
+            src={imgSrc}
             alt={eventTitle}
             className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
             loading="lazy"
-            onError={() => setImgError(true)}
+            onError={() => setImgSrc(imgSrc !== rawImageUrl ? rawImageUrl : null)}
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-muted to-muted/60">
