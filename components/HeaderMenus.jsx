@@ -571,7 +571,7 @@ const CommunityDropdown = ({ onNavigate }) => {
           >
             <div>
               <span className="text-sm font-bold text-foreground">Community Hub</span>
-              <p className="text-xs text-muted-foreground mt-0.5">Connect with collectors</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Connect with Collectors</p>
             </div>
             <ArrowRight className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
           </Link>
