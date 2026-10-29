@@ -183,6 +183,22 @@ describe('Header desktop dropdowns — consecutive navigations', () => {
     await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/marketplace'));
   });
 
+  it('Community mega-menu column headings link to their section index pages', async () => {
+    const user = userEvent.setup();
+    renderHeader();
+
+    await user.hover(await screen.findByRole('button', { name: 'Community' }));
+    // The headings are the links; there is no separate "Full event calendar" row.
+    expect(screen.queryByRole('link', { name: /full event calendar/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Community' })).toHaveAttribute('href', '/community');
+    expect(screen.getByRole('link', { name: 'Reads' })).toHaveAttribute('href', '/blog');
+
+    const eventsHeading = screen.getByRole('link', { name: 'Events' });
+    expect(eventsHeading).toHaveAttribute('href', '/events');
+    await user.click(eventsHeading);
+    await waitFor(() => expect(screen.getByTestId('current-path')).toHaveTextContent('/events'));
+  });
+
   it('mouse click on a hover-opened trigger keeps the menu open instead of toggling it shut', async () => {
     const user = userEvent.setup();
     renderHeader();
