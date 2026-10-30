@@ -71,4 +71,11 @@ describe('copy', () => {
     expect(PROTECTION_COPY.notShippedSummary).toContain('45 days after purchase');
     expect(PROTECTION_COPY.shopSummary).toContain('14 days of delivery');
   });
+
+  it('promises the same 7-day refund processing time as the shop policy once a claim is approved', () => {
+    expect(MARKETPLACE_PROTECTION.refundProcessingDays).toBe(7);
+    expect(PROTECTION_COPY.processSummary).toContain('processed within 7 days');
+    expect(PROTECTION_COPY.processSummary).not.toMatch(/5–10/);
+    expect(PROTECTION_COPY.shopSummary).toContain('processed within 7 days');
+  });
 });

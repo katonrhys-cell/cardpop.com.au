@@ -119,6 +119,11 @@ const ReturnsPage = () => {
 
       <h3>How to make a claim</h3>
       <p>{PROTECTION_COPY.processSummary}</p>
+      <p>
+        <strong>Refund processing time:</strong> once your claim is approved, your refund is processed within{' '}
+        {MP.refundProcessingDays} days to your original payment method. Your bank may take a few extra business
+        days to show it on your statement.
+      </p>
 
       <h3>Seller obligations</h3>
       <p>
