@@ -2090,7 +2090,7 @@ const STATIC_CONTENT = {
       { h2: 'What you get back', paras: ['An approved claim refunds everything you paid on the order: the card’s price, the seller’s postage, CardPop’s service fee and the payment-processing fee. Nothing is retained. Example — a $100 card with $10 postage, a $3 service fee and a $2.50 processing fee returns $115.50 AUD.'] },
       { h2: 'When a claim is approved', items: MP.eligibleReasons.map((text) => ({ text })) },
       { h2: 'When a claim isn’t', items: [...MP.ineligibleReasons.map((text) => ({ text })), { text: `Requests made after the window — ${MP.claimWindowDaysFromDelivery} days from delivery, and never more than ${MP.hardCapDaysFromPurchase} days after purchase.` }] },
-      { h2: 'How to make a claim', paras: [PROTECTION_COPY.processSummary] },
+      { h2: 'How to make a claim', paras: [PROTECTION_COPY.processSummary, `Refund processing time: once your claim is approved, your refund is processed within ${MP.refundProcessingDays} days to your original payment method. Your bank may take a few extra business days to show it on your statement.`] },
       { h2: 'Seller obligations', paras: [`Sellers must describe condition and grade accurately, post within ${MP.notShippedClaimAfterDays} days using a tracked service, and carry the risk of a parcel that doesn’t arrive. Where a claim is approved, the seller’s payout for that order is reversed. Repeat misdescription leads to account suspension.`] },
       { h2: 'Disputes', paras: ['If buyer and seller can’t resolve an issue directly, contact CardPop support with the order number and evidence. The team mediates and makes a binding decision within 5 business days.'] },
     ],

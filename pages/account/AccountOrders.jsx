@@ -473,7 +473,7 @@ const AccountOrders = () => {
             {PROTECTION_COPY.marketplaceOneLine} Report a marketplace order within{' '}
             <strong>{MARKETPLACE_PROTECTION.claimWindowDaysFromDelivery} days of delivery</strong> (or after{' '}
             {MARKETPLACE_PROTECTION.notShippedClaimAfterDays} days if it was never posted) and, once approved, the
-            whole order comes back to your original payment method within {MARKETPLACE_PROTECTION.refundArrivalBusinessDays} business
+            whole order is refunded to your original payment method within {MARKETPLACE_PROTECTION.refundProcessingDays}{' '}
             days. {PROTECTION_COPY.marketplaceNoChangeOfMind} CardPop Shop products can be returned within{' '}
             {SHOP_PROTECTION.windowDays} days of delivery for any reason.
           </p>

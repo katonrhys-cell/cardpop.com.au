@@ -41,7 +41,11 @@ export const MARKETPLACE_PROTECTION = Object.freeze({
   changeOfMind: false,
   fullRefund: true,
   reviewBusinessDays: 2,
-  refundArrivalBusinessDays: '5–10',
+  // Once a claim is approved the refund is PROCESSED (issued through Stripe to
+  // the original payment method) within this many days — the same figure as
+  // the Shop policy registered in Google Merchant Center. The buyer's bank may
+  // take a few extra business days to show it; that is not a processing promise.
+  refundProcessingDays: 7,
   eligibleReasons: Object.freeze([
     'The card is significantly not as described (wrong card, wrong condition or grade, undisclosed damage).',
     'The card arrived damaged in transit (photos of the packaging required).',
@@ -149,7 +153,7 @@ export const PROTECTION_COPY = Object.freeze({
   notShippedSummary:
     `Sellers are expected to post within ${MARKETPLACE_PROTECTION.notShippedClaimAfterDays} days. If your order hasn’t been marked as posted by then you can report it as not received, and if a tracked parcel goes missing the seller — not you — carries the loss. No claim can be opened more than ${MARKETPLACE_PROTECTION.hardCapDaysFromPurchase} days after purchase.`,
   processSummary:
-    `Go to My Account → Orders, choose Request Refund on the order, pick the reason and add photos. CardPop reviews every claim within ${MARKETPLACE_PROTECTION.reviewBusinessDays} business days and tells you the outcome by email and in the app. Approved refunds are issued through Stripe and take ${MARKETPLACE_PROTECTION.refundArrivalBusinessDays} business days to appear on your statement.`,
+    `Go to My Account → Orders, choose Request Refund on the order, pick the reason and add photos. CardPop reviews every claim within ${MARKETPLACE_PROTECTION.reviewBusinessDays} business days and tells you the outcome by email and in the app. Once a claim is approved, your refund is processed within ${MARKETPLACE_PROTECTION.refundProcessingDays} days to your original payment method; your bank may take a few extra business days to show it on your statement.`,
   shopSummary:
     `New products bought from the CardPop Shop can be returned or exchanged within ${SHOP_PROTECTION.windowDays} days of delivery for any reason, including change of mind, as long as they’re unused and in their original packaging. You post the item back (a tracked service is recommended); there’s no restocking fee, and your refund is processed within ${SHOP_PROTECTION.refundProcessingDays} days of the return arriving.`,
 });
