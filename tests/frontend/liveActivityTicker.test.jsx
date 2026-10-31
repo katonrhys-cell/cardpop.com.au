@@ -4,7 +4,7 @@ import { render, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { THUMBNAILS_SINCE, THUMB_SUFFIX } from '@/utils/imageUrl.js';
 
-// The live strip shows cards at 36×48 px; it must serve the 480 px companion
+// The live strip shows cards at 80×112 px; it must serve the 480 px companion
 // thumbnail when one exists rather than the full upload. And it must never
 // open a realtime channel: it is rendered to every anonymous visitor of the
 // homepage and marketplace, and the open subscriptions were what kept
