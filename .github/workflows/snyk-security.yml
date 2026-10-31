@@ -1,13 +1,14 @@
 name: Snyk Security Scan
 
-# Scoped to main pushes + a weekly sweep instead of every PR: per-PR dependency
-# scanning is already provided by the Snyk GitHub App (the `security/snyk`
-# status check), so the per-PR workflow run (checkout + npm ci + scan) was
-# redundant and burned Actions minutes / Snyk test quota.
+# Weekly sweep + manual runs only. Per-PR dependency scanning is already
+# provided by the Snyk GitHub App (the `security/snyk` status check on every
+# pull request), and the lockfile only changes through a PR, so a run on every
+# push to main re-scanned the same lockfile the App had just checked — a whole
+# billed Actions minute per merge on a private repo (~45 a month) to repeat a
+# verdict already on the PR. The weekly run keeps the Snyk dashboard
+# (`snyk monitor`) current and catches advisories published against an
+# unchanged lockfile.
 on:
-  push:
-    branches:
-      - main
   schedule:
     - cron: '0 3 * * 1' # Mondays 03:00 UTC
   workflow_dispatch:
@@ -68,7 +69,7 @@ jobs:
           args: --severity-threshold=high
 
       - name: Monitor project in Snyk dashboard
-        if: env.SNYK_TOKEN != '' && github.ref == 'refs/heads/main' && github.event_name == 'push'
+        if: env.SNYK_TOKEN != '' && github.ref == 'refs/heads/main'
         uses: snyk/actions/node@0.4.0
         with:
           command: monitor
