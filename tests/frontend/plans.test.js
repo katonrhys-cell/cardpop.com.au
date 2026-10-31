@@ -15,6 +15,7 @@ import {
   isProTier,
   isProAccount,
   hasStorefront,
+  STOREFRONT_FILTER,
   canListWhatnotShows,
   WHATNOT_SHOW_TIERS,
   TOP_PLAN,
@@ -75,6 +76,14 @@ describe('config/plans', () => {
       expect(PLANS[planKeyFromTier(tier)].limits.storefront).toBe(true);
     });
     expect(PLANS[PLAN_HOBBY].limits.storefront).toBe(false);
+  });
+
+  it('an admin-featured dealer keeps a storefront on the Hobby plan', () => {
+    expect(hasStorefront({ subscriptionTier: 'free', subscriptionStatus: 'none', isFeaturedSeller: true })).toBe(true);
+    expect(hasStorefront({ subscriptionTier: 'free', subscriptionStatus: 'none', isFeaturedSeller: false })).toBe(false);
+    expect(hasStorefront({ subscriptionTier: 'free', subscriptionStatus: 'none', isFeaturedSeller: null })).toBe(false);
+    // The list-query filter admits exactly the same accounts.
+    expect(STOREFRONT_FILTER).toBe('subscription_tier.in.(pro,premium,elite,ultimate),is_featured_seller.eq.true');
   });
 
   it('Whatnot show listing is Premium-and-up only', () => {

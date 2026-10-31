@@ -82,7 +82,11 @@ const SoleTraderStorePage = () => {
         if (profile.is_public === false) throw new Error('This store is private.');
         // Store pages are a paid-membership perk — a Hobby account's store is
         // unavailable (their business details are kept for when they upgrade).
-        if (!hasStorefront({ subscriptionTier: profile.subscription_tier, subscriptionStatus: profile.subscription_status })) {
+        if (!hasStorefront({
+          subscriptionTier: profile.subscription_tier,
+          subscriptionStatus: profile.subscription_status,
+          isFeaturedSeller: profile.is_featured_seller,
+        })) {
           throw new Error('This store is not currently active.');
         }
 

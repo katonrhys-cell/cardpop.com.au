@@ -218,6 +218,13 @@ describe('publicImageUrl', () => {
     const url = 'https://example.com/legacy.jpg';
     expect(publicImageUrl(url)).toBe(url);
   });
+
+  it('serves a site-relative path (a bundled static asset) as-is, not as a storage path', () => {
+    expect(publicImageUrl('/images/stores/cleet-collectables.png')).toBe('/images/stores/cleet-collectables.png');
+    expect(publicImageUrl('/images/stores/cleet-collectables.png', 'avatars')).toBe('/images/stores/cleet-collectables.png');
+    // A protocol-relative URL is not a site path.
+    expect(publicImageUrl('//example.com/x.png')).toContain('//example.com/x.png');
+  });
 });
 
 describe('getCardImage with stored absolute Supabase URLs', () => {

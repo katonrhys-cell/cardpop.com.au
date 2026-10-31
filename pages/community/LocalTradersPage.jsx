@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
-import { PAID_TIERS } from '@/config/plans.js';
+import { STOREFRONT_FILTER } from '@/config/plans.js';
 
 const AU_STATES = [
   { code: 'NSW', label: 'New South Wales' },
@@ -106,9 +106,10 @@ const LocalTradersPage = () => {
       .eq('is_sole_trader', true)
       .eq('is_public', true)
       // Store pages are a paid-membership perk: only Pro-and-above accounts
-      // appear in the directory. Hobby sole traders keep their saved business
-      // details but get no storefront until they upgrade.
-      .in('subscription_tier', PAID_TIERS)
+      // (and admin-featured dealers) appear in the directory. Other Hobby sole
+      // traders keep their saved business details but get no storefront until
+      // they upgrade.
+      .or(STOREFRONT_FILTER)
       // Promoted stores pinned to the top, then by rating.
       .order('is_featured_seller', { ascending: false })
       .order('rating', { ascending: false, nullsFirst: false })

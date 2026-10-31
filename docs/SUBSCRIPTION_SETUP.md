@@ -7,7 +7,10 @@ CardPop has five account plans, defined in `config/plans.js`:
   keeps a **card on file** (so the per-sale/trade fee can always be collected —
   trades have no proceeds to net it from). The card is never charged until a
   sale or trade actually completes. Hobby can create **5 new listings per
-  calendar month** and never gets a storefront.
+  calendar month** and gets no storefront — with one exception: a sole
+  trader an admin has flagged as a **featured seller** (`is_featured_seller`,
+  the homepage Trusted Sellers strip) keeps a live `/dealer` store page on
+  Hobby, since a hand-picked dealer needs a store to send visitors to.
 - **Pro / Premium / Elite / Ultimate** — paid monthly subscriptions
   (**$20 / $40 / $80 / $150 AUD/month**, each with a 30-day free trial and a
   card/PayPal on file). Every paid tier requires ID verification and a Stripe
@@ -258,9 +261,12 @@ marketplace checkout and are reused here.
   `subscriptionTier`; the DB `can_sell()` RLS policy and the
   `enforce_monthly_listing_quota` trigger are the hard enforcement;
   `components/SellingRequirementsNotice.jsx` and the quota toasts
-  (`utils/listingErrors.js`) handle the UX. Store pages are filtered to paid
-  tiers in `pages/community/LocalTradersPage.jsx`, `pages/SoleTraderStorePage.jsx`,
-  `api/prerender.js` and `api/sitemap.js`.
+  (`utils/listingErrors.js`) handle the UX. Store pages are gated by
+  `hasStorefront()` (paid tier, entitled status, or admin-featured) in
+  `components/FeaturedSellerCard.jsx`, `pages/SoleTraderStorePage.jsx` and
+  `api/prerender.js`; the list queries in `pages/community/LocalTradersPage.jsx`,
+  `api/sitemap.js` and the prerendered directory use the matching
+  `STOREFRONT_FILTER` from `config/plans.js` — change the two together.
 
 > To collect the card strictly **during** registration, disable "Confirm email"
 > in Supabase Auth so `signUp()` returns a session. Otherwise the card step

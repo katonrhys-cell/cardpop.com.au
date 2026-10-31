@@ -14,6 +14,7 @@ vi.mock('@supabase/supabase-js', () => {
       eq: vi.fn(() => b),
       neq: vi.fn(() => b),
       in: vi.fn(() => b),
+      or: vi.fn(() => b),
       gt: vi.fn(() => b),
       gte: vi.fn(() => b),
       like: vi.fn(() => b),
@@ -876,6 +877,17 @@ describe('prerender seller profiles', () => {
     expect(status).toBe(200);
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/dealer/poke-den" />');
     expect(body).not.toContain('noindex');
+  });
+
+  it('canonicalises an admin-FEATURED Hobby sole trader to their dealer store page', async () => {
+    state.result = { data: {
+      id: UUID, display_name: 'Poke Den', business_name: 'Poke Den',
+      store_slug: 'poke-den', is_sole_trader: true, is_public: true,
+      subscription_tier: 'free', subscription_status: 'none', is_featured_seller: true,
+    } };
+    const { status, body } = await run(`/seller/${UUID}`);
+    expect(status).toBe(200);
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/dealer/poke-den" />');
   });
 
   it('keeps /seller canonical for a Hobby (free) sole trader — no live store page', async () => {

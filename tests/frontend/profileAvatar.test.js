@@ -17,6 +17,10 @@ describe('profilePhotoUrl', () => {
     expect(profilePhotoUrl({ profile_photo_or_character: 'avatars/u-1.webp' })).toContain('avatars/u-1.webp');
   });
 
+  it('keeps a site-relative photo path as a site path', () => {
+    expect(profilePhotoUrl({ avatar_url: '/images/stores/cleet-collectables.png' })).toBe('/images/stores/cleet-collectables.png');
+  });
+
   it('prefers avatar_url over profile_photo_or_character', () => {
     expect(profilePhotoUrl({ avatar_url: 'https://example.com/a.png', profile_photo_or_character: 'x.png' }))
       .toBe('https://example.com/a.png');

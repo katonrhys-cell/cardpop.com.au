@@ -118,12 +118,24 @@ export function isProAccount({ subscriptionTier, subscriptionStatus } = {}) {
 
 /**
  * Does this account get a storefront (a /dealer store page listed on Local
- * Traders)? Every paid tier does; Hobby never does. Same belt-and-braces
- * status fallback as isProAccount.
+ * Traders)? Every paid tier does; Hobby doesn't — unless an admin has flagged
+ * the account as a featured seller (`profiles.is_featured_seller`): the
+ * homepage's Trusted Sellers strip is hand-picked, and a dealer picked for it
+ * must have a store to send visitors to. Same belt-and-braces status fallback
+ * as isProAccount. The PostgREST equivalent for list queries is
+ * STOREFRONT_FILTER — keep the two in step.
  */
-export function hasStorefront({ subscriptionTier, subscriptionStatus } = {}) {
-  return isProAccount({ subscriptionTier, subscriptionStatus });
+export function hasStorefront({ subscriptionTier, subscriptionStatus, isFeaturedSeller } = {}) {
+  return isFeaturedSeller === true || isProAccount({ subscriptionTier, subscriptionStatus });
 }
+
+/**
+ * `.or()` filter selecting the profiles hasStorefront() admits, for the
+ * directory / sitemap / prerender queries that list dealer stores. (The
+ * status fallback is deliberately not mirrored here — those lists have only
+ * ever keyed on the tier column, which the subscription webhook keeps current.)
+ */
+export const STOREFRONT_FILTER = `subscription_tier.in.(${PAID_TIERS.join(',')}),is_featured_seller.eq.true`;
 
 /**
  * Listing Whatnot live shows on the community directory is a Premium-and-up
@@ -315,6 +327,7 @@ export default {
   isProTier,
   isProAccount,
   hasStorefront,
+  STOREFRONT_FILTER,
   WHATNOT_SHOWS_MIN_TIER,
   WHATNOT_SHOW_TIERS,
   canListWhatnotShows,
