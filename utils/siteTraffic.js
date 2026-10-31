@@ -17,6 +17,13 @@ export const MIN_PUBLIC_VISITORS_30D = 100;
 // off hidden than showing last season's figures (the sync runs nightly).
 export const MAX_PUBLIC_SUMMARY_AGE_DAYS = 14;
 
+// Search Console tiles ("Found on Google"): impressions are the big number
+// and open the panel; clicks join once they're worth reading. A site whose
+// pages were shown a few hundred times in a month is better off saying
+// nothing than saying so.
+export const MIN_PUBLIC_SEARCH_IMPRESSIONS_30D = 1000;
+export const MIN_PUBLIC_SEARCH_CLICKS_30D = 50;
+
 const int = (v) => {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
@@ -73,9 +80,48 @@ export const publicTrafficStat = (summary, { now = Date.now() } = {}) => {
   return {
     key: 'visitors',
     value: visitors30d,
-    label: 'Visitors · last 30 days',
+    label: 'Visitors',
     sub: `${formatCompact(allTimeShown)} since ${since ? `${since}` : 'launch'}`,
   };
+};
+
+const sinceLine = (allTime, last30, sinceDate) => {
+  // All-time can't honestly be lower than the last 30 days; show the larger.
+  const shown = Math.max(int(allTime), int(last30));
+  const since = formatSinceMonth(sinceDate);
+  return `${formatCompact(shown)} since ${since || 'launch'}`;
+};
+
+/**
+ * Turn a site_traffic_summary row into the home page's Google Search tiles
+ * — impressions (times a CardPop page showed in Google results) and clicks
+ * (searchers who came through) over the last 30 days, each with the
+ * since-launch total underneath. Returns [] when there's nothing honest to
+ * show (no row, too few impressions, stale search sync); clicks are left out
+ * on their own while they're below their floor.
+ */
+export const publicSearchStats = (summary, { now = Date.now() } = {}) => {
+  if (!summary) return [];
+  const impressions30d = int(summary.search_impressions_30d);
+  const clicks30d = int(summary.search_clicks_30d);
+  if (impressions30d < MIN_PUBLIC_SEARCH_IMPRESSIONS_30D) return [];
+  if (ageInDays(summary.search_synced_at, now) > MAX_PUBLIC_SUMMARY_AGE_DAYS) return [];
+
+  const stats = [{
+    key: 'impressions',
+    value: impressions30d,
+    label: 'Google Search impressions',
+    sub: sinceLine(summary.search_impressions_all_time, impressions30d, summary.search_since_date),
+  }];
+  if (clicks30d >= MIN_PUBLIC_SEARCH_CLICKS_30D) {
+    stats.push({
+      key: 'clicks',
+      value: clicks30d,
+      label: 'Clicks from Google',
+      sub: sinceLine(summary.search_clicks_all_time, clicks30d, summary.search_since_date),
+    });
+  }
+  return stats;
 };
 
 /**

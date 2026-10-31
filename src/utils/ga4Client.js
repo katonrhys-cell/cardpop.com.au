@@ -21,6 +21,10 @@ import logger from './logger.js';
 
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const SCOPE = 'https://www.googleapis.com/auth/analytics.readonly';
+// The same service account also reads Search Console (clicks / impressions)
+// for the home page — src/utils/searchConsoleClient.js asks for a token with
+// this scope through getAccessToken({ scope }).
+export const SEARCH_CONSOLE_SCOPE = 'https://www.googleapis.com/auth/webmasters.readonly';
 const DATA_API = 'https://analyticsdata.googleapis.com/v1beta';
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -55,12 +59,12 @@ export const getPropertyId = (raw = process.env.GA4_PROPERTY_ID) => {
 export const isGa4Configured = () => Boolean(getPropertyId() && parseServiceAccount());
 
 /** Build and sign the service-account assertion (RS256). Exported for tests. */
-export const buildAssertion = ({ clientEmail, privateKey }, { now = Date.now(), ttlSeconds = 3600 } = {}) => {
+export const buildAssertion = ({ clientEmail, privateKey }, { now = Date.now(), ttlSeconds = 3600, scope = SCOPE } = {}) => {
   const iat = Math.floor(now / 1000);
   const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const claims = b64url(JSON.stringify({
     iss: clientEmail,
-    scope: SCOPE,
+    scope,
     aud: TOKEN_URL,
     iat,
     exp: iat + ttlSeconds,
@@ -80,19 +84,22 @@ const fetchWithTimeout = async (url, init) => {
   }
 };
 
-// One access token per process, reused until a minute before it expires.
-let cachedToken = null;
+// One access token per scope per process, reused until a minute before it
+// expires (a token is minted for one scope, so Search Console reads can't
+// share the Analytics one).
+const cachedTokens = new Map();
 
-export const _resetTokenCache = () => { cachedToken = null; };
+export const _resetTokenCache = () => { cachedTokens.clear(); };
 
-export const getAccessToken = async () => {
-  if (cachedToken && cachedToken.expiresAt - 60_000 > Date.now()) return cachedToken.token;
+export const getAccessToken = async ({ scope = SCOPE } = {}) => {
+  const cached = cachedTokens.get(scope);
+  if (cached && cached.expiresAt - 60_000 > Date.now()) return cached.token;
   const account = parseServiceAccount();
   if (!account) throw new Error('GA4_SERVICE_ACCOUNT_JSON is not set or not a service-account key');
 
   const body = new URLSearchParams({
     grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-    assertion: buildAssertion(account),
+    assertion: buildAssertion(account, { scope }),
   });
   const res = await fetchWithTimeout(TOKEN_URL, {
     method: 'POST',
@@ -105,8 +112,8 @@ export const getAccessToken = async () => {
   }
   const json = await res.json();
   if (!json.access_token) throw new Error('GA4 token exchange returned no access_token');
-  cachedToken = { token: json.access_token, expiresAt: Date.now() + (Number(json.expires_in) || 3600) * 1000 };
-  return cachedToken.token;
+  cachedTokens.set(scope, { token: json.access_token, expiresAt: Date.now() + (Number(json.expires_in) || 3600) * 1000 });
+  return json.access_token;
 };
 
 /**
@@ -126,7 +133,7 @@ export const runGa4Report = async (request) => {
   });
   if (!res.ok) {
     const text = (await res.text().catch(() => '')).slice(0, 500);
-    if (res.status === 401) cachedToken = null;
+    if (res.status === 401) cachedTokens.delete(SCOPE);
     logger.warn(`[GA4] runReport failed (${res.status}): ${text}`);
     throw new Error(`GA4 runReport failed (${res.status})`);
   }

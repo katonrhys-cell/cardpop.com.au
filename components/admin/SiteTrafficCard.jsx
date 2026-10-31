@@ -58,7 +58,10 @@ const SiteTrafficCard = () => {
       const res = await apiServerClient.fetch('/admin/site-traffic/sync', { method: 'POST' });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || `Sync failed (${res.status})`);
-      toast.success(`Visitors synced — ${formatCount(body.visitors_30d)} in the last 30 days`);
+      const parts = [];
+      if (body.visitors_30d != null) parts.push(`${formatCount(body.visitors_30d)} visitors`);
+      if (body.search_clicks_30d != null) parts.push(`${formatCount(body.search_clicks_30d)} Google clicks`);
+      toast.success(`Synced — ${parts.join(', ') || 'no figures'} in the last 30 days`);
       await load();
     } catch (err) {
       toast.error(err.message || 'Sync failed');
@@ -69,7 +72,9 @@ const SiteTrafficCard = () => {
 
   const spark = sparklinePath(days, { width: SPARK_W, height: SPARK_H, pad: 3 });
   const configured = Boolean(summary);
-  const synced = fmtSynced(summary?.synced_at);
+  const synced = fmtSynced(summary?.synced_at || summary?.search_synced_at);
+  // Search Console figures land in the same row once GSC_SITE_URL is set.
+  const hasSearch = Boolean(summary?.search_synced_at);
 
   const onMove = (e) => {
     if (!spark) return;
@@ -91,7 +96,7 @@ const SiteTrafficCard = () => {
           <Skeleton className="h-8 w-24 mb-2" />
         ) : !configured ? (
           <div className="text-sm text-muted-foreground space-y-2">
-            <p>No visitor data yet. Set <code className="text-xs">GA4_PROPERTY_ID</code> and <code className="text-xs">GA4_SERVICE_ACCOUNT_JSON</code> in Vercel, then run a sync.</p>
+            <p>No visitor data yet. Set <code className="text-xs">GA4_PROPERTY_ID</code> and <code className="text-xs">GA4_SERVICE_ACCOUNT_JSON</code> in Vercel (plus <code className="text-xs">GSC_SITE_URL</code> for Google Search clicks and impressions), then run a sync.</p>
           </div>
         ) : (
           <>
@@ -104,6 +109,16 @@ const SiteTrafficCard = () => {
               {summary.since_date ? ` (${fmtDay(summary.since_date)})` : ''}
               {' · '}{formatCount(summary.pageviews_30d)} page views
             </p>
+            {hasSearch ? (
+              <p className="text-xs font-medium text-muted-foreground mt-1 tabular-nums" data-testid="site-traffic-search">
+                Google Search · {formatCount(summary.search_impressions_30d)} impressions, {formatCount(summary.search_clicks_30d)} clicks (30 days)
+                {' · '}{formatCount(summary.search_impressions_all_time)} / {formatCount(summary.search_clicks_all_time)} since {fmtDay(summary.search_since_date) || 'launch'}
+              </p>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-1">
+                Google Search clicks and impressions appear here once <code className="text-[11px]">GSC_SITE_URL</code> is set.
+              </p>
+            )}
             {spark && (
               <div className="mt-3">
                 <svg
