@@ -190,6 +190,7 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <meta property="og:title" content="${esc(title)}" />
 <meta property="og:description" content="${esc(description)}" />
 <meta property="og:type" content="${esc(ogType)}" />
+<meta name="application-name" content="CardPop Australia™" />
 <meta property="og:site_name" content="CardPop Australia™" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}

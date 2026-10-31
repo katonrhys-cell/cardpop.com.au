@@ -75,6 +75,10 @@ describe('Google site name signals', () => {
 
   it('emits the same og:site_name from the SPA and the crawler prerender', () => {
     expect(read('components/SEOHead.jsx')).toContain(`const brandName = "${SITE_NAME}"`);
-    expect(metaContent(read('api/prerender.js'), 'og:site_name')).toBe(SITE_NAME);
+    const prerender = read('api/prerender.js');
+    expect(metaContent(prerender, 'og:site_name')).toBe(SITE_NAME);
+    // Bots never receive index.html for "/" — the prerender is the only page
+    // Google reads the site name from, so it must carry application-name too.
+    expect(metaContent(prerender, 'application-name')).toBe(SITE_NAME);
   });
 });
