@@ -26,6 +26,8 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # A hung step must not run to the 6-hour default and eat the Actions budget.
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
