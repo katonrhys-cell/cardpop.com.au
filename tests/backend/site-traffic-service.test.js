@@ -10,6 +10,12 @@ vi.mock('../../src/utils/ga4Client.js', () => ({
   runGa4Report: ga4.runReport,
 }));
 
+const gsc = vi.hoisted(() => ({ configured: false, query: vi.fn() }));
+vi.mock('../../src/utils/searchConsoleClient.js', () => ({
+  isSearchConsoleConfigured: () => gsc.configured,
+  runSearchAnalytics: gsc.query,
+}));
+
 const db = vi.hoisted(() => ({ writes: [] }));
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   default: {
@@ -19,7 +25,9 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({
   },
 }));
 
-const { syncSiteTraffic, parseDailyReport, Ga4NotConfiguredError } = await import('../../src/services/siteTrafficService.js');
+const { syncSiteTraffic, parseDailyReport, parseSearchReport, Ga4NotConfiguredError } = await import('../../src/services/siteTrafficService.js');
+
+const searchRow = (date, clicks, impressions) => ({ keys: [date], clicks, impressions, ctr: 0, position: 0 });
 
 const row = (date, users, sessions, views) => ({
   dimensionValues: [{ value: date }],
@@ -54,10 +62,34 @@ describe('parseDailyReport', () => {
   });
 });
 
+describe('parseSearchReport', () => {
+  const today = '2026-10-31';
+
+  it('sums clicks and impressions over the whole range and over the last 30 reportable days', () => {
+    const { days, totals, last30 } = parseSearchReport({ rows: [
+      searchRow('2026-10-29', 4, 120),      // inside the window (lags two days, still counts)
+      searchRow('2026-10-01', 2, 60),       // window start
+      searchRow('2026-09-30', 10, 1000),    // the day before the window
+      { keys: ['(other)'], clicks: 99, impressions: 99 },
+    ] }, { today });
+    expect(days.map((d) => d.day)).toEqual(['2026-09-30', '2026-10-01', '2026-10-29']);
+    expect(days[0]).toEqual({ day: '2026-09-30', search_clicks: 10, search_impressions: 1000 });
+    expect(totals).toEqual({ clicks: 16, impressions: 1180 });
+    expect(last30).toEqual({ clicks: 6, impressions: 180, window_start: '2026-10-01', window_end: '2026-10-30' });
+  });
+
+  it('handles an empty report', () => {
+    expect(parseSearchReport({}, { today }).totals).toEqual({ clicks: 0, impressions: 0 });
+    expect(parseSearchReport(null, { today }).days).toEqual([]);
+  });
+});
+
 describe('syncSiteTraffic', () => {
   beforeEach(() => {
     ga4.configured = true;
     ga4.runReport.mockReset();
+    gsc.configured = false;
+    gsc.query.mockReset();
     db.writes.length = 0;
     process.env.GA4_START_DATE = '2026-06-01';
   });
@@ -71,6 +103,60 @@ describe('syncSiteTraffic', () => {
     await expect(syncSiteTraffic()).rejects.toBeInstanceOf(Ga4NotConfiguredError);
     expect(ga4.runReport).not.toHaveBeenCalled();
     expect(db.writes).toHaveLength(0);
+  });
+
+  it('adds the Search Console figures in their own columns, after the GA4 write', async () => {
+    gsc.configured = true;
+    ga4.runReport.mockResolvedValue(report([row('20260903', 50, 60, 200)], [50, 60, 200]));
+    gsc.query.mockResolvedValue({ rows: [searchRow('2026-06-03', 1, 40), searchRow('2026-09-03', 7, 300)] });
+
+    const result = await syncSiteTraffic();
+
+    // One query, by date, as far back as GA4_START_DATE, including fresh days.
+    expect(gsc.query).toHaveBeenCalledTimes(1);
+    expect(gsc.query.mock.calls[0][0]).toMatchObject({ startDate: '2026-06-01', dimensions: ['date'], dataState: 'all' });
+    expect(gsc.query.mock.calls[0][0].endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    const summaries = db.writes.filter((w) => w.table === 'site_traffic_summary');
+    expect(summaries).toHaveLength(2);
+    // GA4's row carries no search columns and the search row carries no GA4
+    // ones, so neither source can blank the other.
+    expect(summaries[0].rows).toMatchObject({ id: true, visitors_30d: 50 });
+    expect(summaries[0].rows).not.toHaveProperty('search_clicks_30d');
+    expect(summaries[1].rows).toMatchObject({
+      id: true,
+      search_clicks_all_time: 8,
+      search_impressions_all_time: 340,
+      search_since_date: '2026-06-03',
+    });
+    expect(summaries[1].rows).not.toHaveProperty('visitors_30d');
+    expect(summaries[1].rows.search_synced_at).toBe(summaries[0].rows.synced_at);
+
+    const searchDaily = db.writes.filter((w) => w.table === 'site_traffic_daily')[1];
+    expect(searchDaily.rows[1]).toMatchObject({ day: '2026-09-03', search_clicks: 7, search_impressions: 300 });
+    expect(searchDaily.rows[1]).not.toHaveProperty('users');
+
+    expect(result).toMatchObject({ visitors_30d: 50, search_days: 2, search_clicks_all_time: 8, search_impressions_all_time: 340 });
+  });
+
+  it('runs Search Console on its own when GA4 is not configured', async () => {
+    ga4.configured = false;
+    gsc.configured = true;
+    gsc.query.mockResolvedValue({ rows: [searchRow('2026-09-03', 7, 300)] });
+    const result = await syncSiteTraffic();
+    expect(ga4.runReport).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ search_clicks_all_time: 7 });
+    expect(result).not.toHaveProperty('visitors_30d');
+    expect(db.writes.filter((w) => w.table === 'site_traffic_summary')).toHaveLength(1);
+  });
+
+  it('keeps the GA4 figures when Search Console fails, and still reports the failure', async () => {
+    gsc.configured = true;
+    ga4.runReport.mockResolvedValue(report([row('20260903', 50, 60, 200)], [50, 60, 200]));
+    gsc.query.mockRejectedValue(new Error('Search Console query failed (403)'));
+    await expect(syncSiteTraffic()).rejects.toThrow(/403/);
+    expect(db.writes.filter((w) => w.table === 'site_traffic_summary')).toHaveLength(1);
+    expect(db.writes.find((w) => w.table === 'site_traffic_summary').rows).toMatchObject({ visitors_30d: 50 });
   });
 
   it('writes the daily rows and a single summary row from the two reports', async () => {

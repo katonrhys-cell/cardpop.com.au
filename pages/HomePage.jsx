@@ -13,7 +13,8 @@ import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
-import { publicTrafficStat } from '@/utils/siteTraffic.js';
+import { publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import { HeroSearchForm } from '@/components/HeroSection.jsx';
 import { MARKETPLACE_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
@@ -189,15 +190,61 @@ const HERO_CARDS = [
 const StatItem = ({ value, suffix, label, sub, isDecimal, inView }) => {
   const count = useCountUp(value, inView, isDecimal);
   return (
-    <div className="text-center">
-      <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums">
+    <div className="px-2 text-center sm:px-3">
+      <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums tracking-tight">
         {isDecimal ? count : count.toLocaleString('en-AU')}{suffix}
       </div>
-      <div className="text-sm text-muted-foreground mt-1 font-medium">{label}</div>
-      {sub && <div className="text-xs text-muted-foreground/80 mt-0.5 tabular-nums">{sub}</div>}
+      <div className="mt-1 text-xs font-semibold leading-snug text-muted-foreground sm:text-sm">{label}</div>
+      {sub && <div className="mt-0.5 text-[11px] text-muted-foreground/80 tabular-nums sm:text-xs">{sub}</div>}
     </div>
   );
 };
+
+// Tailwind only ships classes it can see, so the tile column count is a
+// lookup rather than a template string.
+const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
+
+/**
+ * One half of the stats strip: an icon + eyebrow heading, up to three
+ * count-up tiles separated by hairlines, a footnote, and (community panel,
+ * signed-out visitors) a "Join free" call to action.
+ */
+const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testId }) => (
+  <div
+    className="relative flex flex-col rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6 md:p-7"
+    data-testid={testId}
+  >
+    <div className="flex items-start justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="leading-tight">
+          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
+          <p className="mt-0.5 text-sm font-semibold text-foreground sm:text-base">{title}</p>
+        </div>
+      </div>
+      {cta && (
+        <Button asChild size="sm" className="hidden shrink-0 rounded-full font-bold sm:inline-flex">
+          <Link to={cta.to}>{cta.label} <ArrowRight className="ml-1 h-4 w-4" /></Link>
+        </Button>
+      )}
+    </div>
+    <div className={`mt-6 grid flex-1 items-start divide-x divide-border ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
+      {stats.map((stat) => (
+        <StatItem key={stat.key} {...stat} inView={inView} />
+      ))}
+    </div>
+    <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground sm:text-xs">
+      <span>{note}</span>
+      {cta && (
+        <Link to={cta.to} className="shrink-0 font-bold text-primary hover:underline sm:hidden">
+          {cta.label} <ArrowRight className="inline h-3 w-3 align-[-1px]" />
+        </Link>
+      )}
+    </div>
+  </div>
+);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const HomePage = () => {
@@ -208,9 +255,13 @@ const HomePage = () => {
   // Real platform counts — null until loaded; the strip renders nothing rather
   // than invented numbers if the query fails or the counts are still small.
   const [platformStats, setPlatformStats]     = useState(null);
-  // Visitor counts (GA4 → site_traffic_summary, docs/site-traffic.md). Loaded
-  // separately so a missing/stale traffic row never hides the other counts.
-  const [trafficStat, setTrafficStat]         = useState(null);
+  // Google figures (GA4 visitors + Search Console impressions/clicks →
+  // site_traffic_summary, docs/site-traffic.md). Loaded separately so a
+  // missing/stale traffic row never hides the community counts.
+  const [trafficSummary, setTrafficSummary]   = useState(null);
+  // `|| {}`: the page is also rendered outside AuthProvider (tests, prerender
+  // shells), where the "Join free" nudge simply shows.
+  const { isAuthenticated } = useAuth() || {};
 
   const DESK_VISIBLE = 8;
   const total = CATEGORIES.length;
@@ -256,16 +307,22 @@ const HomePage = () => {
     else if (deskPos < 0)  { setDeskInstant(true); setDeskPos(p => p + total); }
   };
 
-  // Stats strip entries — only metrics that have real, non-zero counts.
-  const statItems = platformStats
+  // Stats strip — two panels, real counts only.
+  //   "Found on Google": Search Console impressions → clicks → GA4 visitors,
+  //   each last-30-days with the since-launch figure underneath; every tile
+  //   hides itself below its floor or when its sync is stale (utils/siteTraffic.js).
+  //   "The CardPop community": cards in vaults, members, events — zero counts skipped.
+  const googleStats = [
+    ...publicSearchStats(trafficSummary),
+    publicTrafficStat(trafficSummary),
+  ].filter(Boolean);
+  const communityStats = platformStats
     ? [
-        { value: platformStats.listings,   label: 'Live Listings' },
-        { value: platformStats.vaultCards, label: 'Cards in Member Vaults' },
-        { value: platformStats.sellers,    label: 'Active Members' },
-        { value: platformStats.events,     label: 'Events Listed' },
+        { key: 'vault',   value: platformStats.vaultCards, label: 'Cards in Member Vaults' },
+        { key: 'members', value: platformStats.sellers,    label: 'Active Members' },
+        { key: 'events',  value: platformStats.events,     label: 'Events Listed' },
       ].filter((s) => s.value > 0)
     : [];
-  if (statItems.length && trafficStat) statItems.push(trafficStat);
 
   const [statsRef, statsInView] = useRevealOnce('-80px');
   const [categoriesRef, categoriesInView] = useRevealOnce('0px');
@@ -304,8 +361,8 @@ const HomePage = () => {
         // Visitors tile. publicTrafficStat() returns null (tile hidden) when
         // the row is missing, stale, or the count is too small to show.
         getTrafficSummary()
-          .then((res) => { if (isMounted && res?.data) setTrafficStat(publicTrafficStat(res.data)); })
-          .catch(() => { /* tile stays hidden */ });
+          .then((res) => { if (isMounted && res?.data) setTrafficSummary(res.data); })
+          .catch(() => { /* panel stays hidden */ });
 
         // Supabase resolves with { data, error } instead of throwing — an
         // unlogged error here renders the empty state with no trace, which
@@ -603,15 +660,35 @@ const HomePage = () => {
 
 
       {/* ── Stats strip — real counts only ───────────────────────────────────
-          Renders nothing until the counts load, and skips any metric that is
-          still zero: honest numbers or no numbers. */}
-      {statItems.length >= 2 && (
-        <section ref={statsRef} className="py-8 md:py-12 border-y border-border bg-card">
+          Renders nothing until the community counts load, and skips any
+          metric that is still zero: honest numbers or no numbers. The Google
+          panel appears only once the nightly Search Console / GA4 sync has
+          figures worth showing. */}
+      {communityStats.length >= 2 && (
+        <section ref={statsRef} className="py-8 md:py-12 border-y border-border bg-card" aria-label="CardPop by the numbers">
           <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-            <div className={`grid grid-cols-2 gap-6 md:gap-4 ${statItems.length >= 5 ? 'md:grid-cols-3 lg:grid-cols-5' : statItems.length === 4 ? 'md:grid-cols-4' : statItems.length === 3 ? 'md:grid-cols-3' : ''}`}>
-              {statItems.map((stat) => (
-                <StatItem key={stat.label} {...stat} inView={statsInView} />
-              ))}
+            <div className={`grid gap-4 md:gap-6 ${googleStats.length ? 'lg:grid-cols-2' : ''}`}>
+              {googleStats.length > 0 && (
+                <StatPanel
+                  testId="stats-google"
+                  icon={Search}
+                  eyebrow="Found on Google"
+                  title="Collectors find CardPop on Google"
+                  note="Last 30 days · Google Search Console and Google Analytics, updated nightly"
+                  stats={googleStats}
+                  inView={statsInView}
+                />
+              )}
+              <StatPanel
+                testId="stats-community"
+                icon={Users}
+                eyebrow="The CardPop community"
+                title="Australia's collectors, in one place"
+                note={isAuthenticated ? 'Live counts across CardPop' : 'Free to join · list your first card in minutes'}
+                stats={communityStats}
+                inView={statsInView}
+                cta={isAuthenticated ? null : { to: '/signup', label: 'Join free' }}
+              />
             </div>
           </div>
         </section>

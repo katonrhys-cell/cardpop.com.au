@@ -7,6 +7,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 
 const {
   parseServiceAccount, getPropertyId, isGa4Configured, buildAssertion, getAccessToken, runGa4Report, _resetTokenCache,
+  SEARCH_CONSOLE_SCOPE,
 } = await import('../../src/utils/ga4Client.js');
 
 const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -103,6 +104,22 @@ describe('token exchange + runReport', () => {
     expect(reportUrl).toBe('https://analyticsdata.googleapis.com/v1beta/properties/987:runReport');
     expect(reportInit.headers.Authorization).toBe('Bearer tok');
     expect(JSON.parse(reportInit.body).dateRanges[0].startDate).toBe('7daysAgo');
+  });
+
+  it('mints a separate token per scope and caches each', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: 'tok-ga4', expires_in: 3600 }))
+      .mockResolvedValueOnce(jsonResponse(200, { access_token: 'tok-gsc', expires_in: 3600 }));
+
+    expect(await getAccessToken()).toBe('tok-ga4');
+    expect(await getAccessToken({ scope: SEARCH_CONSOLE_SCOPE })).toBe('tok-gsc');
+    expect(await getAccessToken()).toBe('tok-ga4');
+    expect(await getAccessToken({ scope: SEARCH_CONSOLE_SCOPE })).toBe('tok-gsc');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // The second assertion asked Google for the Search Console scope.
+    const assertion = new URLSearchParams(String(fetchMock.mock.calls[1][1].body)).get('assertion');
+    expect(b64urlDecode(assertion.split('.')[1]).scope).toBe(SEARCH_CONSOLE_SCOPE);
   });
 
   it('surfaces a failed token exchange', async () => {

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  publicTrafficStat, sparklinePath, formatCompact, formatCount, formatSinceMonth,
-  MIN_PUBLIC_VISITORS_30D,
+  publicTrafficStat, publicSearchStats, sparklinePath, formatCompact, formatCount, formatSinceMonth,
+  MIN_PUBLIC_VISITORS_30D, MIN_PUBLIC_SEARCH_IMPRESSIONS_30D, MIN_PUBLIC_SEARCH_CLICKS_30D,
 } from '@/utils/siteTraffic.js';
 
 const NOW = new Date('2026-10-04T00:00:00Z').getTime();
@@ -18,7 +18,7 @@ describe('publicTrafficStat', () => {
     expect(publicTrafficStat(fresh(), { now: NOW })).toEqual({
       key: 'visitors',
       value: 4210,
-      label: 'Visitors · last 30 days',
+      label: 'Visitors',
       sub: '15.3k since Jun 2026',
     });
   });
@@ -36,6 +36,44 @@ describe('publicTrafficStat', () => {
   it('never shows an all-time figure below the 30-day one, and copes without a launch date', () => {
     const stat = publicTrafficStat(fresh({ visitors_all_time: 10, since_date: null }), { now: NOW });
     expect(stat.sub).toBe('4,210 since launch');
+  });
+});
+
+const freshSearch = (over = {}) => ({
+  search_impressions_30d: 18400,
+  search_clicks_30d: 620,
+  search_impressions_all_time: 61000,
+  search_clicks_all_time: 2100,
+  search_since_date: '2026-05-20',
+  search_synced_at: '2026-10-03T19:25:00Z',
+  ...over,
+});
+
+describe('publicSearchStats', () => {
+  it('leads with impressions, then clicks, each with its since-launch line', () => {
+    expect(publicSearchStats(freshSearch(), { now: NOW })).toEqual([
+      { key: 'impressions', value: 18400, label: 'Google Search impressions', sub: '61k since May 2026' },
+      { key: 'clicks', value: 620, label: 'Clicks from Google', sub: '2,100 since May 2026' },
+    ]);
+  });
+
+  it('shows nothing with no row, too few impressions, or a stale search sync', () => {
+    expect(publicSearchStats(null, { now: NOW })).toEqual([]);
+    expect(publicSearchStats(freshSearch({ search_impressions_30d: MIN_PUBLIC_SEARCH_IMPRESSIONS_30D - 1 }), { now: NOW })).toEqual([]);
+    expect(publicSearchStats(freshSearch({ search_synced_at: '2026-09-01T00:00:00Z' }), { now: NOW })).toEqual([]);
+    // A fresh GA4 sync can't vouch for a Search Console sync that never ran.
+    expect(publicSearchStats({ ...freshSearch(), search_synced_at: null, synced_at: '2026-10-03T19:25:00Z' }, { now: NOW })).toEqual([]);
+  });
+
+  it('keeps impressions but drops clicks while clicks are below their floor', () => {
+    const stats = publicSearchStats(freshSearch({ search_clicks_30d: MIN_PUBLIC_SEARCH_CLICKS_30D - 1 }), { now: NOW });
+    expect(stats.map((s) => s.key)).toEqual(['impressions']);
+    expect(publicSearchStats(freshSearch({ search_clicks_30d: MIN_PUBLIC_SEARCH_CLICKS_30D }), { now: NOW })).toHaveLength(2);
+  });
+
+  it('never shows an all-time figure below the 30-day one', () => {
+    const [imp] = publicSearchStats(freshSearch({ search_impressions_all_time: 5, search_since_date: null }), { now: NOW });
+    expect(imp.sub).toBe('18.4k since launch');
   });
 });
 

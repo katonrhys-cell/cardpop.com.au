@@ -28,6 +28,8 @@ export const OUTBOUND_TIMEOUT_MS = Object.freeze({
   paypal: 15_000,
   // USD→AUD rate (exchangerate-api.com); cached for hours, so fail fast.
   exchangeRate: 6_000,
+  // Google Search Console search-analytics query, on the nightly traffic sync.
+  searchConsole: 15_000,
   // The streaming AI proxy behind the chat and OCR routes, on the 40 s function.
   aiProxy: 35_000,
   // Anthropic SDK clients (`new Anthropic({ timeout })`), per function budget.
