@@ -5,9 +5,13 @@ name: CI
 # required status check in branch protection so a red build can't be merged.
 # Coverage floors live in vitest.config.js (test.coverage.thresholds).
 #
-# NOTE: intentionally PR-only. Pushes to main are covered by the equivalent
-# `verify` job in deploy.yml (which then deploys), so running this on main too
-# would just duplicate the whole suite and burn Actions minutes twice.
+# NOTE: intentionally PR-only, and the ONLY place the suite runs. `main` is
+# only ever changed by merging a PR that passed this job, so the former
+# post-merge copy (`main-ci.yml`) re-ran the identical lint/test/build on the
+# same tree — ~6 billed minutes per merge on a private repo for no new
+# information. Deployment is Vercel's own Git integration, which builds on
+# every push to main regardless. If main ever needs re-verifying, trigger
+# this job by opening a PR; there is no push trigger on purpose.
 
 on:
   pull_request:

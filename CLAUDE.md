@@ -207,9 +207,16 @@ git push main
 
 GitHub Actions does not deploy. It runs the quality gates —
 `.github/workflows/ci.yml` (lint + tests + build) and `e2e.yml` on pull
-requests, `.github/workflows/main-ci.yml` re-running the same `verify` gate on
-pushes to `main` — plus the few schedules that need a runner (migration
-drift, git backup, merchant-listings check). The **scheduled backend jobs**
+requests **only** — plus the few schedules that need a runner (migration
+drift, git backup, merchant-listings check, the weekly Snyk sweep). **Nothing
+runs on a push to `main`** except the Supabase migration push (and only when
+`supabase/migrations/` changed): a private repo bills every run a whole
+metered minute, so the former post-merge `main-ci.yml` (the same `verify`
+job again, ~6 min per merge) and the per-push Snyk scan (the lockfile the
+Snyk App had just checked on the PR, 1 min per merge) were removed on
+2026-10-31 after they helped exhaust the 2,000-minute allowance. Don't add a
+`push: branches: [main]` trigger to a workflow unless it does something a PR
+run can't. The **scheduled backend jobs**
 (price refresh, payment reconciliation, blog generation, event scan, supplier
 price watch, GA4 site-traffic sync, delivery and retention sweeps) are fired
 by a **Cloudflare Worker with Cron Triggers** — `cloudflare/scheduler/worker.js`,
