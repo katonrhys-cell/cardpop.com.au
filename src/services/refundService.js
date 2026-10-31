@@ -7,6 +7,7 @@ import { creditWallet } from './walletService.js';
 import { getPlatformSetting } from './stripeWebhookService.js';
 import { computeRefundAmounts, DEFAULT_REFUND_FEE_RETENTION_PCT, getRefundRetainProcessingFee } from './refundAmounts.js';
 import { isAdminUser } from '../middleware/auth.js';
+import { MARKETPLACE_PROTECTION } from '../../utils/buyerProtectionPolicy.js';
 
 export async function processRefund(req, res) {
   try {
@@ -147,7 +148,7 @@ export async function processRefund(req, res) {
         user_id: refund.buyer_id,
         type: 'refund_processed',
         title: 'Refund Processed',
-        body: `Your refund of $${refundAmount.toFixed(2)} AUD has been issued. Please allow 5-10 business days for it to appear on your statement.`,
+        body: `Your refund of $${refundAmount.toFixed(2)} AUD has been issued. It will reach your original payment method within ${MARKETPLACE_PROTECTION.refundProcessingDays} days.`,
       });
     }
 

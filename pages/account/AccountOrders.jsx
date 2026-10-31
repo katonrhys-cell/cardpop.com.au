@@ -137,7 +137,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
               {shopOrder
                 ? 'CardPop Shop orders are refunded in full — no restocking fee. '
                 : `CardPop retains $${retainedFee.toFixed(2)} in fees: 50% of the platform fee, plus any payment processing fee, which our payment provider doesn't return. `}
-              Refunds take 5–10 business days to appear on your statement.
+              Refunds reach your original payment method within {MARKETPLACE_PROTECTION.refundProcessingDays} days.
             </p>
           </div>
 

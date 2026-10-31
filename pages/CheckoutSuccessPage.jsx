@@ -17,6 +17,7 @@ import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { renderSurveyOptIn } from '@/lib/googleCustomerReviews.js';
 import { trackPurchase } from '@/lib/analytics.js';
 import { CHECKOUT_FORM_STORAGE_KEY } from '@/pages/CheckoutPage.jsx';
+import { MARKETPLACE_PROTECTION } from '@/utils/buyerProtectionPolicy.js';
 
 // Post-purchase account creation for guests. The order is already placed and
 // paid — this just lets the shopper turn their guest checkout into a real
@@ -216,7 +217,7 @@ const CheckoutSuccessPage = () => {
       : status === 'missing'
         ? 'There is no checkout session associated with this page.'
         : status === 'refused'
-          ? 'Your payment went through, but we were unable to fulfil the order — most often because the card was issued outside Australia, or the item had just sold to someone else. A full refund is already on its way to the same card (5–10 business days to appear) and we\'ve emailed you the details. Nothing further is needed.'
+          ? `Your payment went through, but we were unable to fulfil the order — most often because the card was issued outside Australia, or the item had just sold to someone else. A full refund is already on its way to the same card (within ${MARKETPLACE_PROTECTION.refundProcessingDays} days) and we've emailed you the details. Nothing further is needed.`
           : 'We were unable to verify your payment. If you were charged, please contact support before retrying so you are not charged twice.';
 
     return (
