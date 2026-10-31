@@ -1,14 +1,21 @@
 name: E2E
 
 # Real-browser smoke tests (Playwright) against the production build. Runs on
-# pull requests. Kept separate from the deploy gate for now because browser E2E
-# is inherently slower/flakier than unit tests; promote to a required check once
-# it has proven stable.
+# pull requests once they are marked ready for review. Kept separate from the
+# deploy gate for now because browser E2E is inherently slower/flakier than
+# unit tests; promote to a required check once it has proven stable.
+#
+# Draft PRs are skipped: this is the most expensive workflow in the repo
+# (Playwright + Chromium install on every run) and the private repo's metered
+# Actions minutes ran out on 2026-10-31, which stopped every workflow including
+# the migration push. Marking a PR "Ready for review" triggers the run.
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths-ignore:
       - '**.md'
+      - 'docs/**'
       - '.gitignore'
 
 concurrency:
@@ -17,7 +24,9 @@ concurrency:
 
 jobs:
   e2e:
+    if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       id-token: write
       contents: read

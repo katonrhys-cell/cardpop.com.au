@@ -206,8 +206,10 @@ git push main
 ```
 
 GitHub Actions does not deploy. It runs the quality gates —
-`.github/workflows/ci.yml` (lint + tests + build) and `e2e.yml` on pull
-requests **only** — plus the few schedules that need a runner (migration
+`.github/workflows/ci.yml` (lint + tests + build) on pull requests and
+`e2e.yml` on **non-draft** pull requests **only** (the Playwright run is the
+most expensive workflow, so a draft PR skips it until it is marked ready for
+review) — plus the few schedules that need a runner (migration
 drift, git backup, merchant-listings check, the weekly Snyk sweep). **Nothing
 runs on a push to `main`** except the Supabase migration push (and only when
 `supabase/migrations/` changed): a private repo bills every run a whole
