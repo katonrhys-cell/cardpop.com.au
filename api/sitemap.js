@@ -3,7 +3,7 @@ import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES } from '../data/blogCategories.js';
 import { BUYING_GUIDES } from '../data/buyingGuides.js';
-import { PAID_TIERS } from '../config/plans.js';
+import { STOREFRONT_FILTER } from '../config/plans.js';
 import { BINDER_SLUGS } from '../data/shopBinderProducts.js';
 import { PALMS_OFF_PRODUCTS } from '../data/palmsOffCatalogue.js';
 import { shopProductBasePath, legacyShopProductPath } from '../utils/shopProductUrl.js';
@@ -237,9 +237,9 @@ export default async function handler(req, res) {
         .select('id, store_slug, updated_at')
         .eq('is_sole_trader', true)
         .eq('is_public', true)
-        // Store pages are a paid-membership perk — only advertise stores
-        // that renderDealer() will actually serve.
-        .in('subscription_tier', PAID_TIERS)
+        // Store pages are a paid-membership (or admin-featured) perk — only
+        // advertise stores that renderDealer() will actually serve.
+        .or(STOREFRONT_FILTER)
         .order('id'), MAX_ROWS.dealers),
       fetchAll(() => supabase
         .from('shop_products')

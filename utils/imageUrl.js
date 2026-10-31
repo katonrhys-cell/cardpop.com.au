@@ -145,6 +145,11 @@ export function ensureImgAltInHtml(html, fallbackAlt = '') {
 export function publicImageUrl(pathOrUrl, bucket = DEFAULT_BUCKET) {
   if (!pathOrUrl || typeof pathOrUrl !== 'string') return null;
   if (isHttp(pathOrUrl)) return toCdnUrl(pathOrUrl);
+  // A site-relative path (`/images/stores/<slug>.png`) is a static asset
+  // bundled with the app, not a storage object — serve it as-is. Treating it
+  // as a bucket path built a Supabase URL that 404s (a dealer's logo set to a
+  // bundled file rendered as a broken image on the homepage).
+  if (isSiteRelative(pathOrUrl)) return pathOrUrl;
   return toCdnUrl(supabase.storage.from(bucket).getPublicUrl(pathOrUrl).data.publicUrl);
 }
 
@@ -181,6 +186,8 @@ export function _resetTransformState() {
 }
 
 const isHttp = (s) => typeof s === 'string' && /^https?:\/\//.test(s);
+// `/path` but not `//host/path` (protocol-relative URLs are not ours).
+const isSiteRelative = (s) => typeof s === 'string' && /^\/(?!\/)/.test(s);
 
 // Matches an absolute Supabase storage *object* URL and captures bucket + path.
 // Used to recover the storage path from URLs stored whole in the database

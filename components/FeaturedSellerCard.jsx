@@ -23,12 +23,14 @@ const FeaturedSellerCard = ({ seller }) => {
     : seller.location_state || null;
 
   // Dealers (sole traders) have their own store page resolved by store_slug
-  // (legacy UUID also works) — but a store page is a paid-membership perk and
-  // answers "Store Unavailable" for a Hobby account, so those fall back to the
-  // public seller profile, as does everyone else (resolved by profile id).
+  // (legacy UUID also works) — but a store page is a paid-membership perk
+  // (or an admin-featured dealer's) and answers "Store Unavailable" for any
+  // other Hobby account, so those fall back to the public seller profile, as
+  // does everyone else (resolved by profile id).
   const storePath = seller.is_sole_trader && hasStorefront({
     subscriptionTier: seller.subscription_tier,
     subscriptionStatus: seller.subscription_status,
+    isFeaturedSeller: seller.is_featured_seller,
   })
     ? `/dealer/${seller.store_slug || seller.id}`
     : `/seller/${seller.id}`;

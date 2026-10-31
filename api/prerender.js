@@ -5,7 +5,7 @@ import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
-import { PAID_TIERS, hasStorefront } from '../config/plans.js';
+import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
   BINDER_PRODUCTS, resolveBinderProduct, binderImages, binderImageAlt, binderSpecs,
 } from '../data/shopBinderProducts.js';
@@ -234,9 +234,9 @@ async function renderLocalTraders(supabase) {
     .select('id, store_slug, business_name, display_name, username, business_tagline, business_logo_url, location_state, location_suburb, rating, reviews_count, is_featured_seller')
     .eq('is_sole_trader', true)
     .eq('is_public', true)
-    // Store pages are a paid-membership perk — mirror the SPA's filter so
-    // crawlers never index a storefront the app won't show.
-    .in('subscription_tier', PAID_TIERS)
+    // Store pages are a paid-membership (or admin-featured) perk — mirror the
+    // SPA's filter so crawlers never index a storefront the app won't show.
+    .or(STOREFRONT_FILTER)
     .order('is_featured_seller', { ascending: false })
     .order('rating', { ascending: false, nullsFirst: false })
     .limit(100);
@@ -309,16 +309,20 @@ async function renderDealer(supabase, param) {
   const byUuid = UUID_RE.test(param);
   let dealerQuery = supabase
     .from('profiles')
-    .select('id, store_slug, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, subscription_tier, subscription_status, created_at');
+    .select('id, store_slug, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, subscription_tier, subscription_status, is_featured_seller, created_at');
   dealerQuery = byUuid ? dealerQuery.eq('id', param) : dealerQuery.eq('store_slug', param);
   const { data: dealer } = await dealerQuery.maybeSingle();
 
   const canonical = `${BASE_URL}/dealer/${dealer?.store_slug || param}`;
 
-  // Store pages are a paid-membership perk — a Hobby account's store 404s
-  // here exactly as it does in the SPA.
+  // Store pages are a paid-membership (or admin-featured) perk — any other
+  // Hobby account's store 404s here exactly as it does in the SPA.
   if (!dealer || !dealer.is_sole_trader || dealer.is_public === false
-      || !hasStorefront({ subscriptionTier: dealer.subscription_tier, subscriptionStatus: dealer.subscription_status })) {
+      || !hasStorefront({
+        subscriptionTier: dealer.subscription_tier,
+        subscriptionStatus: dealer.subscription_status,
+        isFeaturedSeller: dealer.is_featured_seller,
+      })) {
     return notFound({
       title: 'Store Unavailable | CardPop',
       description: 'This dealer store could not be found on CardPop.',
@@ -3663,7 +3667,7 @@ async function renderSeller(supabase, param) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, store_slug, business_name, display_name, username, bio, business_tagline, avatar_url, business_logo_url, location_state, location_suburb, rating, reviews_count, is_sole_trader, is_public, subscription_tier, subscription_status')
+    .select('id, store_slug, business_name, display_name, username, bio, business_tagline, avatar_url, business_logo_url, location_state, location_suburb, rating, reviews_count, is_sole_trader, is_public, subscription_tier, subscription_status, is_featured_seller')
     .eq('id', param)
     .maybeSingle();
 
@@ -3677,13 +3681,17 @@ async function renderSeller(supabase, param) {
   }
 
   const name = profile.display_name || profile.business_name || profile.username || 'CardPop Seller';
-  // Paid sole traders have a dedicated /dealer store page (in the sitemap and
-  // prerendered) with substantially the same content — that page is canonical,
-  // so /seller/:id for them is a declared alternate rather than a duplicate.
-  // A Hobby sole trader has no live store page, so their /seller page stays
-  // canonical for itself.
+  // Paid (or admin-featured) sole traders have a dedicated /dealer store page
+  // (in the sitemap and prerendered) with substantially the same content —
+  // that page is canonical, so /seller/:id for them is a declared alternate
+  // rather than a duplicate. Any other Hobby sole trader has no live store
+  // page, so their /seller page stays canonical for itself.
   const hasStore = profile.is_sole_trader
-    && hasStorefront({ subscriptionTier: profile.subscription_tier, subscriptionStatus: profile.subscription_status });
+    && hasStorefront({
+      subscriptionTier: profile.subscription_tier,
+      subscriptionStatus: profile.subscription_status,
+      isFeaturedSeller: profile.is_featured_seller,
+    });
   const canonical = hasStore
     ? `${BASE_URL}/dealer/${profile.store_slug || profile.id}`
     : canonicalSelf;
