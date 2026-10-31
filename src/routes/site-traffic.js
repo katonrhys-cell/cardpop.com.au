@@ -25,10 +25,10 @@ const isAuthorisedCronCall = (req) => {
 
 /**
  * GET /site-traffic/sync
- * Nightly cron (.github/workflows/cron-daily.yml): pulls visitor
+ * Nightly cron (cloudflare/scheduler/worker.js): pulls visitor
  * counts from GA4 into site_traffic_daily / site_traffic_summary for the home
  * page stats strip and the admin dashboard. 503 until GA4 is configured, so
- * the Actions run stays red as a reminder rather than silently doing nothing.
+ * the scheduled run stays red as a reminder rather than silently doing nothing.
  */
 router.get('/sync', async (req, res) => {
   if (!isAuthorisedCronCall(req)) {

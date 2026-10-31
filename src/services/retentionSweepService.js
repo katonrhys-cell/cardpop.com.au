@@ -10,7 +10,7 @@ import { buildCardSearchOr } from '../utils/cardSearchFilter.js';
 import { PURCHASABLE_SHOP_STATUSES } from '../../utils/shopStock.js';
 import { shopProductPath } from '../../utils/shopProductUrl.js';
 
-// The daily retention sweep (.github/workflows/cron-daily.yml →
+// The daily retention sweep (cloudflare/scheduler/worker.js →
 // GET /api/retention/sweep). Six small jobs, each bounded and independent, so
 // one failing never blocks the rest, run under one wall-clock budget (the
 // endpoint lives on the 40 s api/index.js function):

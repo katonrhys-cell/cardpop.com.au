@@ -19,7 +19,7 @@ only), so expect GA4's figure to be higher.
 ## How it flows
 
 ```
-GitHub Actions  cron-daily.yml (step 1)  05:23 AEST daily
+Cloudflare Worker  cloudflare/scheduler/worker.js (daily run)  05:23 AEST daily
    └─ GET /api/site-traffic/sync        (CRON_SECRET bearer, fail-closed)
         └─ src/services/siteTrafficService.js
              ├─ GA4 Data API runReport ×2  (src/utils/ga4Client.js, service account)
@@ -78,8 +78,8 @@ backend writes them.
    Sync now**. A green toast with a 30-day number means the credentials work.
    The nightly job takes over from there.
 
-The `CRON_SECRET` Actions secret is shared with the other scheduled jobs
-(`docs/scheduled-jobs.md`) — nothing extra is needed on the GitHub side.
+The `CRON_SECRET` on the Cloudflare scheduler Worker is shared with the other
+scheduled jobs (`docs/scheduled-jobs.md`) — nothing extra is needed there.
 
 ## Display rules
 
@@ -92,7 +92,7 @@ The `CRON_SECRET` Actions secret is shared with the other scheduled jobs
 - The admin card shows everything regardless and explains what to set when
   there's no summary row yet.
 - Until GA4 is configured `GET /api/site-traffic/sync` answers **503**, so
-  the Actions run stays red as a reminder rather than silently doing nothing.
+  the scheduled run stays red as a reminder rather than silently doing nothing.
 
 ## Endpoints
 

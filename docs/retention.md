@@ -1,8 +1,8 @@
 # Retention emails
 
 The daily **retention sweep** is the one scheduled job that brings shoppers
-back. It runs as the last step of the daily maintenance run (~05:25 AEST,
-`.github/workflows/cron-daily.yml` → `GET /api/retention/sweep`, `CRON_SECRET`
+back. It runs as part of the daily maintenance run (05:23 AEST, the Cloudflare
+scheduler Worker `cloudflare/scheduler/worker.js` → `GET /api/retention/sweep`, `CRON_SECRET`
 bearer, fail-closed — see `docs/scheduled-jobs.md`) and does six small,
 independent jobs — one failing never blocks the rest, and the whole sweep stops
 starting new emails after ~28 s so it always answers inside the function's 40 s

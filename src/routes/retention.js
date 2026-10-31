@@ -19,7 +19,7 @@ const isAuthorisedCronCall = (req) => {
 
 /**
  * GET /retention/sweep
- * Daily cron (.github/workflows/cron-daily.yml): abandoned-checkout
+ * Daily cron (cloudflare/scheduler/worker.js): abandoned-checkout
  * reminders, watchlist price-drop / sold alerts, saved-search digests,
  * back-in-stock emails, welcome codes for accounts the signup page didn't
  * issue, and welcome-code expiry reminders. See docs/retention.md.

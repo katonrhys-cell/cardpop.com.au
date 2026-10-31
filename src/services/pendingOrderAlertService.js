@@ -26,12 +26,12 @@ import logger from '../utils/logger.js';
 // fulfilment path moves money), so this deliberately does not self-heal — it
 // tells you which session to resend.
 //
-// Runs every two hours from GitHub Actions (.github/workflows/
-// cron-reconcile-pending.yml). It used to be a daily Vercel cron — the Hobby
-// plan rejects anything more frequent — which is why the schedules moved; see
-// docs/scheduled-jobs.md. Nothing here depends on the cadence, but each run
-// bills a metered Actions minute, so the scan below is kept to orders that can
-// still be news (see MAX_AGE_MS).
+// Runs every two hours from the Cloudflare scheduler Worker
+// (cloudflare/scheduler/worker.js, the `reconcile` Cron Trigger). It used to
+// be a daily Vercel cron — the Hobby plan rejects anything more frequent —
+// and then a GitHub Actions schedule, which billed a metered minute per run;
+// see docs/scheduled-jobs.md. Nothing here depends on the cadence, but the
+// scan below is kept to orders that can still be news (see MAX_AGE_MS).
 // ─────────────────────────────────────────────────────────────────────────────
 
 // How long an order may legitimately sit 'pending' before it's suspicious.
