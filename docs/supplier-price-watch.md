@@ -26,8 +26,9 @@ never reported as a "change" from the old page's price.
 
 ## The weekly check
 
-The daily maintenance run (`.github/workflows/cron-daily.yml`, 19:23 UTC =
-05:23 AEST, see `docs/scheduled-jobs.md`) calls `GET /api/shop-supplier-watch/run`
+The daily maintenance run (the Cloudflare scheduler Worker's `daily` trigger,
+`cloudflare/scheduler/worker.js`, 19:23 UTC = 05:23 AEST, see
+`docs/scheduled-jobs.md`) calls `GET /api/shop-supplier-watch/run`
 with the `CRON_SECRET` bearer (fail-closed). Each run checks only products whose last
 check is **7 or more days** old, so each product is checked once a week, a week
 after its own last check. Products that share one page (the colours of one
@@ -85,7 +86,8 @@ price the watch reads is the carton price, not the per-box cost on the row) by
 
 - One product: **Check price now** in its edit form (admin + MFA:
   `POST /api/admin/shop-products/:id/supplier-price-check`).
-- Everything due: Actions → **Cron · Supplier price watch** → Run workflow.
+- Everything due: `POST /run/supplier_watch` on the scheduler Worker with the
+  `CRON_SECRET` bearer (`docs/scheduled-jobs.md`).
 
 ## Tests
 

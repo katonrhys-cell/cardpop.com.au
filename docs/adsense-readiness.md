@@ -64,17 +64,18 @@ with a crawler that **does not execute JavaScript** and starts at the homepage:
 5. **The topic queue is refilled.** `supabase/migrations/…_seed_blog_article_topics_wave2.sql`
    queues twelve briefs anchored on tracked cards with 60+ days of snapshots —
    about a fortnight of nightly drafts once the cron runs again.
-6. **Failing schedules file an issue.** `.github/workflows/cron-health.yml`
-   opens one tracking issue when any `Cron ·` workflow fails, like
-   `migration-drift.yml` does for migrations.
+6. **Failing schedules send an email.** The Cloudflare scheduler Worker
+   (`cloudflare/scheduler/worker.js`) emails `admin@cardpop.com.au` when any
+   run fails, once `RESEND_API_KEY` is set on it (`docs/scheduled-jobs.md`).
 
 ## What must be done outside the repo (in order)
 
-1. **Add the `CRON_SECRET` repository secret** — GitHub → Settings → Secrets
-   and variables → Actions → New repository secret, value identical to the
-   `CRON_SECRET` environment variable in Vercel. Then run **Cron · Daily
-   maintenance** and **Cron · Blog article generation** by hand (Actions → Run
-   workflow) and confirm both are green. Nothing scheduled runs until this is
+1. **Add the `CRON_SECRET` secret to the scheduler Worker** —
+   `npx wrangler secret put CRON_SECRET --config cloudflare/scheduler/wrangler.toml`,
+   value identical to the `CRON_SECRET` environment variable in Vercel. Then
+   run the `daily` and `blog` schedules by hand (`POST /run/daily` and
+   `POST /run/blog` on the Worker with that bearer — `docs/scheduled-jobs.md`)
+   and confirm both reports are green. Nothing scheduled runs until this is
    done.
 2. **Review and publish the drafts.** The generator stores drafts unpublished.
    Read each in Admin → Blog, edit where it is wrong or flat, and publish. A

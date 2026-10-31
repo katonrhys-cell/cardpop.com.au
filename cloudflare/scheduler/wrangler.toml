@@ -1,0 +1,49 @@
+# CardPop scheduler — Cloudflare Worker config.
+#
+# Deploy from the repository root:
+#   npx wrangler login                                                   (once)
+#   npx wrangler deploy --config cloudflare/scheduler/wrangler.toml
+#   npx wrangler secret put CRON_SECRET --config cloudflare/scheduler/wrangler.toml
+#
+# The `crons` list below IS the schedule: `wrangler deploy` writes it onto the
+# Worker, and each expression must match one in SCHEDULES in worker.js, because
+# the runtime identifies a firing by its cron string. Add or move a schedule in
+# both places. Runbook: docs/scheduled-jobs.md.
+
+name = "cardpop-scheduler"
+main = "worker.js"
+compatibility_date = "2026-09-01"
+
+# Keeps the <name>.<subdomain>.workers.dev URL, which is how a schedule is run
+# by hand (POST /run/<key> with the CRON_SECRET bearer). Nothing is served
+# without that bearer except a plain "ok" at /.
+workers_dev = true
+
+# Workers Logs: every run's report is one JSON line (dashboard → Worker →
+# Logs). Free plan included.
+[observability]
+enabled = true
+
+[triggers]
+# UTC. Must match worker.js SCHEDULES exactly (whitespace is normalised).
+crons = [
+  "15 */2 * * *",  # Reconcile pending payments — every 2 hours
+  "23 19 * * *",   # Daily maintenance — 05:23 AEST / 06:23 AEDT
+  "7 21 * * *",    # Blog article generation — 07:07 AEST
+  "7 17 * * SUN",  # Event scan — 03:07 AEST Monday
+]
+
+[vars]
+# Origin to call. Point at a preview deployment to test without touching prod.
+BASE_URL = "https://cardpop.com.au"
+# Failure alerts. Needs the RESEND_API_KEY secret as well:
+#   npx wrangler secret put RESEND_API_KEY --config cloudflare/scheduler/wrangler.toml
+ALERT_EMAIL = "admin@cardpop.com.au"
+ALERT_FROM = "CardPop Scheduler <noreply@cardpop.com.au>"
+
+# Optional: de-duplicate alerts (one email per schedule per 12 h while it keeps
+# failing). Create the namespace, then paste its id here and redeploy:
+#   npx wrangler kv namespace create STATE --config cloudflare/scheduler/wrangler.toml
+# [[kv_namespaces]]
+# binding = "STATE"
+# id = "<paste the id wrangler prints>"
