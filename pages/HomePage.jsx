@@ -9,7 +9,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery.js';
 import VaultListingCard from '@/components/VaultListingCard.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
-import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
+import FeaturedSellersCarousel from '@/components/FeaturedSellersCarousel.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
@@ -934,27 +934,14 @@ const HomePage = () => {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map(i => (
                 <Skeleton key={i} className="h-64 w-full rounded-3xl" />
               ))}
             </div>
           ) : featuredSellers.length > 0 ? (
-            <div
-              ref={sellersRef}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-            >
-              {featuredSellers.map((seller, i) => (
-                <div
-                  key={seller.id}
-                  className={sellersInView ? 'anim-reveal-up' : 'opacity-0'}
-                  style={sellersInView ? { animationDelay: `${i * 0.1}s` } : undefined}
-                >
-                  <ErrorBoundary fallback={null}>
-                    <FeaturedSellerCard seller={seller} />
-                  </ErrorBoundary>
-                </div>
-              ))}
+            <div ref={sellersRef}>
+              <FeaturedSellersCarousel sellers={featuredSellers} inView={sellersInView} />
             </div>
           ) : (
             <div className="text-center py-12 bg-muted rounded-3xl border border-border shadow-sm">

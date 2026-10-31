@@ -1,112 +1,113 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Star, ShieldCheck, UserCircle2 } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/lib/supabaseClient.js';
-import ProfileAvatar from '@/components/ProfileAvatar.jsx';
-import { PUBLIC_PROFILE_COLUMNS } from '@/lib/profileColumns.js';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import FeaturedSellerCard from '@/components/FeaturedSellerCard.jsx';
+import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 
-const FeaturedSellersCarousel = () => {
-  const [sellers, setSellers] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+/**
+ * The homepage "Trusted Australian Sellers" strip: a native scroll-snap track
+ * (so it swipes on touch) with an arrow either side that pages through the
+ * sellers and wraps around — Next on the last page returns to the first,
+ * Previous on the first page jumps to the last — so visitors can rotate
+ * through every featured seller rather than only the four that fit.
+ *
+ * One card per page on phones, two on tablets, three on desktop (the widths
+ * below must stay in step with the `gap-6` between cards). The arrows only
+ * render once the track actually overflows, so a short list stays a plain row.
+ *
+ * `inView` drives the same reveal-up animation the grid used; the reveal
+ * wrapper stays the card's direct parent (a test relies on it).
+ */
+const FeaturedSellersCarousel = ({ sellers, inView = true }) => {
+  const trackRef = useRef(null);
+  const [canScroll, setCanScroll] = useState(false);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchSellers = async () => {
-      try {
-        setIsLoading(true);
-        // featuredSellers has no direct Supabase equivalent — get top sellers by positive_feedback_pct
-        let activeSellers = [];
-
-        const { data: topUsers } = await supabase
-          .from('profiles')
-          .select(PUBLIC_PROFILE_COLUMNS)
-          .gt('total_sales', 0)
-          .order('positive_feedback_pct', { ascending: false })
-          .limit(4);
-
-        // Deduplicate by user id to prevent duplicates
-        const seen = new Set();
-        const uniqueSellers = (topUsers || []).filter(seller => {
-          if (seen.has(seller.id)) return false;
-          seen.add(seller.id);
-          return true;
-        });
-
-        activeSellers = uniqueSellers;
-
-        if (isMounted) {
-          setSellers(activeSellers);
-        }
-      } catch (error) {
-        console.error('Error fetching sellers:', error);
-        // Fail silently - UI handles empty state
-      } finally {
-        if (isMounted) setIsLoading(false);
-      }
-    };
-
-    fetchSellers();
-    return () => { isMounted = false; };
+  const measure = useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    setCanScroll(el.scrollWidth - el.clientWidth > 1);
   }, []);
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-4 md:px-0">
-        {[...Array(4)].map((_, i) => (
-          <div key={i} className="bg-background rounded-2xl p-6 border border-border shadow-sm flex flex-col items-center">
-            <Skeleton className="w-16 h-16 rounded-full mb-5" />
-            <Skeleton className="h-6 w-32 mb-3" />
-            <Skeleton className="h-4 w-24 mb-6" />
-            <Skeleton className="h-10 w-full rounded-xl" />
+  useEffect(() => {
+    measure();
+    const el = trackRef.current;
+    let observer;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measure);
+      observer.observe(el);
+    }
+    window.addEventListener('resize', measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', measure);
+    };
+  }, [measure, sellers.length]);
+
+  const scrollTrackTo = (left) => {
+    const el = trackRef.current;
+    if (!el) return;
+    if (typeof el.scrollTo === 'function') el.scrollTo({ left, behavior: 'smooth' });
+    else el.scrollLeft = left;
+  };
+
+  const page = (direction) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const { scrollLeft, clientWidth, scrollWidth } = el;
+    const maxLeft = scrollWidth - clientWidth;
+    if (direction > 0) {
+      // Past the last page → wrap to the start.
+      scrollTrackTo(scrollLeft >= maxLeft - 1 ? 0 : Math.min(scrollLeft + clientWidth, maxLeft));
+    } else {
+      scrollTrackTo(scrollLeft <= 1 ? maxLeft : Math.max(scrollLeft - clientWidth, 0));
+    }
+  };
+
+  const arrowClass =
+    'absolute top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-background/95 hover:bg-background ' +
+    'border border-border shadow-lg flex items-center justify-center text-foreground transition-colors ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+  return (
+    <div className="relative">
+      {canScroll && (
+        <>
+          <button
+            type="button"
+            onClick={() => page(-1)}
+            aria-label="Previous sellers"
+            className={`${arrowClass} -left-3 sm:-left-5`}
+          >
+            <ChevronLeft className="w-6 h-6" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => page(1)}
+            aria-label="Next sellers"
+            className={`${arrowClass} -right-3 sm:-right-5`}
+          >
+            <ChevronRight className="w-6 h-6" aria-hidden="true" />
+          </button>
+        </>
+      )}
+
+      <div
+        ref={trackRef}
+        data-testid="featured-sellers-track"
+        className="flex gap-6 overflow-x-auto snap-x snap-mandatory scroll-smooth motion-reduce:scroll-auto scrollbar-hide py-2 -my-2"
+        aria-label="Trusted sellers"
+      >
+        {sellers.map((seller, i) => (
+          <div
+            key={seller.id}
+            className={`snap-start shrink-0 basis-full sm:basis-[calc((100%_-_1.5rem)/2)] lg:basis-[calc((100%_-_3rem)/3)] ${inView ? 'anim-reveal-up' : 'opacity-0'}`}
+            style={inView ? { animationDelay: `${Math.min(i, 5) * 0.1}s` } : undefined}
+          >
+            <ErrorBoundary fallback={null}>
+              <FeaturedSellerCard seller={seller} />
+            </ErrorBoundary>
           </div>
         ))}
       </div>
-    );
-  }
-
-  if (sellers.length === 0) {
-    return (
-      <div className="text-center py-16 px-4 bg-background/50 rounded-2xl border border-border border-dashed mx-4 md:mx-0">
-        <UserCircle2 className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-        <p className="text-muted-foreground font-medium">Our community is growing. Trusted sellers will appear here soon.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 px-4 md:px-0">
-      {sellers.map((seller) => (
-        <Link 
-          key={seller.id} 
-          to={`/community/user/${seller.id}`}
-          className="group bg-background rounded-2xl p-6 border border-border shadow-sm flex flex-col items-center transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-primary/30"
-        >
-          <div className="relative mb-5">
-            <ProfileAvatar profile={seller} size="lg" name={seller.name} className="shadow-sm" />
-            {seller.verified && (
-              <div className="absolute -bottom-2 -right-2 bg-background rounded-xl p-1 shadow-sm border border-border">
-                <ShieldCheck className="w-5 h-5 text-primary" />
-              </div>
-            )}
-          </div>
-          
-          <h3 className="font-bold text-foreground text-lg mb-1 truncate w-full text-center group-hover:text-primary transition-colors">
-            {seller.name || 'Anonymous Collector'}
-          </h3>
-          
-          <div className="flex items-center justify-center gap-1.5 mb-6">
-            <Star className="w-4 h-4 fill-primary text-primary" />
-            <span className="font-bold tabular-nums">{seller.positive_feedback_pct || '5.0'}</span>
-            <span className="text-muted-foreground text-sm">({seller.total_sales || 0})</span>
-          </div>
-          
-          <div className="w-full text-center text-sm font-bold text-primary bg-primary/5 py-2.5 rounded-xl group-hover:bg-primary/10 transition-colors">
-            View Vault
-          </div>
-        </Link>
-      ))}
     </div>
   );
 };
