@@ -8,10 +8,11 @@ import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MAX_EVENTS = 16;
 
-// The strip shows each card at 36×48 px, so serve the pre-generated 480 px
-// grid thumbnail wherever one exists (uploads since THUMBNAILS_SINCE) instead
-// of the full 1600 px upload — up to 16 of these load on the homepage, and
-// the full images were the bulk of PageSpeed's "Improve image delivery".
+// The strip shows each card at 80×112 px (160×224 on a 2× display), so serve
+// the pre-generated 480 px grid thumbnail wherever one exists (uploads since
+// THUMBNAILS_SINCE) instead of the full 1600 px upload — up to 16 of these
+// load on the homepage, and the full images were the bulk of PageSpeed's
+// "Improve image delivery".
 export const tickerImageUrl = (vaultItem) => {
   const raw = vaultItem?.card_image || vaultItem?.vault_images?.[0]?.storage_path || null;
   const art = getCardImage(raw);
@@ -93,33 +94,36 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
         </span>
         <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live on CardPop</p>
       </div>
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+      <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
         {events.map(ev => (
           <Link
             key={ev.key}
             to={`/marketplace/${ev.listingId}`}
-            className="shrink-0 flex items-center gap-2.5 bg-card border border-border rounded-xl pl-1.5 pr-3.5 py-1.5 hover:border-primary/40 transition-colors"
+            className="group shrink-0 flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-2xl p-2 pr-5 hover:border-primary/40 hover:bg-primary/[0.03] transition-colors"
           >
-            <div className="w-9 h-12 rounded-lg bg-muted/40 overflow-hidden flex items-center justify-center shrink-0">
+            {/* The card itself is the point of the strip, so give it a real
+                thumbnail — 80×112 px (5:7, a card's own aspect ratio) on
+                tablet and up, 64×90 on phones — rather than a 36 px glyph. */}
+            <div className="w-16 h-[5.625rem] sm:w-20 sm:h-28 rounded-xl bg-muted/40 overflow-hidden flex items-center justify-center shrink-0">
               {ev.image
-                ? <img src={ev.image} alt="" width="36" height="48" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                : <span className="text-[10px] text-muted-foreground">🃏</span>}
+                ? <img src={ev.image} alt="" width="80" height="112" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                : <span className="text-2xl text-muted-foreground">🃏</span>}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 mb-1">
                 {ev.kind === 'sold' ? (
                   <SoldBadge size="sm" />
                 ) : (
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-primary">Just listed</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-primary">Just listed</span>
                 )}
                 {ev.at && (
-                  <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                  <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                     {formatDistanceToNowStrict(ev.at, { addSuffix: true })}
                   </span>
                 )}
               </div>
-              <p className="text-xs font-bold text-foreground truncate max-w-[11rem]">{ev.name}</p>
-              {ev.price > 0 && <p className="text-xs font-semibold text-muted-foreground tabular-nums">${ev.price.toFixed(2)}</p>}
+              <p className="text-sm font-bold text-foreground truncate max-w-[12rem] sm:max-w-[15rem] group-hover:text-primary transition-colors">{ev.name}</p>
+              {ev.price > 0 && <p className="text-sm font-semibold text-muted-foreground tabular-nums mt-0.5">${ev.price.toFixed(2)}</p>}
             </div>
           </Link>
         ))}
