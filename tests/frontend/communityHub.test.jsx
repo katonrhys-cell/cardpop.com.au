@@ -108,4 +108,35 @@ describe('CommunityPage', () => {
     expect(withoutPoster.querySelector('[data-testid="event-thumb"]')).toBeNull();
     expect(withoutPoster.querySelector('svg')).toBeTruthy(); // falls back to the type icon
   });
+
+  it('fills every event tile with the brand gradient and leads with a date leaf', async () => {
+    const rowsQuery = (rows) => {
+      const q = emptyQuery();
+      q.then = (resolve) => Promise.resolve({ data: rows, error: null }).then(resolve);
+      return q;
+    };
+    from.mockImplementation((table) => (table === 'events_public'
+      ? rowsQuery([
+        { id: 'e1', slug: 'collectorama', event_type: 'card_show', title: 'Collectorama Melbourne', start_date: '2099-11-01', suburb: 'Keilor Park', state: 'VIC', image_url: null },
+        { id: 'e2', slug: 'supanova', event_type: 'community_event', title: 'Supanova Brisbane', start_date: '2099-11-06', end_date: '2099-11-08', suburb: 'South Brisbane', state: 'QLD', image_url: null },
+      ])
+      : emptyQuery()));
+
+    render(<MemoryRouter><CommunityPage /></MemoryRouter>);
+    const tile = (await screen.findByText('Collectorama Melbourne')).closest('a');
+    expect(tile.getAttribute('data-testid')).toBe('event-tile');
+    // CardPop red + charcoal, never the page's card/border tokens.
+    expect(tile.style.background).toMatch(/#CE1126|rgb\(206, 17, 38\)/i);
+    expect(tile.style.background).toMatch(/#1F2937|rgb\(31, 41, 55\)/i);
+    expect(tile.className).toContain('text-white');
+    expect(tile.className).not.toContain('bg-card');
+    // Date leaf: start day numeral over its month.
+    expect(tile.textContent).toContain('1Nov');
+    expect(tile.textContent).toContain('View event');
+
+    const multiDay = screen.getByText('Supanova Brisbane').closest('a');
+    expect(multiDay.textContent).toContain('6Nov');
+    expect(multiDay.textContent).toMatch(/Fri, 6 Nov 2099 – Sun, 8 Nov 2099/);
+    expect(screen.getByText('Community Event')).toBeInTheDocument();
+  });
 });
