@@ -12,15 +12,16 @@ import { fileURLToPath } from 'node:url';
 // These tests pin every source to one identical string so an edit to a single
 // file can't silently drop the result back to the domain.
 //
-// One canonical string, ™ included, across every source. The bare
-// "CardPop Australia" is kept only as an alternateName — a fallback form on
-// record in case Google declines to print the symbol.
+// One canonical string across every source, and it is the plain
+// "CardPop Australia": the ™ form was tried first (2026-10-19) and Google kept
+// printing the domain, so the symbol is now only on record as an alternateName
+// alongside the short "CardPop".
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const read = (p) => readFileSync(resolve(root, p), 'utf8');
 
-const SITE_NAME = 'CardPop Australia™';
-const PLAIN_NAME = 'CardPop Australia';
+const SITE_NAME = 'CardPop Australia';
+const TRADEMARK_NAME = 'CardPop Australia™';
 
 const html = read('index.html');
 
@@ -37,9 +38,10 @@ describe('Google site name signals', () => {
     expect(website.name).toBe(SITE_NAME);
   });
 
-  it('keeps a ™-free form on record as an alternate name', () => {
+  it('keeps the ™ form and the short name on record as alternate names', () => {
     const website = jsonLdBlocks.find((b) => b['@type'] === 'WebSite');
-    expect(website.alternateName).toContain(PLAIN_NAME);
+    expect(website.alternateName).toContain(TRADEMARK_NAME);
+    expect(website.alternateName).toContain('CardPop');
   });
 
   it('gives every homepage entity the same name', () => {

@@ -126,8 +126,8 @@ export const generateLocalBusinessSchema = () => {
   return {
     "@context": "https://schema.org",
     "@type": "OnlineStore",
-    "name": "CardPop Australia™",
-    "alternateName": ["CardPop", "CardPop Australia"],
+    "name": "CardPop Australia",
+    "alternateName": ["CardPop", "CardPop Australia™"],
     "description": "Australia's most trusted trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
     "url": "https://cardpop.com.au",
     "address": {

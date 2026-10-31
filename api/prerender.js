@@ -190,7 +190,7 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <meta property="og:title" content="${esc(title)}" />
 <meta property="og:description" content="${esc(description)}" />
 <meta property="og:type" content="${esc(ogType)}" />
-<meta property="og:site_name" content="CardPop Australia™" />
+<meta property="og:site_name" content="CardPop Australia" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
 ${ogImage ? `<meta property="og:image:alt" content="${esc(imageAlt)}" />` : ''}
@@ -1026,7 +1026,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
         price: price.toFixed(2),
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
-        seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        seller: { '@type': 'Organization', name: 'CardPop Australia' },
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -1146,7 +1146,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
         price: price.toFixed(2),
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
-        seller: { '@type': 'Organization', name: 'CardPop Australia\u2122' },
+        seller: { '@type': 'Organization', name: 'CardPop Australia' },
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -3888,7 +3888,7 @@ async function renderStoresCity(supabase, citySlug) {
 // not a different one, so it is dynamic rendering rather than cloaking. The
 // title must stay identical to index.html's: Google reads the homepage title
 // as a site-name candidate.
-const HOME_TITLE = 'CardPop Australia™ | Trading Card Marketplace';
+const HOME_TITLE = 'CardPop Australia | Trading Card Marketplace';
 const HOME_DESCRIPTION = 'Buy, sell and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards with verified Australian sellers on CardPop — AUD prices, Buyer Protection on every order, live Australian market data, card shows and collector guides.';
 
 const HOME_HOW_IT_WORKS = [
@@ -3971,8 +3971,8 @@ async function renderHome(supabase) {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     '@id': `${BASE_URL}/#website`,
-    name: 'CardPop Australia™',
-    alternateName: ['CardPop', 'CardPop Australia'],
+    name: 'CardPop Australia',
+    alternateName: ['CardPop', 'CardPop Australia™'],
     publisher: { '@id': `${BASE_URL}/#organization` },
     url: BASE_URL,
     description: "Australia's trading card marketplace for Pokémon, Magic: The Gathering, sports cards and more.",
@@ -3986,8 +3986,8 @@ async function renderHome(supabase) {
     '@context': 'https://schema.org',
     '@type': 'Organization',
     '@id': `${BASE_URL}/#organization`,
-    name: 'CardPop Australia™',
-    alternateName: ['CardPop', 'CardPop Australia'],
+    name: 'CardPop Australia',
+    alternateName: ['CardPop', 'CardPop Australia™'],
     url: BASE_URL,
     logo: `${BASE_URL}/og-image.jpg`,
     description: "Australia's trading card marketplace.",

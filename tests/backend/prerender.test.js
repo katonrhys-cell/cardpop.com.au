@@ -1231,7 +1231,7 @@ describe('prerender homepage', () => {
     expect(status).toBe(200);
     expect(headers['Content-Type']).toContain('text/html');
     // Same title as index.html — Google reads it as the site-name candidate.
-    expect(body).toContain('<title>CardPop Australia™ | Trading Card Marketplace</title>');
+    expect(body).toContain('<title>CardPop Australia | Trading Card Marketplace</title>');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/" />');
     expect(body).not.toContain('noindex');
     // Every section HomePage.jsx renders, as real HTML.

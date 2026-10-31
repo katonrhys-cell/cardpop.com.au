@@ -186,7 +186,7 @@ const ShopProductPage = () => {
         price: price.toFixed(2),
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
-        seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        seller: { '@type': 'Organization', name: 'CardPop Australia' },
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
