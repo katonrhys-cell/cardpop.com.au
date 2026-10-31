@@ -1,4 +1,5 @@
 import { trackingUrl, carrierLabel, normalizeTrackingNumber } from '../../utils/shipmentTracking.js';
+import { MARKETPLACE_PROTECTION } from '../../utils/buyerProtectionPolicy.js';
 
 /**
  * Shared HTML email template builder matching CardPop brand.
@@ -414,9 +415,9 @@ export function refundProcessedEmail({ buyerName, refundAmount, orderId }) {
 ${heroHeading('Refund processed', `Hi ${esc(buyerName)} — your money is on its way back.`)}
 ${statRow([
   { glyph: '$', colour: TILE.red, value: money(refundAmount), caption: 'Refunded (AUD)' },
-  { glyph: '⏱', colour: TILE.charcoal, value: '5–10', caption: 'Business days to appear' },
+  { glyph: '⏱', colour: TILE.charcoal, value: `${MARKETPLACE_PROTECTION.refundProcessingDays}`, caption: 'Days to your account' },
 ])}
-${centred('The refund goes back to your original payment method. Banks and card issuers can take 5–10 business days to show it.')}`;
+${centred(`The refund goes back to your original payment method within ${MARKETPLACE_PROTECTION.refundProcessingDays} days.`)}`;
 
   return cpEmail(
     `Your CardPop refund of $${Number(refundAmount).toFixed(2)} AUD is on its way.`,
