@@ -12,7 +12,7 @@ import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { COMMUNITY_ITEMS, EVENT_ITEMS, READS_ITEM, badgeStyle } from '@/lib/communityNav.js';
 import { EVENT_CARD_COLUMNS } from '@/pages/community/CommunityEventsPage.jsx';
 import { BLOG_CARD_COLUMNS } from '@/pages/blog/BlogPage.jsx';
-import { eventPath, formatEventDate, formatEventLocation, eventTypeLabel, eventTypeStyle, toLocalDateStr } from '@/lib/eventSeo.js';
+import { eventPath, formatEventDate, formatEventLocation, eventTypeLabel, eventTypeStyle, toLocalDateStr, parseDate } from '@/lib/eventSeo.js';
 import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { isVerified } from '@/utils/verification.js';
@@ -28,6 +28,13 @@ import { Badge } from '@/components/ui/badge';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 
 const TOTAL_SLIDES = 3;
+
+// The upcoming-event tiles are filled with the brand gradient (the same
+// charcoal → CardPop red sweep as the promo carousel) so the section reads as
+// a designed feature rather than four outlined boxes. Everything on a tile
+// is white-on-brand, so the thumb, pill and date leaf below are frosted
+// (white at low alpha) rather than the page's border/muted tokens.
+const EVENT_TILE_BG = 'linear-gradient(135deg, #1F2937 0%, #7F131F 58%, #CE1126 100%)';
 
 // The little picture on an upcoming-event tile: the event's own poster/logo
 // (`events.image_url`, routed through the image CDN like every stored image).
@@ -46,15 +53,35 @@ function EventThumb({ event, style }) {
         loading="lazy"
         decoding="async"
         onError={() => setSrc(src !== full ? full : null)}
-        className="w-10 h-10 rounded-lg object-cover shrink-0 border border-border bg-muted shadow-sm"
+        className="w-11 h-11 rounded-xl object-cover shrink-0 bg-white/10 ring-2 ring-white/30 shadow-md"
         data-testid="event-thumb"
       />
     );
   }
   if (!style) return null;
   return (
-    <span className={`inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br ${style.gradient} shrink-0 shadow-sm`}>
+    <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/15 ring-2 ring-white/20 shrink-0 shadow-md backdrop-blur-sm">
       <style.Icon className="w-5 h-5 text-white" />
+    </span>
+  );
+}
+
+// Calendar-leaf date mark in the tile's top-right corner: the start day as a
+// big numeral over its month, so a collector scanning the row reads the
+// dates before the titles. The full formatted date (weekday, range) still
+// sits in the tile's detail rows beneath.
+function EventDateLeaf({ event }) {
+  const start = parseDate(event?.start_date);
+  if (!start) return null;
+  return (
+    <span
+      className="flex flex-col items-center justify-center w-12 h-12 rounded-xl bg-white text-brand-charcoal shadow-md shrink-0 leading-none"
+      aria-hidden="true"
+    >
+      <span className="font-heading font-extrabold text-lg tabular-nums">{start.getDate()}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wider text-brand-red">
+        {start.toLocaleDateString('en-AU', { month: 'short' })}
+      </span>
     </span>
   );
 }
@@ -367,26 +394,51 @@ const CommunityPage = () => {
             cta="Full calendar"
           />
           {events.data === null ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array(EVENTS_LIMIT).fill(0).map((_, i) => <Skeleton key={i} className="h-36 rounded-2xl" />)}</div>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{Array(EVENTS_LIMIT).fill(0).map((_, i) => <Skeleton key={i} className="h-52 rounded-2xl" />)}</div>
           ) : events.error ? (
             <EmptyState Icon={Calendar} title="Couldn't load events" error>Unable to load events right now.</EmptyState>
           ) : events.data.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {events.data.map(event => {
                 const style = eventTypeStyle(event);
+                const TypeIcon = style?.Icon;
                 return (
                   <Link
                     key={event.id}
                     to={eventPath(event)}
-                    className="group flex flex-col gap-2 bg-card border border-border p-5 rounded-2xl hover:shadow-md hover:-translate-y-0.5 transition-all"
+                    className="group relative flex flex-col min-h-[13rem] overflow-hidden rounded-2xl p-5 text-white shadow-md ring-1 ring-black/10 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
+                    style={{ background: EVENT_TILE_BG }}
+                    data-testid="event-tile"
                   >
-                    <div className="flex items-center gap-2">
-                      <EventThumb event={event} style={style} />
-                      <Badge variant="secondary" className="text-[10px] uppercase tracking-wide font-bold">{eventTypeLabel(event)}</Badge>
+                    {/* Diagonal accent slabs — the same device as the promo carousel */}
+                    <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
+                      <div className="absolute -right-10 top-0 w-36 h-full bg-white/[0.07] group-hover:bg-white/[0.11] transition-colors duration-300" style={{ transform: 'skewX(-12deg)' }} />
+                      <div className="absolute right-20 top-0 w-10 h-full bg-white/[0.04]" style={{ transform: 'skewX(-12deg)' }} />
                     </div>
-                    <h3 className="font-bold line-clamp-2 group-hover:text-primary transition-colors">{event.title}</h3>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 shrink-0" />{formatEventDate(event)}</p>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1.5 line-clamp-1"><MapPin className="w-3.5 h-3.5 shrink-0" />{formatEventLocation(event)}</p>
+
+                    <div className="relative z-10 flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <EventThumb event={event} style={style} />
+                        <span className="inline-flex items-center gap-1 rounded-pill bg-white/15 ring-1 ring-white/25 backdrop-blur-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white truncate">
+                          {TypeIcon && <TypeIcon className="w-3 h-3 shrink-0" aria-hidden="true" />}
+                          {eventTypeLabel(event)}
+                        </span>
+                      </div>
+                      <EventDateLeaf event={event} />
+                    </div>
+
+                    <h3 className="relative z-10 mt-4 font-heading font-extrabold text-base leading-snug line-clamp-3">
+                      {event.title}
+                    </h3>
+
+                    <div className="relative z-10 mt-auto pt-4 space-y-1.5 text-xs text-white/85">
+                      <p className="flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5 shrink-0 text-white/70" aria-hidden="true" />{formatEventDate(event)}</p>
+                      <p className="flex items-center gap-1.5 line-clamp-1"><MapPin className="w-3.5 h-3.5 shrink-0 text-white/70" aria-hidden="true" />{formatEventLocation(event)}</p>
+                    </div>
+
+                    <span className="relative z-10 mt-4 inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.15em] text-white/90 group-hover:gap-2.5 transition-all">
+                      View event <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                    </span>
                   </Link>
                 );
               })}
