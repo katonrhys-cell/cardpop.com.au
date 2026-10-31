@@ -10,7 +10,10 @@ create schema if not exists auth;
 create or replace function auth.uid() returns uuid language sql stable as
 $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 
-create type listing_status as enum ('draft', 'active', 'sold', 'ended', 'archived', 'removed', 'pending', 'private');
+-- Mirrors production's enum, which was created before this repository and has
+-- no 'pending' value of its own: 20261031134827_listing_status_pending_value
+-- adds it, and the runner applies that migration before the approval ones.
+create type listing_status as enum ('draft', 'active', 'sold', 'ended', 'archived', 'removed');
 
 create table public.profiles (id uuid primary key, is_admin boolean default false);
 create table public.platform_settings (key text primary key, value jsonb);

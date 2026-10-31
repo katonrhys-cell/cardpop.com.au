@@ -32,6 +32,28 @@ export const ContentBlockType = Object.freeze({
 	Image: 'image',
 });
 
+/**
+ * Thrown when the AI proxy this module talks to has no URL configured. Every
+ * caller used to send its request to `undefined/generate`, which surfaced as
+ * a bare 500 ("Failed to parse URL from undefined/generate") with nothing in
+ * the response to say the feature simply isn't set up on this deployment.
+ * `status` lets a route answer 503 and the message says which variable to set.
+ */
+export class IntegratedAiNotConfiguredError extends Error {
+	constructor() {
+		super('The AI assistant is not configured on this deployment (INTEGRATED_AI_API_URL is not set).');
+		this.name = 'IntegratedAiNotConfiguredError';
+		this.status = 503;
+	}
+}
+
+/** True when the AI proxy URL is set, i.e. `stream()` / `streamOneShot()` can run. */
+export const isIntegratedAiConfigured = () => Boolean(process.env.INTEGRATED_AI_API_URL);
+
+function assertIntegratedAiConfigured() {
+	if (!isIntegratedAiConfigured()) throw new IntegratedAiNotConfiguredError();
+}
+
 const HistoryEventTypes = new Set([
 	SSEEventType.Reasoning,
 	SSEEventType.Content,
@@ -189,6 +211,7 @@ export async function uploadImagesToSupabase({ images }) {
  * @returns {Promise<import('node:stream').Readable>}
  */
 export async function streamOneShot({ systemPrompt, userMessage }) {
+	assertIntegratedAiConfigured();
 	const response = await fetch(`${process.env.INTEGRATED_AI_API_URL}/generate`, {
 		method: 'POST',
 		headers: {
@@ -236,6 +259,7 @@ export async function streamOneShot({ systemPrompt, userMessage }) {
  * @returns {Promise<import('node:stream').Readable>}
  */
 export async function stream({ userId, systemPrompt, userMessage }) {
+	assertIntegratedAiConfigured();
 	const history = await getHistory({ userId });
 
 	const response = await fetch(`${process.env.INTEGRATED_AI_API_URL}/generate`, {
