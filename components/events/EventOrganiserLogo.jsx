@@ -6,7 +6,7 @@ import { isVideoLogoUrl, safeLogoUrl, logoAltText } from '@/utils/eventOrganiser
 // or animated image, or a short muted video loop. Renders nothing when the
 // event has no logo or it fails to load, so the layout can fall back to the
 // full-width title. `title` is the "Presented by" caption's organiser name.
-export default function EventOrganiserLogo({ event, className = '' }) {
+export default function EventOrganiserLogo({ event, className = '', caption = true }) {
   const url = safeLogoUrl(event?.organizer_logo_url);
   const [failed, setFailed] = useState(false);
   if (!url || failed) return null;
@@ -41,7 +41,7 @@ export default function EventOrganiserLogo({ event, className = '' }) {
   return (
     <figure className={`flex flex-col items-center justify-center gap-2 text-center ${className}`}>
       {media}
-      {event?.organizer_name && (
+      {caption && event?.organizer_name && (
         <figcaption className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
           Presented by {event.organizer_name}
         </figcaption>

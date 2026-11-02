@@ -194,6 +194,7 @@ const BlogCategoryPage = lazy(() => import('@/pages/blog/BlogCategoryPage.jsx'))
 const CommunityPage = lazy(() => import('@/pages/community/CommunityPage.jsx'));
 const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEventsPage.jsx'));
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
+const EventOrganiserPage = lazy(() => import('@/pages/community/EventOrganiserPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
 const CommunityDiscussionNewPage = lazy(() => import('@/pages/community/CommunityDiscussionNewPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
@@ -502,6 +503,7 @@ const App = () => {
                         <Route path="/events/trade-events" element={<CommunityEventsPage defaultType="trade_event" />} />
                         <Route path="/events/community-events" element={<CommunityEventsPage defaultType="community_event" />} />
                         <Route path="/events/store-events" element={<CommunityEventsPage defaultType="lgs_event" />} />
+                        <Route path="/events/organisers/:slug" element={<EventOrganiserPage />} />
                         <Route path="/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/events" element={<Navigate to="/events" replace />} />
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />

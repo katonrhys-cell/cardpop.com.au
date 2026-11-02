@@ -15,7 +15,7 @@ export function useEventOrganisers(enabled = true) {
     try {
       const { data, error } = await supabase
         .from('event_organisers')
-        .select('id, name, logo_url')
+        .select('id, name, slug, logo_url')
         .order('name')
         .limit(500);
       if (!error && Array.isArray(data)) setOrganisers(sortOrganisers(data));
@@ -36,7 +36,7 @@ export function useEventOrganisers(enabled = true) {
     const query = existing
       ? supabase.from('event_organisers').update(row).eq('id', existing.id)
       : supabase.from('event_organisers').insert(row);
-    const { data, error } = await query.select('id, name, logo_url').single();
+    const { data, error } = await query.select('id, name, slug, logo_url').single();
     if (error) throw error;
     await reload();
     return { organiser: data, created: !existing };

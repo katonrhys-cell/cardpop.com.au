@@ -6,6 +6,10 @@
 -- organizer_logo_url) — picking an organiser just fills those fields — so the
 -- event page, events_public, the prerender and the JSON-LD are unchanged.
 --
+-- Each organiser also has a public page, /events/organisers/<slug>, listing
+-- every event whose organizer_name names them (pages/community/
+-- EventOrganiserPage.jsx); event pages link the organiser name and logo there.
+--
 -- Public read: an organiser's name and logo are already public on every event
 -- page. Contact email / phone are deliberately NOT stored here (events_public
 -- doesn't expose them). Writes are admin-only.
@@ -13,6 +17,9 @@
 create table if not exists public.event_organisers (
   id         uuid primary key default gen_random_uuid(),
   name       text not null check (char_length(btrim(name)) between 1 and 120),
+  -- URL segment for /events/organisers/<slug>; filled from the name by the
+  -- trigger below when blank, and kept when the name is edited (links stay).
+  slug       text check (slug is null or slug ~ '^[a-z0-9]+(-[a-z0-9]+)*$'),
   logo_url   text check (logo_url is null or logo_url ~* '^https?://[^[:space:]]+$'),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -21,6 +28,8 @@ create table if not exists public.event_organisers (
 -- One row per organiser, ignoring case and stray spaces.
 create unique index if not exists event_organisers_name_key
   on public.event_organisers (lower(btrim(name)));
+create unique index if not exists event_organisers_slug_key
+  on public.event_organisers (slug);
 
 comment on table public.event_organisers is
   'Saved event organisers (name + logo) selectable on the event form. Events keep a denormalised copy of the name/logo — see utils/eventOrganisers.js.';
@@ -52,9 +61,24 @@ returns trigger
 language plpgsql
 set search_path = public
 as $$
+declare
+  base text;
 begin
   new.name := btrim(new.name);
   new.logo_url := nullif(btrim(new.logo_url), '');
+  new.slug := nullif(btrim(new.slug), '');
+  if tg_op = 'UPDATE' and new.slug is null then
+    new.slug := old.slug;
+  end if;
+  if new.slug is null then
+    base := btrim(regexp_replace(lower(new.name), '[^a-z0-9]+', '-', 'g'), '-');
+    if base = '' then base := 'organiser'; end if;
+    new.slug := base;
+    -- Two names can slug alike ("A&B" / "A B"); suffix until free.
+    while exists (select 1 from public.event_organisers o where o.slug = new.slug and o.id <> new.id) loop
+      new.slug := base || '-' || substr(md5(random()::text), 1, 4);
+    end loop;
+  end if;
   new.updated_at := now();
   if tg_op = 'UPDATE' then
     new.created_at := old.created_at;

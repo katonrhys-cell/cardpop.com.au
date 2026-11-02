@@ -48,3 +48,23 @@ still stores its own copy in `organizer_name` / `organizer_logo_url`, so the
 page, `events_public` and the prerender are unchanged — updating an organiser's
 logo in the list affects events saved afterwards, not ones already saved.
 Helpers: `utils/eventOrganisers.js`, `hooks/useEventOrganisers.js`.
+
+## Organiser pages
+
+Every saved organiser has a public page at **`/events/organisers/<slug>`**
+(`pages/community/EventOrganiserPage.jsx`): their logo, name and every public
+event (`events_public`) whose `organizer_name` names them, as Upcoming and
+Past grids. `event_organisers.slug` is filled from the name by the table's
+trigger and kept when the name is edited, so links don't break.
+
+On an event page (`EventDetailCard`), `organisersForEvent()` resolves the
+event's `organizer_name` to saved organisers: an exact match, or, for a
+co-hosted name like "Fast Break Trading Cards Pty Ltd & Sports Addicts
+Australia", every saved organiser named in it. Each name in the Organiser row
+links to its page (`organiserNameParts()`), and so do the logo tile and the
+title-row logo. An event saved without its own logo shows its organisers'
+saved logos (one per organiser). Matching is by whole words, so "Cardcore"
+never matches "Hardcardcore".
+
+The organiser page is client-rendered (no bot prerender yet), is not in the
+sitemap, and is `noindex` while the organiser has no public events.
