@@ -52,7 +52,7 @@ port = 54323
 api_url = "http://127.0.0.1"
 
 # Email testing server. Emails sent with the local dev stack are captured here.
-[inbucket]
+[local_smtp]
 enabled = true
 port = 54324
 
