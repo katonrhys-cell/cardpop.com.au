@@ -21,10 +21,10 @@
 -- (@officiallycardcore) as at 2 Nov 2026; the vendor application form is
 -- the Google Form from Cardcore's Instagram link-in-bio (stored without the
 -- account-specific `/u/1/` segment and the utm tags, so it opens for any
--- visitor). One field is deliberately left for an admin to paste in from
--- Admin → Events because the exact URL was not available at seed time:
--- `ticket_url` (the Oztix event link — "Get Tickets" falls back to the
--- website until then).
+-- visitor). `ticket_url` is the Oztix event page (without the fbclid /
+-- utm tags Instagram appends) and doubles as `source_url`, so the weekly
+-- event watch re-reads the Oztix listing and queues any date, venue or
+-- price change for an admin.
 --
 -- Idempotent: the event insert is skipped when the slug exists, and each
 -- board post is skipped when a post with the same title is already on that
@@ -37,7 +37,7 @@ insert into public.events (
   venue_name, address, suburb, state, postcode,
   start_date, end_date, start_time,
   entry_fee_aud, ticket_prices,
-  website_url, instagram_url, facebook_url, vendor_application_url,
+  website_url, ticket_url, source_url, instagram_url, facebook_url, vendor_application_url,
   organizer_name,
   age_restrictions, accessibility_info,
   featured_card_games, tags,
@@ -66,6 +66,8 @@ select
   15,
   '[{"type": "child", "price_aud": 0}, {"type": "vip", "price_aud": 50}]'::jsonb,
   'https://www.cardcore.club',
+  'https://tickets.oztix.com.au/outlet/event/63c84b6c-1fe5-46ed-af37-c7dd2541423c',
+  'https://tickets.oztix.com.au/outlet/event/63c84b6c-1fe5-46ed-af37-c7dd2541423c',
   'https://www.instagram.com/officiallycardcore/',
   'https://www.facebook.com/p/Cardcore-61577108853691/',
   'https://docs.google.com/forms/d/e/1FAIpQLScZML_0yIj2ndEGRFO-7UTnUNqrmNFZ9BBSRssEaNvW2Z05tg/viewform',
