@@ -77,11 +77,21 @@ router.post('/stream', requireUserId, integratedAiRateLimit, uploadFiles({
 		});
 	}
 
-	const sseStream = await stream({
-		userId: req.userId,
-		systemPrompt: SystemPrompt,
-		userMessage: parsedMessage,
-	});
+	let sseStream;
+	try {
+		sseStream = await stream({
+			userId: req.userId,
+			systemPrompt: SystemPrompt,
+			userMessage: parsedMessage,
+		});
+	} catch (err) {
+		// The proxy isn't configured on this deployment: say so (503) instead of
+		// letting the generic 500 handler hide the cause.
+		if (err?.status === 503) {
+			return res.status(503).json({ error: err.message });
+		}
+		throw err;
+	}
 
 	res.setHeader('Content-Type', 'text/event-stream');
 	res.setHeader('Cache-Control', 'no-cache');

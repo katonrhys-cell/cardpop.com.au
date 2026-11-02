@@ -1,0 +1,21 @@
+-- Add the 'pending' value the listing-approval trigger writes to listing_status.
+--
+-- enforce_listing_approval() (20260709084111, 20261002082700) holds a new
+-- 'active' listing as `status := 'pending'` while the admin setting
+-- `listing_approval_required` is on, and the app, the admin Listings page and
+-- vaultListingService.js all read that state. The production enum was created
+-- before this repository existed with
+--   ('draft', 'active', 'sold', 'ended', 'archived', 'removed')
+-- and no migration ever added 'pending' — only the DB test stub
+-- (tests/db/listing_approval_stub_schema.sql) had it, which is why the test
+-- passed. Flip the switch in Admin → Settings today and every new listing
+-- fails with `invalid input value for enum listing_status: "pending"`.
+--
+-- ADD VALUE is idempotent with IF NOT EXISTS. It runs in its own migration
+-- because a value added inside a transaction can't be used until that
+-- transaction commits (nothing here uses it). Public reads are unaffected:
+-- the listings SELECT policies admit only 'active' / 'sold'
+-- (20260819214352_public_read_sold_listings.sql), so a pending listing stays
+-- hidden from buyers exactly as the approval feature intends.
+
+alter type public.listing_status add value if not exists 'pending';

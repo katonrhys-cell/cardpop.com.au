@@ -114,6 +114,19 @@ describe('POST /stream', () => {
     );
   });
 
+  it('answers 503 with the reason when the AI proxy is not configured', async () => {
+    const notConfigured = Object.assign(
+      new Error('The AI assistant is not configured on this deployment (INTEGRATED_AI_API_URL is not set).'),
+      { status: 503 },
+    );
+    mockStream.mockRejectedValue(notConfigured);
+
+    const res = await request(app).post('/stream').send({ message: JSON.stringify([{ type: 'text', text: 'Hi' }]) });
+
+    expect(res.status).toBe(503);
+    expect(res.body.error).toMatch(/INTEGRATED_AI_API_URL/);
+  });
+
   it('sets SSE response headers', async () => {
     const userMessage = [{ type: 'text', text: 'Hello' }];
     mockStream.mockResolvedValue(makeSseStream());
