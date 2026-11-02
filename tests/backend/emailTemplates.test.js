@@ -23,6 +23,7 @@ import {
   welcomeOfferEmail,
   refundProcessedEmail,
   refundIssuedEmail,
+  contactMessageEmail,
 } from '../../src/emails/templates.js';
 
 // Regression guard: transactional emails are sent from noreply@cardpop.com.au
@@ -407,5 +408,77 @@ describe('transactional emails — hero badge + stat tiles', () => {
     const issued = refundIssuedEmail({ sellerName: 'Misty', refundAmount: 100, retainedFee: 0, orderId: 'x' });
     expect(issued).toContain('Refunded to buyer');
     expect(issued).toContain('$0.00');
+  });
+});
+
+// The shared layout: eyebrow + heading instead of a solid red band, brand
+// colours only, the "why you received this" note in the footer, and a
+// professional contact-form / invoice presentation.
+describe('cpEmail layout', () => {
+  const html = orderAdminNoticeEmail({ orderId: 'o1', buyerName: 'Ash', buyerEmail: 'a@b.co', total: 9, itemsSummary: '1 item' });
+
+  it('renders the title as a red uppercase eyebrow above the heading, not a red band', () => {
+    expect(html).toMatch(/<p style="[^"]*text-transform:uppercase;color:#CE1126;">New Order<\/p>\s*<h1 [^>]*>A new order has come in<\/h1>/);
+    expect(html).not.toMatch(/background:#CE1126;padding:20px 40px/);
+    // A thin brand-red rule separates the logo band from the body.
+    expect(html).toMatch(/background:#CE1126;height:4px/);
+  });
+
+  it('uses the brand palette, never the old off-brand red or charcoal', () => {
+    expect(html).not.toContain('#E63946');
+    expect(html).not.toContain('#1C1C1E');
+    expect(html).toContain('#1F2937');
+  });
+
+  it('puts the support line, the © line and the footer note in the footer', () => {
+    expect(html).toContain('support@cardpop.com.au');
+    expect(html).toContain(`&copy; ${new Date().getFullYear()} CardPop Australia`);
+    expect(html).toContain('You received this because you are the CardPop admin contact.');
+    expect(html).toContain('<meta name="color-scheme" content="light">');
+  });
+
+  it('draws the button only when a URL is given', () => {
+    expect(html).toContain('View in Admin');
+    expect(contactMessageEmail({ name: 'A', email: 'a@b.co', subject: 's', message: 'm' })).not.toContain('mso-padding-alt');
+  });
+
+  it('lays details out as a label column and a value column', () => {
+    expect(html).toMatch(/<td valign="top" width="130" [^>]*>Buyer<\/td>\s*<td valign="top" [^>]*>Ash · a@b.co<\/td>/);
+    expect(html).not.toContain('<strong>Buyer:</strong>');
+  });
+});
+
+describe('contactMessageEmail', () => {
+  const args = { name: 'Simon', email: 'simon@example.com', subject: 'Price and buy', message: 'Do you buy scanlens cards 1974?\nMy full set is unmarked.', receivedAt: '2026-11-02T06:56:00+11:00' };
+
+  it('shows who wrote, a mailto link, the subject, when it arrived, and the message with line breaks kept', () => {
+    const html = contactMessageEmail(args);
+    expect(html).toContain('New message from Simon');
+    expect(html).toContain('<title>Contact form</title>');
+    expect(html).toContain('href="mailto:simon@example.com"');
+    expect(html).toContain('Price and buy');
+    expect(html).toMatch(/Received<\/td>\s*<td [^>]*>2 Nov 2026, 6:56\s?am AEDT<\/td>/);
+    expect(html).toMatch(/white-space:pre-wrap;">Do you buy scanlens cards 1974\?\nMy full set is unmarked\.<\/td>/);
+    expect(html).toContain('the reply goes to simon@example.com');
+  });
+
+  it('escapes every visitor-controlled field', () => {
+    const html = contactMessageEmail({ ...args, name: XSS, subject: XSS, message: XSS, email: 'x@y.co"><b>z' });
+    expect(html).not.toContain('<a href="https://evil.example">click</a>');
+    expect(html).not.toContain('"><b>z');
+  });
+});
+
+describe('invoiceBlock', () => {
+  it('rules off a header row, right-aligns amounts and emphasises the total', () => {
+    const html = orderConfirmedEmail({
+      buyerName: 'Ash', orderId: 'abcd1234-0000', total: 109.95,
+      invoice: { items: [{ name: 'Charizard', quantity: 1, total: 100 }], subtotal: 100, shipping: 9.95, gstIncluded: 9.09, total: 109.95 },
+    });
+    expect(html).toMatch(/text-transform:uppercase;[^"]*">Item <span[^>]*>&middot; Order #ABCD1234<\/span><\/td><td align="right" [^>]*>Amount<\/td>/);
+    expect(html).toMatch(/<td align="right" [^>]*>\$100\.00 AUD<\/td>/);
+    expect(html).toMatch(/border-top:2px solid #1F2937;">Total \(AUD\)<\/td>/);
+    expect(html).toContain('Shipping');
+    expect(html).toContain('Includes GST of $9.09 AUD');
   });
 });
