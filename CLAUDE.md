@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is deployed on Vercel. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of Vercel, which hosts the app. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
+CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is hosted on a **Vultr VPS** (one Node process under systemd, terminating TLS itself — `docs/vultr-rollout.md`), having moved off Vercel in November 2026. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of the VPS, which hosts the app. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
 
 ## Commands
 
@@ -25,7 +25,8 @@ npx vitest run tests/backend/health.test.js
 
 # Build
 npm run build        # Vite build → dist/
-npm run start        # Preview the production build on port 3000
+npm run start        # Run the real server (server/index.js: dist/ + API + functions) on port 3000 — needs a build and a .env
+npm run preview      # vite preview of dist/ on port 3000 (static only, no API)
 ```
 
 ## Architecture
@@ -67,11 +68,11 @@ The frontend has two data sources:
    **Never `select('*')` for a grid, strip or search result.** Every browse surface reads an explicit projection: `LISTING_CARD_COLUMNS` + `LISTING_SELLER_EMBED` (`lib/listingColumns.js`) with the vault embed from `lib/listingCardColumns.js`; `SHOP_CARD_COLUMNS` (`utils/shopColumns.js`, the whole row minus `description`); `PROFILE_CARD_COLUMNS` for other people's profile cards vs `PUBLIC_PROFILE_COLUMNS` for the user's own / full profile (`lib/profileColumns.js`); `BLOG_CARD_COLUMNS` (no `content`) and `EVENT_CARD_COLUMNS`. Lists are bounded (`limit`/`range`, a date window for events) — a public page's cost must not grow with the table. Small tiles (strips, rails, watchlist rows) load the 480 px companion thumbnail via `cardThumbUrl()` from `utils/imageUrl.js`, never the full upload. Decorative counts use `count: 'estimated'` (exact under PostgREST's 1,000-row cap).
 2. **Express backend** (`lib/apiServerClient.js`) — proxied via `/hcgi/api` (Vercel rewrites this to `/api`). Used for operations requiring server-side secrets: eBay pricing, Stripe payments, card OCR, AI chat, auth/MFA flows, newsletter subscription. Always sends the Supabase `access_token` as a Bearer header automatically.
 
-### Backend (Express → Vercel Serverless Function)
+### Backend (Express, one Node process on the VPS)
 
-**Entry point**: `src/app.js`, exported from `api/index.js` as a Vercel serverless function.
+**Entry point**: `src/app.js`. In production it is mounted by `server/app.js` (the self-hosted server, started by `server/index.js`) for every `/api/*` and `/hcgi/api/*` request; `api/index.js` still re-exports it for the Vercel layout. In local dev the Express server runs on port 3001. The routing manifest `vercel.json` (read at runtime by `server/vercelRoutes.js`) maps `/hcgi/api/:path*` → `/api/:path*` → `api/index.js`.
 
-In production the function handles all `/api/*` requests. In local dev the Express server runs on port 3001. The `vercel.json` rewrite maps `/hcgi/api/:path*` → `/api/:path*` → `api/index.js`.
+The other files in `api/` (`prerender.js`, `sitemap.js`, `merchant-feed.js`, `blog-generate.js`, `event-scan.js`, `grade-estimate.js`) were separate Vercel functions with their own time budgets; on the VPS they are plain modules the server mounts under the same public paths (`FUNCTION_MODULES` in `server/app.js`), so the comments about 40 s / 300 s `maxDuration` describe history, not a limit that still applies. Cloudflare's 100 s proxy limit does — see `docs/vultr-rollout.md` → Timeouts.
 
 Routes are registered in `src/routes/index.js`. Each domain has its own router file:
 
@@ -196,26 +197,45 @@ Every document paints from a static shell: "/" from `tools/home-shell.html` (hea
 
 ### Deployment
 
-Vercel's **native Git integration** builds and deploys on every push to `main`
-(and creates preview deployments for pull requests) — no GitHub Actions step is
-involved in deploying:
+The site runs on a **Vultr VPS** as one plain Node process — `server/index.js`
+serving `dist/` + the Express API + the former Vercel functions — managed by
+systemd (`deploy/cardpop.service`), terminating TLS itself on :443 with a
+Cloudflare Origin CA certificate, with Cloudflare proxying in front exactly as
+before. No Docker, no reverse proxy: the same `node` + `npm` the project
+already uses. Full runbook, including provisioning, cutover and rollback:
+`docs/vultr-rollout.md`.
 
 ```
 git push main
-  → Vercel builds dist/ and serves api/index.js as a serverless function
+  → .github/workflows/deploy.yml  (SSH to the box, seconds of Actions time)
+    → /opt/cardpop/bin/deploy.sh --detach <sha>
+        (on the VPS: export that commit into /opt/cardpop/releases/<id>, npm ci,
+         vite build, prune dev deps, flip the `current` symlink, systemctl restart, wait for /healthz)
 ```
 
-GitHub Actions does not deploy. It runs the quality gates —
+The build happens **on the box** in a fresh release directory, not in Actions
+and not in place, so the deploy job bills about one metered minute per merge
+and the running release is untouched until the switch; the result is in
+`/opt/cardpop/logs/deploy.log`, a release that doesn't come up healthy is
+rolled back to the previous one, and a failed deploy emails
+`DEPLOY_ALERT_EMAIL` through Resend. `vercel.json` is still the **routing
+manifest** (redirects, bot-only prerender rewrites, the `/hcgi/api` prefix,
+per-path headers incl. the CSP) — `server/vercelRoutes.js` interprets it with
+the same semantics Vercel did, so there is one set of rules and nothing to keep
+in step. Change routing there, never in Express. Once Vercel is fully
+decommissioned the file is to be renamed (see the runbook); until then don't
+delete it or its tests.
+
+GitHub Actions otherwise runs only the quality gates —
 `.github/workflows/ci.yml` (lint + tests + build) on pull requests and
 `e2e.yml` on **non-draft** pull requests **only** (the Playwright run is the
 most expensive workflow, so a draft PR skips it until it is marked ready for
 review) — plus the few schedules that need a runner (migration
-drift, git backup, merchant-listings check, the weekly Snyk sweep). **Nothing
-runs on a push to `main`** except the Supabase migration push (and only when
-`supabase/migrations/` changed): a private repo bills every run a whole
+drift, git backup, merchant-listings check, the weekly Snyk sweep). On a push
+to `main` only `deploy.yml` and the Supabase migration push (when
+`supabase/migrations/` changed) run: a private repo bills every run a whole
 metered minute, so the former post-merge `main-ci.yml` (the same `verify`
-job again, ~6 min per merge) and the per-push Snyk scan (the lockfile the
-Snyk App had just checked on the PR, 1 min per merge) were removed on
+job again, ~6 min per merge) and the per-push Snyk scan were removed on
 2026-10-31 after they helped exhaust the 2,000-minute allowance. Don't add a
 `push: branches: [main]` trigger to a workflow unless it does something a PR
 run can't. The **scheduled backend jobs**
@@ -224,17 +244,13 @@ price watch, GA4 site-traffic sync, delivery and retention sweeps) are fired
 by a **Cloudflare Worker with Cron Triggers** — `cloudflare/scheduler/worker.js`,
 deployed with `npx wrangler deploy --config cloudflare/scheduler/wrangler.toml`,
 holding the `CRON_SECRET` as a Worker secret. They moved off Vercel Cron
-because the Hobby plan rejects any cron firing more than once a day
-(`vercel.json` has no `crons` block), and off GitHub Actions on 2026-10-31
-because a private repo is billed a whole metered minute per run and the
-2,000-minute allowance ran out, which stopped every workflow including the
-migration push. Cron Triggers are free. Full runbook:
-`docs/scheduled-jobs.md`. The old `deploy.yml` (which ran `vercel --prod` via the CLI using an AWS
-OIDC role + SSM-stored token) was removed when deploys moved to Vercel's Git
-integration; the AWS role and `/cardpop/vercel/*` SSM parameters are now unused
-and can be cleaned up.
+because the Hobby plan rejected any cron firing more than once a day, and off
+GitHub Actions on 2026-10-31 because the metered minutes ran out, which stopped
+every workflow including the migration push. Cron Triggers are free, and the
+Worker needed no change for the VPS move (it calls `https://cardpop.com.au`).
+Full runbook: `docs/scheduled-jobs.md`.
 
-**Vercel environment variables** required in production (set in Vercel dashboard → Settings → Environment Variables):
+**Environment variables** required in production live in `/opt/cardpop/shared/.env` on the VPS (`chmod 600`, owned by `cardpop`; linked into every release, so Vite reads the `VITE_*` values at build time and dotenv the rest at runtime — edit it, then redeploy). Before November 2026 these were set in the Vercel dashboard:
 
 | Variable | Used by |
 |---|---|
@@ -264,7 +280,7 @@ and can be cleaned up.
 | `SENDLE_API_KEY` | *(optional)* Pairs with `SENDLE_ID` |
 | `RESEND_API_KEY` | Resend transactional email (order/refund/welcome). Unset = emails silently skipped. Domain must be verified in Resend — see `docs/email.md` |
 | `ANTHROPIC_API_KEY` | Scheduled blog article generation (`src/utils/blogArticleGenerator.js`) **and** the nightly event scan (`src/utils/eventScanner.js`). Unset = the nightly `/cron/blog-generate` job returns 503 and writes nothing, and every event scan fails with a recorded error — see `docs/blog-automation.md` and `docs/event-scanning.md` |
-| `CRON_SECRET` | Bearer token the Cloudflare scheduler Worker sends (`cloudflare/scheduler/worker.js`). Must be set **in both places** — the Vercel environment variable and the Worker's `CRON_SECRET` secret (`npx wrangler secret put CRON_SECRET --config cloudflare/scheduler/wrangler.toml`) — and they must match. Guards **every** cron endpoint (`/api/prices/refresh`, `/cron/blog-generate`, `/cron/event-scan`, `/api/stripe/reconcile-pending`, `/api/shop-supplier-watch/run`, `/api/orders/delivery-sweep`, `/api/site-traffic/sync`, `/api/retention/sweep`); all **fail closed** — unset means the scheduled job refuses to run rather than being publicly triggerable. (`/cron/event-scan` additionally accepts a signed-in admin's Supabase token for the manual "Run scan now" button, so admins can still trigger it by hand.) See `docs/scheduled-jobs.md` |
+| `CRON_SECRET` | Bearer token the Cloudflare scheduler Worker sends (`cloudflare/scheduler/worker.js`). Must be set **in both places** — the server's `.env` on the VPS and the Worker's `CRON_SECRET` secret (`npx wrangler secret put CRON_SECRET --config cloudflare/scheduler/wrangler.toml`) — and they must match. Guards **every** cron endpoint (`/api/prices/refresh`, `/cron/blog-generate`, `/cron/event-scan`, `/api/stripe/reconcile-pending`, `/api/shop-supplier-watch/run`, `/api/orders/delivery-sweep`, `/api/site-traffic/sync`, `/api/retention/sweep`); all **fail closed** — unset means the scheduled job refuses to run rather than being publicly triggerable. (`/cron/event-scan` additionally accepts a signed-in admin's Supabase token for the manual "Run scan now" button, so admins can still trigger it by hand.) See `docs/scheduled-jobs.md` |
 | `GA4_PROPERTY_ID` | Site traffic sync — numeric GA4 property id (`properties/…` accepted). With `GA4_SERVICE_ACCOUNT_JSON`, turns on the nightly visitor-count pull behind the home page Visitors tile and the admin Visitors card. Unset = `/api/site-traffic/sync` answers 503 and the tile stays hidden — see `docs/site-traffic.md` |
 | `GA4_SERVICE_ACCOUNT_JSON` | Site traffic sync — the service account's JSON key (raw or base64). The account needs **Viewer** on the GA4 property and the Analytics Data API enabled in its Cloud project. Never expose client-side |
 | `GA4_START_DATE` | *(optional)* `YYYY-MM-DD` the all-time visitor figure counts from; default `2025-01-01` (earlier is harmless — "since launch" uses the first day GA4 actually recorded a session) |
@@ -284,7 +300,7 @@ and can be cleaned up.
 | `AWS_LOCATION_API_KEY` | *(optional)* Amazon Location Service Places API key — server-side geocode check of the chosen shipping address before creating the Stripe session; blank = skipped (fail-open) |
 | `AWS_LOCATION_REGION` | *(optional)* Region for the server-side Amazon Location endpoint — defaults to `ap-southeast-2` |
 | `CORS_ORIGIN` | Express CORS (set to `https://cardpop.com.au`) — its origins are also accepted as payment return URLs |
-| `CHECKOUT_RETURN_ORIGINS` | *(optional)* Extra comma-separated origins allowed as Stripe/Connect/PayPal return URLs (`src/utils/returnUrl.js`), e.g. a staging host. `APP_URL`, `CORS_ORIGIN` and Vercel's own deployment URLs are always allowed |
+| `CHECKOUT_RETURN_ORIGINS` | *(optional)* Extra comma-separated origins allowed as Stripe/Connect/PayPal return URLs (`src/utils/returnUrl.js`), e.g. a staging host. `APP_URL` and `CORS_ORIGIN` are always allowed (and Vercel's `VERCEL_URL` family when set, from the old hosting) |
 | `APP_URL` | App base URL |
 | `VITE_POKEMONTCG_API_KEY` | *(optional)* Pokémon TCG API key ([dev.pokemontcg.io](https://dev.pokemontcg.io)) for analytics card art (`utils/pokemonCardImage.js`) — blank works keyless (~1,000 req/day); a free key raises the limit to 20,000/day. Images are served from the API's own CDN, so they cost nothing against Supabase egress |
 | `VITE_GOOGLE_ADS_ID` | *(optional, build-time)* Google Ads tag id (`AW-…`). With `VITE_GOOGLE_ADS_PURCHASE_LABEL` (the purchase conversion-action label) a `conversion` event fires per paid order. Loads only after the visitor accepts marketing cookies (`lib/consent.js`) — see `docs/seo-analytics.md` |
@@ -296,4 +312,8 @@ and can be cleaned up.
 | `IMAGE_CDN_HOST` | *(optional)* Same host, for `api/prerender.js` og:image URLs |
 | `CARD_ART_CDN_HOST` | *(optional)* Card-art CDN host — when set, the server-side card-art resolver (`src/utils/cardImageResolver.js`) serves resolved Pokémon/Magic/Yu-Gi-Oh art through the Worker's `/card-art` route (cached in R2, insulated from the upstream APIs' CDNs) instead of hotlinking them. Off by default; **only set after the Worker with the `/card-art` route is deployed** — see `docs/image-cdn.md` → "Card-art passthrough" |
 
-`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public and already hardcoded in `lib/supabaseClient.js` — no need to add them as Vercel secrets.
+`VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public and already hardcoded in `lib/supabaseClient.js` — no need to add them to `.env`.
+
+| `DEPLOY_ALERT_EMAIL` | *(VPS only, optional)* Where `deploy/deploy.sh` emails when a deploy fails (sent through `RESEND_API_KEY`; `DEPLOY_ALERT_FROM` overrides the sender). Unset = failures are only in `/opt/cardpop/logs/deploy.log` |
+| `TRUST_PROXY_HOPS` | *(VPS)* Hops of `X-Forwarded-For` trusted outright before the Cloudflare-range check. **`0` in production** (set by `deploy/cardpop.service`): Node faces Cloudflare directly, so only Cloudflare edge addresses are walked past and a request that reaches the box without Cloudflare can't forge its IP. The code default of `1` is for a local reverse proxy |
+| `TLS_CERT_FILE` / `TLS_KEY_FILE` | *(VPS)* The Cloudflare Origin CA certificate and key `server/index.js` terminates TLS with on `HTTPS_PORT` (443); `PORT` (80) then only redirects to https. Unset = plain HTTP on `PORT` (local runs). Set by the systemd unit to `/opt/cardpop/shared/certs/origin.{pem,key}` |

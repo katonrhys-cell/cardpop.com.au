@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "vite --host :: --port 3000",
     "build": "node tools/generate-llms.js || true && node tools/generate-agent-skills-index.js || true && vite build --outDir dist",
-    "start": "vite preview --outDir dist --host :: --port 3000",
+    "start": "node server/index.js",
+    "preview": "vite preview --outDir dist --host :: --port 3000",
     "lint": "eslint . --quiet",
     "lint:warn": "eslint .",
     "test": "vitest run",
@@ -76,6 +77,7 @@
     "multer": "^2.2.0",
     "next-themes": "^0.4.6",
     "papaparse": "^5.4.1",
+    "path-to-regexp": "6.3.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-helmet-async": "^1.3.0",
