@@ -25,6 +25,8 @@ import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx'
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
+import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
+import { findOrganiser } from '@/utils/eventOrganisers.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -184,6 +186,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [logoPreview, setLogoPreview] = useState(null);
   const [logoIsVideo, setLogoIsVideo] = useState(false);
   const [removeExistingLogo, setRemoveExistingLogo] = useState(false);
+  // A saved organiser's logo picked from the list (already uploaded — no file).
+  const [pickedLogoUrl, setPickedLogoUrl] = useState(null);
+  const [savingOrganiser, setSavingOrganiser] = useState(false);
+  const { organisers, saveOrganiser } = useEventOrganisers(isOpen);
   const logoInputRef = useRef(null);
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
   // { url } (saved) or { file, preview } (uploaded on save).
@@ -339,6 +345,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setImagePreview(event.image_url || null);
       setLogoFile(null);
       setLogoPreview(event.organizer_logo_url || null);
+      setPickedLogoUrl(null);
       setLogoIsVideo(isVideoLogoUrl(event.organizer_logo_url));
       setRemoveExistingLogo(false);
       setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
@@ -363,6 +370,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setFormData(INITIAL_STATE);
       setImagePreview(null);
       setLogoPreview(null);
+      setPickedLogoUrl(null);
       setLogoIsVideo(false);
       setActiveTab('details');
     }
@@ -381,12 +389,47 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     const problem = logoFileError(file);
     if (problem) { toast.error(problem); return; }
     setLogoFile(file);
+    setPickedLogoUrl(null);
     setLogoIsVideo(isVideoLogoFile(file));
     setLogoPreview(URL.createObjectURL(file));
     setRemoveExistingLogo(false);
   };
+  // Choose a saved organiser: fills the name and brings its logo along.
+  const pickOrganiser = (id) => {
+    const org = organisers.find(o => o.id === id);
+    if (!org) return;
+    set('organizer_name', org.name);
+    setLogoFile(null);
+    if (logoInputRef.current) logoInputRef.current.value = '';
+    setPickedLogoUrl(org.logo_url || null);
+    setLogoPreview(org.logo_url || null);
+    setLogoIsVideo(isVideoLogoUrl(org.logo_url));
+    setRemoveExistingLogo(!org.logo_url);
+  };
+
+  // Admin: add / update this organiser (name + current logo) in the saved list.
+  const handleSaveOrganiser = async () => {
+    setSavingOrganiser(true);
+    try {
+      let logoUrl = pickedLogoUrl || (!removeExistingLogo ? event?.organizer_logo_url : null) || null;
+      if (logoFile) logoUrl = await uploadEventOrganiserLogo(logoFile);
+      const { created } = await saveOrganiser({ name: formData.organizer_name, logoUrl });
+      // The logo is saved now — keep using that URL rather than uploading again.
+      setLogoFile(null);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+      setPickedLogoUrl(logoUrl);
+      setRemoveExistingLogo(!logoUrl);
+      toast.success(created ? 'Organiser added to the list' : 'Organiser updated in the list');
+    } catch (err) {
+      toast.error(err?.message || 'Could not save the organiser');
+    } finally {
+      setSavingOrganiser(false);
+    }
+  };
+
   const clearLogo = () => {
     setLogoFile(null);
+    setPickedLogoUrl(null);
     setLogoPreview(null);
     setLogoIsVideo(false);
     setRemoveExistingLogo(true);
@@ -466,6 +509,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         organizer_logo_url = await uploadEventOrganiserLogo(logoFile); // throws — don't save without the logo the organiser picked
       } else if (removeExistingLogo) {
         organizer_logo_url = null;
+      } else if (pickedLogoUrl) {
+        organizer_logo_url = pickedLogoUrl;
       }
 
       // Gallery photos picked this session go up now, each under its own
@@ -855,6 +900,21 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               {/* ── TAB 3: ORGANISER ── */}
               <TabsContent value="organiser" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {organisers.length > 0 && (
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label htmlFor="saved_organiser" className="font-bold">Saved Organiser <span className="text-muted-foreground font-normal text-xs">(pick one to fill the name and logo)</span></Label>
+                      <Select
+                        value={findOrganiser(organisers, formData.organizer_name)?.id ?? ''}
+                        onValueChange={pickOrganiser}
+                        disabled={loading}
+                      >
+                        <SelectTrigger id="saved_organiser" className={inputCls}><SelectValue placeholder="Choose from saved organisers…" /></SelectTrigger>
+                        <SelectContent>
+                          {organisers.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="organizer_name" className="font-bold">Organizer Name</Label>
                     <Input id="organizer_name" name="organizer_name" value={formData.organizer_name} onChange={handleChange} className={inputCls} disabled={loading} />
@@ -889,6 +949,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                       )}
                       <input type="file" ref={logoInputRef} className="hidden" accept={LOGO_ACCEPT} onChange={e => e.target.files[0] && processLogoFile(e.target.files[0])} disabled={loading} />
                     </div>
+                    {!isUserMode && (
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <Button type="button" variant="outline" size="sm" onClick={handleSaveOrganiser} disabled={loading || savingOrganiser || !formData.organizer_name.trim()}>
+                          {savingOrganiser && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
+                          {findOrganiser(organisers, formData.organizer_name) ? 'Update in organiser list' : 'Save to organiser list'}
+                        </Button>
+                        <span className="text-xs text-muted-foreground">Saves this name and logo so you can pick it on any event.</span>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="organizer_email" className="font-bold">Contact Email</Label>

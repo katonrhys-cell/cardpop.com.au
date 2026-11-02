@@ -30,3 +30,21 @@ keeps the full width as before.
 - Never put the logo on a `Date.now()`-stamped path in the `events` bucket
   (see Upload above), and never write `organizer_logo_url` with anything but
   a public `https://` URL — the page refuses anything else.
+
+## Saved organisers list
+
+`event_organisers` (migration `20261102093000_event_organisers_directory.sql`)
+is a directory of organiser **name + logo** so each event doesn't need the
+name retyped and the logo re-uploaded. Public read (name and logo are already
+public on event pages), admin-only write; contact email/phone are deliberately
+not stored there. It was backfilled from every organiser already named on an
+event (latest logo wins) and seeded with Fast Break Trading Cards Pty Ltd and
+Sports Addicts Australia.
+
+On the event form's **Organiser** tab, *Saved Organiser* fills the name and
+brings the logo along; admins get **Save to organiser list** (uploads the
+current logo and adds/updates the row by case-insensitive name). The event
+still stores its own copy in `organizer_name` / `organizer_logo_url`, so the
+page, `events_public` and the prerender are unchanged — updating an organiser's
+logo in the list affects events saved afterwards, not ones already saved.
+Helpers: `utils/eventOrganisers.js`, `hooks/useEventOrganisers.js`.
