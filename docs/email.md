@@ -48,8 +48,15 @@ place: the header is the official CardPop Australia logo (card icon ·
 CardPop™ · AUSTRALIA), served from
 `https://cardpop.com.au/images/email/cardpop-logo-v1.png` (a trimmed 440 px
 copy shown at 220 px, so it is crisp on retina inboxes) on a band that
-matches the artwork's own near-black ground, with the title band below it in
-brand red. `/images/` is cached immutable for a year, so a new logo must be a
+matches the artwork's own near-black ground, under a thin brand-red rule. The
+`titleBand` argument renders as a small red uppercase label ("CONTACT FORM",
+"NEW ORDER") above the `greeting`, which is the heading; the "why you received
+this" `footerNote` sits in the charcoal footer with the © line. Details go in
+`summaryTable()` (label column + value column), anything a person typed in
+`quoteBlock()` (red-ruled, line breaks kept), and receipts in `invoiceBlock()`
+(ruled header, right-aligned amounts, the total emphasised). Colours come from
+the palette constants at the top of the file (brand red `#CE1126`, charcoal
+`#1F2937`) — never type a hex into a template. `/images/` is cached immutable for a year, so a new logo must be a
 **new `-vN` filename** referenced from `EMAIL_LOGO_URL` — never overwrite
 `-v1`. A client that blocks remote images shows the white "CardPop Australia"
 alt text in its place.
