@@ -226,6 +226,7 @@ const AdminVerificationDashboard = lazy(() => import('@/pages/admin/AdminVerific
 const ReportsModerationPage = lazy(() => import('@/pages/admin/ReportsModerationPage.jsx'));
 const DisputesAdminPage = lazy(() => import('@/pages/admin/DisputesAdminPage.jsx'));
 const OffersAdminPage = lazy(() => import('@/pages/admin/OffersAdminPage.jsx'));
+const InvoicesAdminPage = lazy(() => import('@/pages/admin/InvoicesAdminPage.jsx'));
 const CommissionSettingsPage = lazy(() => import('@/pages/admin/CommissionSettingsPage.jsx'));
 const CategoryManagementPage = lazy(() => import('@/pages/admin/CategoryManagementPage.jsx'));
 const SubcategoryManagementPage = lazy(() => import('@/pages/admin/SubcategoryManagementPage.jsx'));
@@ -562,6 +563,7 @@ const App = () => {
                           <Route path="reports" element={<ReportsModerationPage />} />
                           <Route path="disputes" element={<DisputesAdminPage />} />
                           <Route path="offers" element={<OffersAdminPage />} />
+                          <Route path="invoices" element={<InvoicesAdminPage />} />
                           <Route path="commissions" element={<CommissionSettingsPage />} />
                           <Route path="product-lines" element={<ProductLinesManagementPage />} />
                           <Route path="collections" element={<CollectionsManagementPage />} />
