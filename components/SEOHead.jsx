@@ -1,5 +1,6 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, structuredData, noindex = false }) => {
   const siteName = "CardPop";
@@ -32,10 +33,14 @@ const SEOHead = ({ title, description, canonicalUrl, ogImage, ogImageAlt, struct
 
   // Open Graph / Twitter require absolute image URLs — scrapers and Google's
   // renderer can't resolve a site-relative path like "/og-image.jpg".
+  // A Supabase storage URL (the shape stored in the DB and built by the
+  // catalogue data files) is rewritten onto the image CDN first, so a shared
+  // product link previews from img.cardpop.com.au like the prerender does
+  // and never bills Supabase egress.
   const absolutizeImage = (img) => {
     if (!img) return '';
     try {
-      return new URL(img, SITE_ORIGIN).href;
+      return new URL(toCdnUrl(img) || img, SITE_ORIGIN).href;
     } catch {
       return '';
     }

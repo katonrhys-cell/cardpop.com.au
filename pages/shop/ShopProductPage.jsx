@@ -5,7 +5,7 @@ import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
 import ProductImageCarousel from '@/components/ProductImageCarousel.jsx';
 import CardImage from '@/components/CardImage.jsx';
-import { getCardImage } from '@/utils/imageUrl.js';
+import { getCardImage, toCdnUrl } from '@/utils/imageUrl.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import ShopListedProductPage from '@/pages/shop/ShopListedProductPage.jsx';
 import { Button } from '@/components/ui/button';
@@ -95,6 +95,9 @@ const ShopProductPage = () => {
   const canonical = `${SITE_ORIGIN}/shop/${category.slug}/${product.slug}`;
   // A chosen colour shows its own photos; the catalogue's are the fallback.
   const images = family.length > 0 && productImages(row).length > 0 ? productImages(row) : palmsOffImages(product);
+  // What crawlers and link previews see: the same gallery, served from the
+  // image CDN (the DB and catalogue keep canonical Supabase URLs on purpose).
+  const seoImages = images.map(toCdnUrl);
   const lineTitle = (family.length > 0 && row?.title) || product.title;
   // The colours actually stocked (the picker's own list) once the family has
   // loaded; the catalogue list until then.
@@ -171,7 +174,7 @@ const ShopProductPage = () => {
     '@type': 'Product',
     name: product.title,
     description,
-    image: images,
+    image: seoImages,
     // sku/mpn (the brand's own SKU) + gtin from the shown colour's barcode —
     // the global identifiers Google's Merchant listings report asks for.
     ...shopProductIdentifiersLd({ sku: product.sku, barcode: row?.barcode }, { brand: 'Palms Off Gaming' }),
@@ -219,7 +222,7 @@ const ShopProductPage = () => {
         title={`${product.title} | CardPop Australia`}
         description={description}
         canonicalUrl={canonical}
-        ogImage={images[0]}
+        ogImage={seoImages[0]}
         ogImageAlt={palmsOffImageAlt(product, product.imagePaths[0])}
         structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
