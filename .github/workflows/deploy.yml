@@ -1,0 +1,59 @@
+name: Deploy
+
+# Production deploy to the VPS: every push to main (and a manual run) SSHes to
+# the box and starts deploy/deploy.sh, which fetches this exact commit, builds
+# the Docker image and swaps the container. Runbook: docs/vultr-rollout.md.
+#
+# This is the one workflow that runs on push to main, because deploying is the
+# one thing a PR run can't do (CLAUDE.md → Deployment). It is cheap on the
+# metered Actions minutes: deploy.sh --detach returns at once and the build
+# happens on the VPS, so the job bills seconds. The outcome is in the box's
+# logs/deploy.log and, on failure, in the email deploy.sh sends through Resend.
+#
+# Secrets:
+#   VPS_HOST          hostname or IP of the box
+#   VPS_USER          the deploy user (cardpop)
+#   VPS_SSH_KEY       private key whose public half is in that user's
+#                     authorized_keys (ssh-keygen -t ed25519, no passphrase)
+#   VPS_KNOWN_HOSTS   the box's host key line (ssh-keyscan -t ed25519 <host>)
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Start the deploy on the VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_SSH_KEY" ] || [ -z "$VPS_KNOWN_HOSTS" ]; then
+            echo "VPS_HOST, VPS_SSH_KEY and VPS_KNOWN_HOSTS must be set as repository secrets." >&2
+            exit 1
+          fi
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+            "${VPS_USER:-cardpop}@$VPS_HOST" \
+            "/opt/cardpop/app/deploy/deploy.sh --detach $TARGET_SHA"

@@ -1,0 +1,30 @@
+# Keep the build context to what the image needs (Dockerfile). Secrets never
+# enter the context: the .env is mounted as a BuildKit secret at build time.
+.git
+.github
+node_modules
+dist
+coverage
+.env*
+!.env.example
+backups
+supabase
+tests
+e2e
+test-results
+playwright-report
+blob-report
+.lighthouseci
+samples
+pb_data
+pb_hooks
+pb_migrations
+docs
+*.md
+!README.md
+cloudflare
+deploy/certs
+scripts
+.vercel
+.vscode
+.idea

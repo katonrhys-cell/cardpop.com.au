@@ -1,0 +1,75 @@
+# CardPop on a VPS — docs/vultr-rollout.md.
+#
+#   app    the Node server (Dockerfile): dist/ + Express API + functions
+#   caddy  TLS termination with the Cloudflare Origin CA certificate, gzip/zstd,
+#          reverse proxy to app. Cloudflare stays in front of the box.
+#
+# Run from the checkout on the box (deploy/deploy.sh does this):
+#   docker compose build app && docker compose up -d --remove-orphans
+#
+# The .env in this directory is both the runtime environment (env_file) and
+# the build-time source of VITE_* values (the dotenv secret). It is never
+# committed and never copied into an image.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      secrets:
+        - dotenv
+    image: cardpop-app:latest
+    container_name: cardpop-app
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      HOST: 0.0.0.0
+      # Caddy is one trusted hop; Cloudflare's edge ranges are trusted beyond
+      # it by address (src/utils/cloudflareIps.js). Nothing else is.
+      TRUST_PROXY_HOPS: "1"
+    expose:
+      - "3000"
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: cardpop-caddy
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Cloudflare Origin CA certificate + key (deploy/certs is git-ignored).
+      - ./deploy/certs:/etc/caddy/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+secrets:
+  dotenv:
+    file: .env
+
+volumes:
+  caddy_data:
+  caddy_config:

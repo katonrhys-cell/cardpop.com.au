@@ -63,5 +63,5 @@ export default [
 		},
 	},
 	{ files: ['tools/**/*.js', 'tailwind.config.js'], languageOptions: { globals: globals.node } },
-	{ files: ['src/**/*.js', 'api/**/*.js', 'tests/backend/**/*.js'], languageOptions: { globals: globals.node } },
+	{ files: ['src/**/*.js', 'api/**/*.js', 'server/**/*.js', 'tests/backend/**/*.js'], languageOptions: { globals: globals.node } },
 ];

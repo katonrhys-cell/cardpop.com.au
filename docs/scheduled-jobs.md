@@ -76,7 +76,7 @@ From the repository root, with a Cloudflare account that owns the
 npx wrangler login                                                        # opens the browser once
 npx wrangler deploy --config cloudflare/scheduler/wrangler.toml            # creates the Worker + the four triggers
 npx wrangler secret put CRON_SECRET --config cloudflare/scheduler/wrangler.toml
-#   paste exactly the CRON_SECRET environment variable from the Vercel dashboard
+#   paste exactly the CRON_SECRET value from the server's .env on the VPS (docs/vultr-rollout.md)
 ```
 
 That is enough for every schedule to run. Two optional extras:
@@ -85,7 +85,7 @@ That is enough for every schedule to run. Two optional extras:
   (`admin@cardpop.com.au`) and `ALERT_FROM`; add the Resend key and the Worker
   emails each failed run:
   `npx wrangler secret put RESEND_API_KEY --config cloudflare/scheduler/wrangler.toml`
-  (the same key Vercel holds, or a separate one from the Resend dashboard).
+  (the same key the server's .env holds, or a separate one from the Resend dashboard).
 - **Alert de-duplication.** Without it, a job failing on every tick emails on
   every tick (the reconciler: twelve a day). Create a KV namespace, uncomment
   the `[[kv_namespaces]]` block in `wrangler.toml` with the id it prints, and
@@ -166,10 +166,10 @@ Variables and Secrets in the dashboard). This is the Worker's equivalent of
 the Actions secret that was missing from 2026-09-13 to 2026-10-18, when every
 schedule sat broken for five weeks: price snapshots stopped, no retention
 email went out, the blog stopped publishing. Add it with exactly the value
-Vercel holds, then run `/run/daily` by hand and check the report.
+the server's .env holds, then run `/run/daily` by hand and check the report.
 
 **A job fails with HTTP 401.** The Worker's `CRON_SECRET` and the `CRON_SECRET`
-environment variable in Vercel have drifted apart, or the Vercel variable is
+variable in the server's .env have drifted apart, or the server variable is
 unset (every endpoint fails closed, so unset reads as 401). Set both to one
 new value.
 
@@ -181,7 +181,7 @@ skip rule matching it (or the `/api/…`/`/cron/…` paths with an
 `docs/ddos-protection.md`.
 
 **A job reports "No response within Ns".** The function exceeded its budget,
-or the site was unreachable. Check the Vercel function logs for that path.
+or the site was unreachable. Check the server logs (`docker logs cardpop-app` on the VPS) for that path.
 
 **The run threw "No schedule for cron …".** A trigger on the Worker doesn't
 match `SCHEDULES` — see above; make `wrangler.toml` and `worker.js` agree and
