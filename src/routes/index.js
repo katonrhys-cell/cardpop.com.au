@@ -56,6 +56,7 @@ import adminRouter from './admin.js';
 import settingsRouter from './settings.js';
 import reportsRouter from './reports.js';
 import blogRouter from './blog.js';
+import publicRouter from './public.js';
 
 const router = Router();
 
@@ -75,6 +76,12 @@ export default () => {
         }
         next();
     });
+
+    // Edge-cached public reads (home page bundle, shop facet rows) — anon-key
+    // queries answered with s-maxage so Cloudflare serves the repeats. The
+    // per-IP limiter is belt-and-braces; a cached hit never reaches here.
+    router.use('/public', apiLimiter);
+    router.use('/public', publicRouter);
 
     // MCP server (read-only tools for AI agents) with API rate limiting
     router.use('/mcp', apiLimiter);

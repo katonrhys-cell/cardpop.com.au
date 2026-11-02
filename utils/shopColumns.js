@@ -32,3 +32,11 @@ export const SHOP_CARD_COLUMNS = [
   'created_at',
   'updated_at',
 ].join(',');
+
+/**
+ * Columns a shop grid needs to build, filter and sort by its facets
+ * (utils/shopFacets.js). Lives here, dependency-free, so the server's public
+ * read endpoint (src/routes/public.js) can run the same projection.
+ */
+export const SHOP_FACET_COLUMNS =
+  'id, sku, title, brand, category, family_sku, colour, colour_hex, price_aud, retail_price_aud, stock_quantity, status, created_at';

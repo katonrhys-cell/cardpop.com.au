@@ -127,7 +127,19 @@ When the site is actively being hammered:
 4. **Turn it off when the attack subsides** — left on, it challenges
    unverified crawlers and adds friction for every first-time visitor.
 
-### 6. While you're in the dashboard (30 seconds)
+### 6. Cache Rule for the public read endpoints
+
+Caching → **Cache Rules** → Create rule — *URI Path starts with*
+`/hcgi/api/public/` → **Eligible for cache**, Edge TTL *Use cache-control
+header if present, bypass cache if not*, Browser TTL *Respect origin*. The
+home page and shop grids read these endpoints instead of querying Supabase
+from every browser; with the rule in place Cloudflare answers the repeats and
+Supabase sees one set of queries a minute, whatever the traffic
+(`docs/performance.md` → Edge-cached public reads). Without the rule the
+box's own micro-cache still protects Supabase, but every request reaches the
+VPS.
+
+### 7. While you're in the dashboard (30 seconds)
 
 **SSL/TLS → Overview**: confirm mode is **Full (strict)**. Anything weaker
 lets a MITM sit between Cloudflare and the origin. The VPS presents a Cloudflare Origin CA certificate (docs/vultr-rollout.md).
