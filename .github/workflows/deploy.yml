@@ -2,7 +2,8 @@ name: Deploy
 
 # Production deploy to the VPS: every push to main (and a manual run) SSHes to
 # the box and starts deploy/deploy.sh, which fetches this exact commit, builds
-# the Docker image and swaps the container. Runbook: docs/vultr-rollout.md.
+# it into a new release directory and restarts the systemd service on it.
+# Runbook: docs/vultr-rollout.md.
 #
 # This is the one workflow that runs on push to main, because deploying is the
 # one thing a PR run can't do (CLAUDE.md → Deployment). It is cheap on the
@@ -56,4 +57,4 @@ jobs:
           chmod 600 ~/.ssh/deploy_key ~/.ssh/known_hosts
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
             "${VPS_USER:-cardpop}@$VPS_HOST" \
-            "/opt/cardpop/app/deploy/deploy.sh --detach $TARGET_SHA"
+            "/opt/cardpop/bin/deploy.sh --detach $TARGET_SHA"

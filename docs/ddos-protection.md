@@ -24,7 +24,8 @@ precision (per-user, per-email, per-endpoint budgets).
 ## What the code does (this repo)
 
 - **Real client IPs behind Cloudflare** — `src/app.js` sets a `trust proxy`
-  function that trusts the Caddy hop on the box plus Cloudflare's published edge ranges
+  function that trusts Cloudflare's published edge ranges (and nothing before them —
+  `TRUST_PROXY_HOPS=0`, since Node faces Cloudflare directly on the VPS)
   (`src/utils/cloudflareIps.js`). `req.ip` — and with it every rate-limit
   key, the login lockout, and audit logs — resolves to the actual visitor,
   not a shared Cloudflare edge IP. Requests that bypass Cloudflare (hitting
@@ -142,7 +143,7 @@ Defence in depth, cheapest first:
 
 ### a. Storage egress (the big one) — already engineered, verify it's live
 
-1. **`/opt/cardpop/app/.env` on the VPS (then redeploy)**:
+1. **`/opt/cardpop/shared/.env` on the VPS (then redeploy)**:
    confirm `VITE_IMAGE_CDN_HOST` and `IMAGE_CDN_HOST` are both set to
    `img.cardpop.com.au`. (Couldn't be verified from this session — it's the
    one config flag this whole layer hangs on. If missing, add both and
@@ -193,7 +194,7 @@ pressure if the REST endpoint is ever hammered.
   (Settings → Billing) to convert surprise bills into a hard stop.
 - Cloudflare **Security → Events** + **Analytics**: what's being challenged
   and blocked at the edge.
-- Server logs (`docker logs cardpop-app`): `[RATE_LIMIT]` lines show who's tripping app-level
+- Server logs (`journalctl -u cardpop`): `[RATE_LIMIT]` lines show who's tripping app-level
   limits — after this branch deploys, they show real visitor IPs.
 
 ### e. If quota abuse ever becomes real: custom domain (paid, last resort)

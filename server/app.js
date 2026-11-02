@@ -88,10 +88,11 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
   app.disable('x-powered-by');
   app.set('etag', 'weak');
 
-  // Same proxy trust as src/app.js: the first TRUST_PROXY_HOPS hops (Caddy on
-  // the box, default 1) are trusted outright, Cloudflare's edge ranges beyond
-  // that, and nothing else — so req.ip / req.hostname cannot be spoofed by a
-  // request that reaches the origin without going through Cloudflare.
+  // Same proxy trust as src/app.js: the first TRUST_PROXY_HOPS hops are trusted
+  // outright (default 1 for a local proxy; the production unit sets 0 because
+  // Node faces Cloudflare directly), Cloudflare's edge ranges beyond that, and
+  // nothing else — so req.ip / req.hostname cannot be spoofed by a request
+  // that reaches the origin without going through Cloudflare.
   const trustProxyHops = (() => {
     const parsed = Number.parseInt(process.env.TRUST_PROXY_HOPS ?? '1', 10);
     return Number.isNaN(parsed) ? 1 : parsed;
@@ -103,7 +104,7 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
   const spaFallback = routing.rewrites.find(isSpaFallback);
   const isTerminal = (p) => TERMINALS.has(p);
 
-  // Liveness for Docker / Caddy. Not a public page (never in the sitemap) and
+  // Liveness for deploy.sh and monitoring. Not a public page (never in the sitemap) and
   // cheaper than /api/health, which runs through the API's rate limiter.
   app.get('/healthz', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

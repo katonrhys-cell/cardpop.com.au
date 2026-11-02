@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is hosted on a **Vultr VPS** (Docker: one Node process behind Caddy — `docs/vultr-rollout.md`), having moved off Vercel in November 2026. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of the VPS, which hosts the app. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
+CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is hosted on a **Vultr VPS** (one Node process under systemd, terminating TLS itself — `docs/vultr-rollout.md`), having moved off Vercel in November 2026. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of the VPS, which hosts the app. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
 
 ## Commands
 
@@ -197,23 +197,28 @@ Every document paints from a static shell: "/" from `tools/home-shell.html` (hea
 
 ### Deployment
 
-The site runs on a **Vultr VPS** as two Docker containers — `app` (the image
-from `Dockerfile`: `dist/` + the Express API + the former Vercel functions,
-all served by `server/index.js`) and `caddy` (TLS with a Cloudflare Origin CA
-certificate, reverse proxy) — with Cloudflare proxying in front exactly as
-before. Full runbook, including provisioning, cutover and rollback:
+The site runs on a **Vultr VPS** as one plain Node process — `server/index.js`
+serving `dist/` + the Express API + the former Vercel functions — managed by
+systemd (`deploy/cardpop.service`), terminating TLS itself on :443 with a
+Cloudflare Origin CA certificate, with Cloudflare proxying in front exactly as
+before. No Docker, no reverse proxy: the same `node` + `npm` the project
+already uses. Full runbook, including provisioning, cutover and rollback:
 `docs/vultr-rollout.md`.
 
 ```
 git push main
   → .github/workflows/deploy.yml  (SSH to the box, seconds of Actions time)
-    → deploy/deploy.sh --detach <sha>  (on the VPS: fetch that commit, docker compose build, swap, health-wait)
+    → /opt/cardpop/bin/deploy.sh --detach <sha>
+        (on the VPS: export that commit into /opt/cardpop/releases/<id>, npm ci,
+         vite build, prune dev deps, flip the `current` symlink, systemctl restart, wait for /healthz)
 ```
 
-The build happens **on the box**, not in Actions, so the deploy job bills about
-one metered minute per merge; the result is in `/opt/cardpop/logs/deploy.log`
-and a failed deploy emails `DEPLOY_ALERT_EMAIL` through Resend while the
-previous container keeps serving. `vercel.json` is still the **routing
+The build happens **on the box** in a fresh release directory, not in Actions
+and not in place, so the deploy job bills about one metered minute per merge
+and the running release is untouched until the switch; the result is in
+`/opt/cardpop/logs/deploy.log`, a release that doesn't come up healthy is
+rolled back to the previous one, and a failed deploy emails
+`DEPLOY_ALERT_EMAIL` through Resend. `vercel.json` is still the **routing
 manifest** (redirects, bot-only prerender rewrites, the `/hcgi/api` prefix,
 per-path headers incl. the CSP) — `server/vercelRoutes.js` interprets it with
 the same semantics Vercel did, so there is one set of rules and nothing to keep
@@ -245,7 +250,7 @@ every workflow including the migration push. Cron Triggers are free, and the
 Worker needed no change for the VPS move (it calls `https://cardpop.com.au`).
 Full runbook: `docs/scheduled-jobs.md`.
 
-**Environment variables** required in production live in `/opt/cardpop/app/.env` on the VPS (`chmod 600`, owned by `cardpop`; read by `docker compose` for the runtime and mounted into the image build so Vite sees the `VITE_*` values — edit it, then redeploy). Before November 2026 these were set in the Vercel dashboard:
+**Environment variables** required in production live in `/opt/cardpop/shared/.env` on the VPS (`chmod 600`, owned by `cardpop`; linked into every release, so Vite reads the `VITE_*` values at build time and dotenv the rest at runtime — edit it, then redeploy). Before November 2026 these were set in the Vercel dashboard:
 
 | Variable | Used by |
 |---|---|
@@ -310,4 +315,5 @@ Full runbook: `docs/scheduled-jobs.md`.
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are public and already hardcoded in `lib/supabaseClient.js` — no need to add them to `.env`.
 
 | `DEPLOY_ALERT_EMAIL` | *(VPS only, optional)* Where `deploy/deploy.sh` emails when a deploy fails (sent through `RESEND_API_KEY`; `DEPLOY_ALERT_FROM` overrides the sender). Unset = failures are only in `/opt/cardpop/logs/deploy.log` |
-| `TRUST_PROXY_HOPS` | *(VPS)* Hops of `X-Forwarded-For` trusted outright before the Cloudflare-range check — `1` for Caddy on the box (set by `docker-compose.yml`) |
+| `TRUST_PROXY_HOPS` | *(VPS)* Hops of `X-Forwarded-For` trusted outright before the Cloudflare-range check. **`0` in production** (set by `deploy/cardpop.service`): Node faces Cloudflare directly, so only Cloudflare edge addresses are walked past and a request that reaches the box without Cloudflare can't forge its IP. The code default of `1` is for a local reverse proxy |
+| `TLS_CERT_FILE` / `TLS_KEY_FILE` | *(VPS)* The Cloudflare Origin CA certificate and key `server/index.js` terminates TLS with on `HTTPS_PORT` (443); `PORT` (80) then only redirects to https. Unset = plain HTTP on `PORT` (local runs). Set by the systemd unit to `/opt/cardpop/shared/certs/origin.{pem,key}` |

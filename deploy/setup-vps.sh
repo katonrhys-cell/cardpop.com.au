@@ -1,49 +1,43 @@
 #!/usr/bin/env bash
 # One-time bootstrap of a fresh Ubuntu 24.04 VPS for CardPop. Run as root:
 #
-#   curl -fsSL https://raw.githubusercontent.com/katonrhys-cell/cardpop.com.au/main/deploy/setup-vps.sh -o setup-vps.sh
-#   ADMIN_IP=203.0.113.7 bash setup-vps.sh        # ADMIN_IP optional: lock SSH to it
+#   scp deploy/setup-vps.sh root@<vps-ip>:
+#   ssh root@<vps-ip> 'ADMIN_IP=<your-ip> bash setup-vps.sh'   # ADMIN_IP optional: lock SSH to it
 #
-# (The repository is private, so copy the script over with scp if the raw URL
-# needs a token.) What it does, and why — full runbook in docs/vultr-rollout.md:
-#
-#   • installs Docker (official repo) + compose plugin, git, ufw, fail2ban,
-#     unattended-upgrades
+# What it does, and why — full runbook in docs/vultr-rollout.md:
+#   • installs Node 24 (NodeSource), git, ufw, fail2ban, unattended-upgrades
 #   • adds a 2 GB swapfile when the box has under 4 GB of RAM (the Vite build
 #     peaks around 2–3 GB)
-#   • creates the `cardpop` user that owns /opt/cardpop and runs the containers,
-#     with an SSH deploy key for GitHub (printed at the end — add it to the
-#     repository as a read-only Deploy Key) and an authorized key for the
-#     deploy workflow (DEPLOY_PUBKEY, or paste it in later)
+#   • creates the `cardpop` user that owns /opt/cardpop and runs the server,
+#     with an SSH deploy key for GitHub (printed — add it to the repository as
+#     a read-only Deploy Key) and, if DEPLOY_PUBKEY is given, the authorized
+#     key for the GitHub deploy workflow
+#   • lays out /opt/cardpop/{repo,releases,shared,logs,bin}, installs the
+#     systemd unit (deploy/cardpop.service) and the sudo rule that lets
+#     `cardpop` restart it
 #   • firewall: deny inbound by default, SSH open (to ADMIN_IP if given),
 #     80/443 from Cloudflare's ranges only (deploy/cloudflare-firewall.sh,
 #     refreshed weekly by cron)
-#   • clones the repository to /opt/cardpop/app and leaves .env + the Origin CA
-#     certificate for you to fill in
+#   • leaves shared/.env and shared/certs/ for you to fill in
 set -euo pipefail
 
 [[ $EUID -eq 0 ]] || { echo "run as root" >&2; exit 1; }
 
 REPO_SSH="${REPO_SSH:-git@github.com:katonrhys-cell/cardpop.com.au.git}"
+NODE_MAJOR="${NODE_MAJOR:-24}"
 APP_USER=cardpop
 BASE=/opt/cardpop
-APP_DIR="$BASE/app"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -q
 apt-get install -y -q ca-certificates curl gnupg git ufw fail2ban unattended-upgrades python3
 
-# ── Docker ───────────────────────────────────────────────────────────────────
-if ! command -v docker > /dev/null; then
-  install -m 0755 -d /etc/apt/keyrings
-  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-  chmod a+r /etc/apt/keyrings/docker.gpg
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
-    > /etc/apt/sources.list.d/docker.list
-  apt-get update -q
-  apt-get install -y -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+# ── Node ─────────────────────────────────────────────────────────────────────
+if ! command -v node > /dev/null || [[ "$(node -v | sed 's/^v//' | cut -d. -f1)" -lt "$NODE_MAJOR" ]]; then
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
+  apt-get install -y -q nodejs
 fi
-systemctl enable --now docker
+echo "node $(node -v), npm $(npm -v)"
 
 # ── Swap (the Vite build needs headroom on a small box) ──────────────────────
 mem_kb=$(awk '/MemTotal/ {print $2}' /proc/meminfo)
@@ -56,13 +50,11 @@ if [[ $mem_kb -lt 4000000 && ! -f /swapfile ]]; then
   echo "added a 2 GB swapfile"
 fi
 
-# ── App user ─────────────────────────────────────────────────────────────────
-if ! id "$APP_USER" > /dev/null 2>&1; then
-  useradd --create-home --shell /bin/bash "$APP_USER"
-fi
-usermod -aG docker "$APP_USER"
-mkdir -p "$BASE" "$BASE/logs"
+# ── App user and layout ──────────────────────────────────────────────────────
+id "$APP_USER" > /dev/null 2>&1 || useradd --create-home --shell /bin/bash "$APP_USER"
+mkdir -p "$BASE"/{releases,shared/certs,logs,bin}
 chown -R "$APP_USER:$APP_USER" "$BASE"
+chmod 700 "$BASE/shared" "$BASE/shared/certs"
 
 su - "$APP_USER" -c '
   set -e
@@ -90,7 +82,7 @@ ufw --force enable > /dev/null
 systemctl enable --now fail2ban
 
 # ── Repository ───────────────────────────────────────────────────────────────
-if [[ ! -d "$APP_DIR/.git" ]]; then
+if [[ ! -d "$BASE/repo/.git" ]]; then
   echo
   echo "Add this read-only Deploy Key to the GitHub repository (Settings → Deploy keys),"
   echo "then press Enter to clone:"
@@ -98,17 +90,27 @@ if [[ ! -d "$APP_DIR/.git" ]]; then
   cat "/home/$APP_USER/.ssh/github_deploy.pub"
   echo
   read -r -p "Press Enter once the key is added… " _
-  su - "$APP_USER" -c "git clone --quiet '$REPO_SSH' '$APP_DIR'"
+  su - "$APP_USER" -c "git clone --quiet '$REPO_SSH' '$BASE/repo'"
 fi
 
 su - "$APP_USER" -c "
-  cd '$APP_DIR'
-  [[ -f .env ]] || { cp .env.example .env && chmod 600 .env; }
-  mkdir -p deploy/certs
+  set -e
+  [[ -f '$BASE/shared/.env' ]] || { cp '$BASE/repo/.env.example' '$BASE/shared/.env' && chmod 600 '$BASE/shared/.env'; }
+  cp '$BASE/repo/deploy/deploy.sh' '$BASE/bin/deploy.sh' && chmod +x '$BASE/bin/deploy.sh'
 "
 
-# Cloudflare-only on 80/443, refreshed weekly.
-install -m 0755 "$APP_DIR/deploy/cloudflare-firewall.sh" /usr/local/sbin/cardpop-cloudflare-firewall
+# ── systemd unit + the one sudo rule the deploy needs ────────────────────────
+install -m 0644 "$BASE/repo/deploy/cardpop.service" /etc/systemd/system/cardpop.service
+systemctl daemon-reload
+systemctl enable cardpop > /dev/null
+cat > /etc/sudoers.d/cardpop <<SUDO
+$APP_USER ALL=(root) NOPASSWD: /usr/bin/systemctl restart cardpop, /usr/bin/systemctl status cardpop, /usr/bin/systemctl is-active cardpop, /usr/bin/journalctl -u cardpop *
+SUDO
+chmod 0440 /etc/sudoers.d/cardpop
+visudo -cf /etc/sudoers.d/cardpop > /dev/null
+
+# ── Cloudflare-only on 80/443, refreshed weekly ──────────────────────────────
+install -m 0755 "$BASE/repo/deploy/cloudflare-firewall.sh" /usr/local/sbin/cardpop-cloudflare-firewall
 /usr/local/sbin/cardpop-cloudflare-firewall
 printf '#!/bin/sh\n/usr/local/sbin/cardpop-cloudflare-firewall > /dev/null 2>&1\n' > /etc/cron.weekly/cardpop-cloudflare-firewall
 chmod 0755 /etc/cron.weekly/cardpop-cloudflare-firewall
@@ -117,14 +119,15 @@ cat <<MSG
 
 Done. Next:
 
-  1. Fill in $APP_DIR/.env (as $APP_USER) — every variable in CLAUDE.md →
+  1. Fill in $BASE/shared/.env (as $APP_USER) — every variable in CLAUDE.md →
      Deployment, plus DEPLOY_ALERT_EMAIL for deploy-failure emails.
   2. Put the Cloudflare Origin CA certificate at
-       $APP_DIR/deploy/certs/origin.pem
-       $APP_DIR/deploy/certs/origin.key      (chmod 600)
+       $BASE/shared/certs/origin.pem
+       $BASE/shared/certs/origin.key      (chmod 600, owned by $APP_USER)
      Cloudflare dashboard → SSL/TLS → Origin Server → Create Certificate
      (hosts: cardpop.com.au, *.cardpop.com.au).
-  3. First deploy:  su - $APP_USER -c '$APP_DIR/deploy/deploy.sh'
+  3. First deploy:  su - $APP_USER -c $BASE/bin/deploy.sh
+     then:          systemctl status cardpop   /   journalctl -u cardpop -f
   4. For the GitHub deploy workflow, add the workflow's public key to
      /home/$APP_USER/.ssh/authorized_keys and set the VPS_* repository
      secrets — see docs/vultr-rollout.md.

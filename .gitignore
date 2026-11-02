@@ -70,7 +70,3 @@ pb_data/
 # committed; the images live in the "cardpop.com.au- site backup" Drive folder
 # under card-identification-fixtures/. See the fixtures README.
 /tests/fixtures/card-identification/images/
-
-# VPS origin certificate (deploy/setup-vps.sh) — never commit
-/deploy/certs/*
-!/deploy/certs/.gitkeep
