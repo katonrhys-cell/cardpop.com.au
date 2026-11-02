@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { fetchRsvpCounts, fetchMyRsvps, emptyCounts } from '@/lib/eventRsvp.js';
 import EventCard from '@/components/EventCard.jsx';
+import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import EventDetailModal from '@/components/EventDetailModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -28,19 +29,9 @@ const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * DAY_MS));
 const yesterdayStr = toLocalDateStr(new Date(Date.now() - DAY_MS));
 const twoYearsAgoStr = toLocalDateStr(new Date(Date.now() - 2 * 365 * DAY_MS));
 
-// Everything the card, the detail modal and the JSON-LD read from an event —
-// the public view minus its SEO-only columns.
-export const EVENT_CARD_COLUMNS = [
-  'id', 'slug', 'event_type', 'status', 'title', 'description', 'short_description', 'image_url',
-  'venue_name', 'address', 'suburb', 'state', 'postcode',
-  'start_date', 'end_date', 'start_time', 'end_time',
-  'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'website_url', 'ticket_url',
-  'is_cardpop_verified', 'is_featured', 'registration_required', 'capacity',
-  'tags', 'featured_card_games', 'organizer_name',
-  'instagram_url', 'facebook_url', 'youtube_url', 'event_videos', 'facebook_video_url',
-  'youtube_channel_url', 'tiktok_url', 'x_url', 'discord_url', 'vendor_application_url',
-  'accessibility_info', 'age_restrictions', 'created_at', 'updated_at',
-].join(',');
+// Card projection lives in lib/eventColumns.js (shared with the organiser page);
+// re-exported here for existing importers.
+export { EVENT_CARD_COLUMNS };
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_EVENTS = 500;

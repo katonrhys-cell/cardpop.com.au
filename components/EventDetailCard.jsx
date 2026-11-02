@@ -12,6 +12,8 @@ import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import EventVideos from '@/components/events/EventVideos.jsx';
 import EventOrganiserLogo, { EventOrganiserLogoTile } from '@/components/events/EventOrganiserLogo.jsx';
 import { safeLogoUrl } from '@/utils/eventOrganiserLogo.js';
+import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
+import { organisersForEvent, organiserNameParts, organiserPath } from '@/utils/eventOrganisers.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
@@ -23,7 +25,26 @@ import { toast } from 'sonner';
 // `isPast` — the event has finished (utils/eventPast.js): the RSVP, ticket
 // and calendar actions give way to a pointer at the reviews section.
 const EventDetailCard = ({ event, isPast = false }) => {
-  const hasLogo = Boolean(safeLogoUrl(event?.organizer_logo_url));
+  // Saved organisers (event_organisers) named by this event: their names and
+  // logos link to /events/organisers/<slug>, and an event saved without a logo
+  // borrows the organiser's.
+  const { organisers } = useEventOrganisers(Boolean(event?.organizer_name));
+  const eventOrgs = organisersForEvent(organisers, event?.organizer_name);
+  const primaryOrg = eventOrgs[0] ?? null;
+  const ownLogo = safeLogoUrl(event?.organizer_logo_url);
+  // One logo per organiser in the title row: the event's own, else each named
+  // organiser's saved logo (co-hosted events show both).
+  const titleLogos = ownLogo
+    ? [{ key: 'own', event, org: eventOrgs.length === 1 ? primaryOrg : null }]
+    : eventOrgs.filter(o => safeLogoUrl(o.logo_url)).slice(0, 3).map(o => ({
+      key: o.id,
+      event: { ...event, organizer_logo_url: o.logo_url, organizer_name: o.name },
+      org: o,
+    }));
+  const tileOrg = ownLogo ? (eventOrgs.length === 1 ? primaryOrg : null) : (titleLogos[0]?.org ?? primaryOrg);
+  const tileEvent = ownLogo ? event : (titleLogos[0]?.event ?? event);
+  const hasLogo = titleLogos.length > 0;
+  const nameParts = organiserNameParts(event?.organizer_name, eventOrgs);
   // YouTube videos (utils/eventVideos.js) + the optional Facebook embed, shown
   // below the photo gallery by EventVideos, which also starts the first one.
   const videos = cleanEventVideos(event.event_videos, event.youtube_url);
@@ -114,7 +135,17 @@ const EventDetailCard = ({ event, isPast = false }) => {
         </div>
         {hasLogo && (
           <div className="px-5 pt-5 md:px-10 md:pt-8 lg:bg-muted/20 flex items-center justify-center lg:justify-center">
-            <EventOrganiserLogo event={event} />
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {titleLogos.map(({ key, event: logoEvent, org }) => {
+                const logo = <EventOrganiserLogo event={logoEvent} caption={titleLogos.length === 1} />;
+                const to = organiserPath(org);
+                return to ? (
+                  <Link key={key} to={to} className="rounded-xl hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`More events by ${org.name}`}>
+                    {logo}
+                  </Link>
+                ) : <React.Fragment key={key}>{logo}</React.Fragment>;
+              })}
+            </div>
           </div>
         )}
         </div>
@@ -218,17 +249,34 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
               {event.organizer_name && (
                 <div className="flex gap-4 items-start">
-                  <EventOrganiserLogoTile
-                    event={event}
-                    fallback={(
-                      <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
-                        <Users className="w-5 h-5 text-primary" />
-                      </div>
-                    )}
-                  />
+                  {(() => {
+                    const tile = (
+                      <EventOrganiserLogoTile
+                        event={tileEvent}
+                        fallback={(
+                          <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                            <Users className="w-5 h-5 text-primary" />
+                          </div>
+                        )}
+                      />
+                    );
+                    const to = organiserPath(tileOrg);
+                    return to ? (
+                      <Link to={to} className="shrink-0 rounded-xl hover:opacity-90" aria-label={`More events by ${tileOrg.name}`}>{tile}</Link>
+                    ) : tile;
+                  })()}
                   <div>
                     <p className="font-bold text-foreground">Organiser</p>
-                    <p className="text-muted-foreground leading-snug">{event.organizer_name}</p>
+                    <p className="text-muted-foreground leading-snug">
+                      {nameParts.map((part, i) => (part.org && organiserPath(part.org) ? (
+                        <Link key={i} to={organiserPath(part.org)} className="text-primary font-semibold hover:underline underline-offset-2" title={`More events by ${part.org.name}`}>
+                          {part.text}
+                        </Link>
+                      ) : <React.Fragment key={i}>{part.text}</React.Fragment>))}
+                    </p>
+                    {eventOrgs.length > 0 && (
+                      <p className="text-xs text-muted-foreground mt-1">Tap the name to see every event they've hosted.</p>
+                    )}
                   </div>
                 </div>
               )}

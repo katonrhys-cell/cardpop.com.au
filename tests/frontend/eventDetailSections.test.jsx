@@ -6,6 +6,11 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // EventRsvp pulls in auth + supabase; the sections under test don't need it.
 vi.mock('@/components/EventRsvp.jsx', () => ({ default: () => <div data-testid="rsvp" /> }));
+// The saved-organisers directory (no network in tests); set per test.
+const organiserDir = vi.hoisted(() => ({ list: [] }));
+vi.mock('@/hooks/useEventOrganisers.js', () => ({
+  useEventOrganisers: () => ({ organisers: organiserDir.list, saveOrganiser: vi.fn(), reload: vi.fn() }),
+}));
 
 import EventDetailCard from '@/components/EventDetailCard.jsx';
 import EventDetailModal from '@/components/EventDetailModal.jsx';
@@ -405,5 +410,28 @@ describe('EventDetailModal — ticket prices', () => {
     renderModal({ ...baseEvent, is_free: true, ticket_prices: [{ type: 'vip', price_aud: 60 }] });
     expect(screen.getByText('Free entry')).toBeInTheDocument();
     expect(screen.queryByText('VIP')).not.toBeInTheDocument();
+  });
+});
+
+describe('EventDetailCard — organiser links', () => {
+  afterEach(() => { organiserDir.list = []; });
+
+  it('links each saved organiser of a co-hosted event to its page and borrows their logos', () => {
+    organiserDir.list = [
+      { id: 'fb', name: 'Fast Break Trading Cards Pty Ltd', slug: 'fast-break', logo_url: 'https://cdn.test/fb.png' },
+      { id: 'sa', name: 'Sports Addicts Australia', slug: 'sports-addicts', logo_url: 'https://cdn.test/sa.png' },
+    ];
+    renderCard({ ...baseEvent, organizer_name: 'Fast Break Trading Cards Pty Ltd & Sports Addicts Australia' });
+    expect(screen.getByRole('link', { name: 'Fast Break Trading Cards Pty Ltd' })).toHaveAttribute('href', '/events/organisers/fast-break');
+    expect(screen.getByRole('link', { name: 'Sports Addicts Australia' })).toHaveAttribute('href', '/events/organisers/sports-addicts');
+    // Both saved logos fill the title row, each linking to its organiser.
+    const logoLinks = screen.getAllByRole('link', { name: /More events by/ });
+    expect(logoLinks.map(l => l.getAttribute('href'))).toEqual(expect.arrayContaining(['/events/organisers/fast-break', '/events/organisers/sports-addicts']));
+  });
+
+  it('leaves an organiser not in the directory as plain text', () => {
+    renderCard({ ...baseEvent, organizer_name: 'Collect-It Con' });
+    expect(screen.queryByRole('link', { name: 'Collect-It Con' })).not.toBeInTheDocument();
+    expect(screen.getByText('Collect-It Con')).toBeInTheDocument();
   });
 });
