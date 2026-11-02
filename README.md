@@ -7,9 +7,9 @@ Australian trading card marketplace — buy, sell, trade, and track the value of
 ## Stack
 
 - **Frontend**: React 18 SPA, Vite, React Router v7, shadcn/ui, Tailwind CSS
-- **Backend**: Express.js served as a Vercel Serverless Function
+- **Backend**: Express.js, one Node process (`server/index.js`) that also serves the built SPA
 - **Database & Auth**: Supabase (PostgreSQL + RLS + Supabase Auth)
-- **Deployment**: Vercel (auto-deploy on push to `main` via GitHub Actions)
+- **Deployment**: Vultr VPS — one Node process under systemd behind Cloudflare; deployed on push to `main`
 - **Payments**: Stripe
 - **Market data**: eBay AU API
 - **Email marketing**: Kit.com
@@ -39,7 +39,7 @@ npm run test:coverage # Coverage report
 
 ```
 /
-├── api/              # Vercel serverless entry (api/index.js exports Express app)
+├── api/              # Prerender, sitemap, feed and cron modules (former Vercel functions)
 ├── components/       # Shared React components
 ├── contexts/         # React context providers (Auth, Admin, Cart, Categories)
 ├── hooks/            # Custom hooks
@@ -53,14 +53,16 @@ npm run test:coverage # Coverage report
 ├── tests/
 │   ├── frontend/     # Vitest + Testing Library
 │   └── backend/      # Vitest + supertest
-├── vercel.json       # Vercel routing config
+├── server/           # Self-hosted server: dist/ + API + functions, routing from vercel.json
+├── deploy/           # VPS bootstrap, deploy script, systemd unit, firewall
+├── vercel.json       # Routing manifest (redirects, bot rewrites, headers)
 └── CLAUDE.md         # AI assistant instructions for this repo
 ```
 
 ## Deployment
 
-Push to `main` — GitHub Actions runs `vercel --prod` automatically.
+Push to `main` — `.github/workflows/deploy.yml` SSHes to the VPS and runs `deploy/deploy.sh`, which builds the commit into a new release directory on the box and restarts the service on it.
 
-Requires three GitHub Actions secrets: `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
+Requires four repository secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`.
 
-All other secrets (Supabase service role key, Stripe, eBay, Kit.com, etc.) are set as Vercel environment variables — see `PRD.md` for the full list.
+All application secrets (Supabase service role key, Stripe, eBay, Kit.com, etc.) live in `/opt/cardpop/shared/.env` on the VPS — see `CLAUDE.md` → Deployment for the list and `docs/vultr-rollout.md` for the runbook.

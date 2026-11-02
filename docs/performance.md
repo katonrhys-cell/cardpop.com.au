@@ -181,8 +181,10 @@ Rules that keep it from growing:
 
 ## Edge caching (vercel.json `headers`)
 
-Two rules of Vercel's header matching shape the `headers` array, and
-`tests/backend/vercelHeaders.test.js` pins both:
+`vercel.json` is still the routing manifest on the VPS: `server/vercelRoutes.js`
+applies its `headers` rules with Vercel's semantics before the file or
+function answers (`docs/vultr-rollout.md`). Two rules of that matching shape
+the `headers` array, and `tests/backend/vercelHeaders.test.js` pins both:
 
 - **Every matching rule applies, in order, and for a repeated key the last
   match wins.** The catch-all `/(.*)` (which sets `Cache-Control: public,
