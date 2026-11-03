@@ -51,8 +51,15 @@ enabled = true
 port = 54323
 api_url = "http://127.0.0.1"
 
-# Email testing server. Emails sent with the local dev stack are captured here.
-[inbucket]
+# Email testing server for the local dev stack (Mailpit; emails sent locally
+# are captured here). This section was called [inbucket] until the Supabase
+# CLI renamed it in late 2026 — the CLI then REFUSED to run any command,
+# including `db push` in CI, with "[inbucket] in supabase/config.toml is no
+# longer supported. Use [local_smtp] instead", which left two migrations
+# unapplied in production for a day (issue #1125). Every CLI command parses
+# this whole file first, so a deprecated key here takes the migration push
+# down with it.
+[local_smtp]
 enabled = true
 port = 54324
 
