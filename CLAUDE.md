@@ -235,7 +235,17 @@ GitHub Actions otherwise runs only the quality gates —
 `e2e.yml` on **non-draft** pull requests **only** (the Playwright run is the
 most expensive workflow, so a draft PR skips it until it is marked ready for
 review) — plus the few schedules that need a runner (migration
-drift, git backup, merchant-listings check, the weekly Snyk sweep). On a push
+drift, git backup, merchant-listings check, the weekly Snyk sweep). **Those
+two heavy PR jobs run on a self-hosted runner** — a separate small Vultr box
+bootstrapped by `deploy/setup-runner.sh`, never the production VPS, because CI
+executes PR code — selected by the `CI_RUNS_ON` repository variable
+(`runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}`): set to
+the runner's label list they bill no metered minutes, deleted they fall back
+to GitHub-hosted runners with no code change. The deploy, migration and
+schedule workflows stay hosted on purpose so a dead CI box can't block a
+deploy; `tests/backend/workflowRunners.test.js` pins which is which. The
+box has Chromium's system libraries and the AWS CLI pre-installed and grants
+the runner no sudo — see `docs/ci-runner.md`. On a push
 to `main` only `deploy.yml` and the Supabase migration push (when
 `supabase/migrations/` changed) run: a private repo bills every run a whole
 metered minute, so the former post-merge `main-ci.yml` (the same `verify`
