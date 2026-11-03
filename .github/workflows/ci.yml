@@ -12,6 +12,10 @@ name: CI
 # information. Deployment is Vercel's own Git integration, which builds on
 # every push to main regardless. If main ever needs re-verifying, trigger
 # this job by opening a PR; there is no push trigger on purpose.
+#
+# Runs on the self-hosted runner (deploy/setup-runner.sh) when the CI_RUNS_ON
+# repository variable is set, so it costs no metered minutes; without the
+# variable it falls back to GitHub-hosted runners. See docs/ci-runner.md.
 
 on:
   pull_request:
@@ -25,7 +29,11 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Self-hosted when the CI_RUNS_ON repository variable is set (to the JSON
+    # label list the runner was registered with, e.g.
+    # ["self-hosted","linux","x64","cardpop-ci"]); GitHub-hosted otherwise.
+    # Jobs on the self-hosted box bill no metered minutes — docs/ci-runner.md.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}
     # A hung step must not run to the 6-hour default and eat the Actions budget.
     timeout-minutes: 20
     steps:

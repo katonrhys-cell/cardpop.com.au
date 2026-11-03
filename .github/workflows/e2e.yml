@@ -9,6 +9,11 @@ name: E2E
 # (Playwright + Chromium install on every run) and the private repo's metered
 # Actions minutes ran out on 2026-10-31, which stopped every workflow including
 # the migration push. Marking a PR "Ready for review" triggers the run.
+#
+# Runs on the self-hosted runner (deploy/setup-runner.sh) when the CI_RUNS_ON
+# repository variable is set — the box has Chromium's system libraries and the
+# AWS CLI pre-installed, so the job needs no sudo there. Without the variable
+# it falls back to GitHub-hosted runners. See docs/ci-runner.md.
 
 on:
   pull_request:
@@ -25,7 +30,11 @@ concurrency:
 jobs:
   e2e:
     if: github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
+    # Self-hosted when the CI_RUNS_ON repository variable is set (to the JSON
+    # label list the runner was registered with, e.g.
+    # ["self-hosted","linux","x64","cardpop-ci"]); GitHub-hosted otherwise.
+    # Jobs on the self-hosted box bill no metered minutes — docs/ci-runner.md.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}
     timeout-minutes: 20
     permissions:
       id-token: write
@@ -59,12 +68,20 @@ jobs:
       # isn't valid, got 'NOSPLIT'"), failing the browser install. Those repos
       # aren't needed for Chromium's system libraries, so drop them first.
       - name: Remove broken Microsoft apt repos
+        if: runner.environment == 'github-hosted'
         run: sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure*
 
       # GitHub runners don't have the browser pre-installed (this repo's dev
-      # sandbox does), so fetch it here.
+      # sandbox does), so fetch it here. --with-deps needs sudo for the system
+      # libraries, which only the hosted image grants; the self-hosted box has
+      # them pre-installed by deploy/setup-runner.sh and gets the browser only.
       - name: Install Playwright Chromium
+        if: runner.environment == 'github-hosted'
         run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright Chromium (self-hosted)
+        if: runner.environment == 'self-hosted'
+        run: npx playwright install chromium
 
       - name: Run E2E tests
         run: npm run test:e2e
