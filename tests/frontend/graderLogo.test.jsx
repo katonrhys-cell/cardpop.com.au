@@ -2,7 +2,10 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import GraderLogo from '@/components/grading/GraderLogo.jsx';
-import { GRADING_COMPANIES, graderStyle, withAlpha, findGradingCompany } from '@/data/gradingCompanies.js';
+import SlabLabel from '@/components/grading/SlabLabel.jsx';
+import {
+  GRADING_COMPANIES, graderStyle, withAlpha, findGradingCompany, slabLabelTier, SLAB_LABEL_LOOKS,
+} from '@/data/gradingCompanies.js';
 
 const psa = findGradingCompany('psa');
 
@@ -54,5 +57,60 @@ describe('GraderLogo', () => {
   it('renders nothing without a grader', () => {
     const { container } = render(<GraderLogo grader={null} />);
     expect(container.innerHTML).toBe('');
+  });
+});
+
+
+describe('slab label tiers', () => {
+  const bgs = findGradingCompany('BGS');
+  const tens = { centering: 10, corners: 10, edges: 10, surface: 10 };
+
+  it('picks the BGS label stock by grade: silver, gold from 9.5, Black Label for a 10 with four 10s', () => {
+    expect(slabLabelTier(bgs, { estimate: 8.5 })).toBe('silver');
+    expect(slabLabelTier(bgs, { estimate: 9.5 })).toBe('gold');
+    expect(slabLabelTier(bgs, { estimate: 10, subGrades: { ...tens, surface: 9.5 } })).toBe('gold');
+    expect(slabLabelTier(bgs, { estimate: 10, subGrades: tens })).toBe('black');
+  });
+
+  it('keeps PSA and SGC on their one label whatever the grade', () => {
+    expect(slabLabelTier(findGradingCompany('PSA'), { estimate: 10 })).toBe('psa');
+    expect(slabLabelTier(findGradingCompany('SGC'), { estimate: 10 })).toBe('black');
+    expect(slabLabelTier(findGradingCompany('CGC'), { estimate: 10 })).toBe('gold');
+    expect(slabLabelTier(findGradingCompany('CGC'), { estimate: '9.5' })).toBe('black');
+  });
+
+  it('falls back to the default tier for a non-numeric estimate', () => {
+    expect(slabLabelTier(bgs, { estimate: null })).toBe('silver');
+    expect(SLAB_LABEL_LOOKS[slabLabelTier(bgs, { estimate: 'n/a' })]).toBeDefined();
+  });
+});
+
+describe('SlabLabel', () => {
+  it('draws the BGS estimate on a silver label with its sub-grades printed on the label', () => {
+    const bgs = findGradingCompany('BGS');
+    const { container } = render(
+      <SlabLabel grader={bgs} estimate={8.5} label="NM-MT+" range="8-9" subGrades={{ centering: 9, corners: 8.5, edges: 8.5, surface: 8.5 }} />,
+    );
+    const root = container.firstChild;
+    expect(root.getAttribute('data-slab-tier')).toBe('silver');
+    expect(screen.getByText('8.5', { selector: 'span' })).toBeTruthy();
+    expect(screen.getByText('NM-MT+')).toBeTruthy();
+    expect(screen.getByText('centering')).toBeTruthy();
+    expect(screen.getAllByText('8.5').length).toBeGreaterThan(1);
+  });
+
+  it('puts the PSA mark in a red band above a white body', () => {
+    const { container } = render(<SlabLabel grader={psa} estimate={8} label="NM-MT" range="7-9" />);
+    const root = container.firstChild;
+    expect(root.getAttribute('data-slab-tier')).toBe('psa');
+    const band = root.firstChild;
+    expect(band.style.background.toLowerCase()).toMatch(/#e4002b|rgb\(228, 0, 43\)/);
+    expect(screen.getByAltText('Professional Sports Authenticator logo').getAttribute('src')).toBe(psa.logo);
+    expect(screen.getByText('8')).toBeTruthy();
+  });
+
+  it('shows the dash for a missing estimate rather than throwing', () => {
+    render(<SlabLabel grader={findGradingCompany('SGC')} estimate={undefined} label="" />);
+    expect(screen.getByText('—', { selector: 'span' })).toBeTruthy();
   });
 });

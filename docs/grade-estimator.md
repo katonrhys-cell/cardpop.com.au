@@ -74,3 +74,15 @@ each official file comes from; drop the file in, sample its primary fill into
 `brand.primary`, and set `verified: true`. Marks are the companies' trademarks: keep them
 unmodified and use them only to identify the service (PSA publishes logo-use guidelines at
 psacard.com/logo).
+
+**The estimate is drawn as that company's slab label.** `components/grading/SlabLabel.jsx`
+renders the grade box the way the top of the slab looks — PSA's red band over a white body,
+BGS's silver label (gold from 9.5, the Black Label for a 10 with four 10 sub-grades, the
+four sub-grades printed on the label), CGC's and SGC's black labels, TAG's banded white
+label — with the mark on the left and the grade boxed on the right. Which stock a company
+prints for a grade is `label.tiers` on its entry, resolved by `slabLabelTier()`, and the
+stock colours are `SLAB_LABEL_LOOKS`; both in `data/gradingCompanies.js`. Label stock is
+fixed colour (a black label stays black in light mode), so the logo is pinned with
+`GraderLogo`'s `tone` / `ink` props rather than following the theme. The CGC, ACE and TAG
+looks are approximations written without access to their artwork — check them against a
+real slab.

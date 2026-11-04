@@ -25,6 +25,9 @@ export const GRADING_COMPANIES = [
       verified: false,
       source: 'PSA red (the wordmark/red label). Brand guide: psacard.com/logo — take the hex from the official SVG.',
     },
+    // PSA's label: red band carrying the PSA mark, white body with black card details and
+    // the grade large on the right ("NM-MT 8"). One look for every grade.
+    label: { tiers: { default: 'psa' } },
   },
   {
     key: 'BGS',
@@ -38,6 +41,9 @@ export const GRADING_COMPANIES = [
       verified: false,
       source: 'Beckett blue as listed by Brandfetch for beckett.com (unclaimed listing) — confirm from the official SVG.',
     },
+    // BGS labels are tiered by grade: silver below 9.5, gold for 9.5 and 10, and the Black
+    // Label for a 10 with four 10 sub-grades; the four sub-grades print down the label.
+    label: { tiers: { default: 'silver', gold: 'gold', black: 'black' }, showSubGrades: true },
   },
   {
     key: 'CGC',
@@ -51,6 +57,9 @@ export const GRADING_COMPANIES = [
       verified: false,
       source: 'CGC red (CGC describes its own logo as red; hex from Brandfetch for cgccomics.com) — confirm from the official SVG.',
     },
+    // CGC Cards: black label with white text and the grade boxed on the right; a Pristine
+    // 10 is the gold label. Approximation — check against a slab before relying on it.
+    label: { tiers: { default: 'black', perfect: 'gold' } },
   },
   {
     key: 'ACE',
@@ -64,6 +73,9 @@ export const GRADING_COMPANIES = [
       verified: false,
       source: 'Not yet sourced — neutral placeholder until the hex is sampled from the official SVG.',
     },
+    // ACE: dark label, grade boxed on the right, gold for a 10. Approximation — ACE's
+    // artwork wasn't reachable when this was written; check against a slab.
+    label: { tiers: { default: 'black', perfect: 'gold' } },
   },
   {
     key: 'SGC',
@@ -79,6 +91,8 @@ export const GRADING_COMPANIES = [
       verified: false,
       source: 'SGC identity is black with gold (and a purple heritage colour) per its brand agency; gold hex is a reference value — confirm from the official SVG.',
     },
+    // SGC's "tuxedo" label: black, white text, the grade large on the right.
+    label: { tiers: { default: 'black' } },
   },
   {
     key: 'TAG',
@@ -92,6 +106,9 @@ export const GRADING_COMPANIES = [
       verified: false,
       source: 'Not yet sourced — neutral placeholder until the hex is sampled from the official SVG.',
     },
+    // TAG: white label with a dark band and the grade boxed; a 10 flips to the black
+    // label. Approximation — check against a slab.
+    label: { tiers: { default: 'tag', perfect: 'black' } },
   },
 ];
 
@@ -126,4 +143,64 @@ export function graderStyle(grader) {
     '--grader-border': withAlpha(primary, 0.3),
     '--grader-border-dark': withAlpha(onDark, 0.35),
   };
+}
+
+// ─── Slab label looks ─────────────────────────────────────────────────────────
+// The "top of the slab" each company prints: background, ink, muted ink, the grade box and
+// (where the company prints one) a band above the body that carries the mark. Colours are
+// label stock, not brand colours — a silver BGS label is silver whatever Beckett's logo is.
+const GOLD = 'linear-gradient(180deg, #f7e2a0 0%, #d9b24a 55%, #b8921f 100%)';
+const SILVER = 'linear-gradient(180deg, #f4f4f4 0%, #d2d2d2 55%, #b3b3b3 100%)';
+
+export const SLAB_LABEL_LOOKS = {
+  psa: {
+    band: { bg: '#E4002B', fg: '#FFFFFF' },
+    bg: '#FFFFFF', fg: '#111111', muted: '#555555',
+    box: { bg: '#FFFFFF', fg: '#111111', border: '#D9D9D9' },
+    dark: false,
+  },
+  silver: {
+    bg: SILVER, fg: '#111111', muted: '#3F3F3F',
+    box: { bg: '#FFFFFF', fg: '#111111', border: '#9A9A9A' },
+    dark: false,
+  },
+  gold: {
+    bg: GOLD, fg: '#1F1700', muted: '#4A3A08',
+    box: { bg: '#FFF8DC', fg: '#1F1700', border: '#9C7A18' },
+    dark: false,
+  },
+  black: {
+    bg: '#0B0B0B', fg: '#FFFFFF', muted: '#B5B5B5',
+    box: { bg: '#FFFFFF', fg: '#0B0B0B', border: '#0B0B0B' },
+    dark: true,
+  },
+  tag: {
+    band: { bg: '#0F172A', fg: '#FFFFFF' },
+    bg: '#FFFFFF', fg: '#111111', muted: '#555555',
+    box: { bg: '#0F172A', fg: '#FFFFFF', border: '#0F172A' },
+    dark: false,
+  },
+};
+
+function num(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Which label a company would print for this estimate: `black` for a BGS 10 with four 10
+// sub-grades, `gold` for a BGS 9.5+, `perfect` for a 10 elsewhere, else the default.
+export function slabLabelTier(grader, { estimate, subGrades } = {}) {
+  const tiers = grader?.label?.tiers || { default: 'black' };
+  const g = num(estimate);
+  if (g != null) {
+    const subs = subGrades ? Object.values(subGrades).map(num) : [];
+    if (tiers.black && g >= 10 && subs.length >= 4 && subs.every((v) => v != null && v >= 10)) return tiers.black;
+    if (tiers.gold && g >= 9.5) return tiers.gold;
+    if (tiers.perfect && g >= 10) return tiers.perfect;
+  }
+  return tiers.default;
+}
+
+export function slabLabelLook(grader, result) {
+  return SLAB_LABEL_LOOKS[slabLabelTier(grader, result)] || SLAB_LABEL_LOOKS.black;
 }

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useGradeEstimator } from '@/hooks/useGradeEstimator.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import GraderLogo from '@/components/grading/GraderLogo.jsx';
+import SlabLabel from '@/components/grading/SlabLabel.jsx';
 import { GRADING_COMPANIES, graderStyle } from '@/data/gradingCompanies.js';
 
 // ─── Grader config ────────────────────────────────────────────────────────────
@@ -33,14 +34,6 @@ function gradeColor(estimate) {
   if (estimate >= 6) return 'text-amber-500';
   if (estimate >= 4) return 'text-orange-500';
   return 'text-red-500';
-}
-
-function gradeBg(estimate) {
-  if (estimate >= 9.5) return 'bg-emerald-500/10';
-  if (estimate >= 8) return 'bg-blue-500/10';
-  if (estimate >= 6) return 'bg-amber-500/10';
-  if (estimate >= 4) return 'bg-orange-500/10';
-  return 'bg-red-500/10';
 }
 
 function scoreIcon(score) {
@@ -198,13 +191,8 @@ function GraderCard({ grader, gradeData }) {
       </div>
 
       <div className="p-4 space-y-3">
-        <div className={`rounded-xl p-4 text-center ${gradeBg(estimate)}`}>
-          <div className={`text-5xl font-black ${gradeColor(estimate)}`}>
-            {formatGrade(estimate)}
-          </div>
-          <div className="text-sm font-semibold mt-1 text-foreground">{label}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Range: {range}</div>
-        </div>
+        {/* The estimate drawn as the label on that company's slab */}
+        <SlabLabel grader={grader} estimate={estimate} label={label} range={range} subGrades={subGrades} />
 
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${confidenceDot(confidence)}`} />
@@ -213,7 +201,7 @@ function GraderCard({ grader, gradeData }) {
           </span>
         </div>
 
-        {subGrades && (
+        {subGrades && !grader.label?.showSubGrades && (
           <div className="grid grid-cols-2 gap-1.5">
             {Object.entries(subGrades).map(([k, v]) => (
               <div key={k} className="bg-muted/50 rounded-lg px-2.5 py-1.5">
