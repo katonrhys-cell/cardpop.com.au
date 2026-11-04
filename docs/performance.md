@@ -181,9 +181,9 @@ Rules that keep it from growing:
 
 ## Edge caching (vercel.json `headers`)
 
-`vercel.json` is still the routing manifest on the VPS: `server/vercelRoutes.js`
-applies its `headers` rules with Vercel's semantics before the file or
-function answers (`docs/vultr-rollout.md`). Two rules of that matching shape
+`vercel.json` is the routing manifest on Vercel and on the parked VPS stack
+alike: `server/vercelRoutes.js` applies its `headers` rules with Vercel's
+semantics before the file or function answers (`docs/vultr-rollout.md`). Two rules of that matching shape
 the `headers` array, and `tests/backend/vercelHeaders.test.js` pins both:
 
 - **Every matching rule applies, in order, and for a repeated key the last
@@ -212,7 +212,7 @@ What is cached how:
 | `/hcgi/api/public/*` | `max-age=30, s-maxage=60, stale-while-revalidate=300` | The edge-cached public reads below — identical for every visitor |
 
 Cloudflare honours these in front of the origin, so a positive `max-age` here
-also keeps the request off the VPS for repeat visitors and bots.
+also keeps the request off the origin for repeat visitors and bots.
 
 ## Edge-cached public reads (`/hcgi/api/public/*`)
 

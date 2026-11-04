@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is hosted on a **Vultr VPS** (one Node process under systemd, terminating TLS itself — `docs/vultr-rollout.md`), having moved off Vercel in November 2026. The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of the VPS, which hosts the app. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
+CardPop is an Australian trading card marketplace. It is a full-stack application with a React SPA frontend and an Express backend, backed by Supabase (PostgreSQL + Auth). The app is hosted on **Vercel** (Git integration deploys `main`; `vercel.json` is the routing manifest). A complete self-hosted alternative — one Node process under systemd on a **Vultr VPS**, terminating TLS itself (`server/`, `deploy/`, `docs/vultr-rollout.md`) — is built, tested and **parked**: it switches on with one repository variable once a box exists (see Deployment). The domain `cardpop.com.au` was purchased through Crazy Domains (registrar), but its nameservers now point to Cloudflare (`coco.ns.cloudflare.com` / `clayton.ns.cloudflare.com`) — so **Cloudflare is authoritative for DNS** and proxies traffic in front of the host. Live DNS records (A/CNAME/MX/TXT) must be edited in the Cloudflare dashboard — not Vercel's or Hostinger's DNS editors. (Verify with `dig NS cardpop.com.au` before assuming — the nameservers have moved before: Hostinger → Vercel → Cloudflare.)
 
 ## Commands
 
@@ -70,11 +70,11 @@ The frontend has two data sources:
 
    **Public reads that are the same for every visitor go through the edge-cached `/hcgi/api/public/*` endpoints** (`src/routes/public.js`, read via `lib/publicApi.js` with no credentials) rather than a direct Supabase query from the browser: the home page bundle (`lib/homepageData.js`) and the unscoped shop facet rows (`hooks/useShopFacets.js`). The server runs the browser's own query (`lib/homepageQueries.js`, `SHOP_FACET_COLUMNS`) under the **anon key** so RLS still applies, keeps a 60 s micro-cache, and answers `s-maxage=60` so Cloudflare serves the repeats — database load stops growing with anonymous traffic. The browser falls back to the direct query per part when an endpoint fails; failures are never cached. Needs the Cloudflare Cache Rule for `/hcgi/api/public/*` — see `docs/performance.md` → Edge-cached public reads.
 
-### Backend (Express, one Node process on the VPS)
+### Backend (Express)
 
-**Entry point**: `src/app.js`. In production it is mounted by `server/app.js` (the self-hosted server, started by `server/index.js`) for every `/api/*` and `/hcgi/api/*` request; `api/index.js` still re-exports it for the Vercel layout. In local dev the Express server runs on port 3001. The routing manifest `vercel.json` (read at runtime by `server/vercelRoutes.js`) maps `/hcgi/api/:path*` → `/api/:path*` → `api/index.js`.
+**Entry point**: `src/app.js`. On Vercel (production today) it runs as the `api/index.js` serverless function; on the parked VPS stack it is mounted by `server/app.js` (the self-hosted server, started by `server/index.js`) for every `/api/*` and `/hcgi/api/*` request. In local dev the Express server runs on port 3001. The routing manifest `vercel.json` (read at runtime by `server/vercelRoutes.js`) maps `/hcgi/api/:path*` → `/api/:path*` → `api/index.js`.
 
-The other files in `api/` (`prerender.js`, `sitemap.js`, `merchant-feed.js`, `blog-generate.js`, `event-scan.js`, `grade-estimate.js`) were separate Vercel functions with their own time budgets; on the VPS they are plain modules the server mounts under the same public paths (`FUNCTION_MODULES` in `server/app.js`), so the comments about 40 s / 300 s `maxDuration` describe history, not a limit that still applies. Cloudflare's 100 s proxy limit does — see `docs/vultr-rollout.md` → Timeouts.
+The other files in `api/` (`prerender.js`, `sitemap.js`, `merchant-feed.js`, `blog-generate.js`, `event-scan.js`, `grade-estimate.js`) are separate Vercel functions with their own time budgets (`maxDuration` 40 s for `api/index.js`, up to 300 s for the others) — **those limits apply in production today**. On the VPS stack the same files are plain modules the server mounts under the same public paths (`FUNCTION_MODULES` in `server/app.js`) and only Cloudflare's 100 s proxy limit applies — see `docs/vultr-rollout.md` → Timeouts.
 
 Routes are registered in `src/routes/index.js`. Each domain has its own router file:
 
@@ -201,13 +201,23 @@ Every document paints from a static shell: "/" from `tools/home-shell.html` (hea
 
 ### Deployment
 
-The site runs on a **Vultr VPS** as one plain Node process — `server/index.js`
-serving `dist/` + the Express API + the former Vercel functions — managed by
-systemd (`deploy/cardpop.service`), terminating TLS itself on :443 with a
-Cloudflare Origin CA certificate, with Cloudflare proxying in front exactly as
-before. No Docker, no reverse proxy: the same `node` + `npm` the project
-already uses. Full runbook, including provisioning, cutover and rollback:
-`docs/vultr-rollout.md`.
+**Production is on Vercel** (Git integration: every push to `main` builds and
+deploys; env vars in the Vercel dashboard; `vercel.json` routes, rewrites,
+headers and functions). **The Vultr VPS stack is built and parked** (PR #1117,
+2026-11-02): one plain Node process — `server/index.js` serving `dist/` + the
+Express API + the Vercel functions as modules — under systemd
+(`deploy/cardpop.service`), terminating TLS on :443 with a Cloudflare Origin CA
+certificate, Cloudflare proxying in front exactly as now. No Docker, no reverse
+proxy. Nothing about it runs until it is switched on: `deploy.yml` is gated on
+the repository variable `VPS_DEPLOY_ENABLED == 'true'` and skips in a second
+otherwise. To go live later: provision the box (`deploy/setup-vps.sh`), fill
+`/opt/cardpop/shared/.env`, set the four `VPS_*` secrets, create the variable,
+then move the DNS records — the full runbook, including cutover and rollback, is
+`docs/vultr-rollout.md`. Keep `server/`, `deploy/` and their tests green in the
+meantime; they are the exit from Vercel's per-invocation billing and function
+time limits whenever it is wanted.
+
+How a VPS deploy works once enabled:
 
 ```
 git push main
@@ -219,16 +229,15 @@ git push main
 
 The build happens **on the box** in a fresh release directory, not in Actions
 and not in place, so the deploy job bills about one metered minute per merge
-and the running release is untouched until the switch; the result is in
+(and nothing while parked) and the running release is untouched until the switch; the result is in
 `/opt/cardpop/logs/deploy.log`, a release that doesn't come up healthy is
 rolled back to the previous one, and a failed deploy emails
 `DEPLOY_ALERT_EMAIL` through Resend. `vercel.json` is still the **routing
 manifest** (redirects, bot-only prerender rewrites, the `/hcgi/api` prefix,
 per-path headers incl. the CSP) — `server/vercelRoutes.js` interprets it with
-the same semantics Vercel did, so there is one set of rules and nothing to keep
-in step. Change routing there, never in Express. Once Vercel is fully
-decommissioned the file is to be renamed (see the runbook); until then don't
-delete it or its tests.
+the same semantics Vercel does, so there is one set of rules and nothing to keep
+in step. Change routing there, never in Express. Only once Vercel is fully
+decommissioned is the file to be renamed (see the runbook).
 
 GitHub Actions otherwise runs only the quality gates —
 `.github/workflows/ci.yml` (lint + tests + build) on pull requests and
@@ -236,8 +245,8 @@ GitHub Actions otherwise runs only the quality gates —
 most expensive workflow, so a draft PR skips it until it is marked ready for
 review) — plus the few schedules that need a runner (migration
 drift, git backup, merchant-listings check, the weekly Snyk sweep). On a push
-to `main` only `deploy.yml` and the Supabase migration push (when
-`supabase/migrations/` changed) run: a private repo bills every run a whole
+to `main` only the Supabase migration push (when `supabase/migrations/`
+changed) runs, plus `deploy.yml` once the VPS is enabled (it skips while parked): a private repo bills every run a whole
 metered minute, so the former post-merge `main-ci.yml` (the same `verify`
 job again, ~6 min per merge) and the per-push Snyk scan were removed on
 2026-10-31 after they helped exhaust the 2,000-minute allowance. Don't add a
@@ -251,10 +260,10 @@ holding the `CRON_SECRET` as a Worker secret. They moved off Vercel Cron
 because the Hobby plan rejected any cron firing more than once a day, and off
 GitHub Actions on 2026-10-31 because the metered minutes ran out, which stopped
 every workflow including the migration push. Cron Triggers are free, and the
-Worker needed no change for the VPS move (it calls `https://cardpop.com.au`).
+Worker needs no change for a VPS move (it calls `https://cardpop.com.au`).
 Full runbook: `docs/scheduled-jobs.md`.
 
-**Environment variables** required in production live in `/opt/cardpop/shared/.env` on the VPS (`chmod 600`, owned by `cardpop`; linked into every release, so Vite reads the `VITE_*` values at build time and dotenv the rest at runtime — edit it, then redeploy). Before November 2026 these were set in the Vercel dashboard:
+**Environment variables** required in production are set in the **Vercel dashboard** (Project → Settings → Environment Variables; `VITE_*` values are read at build time, so redeploy after changing one). On the parked VPS stack the same variables live in one file, `/opt/cardpop/shared/.env` (`chmod 600`, owned by `cardpop`, linked into every release — edit it, then redeploy):
 
 | Variable | Used by |
 |---|---|

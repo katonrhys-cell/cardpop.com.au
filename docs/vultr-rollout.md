@@ -1,12 +1,20 @@
 # Hosting on a VPS (Vultr)
 
+> **Status: built and parked (2026-11-04).** Production still runs on Vercel.
+> Everything below is in the repository and tested, but no box has been
+> provisioned and `.github/workflows/deploy.yml` skips itself until the
+> repository variable `VPS_DEPLOY_ENABLED` is set to `true`. To pick this up
+> later, start at **Provisioning** and follow the runbook in order; the last
+> step before the DNS cutover is creating that variable. Nothing in the live
+> site depends on this document until then.
+
 CardPop moves off Vercel onto a single Vultr VPS, running exactly the stack the
 project already uses — Node and npm — with nothing new in between: one Node
 process under systemd, terminating TLS itself with a Cloudflare Origin CA
 certificate, and Cloudflare proxying in front as before. This is the runbook:
 what runs on the box, how to provision it, how a deploy happens, how to cut DNS
 over, and how to roll back. Everything in the repository that the move needed
-is on the `vultr-rollout` branch (PR #1117).
+landed in PR #1117.
 
 ## What changes, what doesn't
 
@@ -42,7 +50,7 @@ second or two of connection resets while a deploy restarts the process.
 | `deploy/setup-vps.sh` | One-time Ubuntu 24.04 bootstrap (Node 24, swap, `cardpop` user, layout, unit, sudo rule, firewall, clone) |
 | `deploy/deploy.sh` | The deploy: fetch → export the commit into `releases/<id>` → `npm ci` → `vite build` → prune dev deps → flip `current` → restart → wait for `/healthz`, rolling back on failure; `--detach` for the workflow; emails on failure |
 | `deploy/cloudflare-firewall.sh` | ufw: 80/443 from Cloudflare's published ranges only; weekly cron |
-| `.github/workflows/deploy.yml` | push to `main` → SSH → `/opt/cardpop/bin/deploy.sh --detach <sha>` |
+| `.github/workflows/deploy.yml` | push to `main` → SSH → `/opt/cardpop/bin/deploy.sh --detach <sha>`; gated on the `VPS_DEPLOY_ENABLED` repository variable so it skips while the stack is parked |
 | `tests/backend/vercelRoutes.test.js`, `tests/backend/vpsServer.test.js` | The routing interpreter against the real manifest; the server against a stub `dist/` and stub functions |
 
 `vercel.json` stays the routing manifest for now because both hosts run from
