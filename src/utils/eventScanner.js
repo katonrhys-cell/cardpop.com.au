@@ -33,11 +33,15 @@ import {
 //
 // Full runbook: docs/event-scanning.md
 
-// Claude Opus 5.5: the current Opus, $4 / $20 per MTok against Claude Opus 5's
-// $5 / $25, same context window and tokenizer. Both calls below already set
-// effort explicitly (the default dropped to medium) and use no forced
-// tool_choice, so nothing else changes.
-const MODEL = 'claude-opus-5-5';
+// Two models, one per stage. Discovery stays on Claude Opus 5.5 ($4 / $20 per
+// MTok): one call a week that has to judge which search results are real
+// events and refine queries that come back empty. Extraction — page text in,
+// fixed JSON schema out, at low effort, once per new page and on every weekly
+// event-watch re-scan — is a structured-extraction task and runs on Claude
+// Sonnet 5.5 ($2 / $10) instead. Both set effort explicitly and use no forced
+// tool_choice; Sonnet 5.5 accepts the same `fallbacks: 'default'` form.
+const DISCOVERY_MODEL = 'claude-opus-5-5';
+const EXTRACTION_MODEL = 'claude-sonnet-5-5';
 
 // Per-run budgets. The cron function has a 300s ceiling (vercel.json), and one
 // slow page plus one extraction is comfortably 20s, so these are sized to
@@ -249,7 +253,7 @@ export async function discoverCandidates(queries) {
   if (!queries.length) return [];
 
   const message = await (await anthropic()).beta.messages.create({
-    model: MODEL,
+    model: DISCOVERY_MODEL,
     max_tokens: 8000,
     // Event listings are unremarkable content, but a refusal returns 200 with
     // empty content rather than an error, which would look like "found nothing"
@@ -370,7 +374,7 @@ async function updateCandidate(candidateId, patch) {
 /** Stage 2. Page text in, validated event draft out (or null if it isn't one). */
 export async function extractEventFromPage(pageText, sourceUrl) {
   const message = await (await anthropic()).beta.messages.create({
-    model: MODEL,
+    model: EXTRACTION_MODEL,
     max_tokens: 8000,
     betas: ['server-side-fallback-2026-07-01'],
     fallbacks: 'default',

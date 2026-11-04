@@ -71,7 +71,7 @@ events (status = 'pending_review', auto_discovered = true)
 
 ### ① Discovery
 
-One `claude-opus-5` call with the `web_search_20260209` server tool, given every
+One `claude-opus-5-5` call with the `web_search_20260209` server tool, given every
 active query in the run. Candidate URLs are read out of the `web_search_result`
 blocks programmatically — **not** parsed from the model's prose — so a chatty or
 truncated answer can't corrupt the list.
@@ -89,7 +89,7 @@ short-TTL rebinding record can't slip past the check.
 
 ### ③ Extraction
 
-A second `claude-opus-5` call per page, at `effort: 'low'`, under a JSON schema
+A second call per page — `claude-sonnet-5-5`, at `effort: 'low'`, under a JSON schema
 that mirrors `EventScraperPrompt`'s contract. The schema adds one field the admin
 path doesn't have — `is_trading_card_event` — so the model can say "this is a
 shop homepage, not an event" instead of inventing a plausible-looking event to

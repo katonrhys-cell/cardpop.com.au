@@ -11,7 +11,13 @@ import { extractTextFromHtml } from './safeFetch.js';
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import { normaliseSupplierUrl } from '../../utils/supplierUrl.js';
 
-const MODEL = 'claude-opus-5-5';
+// Pulling one price out of up to 20,000 characters of page text under a
+// four-field JSON schema is an extraction task, not a writing one: Claude
+// Haiku 5.5 ($0.10 / $0.50 per MTok) does it for about a fortieth of what
+// Opus 5.5 ($4 / $20) charged. Haiku has no server-side refusal fallback, so
+// the request sends none; a (very unlikely) refusal surfaces as the same
+// "declined" error as before and the product is reported unreadable.
+const MODEL = 'claude-haiku-5-5';
 const MAX_MODEL_TEXT = 20000;
 
 export { normaliseSupplierUrl };
@@ -151,9 +157,9 @@ export async function extractPriceWithModel(html, pageUrl) {
 
   const message = await (await anthropic()).beta.messages.create({
     model: MODEL,
+    // Thinking counts toward max_tokens on this model; at low effort it is
+    // brief or skipped, and the answer itself is a few dozen tokens.
     max_tokens: 2000,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
     output_config: {
       effort: 'low',
       format: { type: 'json_schema', schema: PRICE_SCHEMA },

@@ -12,8 +12,30 @@ import { mapCollectionType } from '../../utils/ocrResult.js';
 
 // Cheap model handles most scans; escalate to the stronger model only when the
 // cheap one left something out — keeps cost low while lifting accuracy on hard cards.
-export const OCR_MODEL_FAST = 'claude-haiku-4-5-20251001';
-export const OCR_MODEL_STRONG = 'claude-sonnet-4-6';
+//
+// Claude Haiku 5.5 ($0.10 / $0.50 per MTok) replaces Haiku 4.5 ($1 / $5) and
+// Claude Sonnet 5.5 ($2 / $10) replaces Sonnet 4.6 ($3 / $15): the current
+// generation of each tier, cheaper and better at instruction following. Both
+// run adaptive thinking by default, which this fixed-schema read neither needs
+// nor has time for (12–15 s budgets), so each request pins the lowest thinking
+// setting its model accepts: `disabled` on Haiku (allowed at effort ≤ high) and
+// `between_tools` on Sonnet 5.5 (`disabled` is a 400 there). Replies are read
+// by block type, never `content[0]`, so a thinking block can't swallow the JSON.
+export const OCR_MODEL_FAST = 'claude-haiku-5-5';
+export const OCR_MODEL_STRONG = 'claude-sonnet-5-5';
+
+/** The thinking setting that keeps each model on the task, not on deliberation. */
+export function thinkingFor(model) {
+	return model === OCR_MODEL_STRONG ? { type: 'between_tools' } : { type: 'disabled' };
+}
+
+/** Joins a Messages API reply's text blocks; thinking blocks are skipped. */
+export function textFromContent(content) {
+	return (Array.isArray(content) ? content : [])
+		.filter((block) => block?.type === 'text')
+		.map((block) => block.text ?? '')
+		.join('');
+}
 
 // Per-call timeouts are tightened so a fast call + an escalation still fit
 // inside the serverless function budget (see vercel.json maxDuration).
@@ -123,6 +145,8 @@ export async function requestOcr({ apiKey, model, system, promptText, imageBlock
 			// are open-ended, and a truncated reply reads as unparseable JSON —
 			// which costs a wasted escalation before failing.
 			max_tokens: 1500,
+			thinking: thinkingFor(model),
+			output_config: { effort: 'low' },
 			system,
 			messages: [{
 				role: 'user',
@@ -141,7 +165,10 @@ export async function requestOcr({ apiKey, model, system, promptText, imageBlock
 	}
 
 	const data = await res.json();
-	return data.content?.[0]?.text ?? '';
+	if (data.stop_reason === 'refusal') {
+		throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
+	}
+	return textFromContent(data.content);
 }
 
 /**
