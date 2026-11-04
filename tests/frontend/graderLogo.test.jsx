@@ -17,7 +17,7 @@ describe('gradingCompanies data', () => {
     for (const g of GRADING_COMPANIES) {
       expect(g.brand.primary).toMatch(/^#[0-9A-F]{6}$/i);
       expect(g.logo).toMatch(/^\/images\/grading\/[a-z-]+\.(svg|png)$/);
-      if (!['PSA', 'BGS', 'CGC'].includes(g.key)) continue; // the others still await their official file
+      if (!['PSA', 'BGS', 'CGC', 'TAG'].includes(g.key)) continue; // the others still await their official file
       expect(fs.existsSync(path.join(import.meta.dirname, '..', '..', 'public', g.logo))).toBe(true);
       expect(typeof g.brand.verified).toBe('boolean');
     }
@@ -117,6 +117,20 @@ describe('SlabLabel', () => {
     const number = screen.getByText('8');
     expect(number.parentElement.className).toContain('flex-col-reverse');
     expect(number.nextSibling.textContent).toBe('NM-MT');
+  });
+
+  it('draws the TAG label black with a white inset frame and the mark centred on its top edge', () => {
+    const tag = findGradingCompany('TAG');
+    const { container } = render(<SlabLabel grader={tag} estimate={10} label="Gem Mint" range="9-10" />);
+    const root = container.firstChild;
+    expect(root.getAttribute('data-slab-tier')).toBe('tag');
+    expect(root.style.background.toLowerCase()).toMatch(/#0a0a0a|rgb\(10, 10, 10\)/);
+    const inset = root.querySelector('.border.rounded-sm');
+    expect(inset.style.borderColor.toLowerCase()).toMatch(/#ffffff|rgb\(255, 255, 255\)/);
+    const logo = screen.getByAltText('TAG Grading logo');
+    expect(logo.getAttribute('src')).toBe(tag.logoDark);
+    expect(logo.closest('.absolute')).not.toBeNull();
+    expect(screen.getByText('10').nextSibling.textContent).toBe('Gem Mint');
   });
 
   it('keeps the grade word beneath the number on a Beckett label', () => {

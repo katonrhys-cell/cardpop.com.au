@@ -12,7 +12,7 @@ wordmark in the brand colour rather than an approximation of the mark.
 | `cgc.png` | CGC Cards (Certified Guaranty Company) | In place — the red scales + CGC® mark, cut from the logo image supplied on 2026-11-04. Replace with the vector from https://www.cgccards.com when available |
 | `ace.svg` | ACE Grading | **Missing** — the gold shield "A" at https://www.acegrading.com; the copies supplied so far were too small to use. Wordmark fallback until then |
 | `sgc.svg` / `sgc-white.svg` | SGC (Sportscard Guaranty Corporation) | **Missing** — https://www.gosgc.com publishes a white logo for dark backgrounds. Wordmark fallback until then |
-| `tag.svg` | TAG Grading | **Missing** — https://taggrading.com. Wordmark fallback until then |
+| `tag.png` / `tag-white.png` | TAG Grading | In place — the boxed serif TAG mark, black and white versions cut from the artwork supplied on 2026-11-04. Replace with TAG's own file when available |
 
 When a file lands or is replaced: point `logo` (and `logoDark` for a light-on-dark version)
 at it in `data/gradingCompanies.js`, sample the mark's primary fill into `brand.primary`,

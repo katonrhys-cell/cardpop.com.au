@@ -107,16 +107,18 @@ export const GRADING_COMPANIES = [
     name: 'TAG',
     full: 'TAG Grading',
     website: 'https://taggrading.com',
-    logo: '/images/grading/tag.svg',
+    logo: '/images/grading/tag.png',
+    logoDark: '/images/grading/tag-white.png',
     brand: {
-      primary: '#1F2937',
-      onDark: '#E5E7EB',
-      verified: false,
-      source: 'Not yet sourced — neutral placeholder until the hex is sampled from the official SVG.',
+      primary: '#0A0A0A',
+      onDark: '#FFFFFF',
+      verified: true,
+      source: 'TAG is a black-and-white identity: the boxed serif TAG mark, white on black, from the artwork supplied 2026-11-04.',
     },
-    // TAG: white label with a dark band and the grade boxed; a 10 flips to the black
-    // label. Approximation — check against a slab.
-    label: { tiers: { default: 'tag', perfect: 'black' } },
+    // TAG's label: black with a thin white inset frame, the boxed TAG mark centred at the
+    // top breaking the frame line, card details left, the grade at the right with its word
+    // beneath — all white on black, every grade. From slab photos supplied 2026-11-04.
+    label: { tiers: { default: 'tag' } },
   },
 ];
 
@@ -163,8 +165,9 @@ const SILVER = 'linear-gradient(180deg, #E8E8EB 0%, #CCCCD0 55%, #B0B0B4 100%)';
 // `band` is a rule printed above the body and `frame` a border around the whole label;
 // `box` is the grade panel on the right — `bg: 'transparent'` prints the grade straight onto
 // the stock the way Beckett does, `slant` cuts its left edge on the diagonal the way ACE
-// does, `wordAbove` puts the grade word over the number the way PSA does. `logoAt: 'bottom'`
-// moves the mark to a row under the details (PSA).
+// does, `wordAbove` puts the grade word over the number the way PSA does. `logoAt` moves
+// the mark to a row under the details (`bottom`, PSA) or centred on the top edge of the
+// `inset` frame (`top`, TAG).
 export const SLAB_LABEL_LOOKS = {
   // PSA: a red frame around a white label, the card details top-left, the grade word
   // above the number at the right, the PSA mark along the bottom.
@@ -205,11 +208,13 @@ export const SLAB_LABEL_LOOKS = {
     box: { bg: '#CBAA6D', fg: '#090F1B', border: '#090F1B', slant: true },
     dark: true,
   },
+  // TAG: black, a thin white inset frame, the mark centred on the frame's top edge.
   tag: {
-    band: { bg: '#0F172A', fg: '#FFFFFF', thin: true },
-    bg: '#FFFFFF', fg: '#111111', muted: '#555555',
-    box: { bg: '#0F172A', fg: '#FFFFFF', border: '#0F172A' },
-    dark: false,
+    bg: '#0A0A0A', fg: '#FFFFFF', muted: '#CFCFCF',
+    box: { bg: 'transparent', fg: '#FFFFFF', border: 'transparent', align: 'end' },
+    inset: '#FFFFFF',
+    logoAt: 'top',
+    dark: true,
   },
 };
 

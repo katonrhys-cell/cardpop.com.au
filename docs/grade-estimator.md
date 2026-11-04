@@ -80,11 +80,12 @@ renders the grade box the way the top of the slab looks — PSA's red-framed whi
 with the grade word above the number and the blue/red mark along the bottom, Beckett's silver label (gold from 9.5, the Black Label with the
 grade in gold for a 10 with four 10 sub-grades) with the laurel crest and the four
 sub-grades in a row, ACE's navy label with the angled grade panel (light stock, gold for a
-Gem Mint 10), CGC's and SGC's black labels, TAG's white label under a dark rule — with the
+Gem Mint 10), CGC's and SGC's black labels, TAG's black label with its white inset frame and the mark
+centred on the frame's top edge — with the
 mark on the left and the grade, its word beneath it, on the right. Which stock a company
 prints for a grade is `label.tiers` on its entry, resolved by `slabLabelTier()`, and the
 stock colours are `SLAB_LABEL_LOOKS`; both in `data/gradingCompanies.js`. Label stock is
 fixed colour (a black label stays black in light mode), so the logo is pinned with
-`GraderLogo`'s `tone` / `ink` props rather than following the theme. PSA, Beckett and ACE
-follow reference artwork supplied on 2026-11-04; the CGC, SGC and TAG looks are still
+`GraderLogo`'s `tone` / `ink` props rather than following the theme. PSA, Beckett, ACE and TAG
+follow reference artwork supplied on 2026-11-04; the CGC and SGC looks are still
 approximations — check them against a real slab.
