@@ -139,6 +139,35 @@ describe('POST /generate', () => {
     expect(res.body.description).toBe('A stunning 1999 Base Set Charizard in Near Mint condition.');
   });
 
+  it('sends the Haiku 5.5 request with thinking off at low effort', async () => {
+    mockFetch.mockResolvedValue(anthropicOk('A clean copy.'));
+
+    await request(app).post('/generate').send({ card: validCard });
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(body.model).toBe('claude-haiku-5-5');
+    expect(body.thinking).toEqual({ type: 'disabled' });
+    expect(body.output_config).toEqual({ effort: 'low' });
+    expect(body).not.toHaveProperty('temperature');
+  });
+
+  it('reads the description from the text block when the reply leads with a thinking block', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: [
+          { type: 'thinking', thinking: '', signature: 'sig' },
+          { type: 'text', text: 'A sharp 1999 Base Set Charizard.' },
+        ],
+      }),
+    });
+
+    const res = await request(app).post('/generate').send({ card: validCard });
+
+    expect(res.status).toBe(200);
+    expect(res.body.description).toBe('A sharp 1999 Base Set Charizard.');
+  });
+
   it('strips surrounding quotes the model may add', async () => {
     mockFetch.mockResolvedValue(anthropicOk('"A graded gem."'));
 

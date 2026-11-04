@@ -24,7 +24,8 @@ carries the disclaimer and the prompt is told to be conservative.
    guard) and bundles sharp like `api/index.js` does.
 4. The route compresses the buffers again server-side and sends them **inline as base64
    image blocks** straight to the Anthropic Messages API as a **stream**
-   (`streamGradeEstimate()` in `src/utils/gradeEstimator.js`, `claude-sonnet-4-6`, 150 s
+   (`streamGradeEstimate()` in `src/utils/gradeEstimator.js`, `claude-sonnet-5-5` with
+   `thinking: between_tools` so it answers straight from the photos, 150 s
    budget `OUTBOUND_TIMEOUT_MS.anthropicGrade` covering the whole stream). The photos are
    never stored. The response headers are flushed at once with an SSE comment, and each
    text delta is forwarded as a `content` event as the model writes it — Cloudflare drops

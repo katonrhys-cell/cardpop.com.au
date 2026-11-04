@@ -311,6 +311,20 @@ describe('extractEventFromPage', () => {
     expect(result.eventData).toBeUndefined();
   });
 
+  it('extracts on Sonnet 5.5 at low effort with the default fallback, while discovery stays on Opus 5.5', async () => {
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent()));
+    await extractEventFromPage('page text', 'https://example.com.au/show');
+    const extraction = mockAnthropicCreate.mock.calls.at(-1)[0];
+    expect(extraction.model).toBe('claude-sonnet-5-5');
+    expect(extraction.output_config.effort).toBe('low');
+    expect(extraction.fallbacks).toBe('default');
+    expect(extraction).not.toHaveProperty('tool_choice');
+
+    mockAnthropicCreate.mockResolvedValue({ stop_reason: 'end_turn', content: [] });
+    await discoverCandidates(['card show sydney']);
+    expect(mockAnthropicCreate.mock.calls.at(-1)[0].model).toBe('claude-opus-5-5');
+  });
+
   it('throws when the output was truncated', async () => {
     mockAnthropicCreate.mockResolvedValue({ stop_reason: 'max_tokens', content: [] });
 
