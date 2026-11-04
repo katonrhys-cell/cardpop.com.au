@@ -30,7 +30,7 @@ import {
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
 import { trackViewItem } from '@/lib/analytics.js';
-import { getCardImage } from '@/utils/imageUrl.js';
+import { getCardImage, toCdnUrl } from '@/utils/imageUrl.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -67,6 +67,9 @@ const ShopBinderProductPage = () => {
   const canonical = `${SITE_ORIGIN}/shop/binders/${product.slug}`;
   // A chosen colour shows its own photos; the catalogue's are the fallback.
   const images = family.length > 0 && productImages(row).length > 0 ? productImages(row) : binderImages(product);
+  // What crawlers and link previews see: the same gallery, served from the
+  // image CDN (the DB and catalogue keep canonical Supabase URLs on purpose).
+  const seoImages = images.map(toCdnUrl);
   const lineTitle = (family.length > 0 && row?.title) || product.title;
   // The colours actually stocked (the picker's own list) once the family has
   // loaded; the catalogue list until then.
@@ -138,7 +141,7 @@ const ShopBinderProductPage = () => {
     '@type': 'Product',
     name: product.title,
     description: product.metaDescription,
-    image: images,
+    image: seoImages,
     // sku/mpn (the brand's own SKU) + gtin from the shown colour's barcode —
     // the global identifiers Google's Merchant listings report asks for.
     ...shopProductIdentifiersLd({ sku: product.sku, barcode: row?.barcode }, { brand: 'Palms Off Gaming' }),
@@ -188,7 +191,7 @@ const ShopBinderProductPage = () => {
         title={product.metaTitle}
         description={product.metaDescription}
         canonicalUrl={canonical}
-        ogImage={images[0]}
+        ogImage={seoImages[0]}
         ogImageAlt={binderImageAlt(product, product.imageFiles[0])}
         structuredData={[isEligibleProductLd(productLd) ? productLd : null, breadcrumbLd, faqLd].filter(Boolean)}
       />
