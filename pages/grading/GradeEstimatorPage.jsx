@@ -8,64 +8,14 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Button } from '@/components/ui/button';
 import { useGradeEstimator } from '@/hooks/useGradeEstimator.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import GraderLogo from '@/components/grading/GraderLogo.jsx';
+import { GRADING_COMPANIES, graderStyle } from '@/data/gradingCompanies.js';
 
 // ─── Grader config ────────────────────────────────────────────────────────────
-const GRADERS = [
-  {
-    key: 'PSA',
-    name: 'PSA',
-    full: 'Professional Sports Authenticator',
-    color: 'text-blue-600',
-    bg: 'bg-blue-600',
-    border: 'border-blue-600/30',
-    light: 'bg-blue-50 dark:bg-blue-950/30',
-  },
-  {
-    key: 'BGS',
-    name: 'BGS',
-    full: 'Beckett Grading Services',
-    color: 'text-orange-500',
-    bg: 'bg-orange-500',
-    border: 'border-orange-500/30',
-    light: 'bg-orange-50 dark:bg-orange-950/30',
-  },
-  {
-    key: 'CGC',
-    name: 'CGC',
-    full: 'Certified Guaranty Company',
-    color: 'text-violet-600',
-    bg: 'bg-violet-600',
-    border: 'border-violet-600/30',
-    light: 'bg-violet-50 dark:bg-violet-950/30',
-  },
-  {
-    key: 'ACE',
-    name: 'ACE',
-    full: 'ACE Grading (Australia)',
-    color: 'text-red-500',
-    bg: 'bg-red-500',
-    border: 'border-red-500/30',
-    light: 'bg-red-50 dark:bg-red-950/30',
-  },
-  {
-    key: 'SGC',
-    name: 'SGC',
-    full: 'Sportscard Guaranty Corporation',
-    color: 'text-slate-600',
-    bg: 'bg-slate-600',
-    border: 'border-slate-600/30',
-    light: 'bg-slate-50 dark:bg-slate-950/30',
-  },
-  {
-    key: 'TAG',
-    name: 'TAG',
-    full: 'TAG Grading',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-600',
-    border: 'border-emerald-600/30',
-    light: 'bg-emerald-50 dark:bg-emerald-950/30',
-  },
-];
+// Names, official logos and brand colours live in data/gradingCompanies.js (shared with the
+// rest of the Grading Hub); the results grid renders whatever keys the prompt returns that
+// this list carries.
+const GRADERS = GRADING_COMPANIES;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 // AI model JSON isn't guaranteed to return a number (a string like "9.5", or a
@@ -236,11 +186,14 @@ function GraderCard({ grader, gradeData }) {
   const { estimate, range, label, confidence, notes, subGrades } = gradeData;
 
   return (
-    <div className={`bg-card border ${grader.border} rounded-2xl overflow-hidden`}>
-      <div className={`${grader.light} px-4 py-3 border-b ${grader.border}`}>
-        <div className="flex items-center justify-between">
-          <span className={`font-black text-lg tracking-tight ${grader.color}`}>{grader.name}</span>
-          <span className="text-xs text-muted-foreground">{grader.full}</span>
+    <div
+      className="bg-card border border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] rounded-2xl overflow-hidden"
+      style={graderStyle(grader)}
+    >
+      <div className="bg-[var(--grader-tint)] dark:bg-[var(--grader-tint-dark)] px-4 py-3 border-b border-[var(--grader-border)] dark:border-[var(--grader-border-dark)]">
+        <div className="flex items-center justify-between gap-3">
+          <GraderLogo grader={grader} height={24} wordmarkClassName="text-lg" />
+          <span className="text-xs text-muted-foreground text-right">{grader.full}</span>
         </div>
       </div>
 
@@ -587,9 +540,13 @@ const GradeEstimatorPage = () => {
               <h2 className="text-xl font-bold mb-4">Grading Services Covered</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {GRADERS.map((g) => (
-                  <div key={g.key} className={`bg-card border ${g.border} rounded-xl px-4 py-3 flex items-center gap-3`}>
-                    <div className={`w-8 h-8 rounded-lg ${g.bg} flex items-center justify-center text-white text-xs font-black`}>
-                      {g.key}
+                  <div
+                    key={g.key}
+                    className="bg-card border border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] rounded-xl px-4 py-3 flex items-center gap-3"
+                    style={graderStyle(g)}
+                  >
+                    <div className="h-10 min-w-[2.5rem] px-2 rounded-lg bg-[var(--grader-tint)] dark:bg-[var(--grader-tint-dark)] flex items-center justify-center">
+                      <GraderLogo grader={g} height={22} wordmarkClassName="text-xs" />
                     </div>
                     <div>
                       <div className="font-semibold text-sm">{g.name}</div>

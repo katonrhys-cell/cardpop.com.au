@@ -57,5 +57,20 @@ way `describeOcrFailure()` does for card scans, and the full error goes to the l
 ## Adding a grading company
 
 Add it to the scale reference and the JSON schema in `GradeEstimatorPrompt`
-(`src/constants/prompts.js`) and to `GRADERS` in `GradeEstimatorPage.jsx`; the results
-grid renders whatever keys the prompt returns that `GRADERS` lists.
+(`src/constants/prompts.js`) and to `GRADING_COMPANIES` in `data/gradingCompanies.js`; the
+results grid renders whatever keys the prompt returns that the list carries.
+
+## Company branding (logos and colours)
+
+Every grader card, and the "Grading Services Covered" strip, is themed from
+`data/gradingCompanies.js` — one entry per company with its `brand.primary` hex (the tint,
+border and fallback wordmark are derived from it via `graderStyle()`), an optional
+`brand.onDark` ink for dark mode, and the path of the company's **official logo file** in
+`public/images/grading/` (`logo`, plus `logoDark` where the company publishes a
+light-on-dark version). `components/grading/GraderLogo.jsx` shows that file and falls back
+to a plain wordmark in the brand colour if it is missing or fails to load — it never redraws
+a mark, so a missing file can't ship as a near-miss logo. The folder's README lists where
+each official file comes from; drop the file in, sample its primary fill into
+`brand.primary`, and set `verified: true`. Marks are the companies' trademarks: keep them
+unmodified and use them only to identify the service (PSA publishes logo-use guidelines at
+psacard.com/logo).
