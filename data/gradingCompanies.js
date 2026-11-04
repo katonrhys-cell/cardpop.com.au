@@ -96,7 +96,7 @@ export const GRADING_COMPANIES = [
       primary: '#0B0B0B',
       onDark: '#FFFFFF',
       verified: true,
-      source: 'SGC is a black-and-white identity: the hexagon ball mark + SGC wordmark, from the artwork supplied 2026-11-04.',
+      source: 'SGC is a black-and-white identity: the SGC wordmark, white on black, from the artwork supplied 2026-11-04.',
     },
     // SGC's "tuxedo" label: a black strip carrying the SGC mark over a white panel with the
     // card details in bold black, the grade huge at the right and its word in a small black
