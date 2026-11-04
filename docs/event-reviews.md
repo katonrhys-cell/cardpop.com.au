@@ -65,7 +65,7 @@ it:
   1. **Which event?** — searchable picker over `events` (admins read the table
      directly). Selecting an event defaults `attended_on` to its start date and
      suggests a title.
-  2. **The story** — title (auto-slug until the slug is edited), standfirst,
+  2. **The story** — title (the URL slug auto-fills as `<event-slug>-cardpop-review` until edited), standfirst,
      byline (defaults to the admin's display name), cover photo, and the body in
      `components/admin/RichTextEditor.jsx` (Tiptap). It reads and writes the same
      HTML `blog_articles.content` already stores, so the article renders through
