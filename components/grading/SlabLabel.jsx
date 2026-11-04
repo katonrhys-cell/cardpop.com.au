@@ -9,8 +9,8 @@ function formatGrade(value) {
 }
 
 /**
- * The estimate drawn as the label at the top of that company's slab — PSA's white label
- * under its red rule (`band`), Beckett's silver / gold / Black Label with the four sub-grades in a
+ * The estimate drawn as the label at the top of that company's slab — PSA's red-framed
+ * white label with the mark along the bottom, Beckett's silver / gold / Black Label with the four sub-grades in a
  * row, ACE's navy label with the angled Gem Mint panel, SGC's black tuxedo label — with
  * the company's mark on the left and the grade, its word beneath it, on the right.
  * The look (`data/gradingCompanies.js` → `SLAB_LABEL_LOOKS`) is fixed label stock, so it
@@ -23,11 +23,13 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
   const subs = showSubs ? Object.entries(subGrades) : [];
   const { box } = look;
   const logoTone = look.dark ? 'dark' : 'light';
+  const logoAtBottom = look.logoAt === 'bottom';
+  const logo = (h, cls) => <GraderLogo grader={grader} height={h} tone={logoTone} ink={look.fg} wordmarkClassName={cls} />;
 
   return (
     <div
-      className={`rounded-xl overflow-hidden border shadow-sm ${className}`}
-      style={{ background: look.bg, color: look.fg, borderColor: box.border }}
+      className={`overflow-hidden shadow-sm ${look.frame ? 'rounded-md border-4' : 'rounded-xl border'} ${className}`}
+      style={{ background: look.bg, color: look.fg, borderColor: look.frame || box.border }}
       data-slab-tier={tier}
       aria-label={`${grader.name} ${formatGrade(estimate)} ${label || ''}`.trim()}
     >
@@ -36,8 +38,10 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
       <div className="flex items-stretch">
         <div className="flex-1 min-w-0 px-3 py-2.5">
           <div className="flex items-center justify-between gap-2">
-            <GraderLogo grader={grader} height={22} tone={logoTone} ink={look.fg} wordmarkClassName="text-base" />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: look.muted }}>Estimate</span>
+            {logoAtBottom
+              ? <span className="text-[11px] font-bold uppercase tracking-wide whitespace-nowrap">Grade estimate</span>
+              : logo(22, 'text-base')}
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: look.muted }}>{logoAtBottom ? 'Preliminary' : 'Estimate'}</span>
           </div>
           {range && (
             <div className="mt-1.5 text-xs font-medium" style={{ color: look.muted }}>Range {range}</div>
@@ -55,7 +59,7 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
         </div>
 
         <div
-          className={`w-[5.5rem] flex-shrink-0 flex flex-col items-center justify-center px-1 text-center ${box.slant ? '-ml-4 pl-4' : 'border-l'}`}
+          className={`w-[5.5rem] flex-shrink-0 flex flex-col justify-center px-2 ${box.align === 'end' ? 'items-end text-right' : 'items-center text-center'} ${box.slant ? '-ml-4 pl-4' : 'border-l'} ${box.wordAbove ? 'flex-col-reverse' : ''}`}
           style={{
             background: box.bg,
             color: box.fg,
@@ -65,10 +69,16 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
         >
           <span className="text-3xl font-black tabular-nums leading-none">{formatGrade(estimate)}</span>
           {label && (
-            <span className="mt-1 text-[9px] font-bold uppercase tracking-wide leading-tight">{label}</span>
+            <span className={`text-[9px] font-bold uppercase tracking-wide leading-tight ${box.wordAbove ? 'mb-1' : 'mt-1'}`}>{label}</span>
           )}
         </div>
       </div>
+
+      {logoAtBottom && (
+        <div className="flex items-center justify-center px-3 pb-2 -mt-1">
+          {logo(18, 'text-sm')}
+        </div>
+      )}
     </div>
   );
 }

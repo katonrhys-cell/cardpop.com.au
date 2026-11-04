@@ -26,9 +26,9 @@ export const GRADING_COMPANIES = [
       verified: true,
       source: 'Sampled from the PSA logo (blue P/A, red S) supplied for the site, 2026-11-04.',
     },
-    // PSA's label: white, the blue/red PSA mark top-left, black card details and the grade
-    // large on the right ("NM-MT 8"), with the red rule PSA prints along the top. One look
-    // for every grade.
+    // PSA's label: a red frame around white stock, black card details top-left, the grade
+    // word above the number at the right ("MINT / 9"), the PSA mark along the bottom. One
+    // look for every grade.
     label: { tiers: { default: 'psa' } },
   },
   {
@@ -160,14 +160,19 @@ export function graderStyle(grader) {
 const GOLD = 'linear-gradient(180deg, #D9C99A 0%, #AEA07E 55%, #8E7F5C 100%)';
 const SILVER = 'linear-gradient(180deg, #E8E8EB 0%, #CCCCD0 55%, #B0B0B4 100%)';
 
-// `band` is a rule printed above the body; `box` is the grade
-// panel on the right — `bg: 'transparent'` prints the grade straight onto the stock the way
-// Beckett does, `slant` cuts its left edge on the diagonal the way ACE does.
+// `band` is a rule printed above the body and `frame` a border around the whole label;
+// `box` is the grade panel on the right — `bg: 'transparent'` prints the grade straight onto
+// the stock the way Beckett does, `slant` cuts its left edge on the diagonal the way ACE
+// does, `wordAbove` puts the grade word over the number the way PSA does. `logoAt: 'bottom'`
+// moves the mark to a row under the details (PSA).
 export const SLAB_LABEL_LOOKS = {
+  // PSA: a red frame around a white label, the card details top-left, the grade word
+  // above the number at the right, the PSA mark along the bottom.
   psa: {
-    band: { bg: '#E72332', fg: '#FFFFFF', thin: true },
+    frame: '#E72332',
     bg: '#FFFFFF', fg: '#111111', muted: '#555555',
-    box: { bg: '#FFFFFF', fg: '#111111', border: '#D9D9D9' },
+    box: { bg: 'transparent', fg: '#111111', border: 'transparent', wordAbove: true, align: 'end' },
+    logoAt: 'bottom',
     dark: false,
   },
   silver: {

@@ -105,16 +105,25 @@ describe('SlabLabel', () => {
     expect(screen.getAllByText('8.5').length).toBeGreaterThan(1);
   });
 
-  it('puts the PSA mark on a white body under its red rule, with the grade word beneath the number', () => {
+  it('frames the PSA label in red, puts the grade word above the number and the mark along the bottom', () => {
     const { container } = render(<SlabLabel grader={psa} estimate={8} label="NM-MT" range="7-9" />);
     const root = container.firstChild;
     expect(root.getAttribute('data-slab-tier')).toBe('psa');
-    const rule = root.firstChild;
-    expect(rule.style.background.toLowerCase()).toMatch(/#e72332|rgb\(231, 35, 50\)/);
-    expect(rule.textContent).toBe('');
-    expect(screen.getByAltText('Professional Sports Authenticator logo').getAttribute('src')).toBe(psa.logo);
+    expect(root.style.borderColor.toLowerCase()).toMatch(/#e72332|rgb\(231, 35, 50\)/);
+    expect(root.className).toContain('border-4');
+    const logo = screen.getByAltText('Professional Sports Authenticator logo');
+    expect(logo.getAttribute('src')).toBe(psa.logo);
+    expect(root.lastChild.contains(logo)).toBe(true); // bottom row
     const number = screen.getByText('8');
+    expect(number.parentElement.className).toContain('flex-col-reverse');
     expect(number.nextSibling.textContent).toBe('NM-MT');
+  });
+
+  it('keeps the grade word beneath the number on a Beckett label', () => {
+    render(<SlabLabel grader={findGradingCompany('BGS')} estimate={8.5} label="NM-MT+" range="8-9" />);
+    const number = screen.getByText('8.5');
+    expect(number.parentElement.className).not.toContain('flex-col-reverse');
+    expect(number.nextSibling.textContent).toBe('NM-MT+');
   });
 
   it('cuts the ACE grade panel on the diagonal and turns it gold for a 10', () => {

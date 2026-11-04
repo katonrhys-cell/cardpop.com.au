@@ -76,8 +76,8 @@ unmodified and use them only to identify the service (PSA publishes logo-use gui
 psacard.com/logo).
 
 **The estimate is drawn as that company's slab label.** `components/grading/SlabLabel.jsx`
-renders the grade box the way the top of the slab looks — PSA's white label under its red
-rule with the blue/red mark, Beckett's silver label (gold from 9.5, the Black Label with the
+renders the grade box the way the top of the slab looks — PSA's red-framed white label
+with the grade word above the number and the blue/red mark along the bottom, Beckett's silver label (gold from 9.5, the Black Label with the
 grade in gold for a 10 with four 10 sub-grades) with the laurel crest and the four
 sub-grades in a row, ACE's navy label with the angled grade panel (light stock, gold for a
 Gem Mint 10), CGC's and SGC's black labels, TAG's white label under a dark rule — with the
