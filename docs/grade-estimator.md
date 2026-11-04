@@ -90,3 +90,12 @@ fixed colour (a black label stays black in light mode), so the logo is pinned wi
 `GraderLogo`'s `tone` / `ink` props rather than following the theme. Every look but CGC's follows
 reference artwork supplied on 2026-11-04; CGC's black label is still an approximation —
 check it against a real slab.
+
+## "Grade with …" links
+
+Each grader card (and each tile in "Grading Services Covered") ends with a **Grade
+with PSA / BGS / …** button → `gradingPartnersPath(key)` from `utils/gradingPartners.js`,
+i.e. `/grading/submission-partners?company=psa`: the Submission Partners page opens on
+the Australian stores and services that submit to that company, under the company's
+own direct-submission note. The lists are the admin-maintained
+`grading_submission_partners` table — see `docs/grading-partners.md`.

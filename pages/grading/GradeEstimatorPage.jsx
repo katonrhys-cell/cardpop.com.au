@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import GraderLogo from '@/components/grading/GraderLogo.jsx';
 import SlabLabel from '@/components/grading/SlabLabel.jsx';
 import { GRADING_COMPANIES, graderStyle } from '@/data/gradingCompanies.js';
+import { gradingPartnersPath } from '@/utils/gradingPartners.js';
 
 // ─── Grader config ────────────────────────────────────────────────────────────
 // Names, official logos and brand colours live in data/gradingCompanies.js (shared with the
@@ -219,6 +220,13 @@ function GraderCard({ grader, gradeData }) {
             {notes}
           </p>
         )}
+
+        {/* → the Australian stores and services that submit to this company */}
+        <Button asChild variant="outline" size="sm" className="w-full border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] hover:bg-[var(--grader-tint)] dark:hover:bg-[var(--grader-tint-dark)]">
+          <Link to={gradingPartnersPath(grader.key)} data-grade-with={grader.key}>
+            Grade with {grader.name} <ChevronRight className="w-4 h-4 ml-1" />
+          </Link>
+        </Button>
       </div>
     </div>
   );
@@ -528,19 +536,22 @@ const GradeEstimatorPage = () => {
               <h2 className="text-xl font-bold mb-4">Grading Services Covered</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {GRADERS.map((g) => (
-                  <div
+                  <Link
                     key={g.key}
-                    className="bg-card border border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] rounded-xl px-4 py-3 flex items-center gap-3"
+                    to={gradingPartnersPath(g.key)}
+                    className="bg-card border border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-[var(--grader-tint)] dark:hover:bg-[var(--grader-tint-dark)] transition-colors group"
                     style={graderStyle(g)}
+                    title={`Australian stores that submit to ${g.name}`}
                   >
                     <div className="h-10 min-w-[2.5rem] px-2 rounded-lg bg-[var(--grader-tint)] dark:bg-[var(--grader-tint-dark)] flex items-center justify-center">
                       <GraderLogo grader={g} height={22} wordmarkClassName="text-xs" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-semibold text-sm">{g.name}</div>
-                      <div className="text-xs text-muted-foreground">{g.full}</div>
+                      <div className="text-xs text-muted-foreground truncate">{g.full}</div>
+                      <div className="text-xs text-primary group-hover:underline">Grade with {g.name} →</div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

@@ -18,6 +18,11 @@ export const GRADING_COMPANIES = [
     name: 'PSA',
     full: 'Professional Sports Authenticator',
     website: 'https://www.psacard.com',
+    // Where a collector submits from Australia and what to expect (researched 2026-11-04).
+    submit: {
+      url: 'https://www.psacard.com/services/tradingcardgrading',
+      note: "PSA's own submissions are for US accounts; from Australia you go through an authorised PSA dealer, who handles shipping, insurance and customs so you pay in AUD.",
+    },
     logo: '/images/grading/psa.png',
     brand: {
       primary: '#0350A1',
@@ -36,6 +41,11 @@ export const GRADING_COMPANIES = [
     name: 'BGS',
     full: 'Beckett Grading Services',
     website: 'https://www.beckett.com/grading',
+    // Where a collector submits from Australia and what to expect (researched 2026-11-04).
+    submit: {
+      url: 'https://www.beckett.com/grading',
+      note: "Australian partners batch cards to Beckett and handle the international shipping and customs on your behalf.",
+    },
     logo: '/images/grading/bgs.png',
     logoDark: '/images/grading/bgs-white.png',
     wordmark: 'BECKETT',
@@ -56,6 +66,11 @@ export const GRADING_COMPANIES = [
     name: 'CGC',
     full: 'Certified Guaranty Company',
     website: 'https://www.cgccards.com',
+    // Where a collector submits from Australia and what to expect (researched 2026-11-04).
+    submit: {
+      url: 'https://www.cgccards.com/about/help-center-faqs/submitting-to-cgc-cards/general-submission-faqs/',
+      note: "CGC accepts international submissions (no membership needed; the declared value sets the tier) — in practice Australian collectors use a local submitter rather than shipping to the US themselves.",
+    },
     logo: '/images/grading/cgc.png',
     brand: {
       primary: '#BF3B2F',
@@ -72,6 +87,11 @@ export const GRADING_COMPANIES = [
     name: 'ACE',
     full: 'ACE Grading',
     website: 'https://www.acegrading.com',
+    // Where a collector submits from Australia and what to expect (researched 2026-11-04).
+    submit: {
+      url: 'https://acegrading.com/international-submitters',
+      note: "ACE takes direct submissions from Australia with a regional minimum of 30 cards, invoices in AUD and covers the import paperwork via DHL Express; local stores pool smaller lots to meet the minimum.",
+    },
     logo: '/images/grading/ace.png',
     logoDark: '/images/grading/ace-gold.png',
     logoScale: 1.6, // the shield is near-square, so it needs more height than a wordmark to read
@@ -92,6 +112,11 @@ export const GRADING_COMPANIES = [
     name: 'SGC',
     full: 'Sportscard Guaranty Corporation',
     website: 'https://www.gosgc.com',
+    // Where a collector submits from Australia and what to expect (researched 2026-11-04).
+    submit: {
+      url: 'https://www.gosgc.com/card-grading',
+      note: "SGC has no official Australian affiliate; Australian submission services batch cards to SGC at SGC's standard fees.",
+    },
     logo: '/images/grading/sgc.png',
     logoDark: '/images/grading/sgc-white.png',
     brand: {
@@ -110,6 +135,11 @@ export const GRADING_COMPANIES = [
     name: 'TAG',
     full: 'TAG Grading',
     website: 'https://taggrading.com',
+    // Where a collector submits from Australia and what to expect (researched 2026-11-04).
+    submit: {
+      url: 'https://help.taggrading.com/en/articles/6712890-can-i-use-tag-internationally',
+      note: "Outside the US and Canada, TAG only accepts cards through its authorised affiliates — for Australia that is PGCG — and the affiliate handles all customer service for the order.",
+    },
     logo: '/images/grading/tag.png',
     logoDark: '/images/grading/tag-white.png',
     brand: {

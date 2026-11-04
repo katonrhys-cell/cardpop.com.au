@@ -1,5 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
+import { GRADING_COMPANIES } from '../data/gradingCompanies.js';
+import { GRADING_PARTNERS_SEED } from '../data/gradingPartnersSeed.js';
+import { partnersForCompany, partnerLineText, gradingPartnersPath } from '../utils/gradingPartners.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd } from '../utils/eventReview.js';
@@ -1680,6 +1683,17 @@ const LOCAL_GRADERS_SPORTS = [
   { text: '2. TCG Grading, Australia-wide — The broadest sports acceptance of any local grader: NRL, AFL, NBA, FIFA and F1 alongside TCG. Custom labels and sub-grade lookup.' },
   { text: '3. Premier Card Grading (PCG), Australia-wide — Accepts modern licensed sports cards. Express option ($60, 5 business days) is among the fastest local sports turnarounds.' },
 ];
+// One section per grading company listing the Australian partners that submit to
+// it — the bot copy of the "Grade with <company>" lists. Rendered from the seed
+// (data/gradingPartnersSeed.js); admin edits in the table reach the SPA only.
+const GRADING_PARTNER_SECTIONS = GRADING_COMPANIES.map((g) => {
+  const rows = partnersForCompany(GRADING_PARTNERS_SEED, g.key);
+  const paras = [g.submit?.note].filter(Boolean);
+  if (!rows.length) paras.push(`No Australian partner for ${g.name} is listed yet.`);
+  return { h2: `Grade with ${g.name} from Australia`, paras, items: rows.map((r) => ({ text: partnerLineText(r) })) };
+});
+const GRADING_PARTNER_INTRO = 'These Australian stores and services take your cards, handle the packaging, international shipping, insurance and customs, and return the graded slabs — you deal in AUD with someone local. Each list below is the partners that submit to that company.';
+
 const WHY_LOCAL_BULLETS = [
   { text: 'Transparent criteria — published grading standards and sub-grades.' },
   { text: 'Tamper-evident slabs — protection that buyers and sellers trust.' },
@@ -1801,20 +1815,8 @@ const STATIC_CONTENT = {
     h1: 'Grading Companies',
     intro: 'Compare the top third-party grading services like PSA, BGS, CGC and ACE. Learn their histories, scales and specialised features, and find the Australian submission partners who handle shipping and customs for you.',
     sections: [
-      { h2: 'Beckett (BGS) submission partners', paras: ['Beckett provides four sub-scores (centering, corners, edges, surface) alongside an overall grade, and is especially popular for high-value sports and premium TCG chases. These Australian partners handle packaging, international shipping and customs on your behalf.'], items: [
-        { text: 'Cherry Collectables — Australia’s exclusive Beckett submission partner, with Melbourne drop-off or mail-in.' },
-        { text: 'Graded Cards Australia — authorised BGS partner; cards appear in the official BGS Population Report. Accepts AFL, NBA and Pokémon.' },
-        { text: 'SLABD — fully insured Beckett submission handling all international shipping and customs.' },
-        { text: 'Slabbys — BGS submission with four tiers from Base ($45) to Priority ($500), sub-grades included, fully tracked and insured.' },
-        { text: 'The Card Spot — monthly BGS batch submissions dispatched the first week of each month.' },
-      ] },
-      { h2: 'PSA submission partners', paras: ['PSA is the world’s most recognised grading company and typically commands the highest resale premiums, especially for US-market sales. These authorised Australian dealers handle shipping, insurance, customs and tracking so you deal in AUD only.'], items: [
-        { text: 'The Hobby — Australia’s first PSA Certified Dealer in the Southern Hemisphere (since 2016). Grades TCG and sports including AFL and Pokémon.' },
-        { text: 'Slabbys — full-service PSA & Beckett submission with 7-stage tracking, fully insured, 12 PSA tiers from Value Bulk ($48).' },
-        { text: 'SLABD — Australian-based, fully insured PSA and BGS submission with clear tiered pricing.' },
-        { text: 'Cherry Collectables — PSA submission with Melbourne drop-off or mail-in; accepts TCG and AFL/sports.' },
-        { text: 'Mana Market — Gold Coast-based PSA Registered Dealer, ideal for Queensland collectors, with in-store drop-off.' },
-      ] },
+      { h2: 'Australian submission partners', paras: [GRADING_PARTNER_INTRO] },
+      ...GRADING_PARTNER_SECTIONS,
       { h2: 'Quick comparison', items: [
         { text: 'PSA — best for Pokémon and sports; 20–150 days; from about $25 USD.' },
         { text: 'BGS — best for all TCG and vintage; 15–90 days; from about $22 USD.' },
@@ -1842,10 +1844,10 @@ const STATIC_CONTENT = {
 
   '/grading/submission-partners': {
     title: 'Submission Partners — Australian Card Grading Services | CardPop',
-    description: 'Trusted Australian card grading submission partners for TCG and sports cards. AUD pricing, no customs, faster turnarounds than PSA or Beckett. Compare CGA, TCG Grading, ARK Grading, ACG, and PCG.',
+    description: 'Australian stores that submit your cards to PSA, Beckett, CGC, ACE, SGC and TAG, plus local graders for TCG and sports cards. AUD pricing, no customs hassle.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Grading', path: '/grading' }, { name: 'Submission Partners', path: '/grading/submission-partners' }],
     h1: 'Submission Partners',
-    intro: 'Trusted Australian grading services for TCG and sports cards — AUD pricing, no customs hassle, and faster returns than international submissions.',
+    intro: 'Australian stores that submit your cards to PSA, Beckett, CGC, ACE, SGC and TAG for you, plus trusted local graders — AUD pricing, no customs hassle, and someone nearby to hand cards to.',
     sections: [
       { h2: 'How to submit', items: [
         { text: 'Choose your grader — pick a partner below based on card type, turnaround and budget, and check their site for current pricing and submission windows.' },
@@ -1853,8 +1855,10 @@ const STATIC_CONTENT = {
         { text: 'Ship securely — use a rigid outer box with bubble wrap, mark "Do Not Bend", insure for the estimated value and keep your tracking number.' },
         { text: 'Receive your slabs — most local partners return graded cards within 2–8 weeks; check for slab damage on arrival before listing or storing.' },
       ] },
-      { h2: 'Australian partners — TCG', items: LOCAL_GRADERS_TCG },
-      { h2: 'Australian partners — sports cards', items: LOCAL_GRADERS_SPORTS },
+      { h2: 'Submit to PSA, Beckett, CGC, ACE, SGC or TAG', paras: [GRADING_PARTNER_INTRO] },
+      ...GRADING_PARTNER_SECTIONS,
+      { h2: 'Australian local graders — TCG', items: LOCAL_GRADERS_TCG },
+      { h2: 'Australian local graders — sports cards', items: LOCAL_GRADERS_SPORTS },
       { h2: 'Why submit locally in Australia?', paras: [WHY_LOCAL_PARA], items: WHY_LOCAL_BULLETS },
       { h2: 'Disclaimer', paras: [LOCAL_DISCLAIMER] },
     ],
@@ -1863,10 +1867,10 @@ const STATIC_CONTENT = {
 
   '/grading/estimator': {
     title: "Card Grade Estimator | CardPop — AI Grading Guide for Australian Collectors",
-    description: 'Upload photos of your trading card and get AI-powered preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC. A guide only — always consult a professional grader.',
+    description: 'Upload photos of your trading card and get AI-powered preliminary grade estimates across PSA, BGS, CGC, ACE, SGC and TAG. A guide only — always consult a professional grader.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Grading', path: '/grading' }, { name: 'Grade Estimator', path: '/grading/estimator' }],
     h1: 'Grade Estimator',
-    intro: 'Upload photos of your trading card and receive AI-generated preliminary grade estimates across five major grading services. A guide to help you self-assess before professional submission.',
+    intro: 'Upload photos of your trading card and receive AI-generated preliminary grade estimates across six major grading services, each with a link to the Australian partners that submit to that company. A guide to help you self-assess before professional submission.',
     sections: [
       { h2: 'Preliminary estimate only', paras: ['This tool provides AI-generated grade estimates as a preliminary guide only. Results may vary significantly from professional grades. Always examine your card physically and consult a qualified grading professional before submitting. CardPop Australia accepts no liability for actual grades returned or any financial outcome.'] },
       { h2: 'How it works', items: [
@@ -1882,7 +1886,7 @@ const STATIC_CONTENT = {
         { text: 'SGC — Sportscard Guaranty Corporation.' },
       ] },
     ],
-    links: [{ text: 'Grading Scales', href: '/grading/scales' }, { text: 'Compare Companies', href: '/grading/companies' }, { text: 'Local Graders (AU)', href: '/grading/local-graders' }],
+    links: [{ text: 'Grade with PSA', href: gradingPartnersPath('psa') }, { text: 'Grade with BGS', href: gradingPartnersPath('bgs') }, { text: 'Grade with CGC', href: gradingPartnersPath('cgc') }, { text: 'Grade with ACE', href: gradingPartnersPath('ace') }, { text: 'Grade with SGC', href: gradingPartnersPath('sgc') }, { text: 'Grade with TAG', href: gradingPartnersPath('tag') }, { text: 'Grading Scales', href: '/grading/scales' }, { text: 'Compare Companies', href: '/grading/companies' }, { text: 'Local Graders (AU)', href: '/grading/local-graders' }],
   },
 
   '/grading/roi-calculator': {

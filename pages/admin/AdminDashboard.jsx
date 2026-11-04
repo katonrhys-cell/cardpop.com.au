@@ -286,6 +286,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
           <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />
+          <ManagementBox title="Grading Partners" description="Australian stores that submit cards to PSA, Beckett, CGC, ACE, SGC and TAG — where every “Grade with…” link lands." icon={Handshake} link="/admin/grading-partners" />
           <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
           <ManagementBox title="Giveaways" description="Instagram giveaways: prizes, entries, comment verification and the recorded random draw." icon={Gift} link="/admin/giveaways" />
         </div>

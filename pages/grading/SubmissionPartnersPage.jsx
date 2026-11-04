@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import Breadcrumb from '@/components/Breadcrumb.jsx';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import GradingPartnerList from '@/components/grading/GradingPartnerList.jsx';
+import { fetchActiveGradingPartners } from '@/lib/gradingPartners.js';
+import { COMPANY_PARAM, companyForKey, normaliseCompanyKey } from '@/utils/gradingPartners.js';
 import { MapPin, Star, ArrowLeft, Handshake, ClipboardList, PackageCheck, Truck, BadgeCheck } from 'lucide-react';
 
 // ─── LOCAL AUSTRALIAN GRADERS — TCG ─────────────────────────────────────────
@@ -165,11 +168,44 @@ const GraderRankCard = ({ grader, rank }) => (
 
 // ─── PAGE ─────────────────────────────────────────────────────────────────────
 
-const SubmissionPartnersPage = () => (
+const SubmissionPartnersPage = () => {
+  // ?company=psa — where every "Grade with PSA" button lands. The chips write
+  // the same param so the filtered view can be shared.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const selected = normaliseCompanyKey(searchParams.get(COMPANY_PARAM));
+  const selectedCompany = selected ? companyForKey(selected) : null;
+  const [partners, setPartners] = useState([]);
+  const [fromSeed, setFromSeed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const sectionRef = useRef(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchActiveGradingPartners().then(({ partners: rows, fromSeed: seeded }) => {
+      if (cancelled) return;
+      setPartners(rows);
+      setFromSeed(seeded);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Arriving with a company picked (from the estimator) should open on that list.
+  useEffect(() => {
+    if (selected && sectionRef.current) sectionRef.current.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }, [selected]);
+
+  const select = (key) => {
+    const next = new URLSearchParams(searchParams);
+    if (key) next.set(COMPANY_PARAM, key); else next.delete(COMPANY_PARAM);
+    setSearchParams(next, { replace: true });
+  };
+
+  return (
   <div className="min-h-screen bg-background">
     <SEOHead
-      title="Submission Partners — Australian Card Grading Services | CardPop"
-      description="Trusted Australian card grading submission partners for TCG and sports cards. AUD pricing, no customs, faster turnarounds than PSA or Beckett. Compare CGA, TCG Grading, ARK Grading, ACG, and PCG."
+      title={selectedCompany ? `Grade with ${selectedCompany.name} in Australia — Submission Partners | CardPop` : 'Submission Partners — Australian Card Grading Services | CardPop'}
+      description={selectedCompany ? `Australian stores and services that submit cards to ${selectedCompany.full} for you — drop-off or mail-in, priced in AUD — plus how to submit to ${selectedCompany.name} direct.` : 'Australian stores that submit your cards to PSA, Beckett, CGC, ACE, SGC and TAG, plus local graders for TCG and sports cards. AUD pricing, no customs hassle.'}
       keywords="card grading submission australia, submission partners australia, australian card grader, TCG grading australia, sports card grading australia, AFL card grading, NRL card grading, pokemon grading australia, CGA grading, ARK grading"
     />
 
@@ -183,8 +219,8 @@ const SubmissionPartnersPage = () => (
         <Handshake className="w-12 h-12 text-primary mx-auto mb-5" />
         <h1 className="text-4xl md:text-5xl font-bold mb-4">Submission Partners</h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-          Trusted Australian grading services for TCG and sports cards — AUD pricing,
-          no customs hassle, and faster returns than international submissions.
+          Australian stores that submit your cards to PSA, Beckett, CGC, ACE, SGC and TAG for you,
+          plus trusted local graders — AUD pricing, no customs hassle, and someone nearby to hand cards to.
         </p>
       </div>
     </section>
@@ -194,6 +230,22 @@ const SubmissionPartnersPage = () => (
       <Link to="/grading" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors">
         <ArrowLeft className="w-4 h-4" /> Back to Grading Hub
       </Link>
+
+      {/* ── SUBMIT TO PSA / BECKETT / CGC / ACE / SGC / TAG ── */}
+      <section ref={sectionRef} id="grade-with" className="scroll-mt-24">
+        <div className="flex items-center gap-3 mb-2">
+          <BadgeCheck className="w-6 h-6 text-primary" />
+          <h2 className="text-2xl font-bold">
+            {selectedCompany ? `Grade with ${selectedCompany.name} from Australia` : 'Submit to PSA, Beckett, CGC, ACE, SGC or TAG'}
+          </h2>
+        </div>
+        <p className="text-muted-foreground text-sm mb-6 leading-relaxed">
+          These Australian stores and services take your cards, handle the packaging, international shipping,
+          insurance and customs, and return the graded slabs — you deal in AUD with someone local. Pick a company to see
+          who submits to it; each card links to that partner's page for the company.
+        </p>
+        <GradingPartnerList partners={partners} loading={loading} selected={selected} onSelect={select} fromSeed={fromSeed} />
+      </section>
 
       {/* ── HOW TO SUBMIT ── */}
       <section>
@@ -273,6 +325,7 @@ const SubmissionPartnersPage = () => (
 
     </div>
   </div>
-);
+  );
+};
 
 export default SubmissionPartnersPage;
