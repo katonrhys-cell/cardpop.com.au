@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
-import { buildEventReviewJsonLd } from '../utils/eventReview.js';
+import { buildEventReviewJsonLd, buildReviewVideoJsonLds, cleanVideos, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
@@ -531,6 +531,28 @@ async function renderBlogArticle(supabase, param) {
         .join(' · ')}</nav>`
     : '';
 
+  // Event reviews (docs/event-reviews.md) add a Review node plus the structured
+  // parts — scorecard, videos, photos, deals, pickups — as plain HTML, because
+  // the crawler reads this document without running the SPA. The structured row
+  // lives in event_reviews and the reviewed event in events. Both lookups are
+  // best-effort — a plain article has neither and skips this.
+  let reviewLd = null;
+  let reviewVideoLds = [];
+  let reviewHtml = '';
+  if (article.category === 'event-reviews') {
+    const { data: reviewRow } = await supabase.from('event_reviews').select('*').eq('article_id', article.id).maybeSingle();
+    if (reviewRow) {
+      let event = null;
+      if (reviewRow.event_id) {
+        const { data: ev } = await supabase.from('events').select('id, slug, title, start_date, venue_name, address, suburb, state, postcode, image_url').eq('id', reviewRow.event_id).maybeSingle();
+        event = ev || null;
+      }
+      reviewLd = buildEventReviewJsonLd({ article, review: reviewRow, event, siteUrl: BASE_URL });
+      reviewVideoLds = buildReviewVideoJsonLds({ article, videos: cleanVideos(reviewRow.videos, reviewRow.video), event, siteUrl: BASE_URL });
+      reviewHtml = renderEventReviewHtml(reviewRow, event);
+    }
+  }
+
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(article.title)}</nav>
   <article>
@@ -540,28 +562,64 @@ async function renderBlogArticle(supabase, param) {
     ${article.excerpt ? `<p>${esc(article.excerpt)}</p>` : ''}
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
     ${addHeadingAnchors(bodyContent) || `<p>${esc(description)}</p>`}
+    ${reviewHtml}
     ${tagsHtml}
   </article>
   ${faqHtml}
 </main>`;
 
-  // Event reviews (docs/event-reviews.md) add a Review node: the structured
-  // row lives in event_reviews and the reviewed event in events. Both lookups
-  // are best-effort — a plain article has neither and skips this.
-  let reviewLd = null;
-  if (article.category === 'event-reviews') {
-    const { data: reviewRow } = await supabase.from('event_reviews').select('overall_rating, event_id').eq('article_id', article.id).maybeSingle();
-    if (reviewRow) {
-      let event = null;
-      if (reviewRow.event_id) {
-        const { data: ev } = await supabase.from('events').select('id, slug, title, start_date, venue_name, address, suburb, state, postcode, image_url').eq('id', reviewRow.event_id).maybeSingle();
-        event = ev || null;
-      }
-      reviewLd = buildEventReviewJsonLd({ article, review: reviewRow, event, siteUrl: BASE_URL });
-    }
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), ...reviewVideoLds, breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
+}
+
+// The structured half of an event review as crawlable HTML — scorecard, videos,
+// photos, deals of the day and pickups (utils/eventReview.js is the one source
+// for the cleaning rules). Mirrors what BlogArticlePage renders after hydration
+// so a crawler that never runs the SPA still sees the whole review.
+function renderEventReviewHtml(review, event) {
+  const parts = [];
+  const eventName = event?.title || 'the event';
+
+  if (hasScorecard(review)) {
+    const scores = cleanScores(review.scores);
+    const rows = SCORE_CATEGORIES.filter((c) => scores[c.id] != null)
+      .map((c) => `<li>${esc(c.label)}: ${esc(formatScore(scores[c.id]))}</li>`).join('');
+    parts.push(`<section><h2>Scorecard</h2>${formatScore(review.overall_rating) ? `<p>Overall: ${esc(formatScore(review.overall_rating))}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}${review.verdict ? `<p>${esc(review.verdict)}</p>` : ''}</section>`);
   }
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
+  const videos = cleanVideos(review.videos, review.video);
+  if (videos.length) {
+    const items = videos.map((v, i) => (v.caption ? `<li>${esc(v.caption)}</li>` : `<li>${esc(eventName)} video ${i + 1}</li>`)).join('');
+    parts.push(`<section><h2>Videos from the day</h2><ul>${items}</ul></section>`);
+  }
+
+  const gallery = cleanGallery(review.gallery);
+  if (gallery.length) {
+    const figures = gallery.map((g, i) => `<figure><img src="${esc(publicImageUrl(g.url) || g.url)}" alt="${esc(g.alt || g.caption || `${eventName} photo ${i + 1}`)}" loading="lazy" />${g.caption ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('');
+    parts.push(`<section><h2>Photos from ${esc(eventName)}</h2>${figures}</section>`);
+  }
+
+  const deals = cleanDeals(review.deals);
+  if (deals.length) {
+    const items = deals.map((d) => {
+      const pct = dealSavingPct(d);
+      const bits = [
+        d.vendor ? esc(d.vendor) : '',
+        d.price_aud != null ? esc(formatAud(d.price_aud)) : '',
+        d.was_price_aud != null ? `usually ${esc(formatAud(d.was_price_aud))}${pct != null ? ` (${pct}% off)` : ''}` : '',
+        d.note ? esc(d.note) : '',
+      ].filter(Boolean).join(' — ');
+      return `<li><strong>${esc(d.title)}</strong>${bits ? ` — ${bits}` : ''}</li>`;
+    }).join('');
+    parts.push(`<section><h2>Deals of the day</h2><ul>${items}</ul></section>`);
+  }
+
+  const pickups = cleanPickups(review.pickups);
+  if (pickups.length) {
+    const items = pickups.map((p) => `<li><strong>${esc(p.name)}</strong>${p.price_aud != null ? ` — ${esc(formatAud(p.price_aud))}` : ''}${p.note ? ` — ${esc(p.note)}` : ''}</li>`).join('');
+    parts.push(`<section><h2>Pickups from the show</h2><ul>${items}</ul></section>`);
+  }
+
+  return parts.join('\n    ');
 }
 
 async function renderListing(supabase, id, slugParam) {
