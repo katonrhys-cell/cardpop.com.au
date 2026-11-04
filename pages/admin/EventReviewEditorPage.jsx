@@ -51,6 +51,14 @@ import {
 const slugify = (text) =>
   String(text || '').toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
 
+// A review's URL is the event's slug plus "-cardpop-review" (…/blog/vault-melbourne-card-collectible-show-cardpop-review),
+// so the event name and the word "review" both sit in the URL. Without an event
+// picked yet it falls back to the title.
+const reviewSlug = (ev, title) => {
+  const base = slugify(ev?.slug || ev?.title);
+  return base ? `${base.replace(/-cardpop-review$/, '')}-cardpop-review` : slugify(title);
+};
+
 const readTimeFromHtml = (html) => {
   const words = String(html || '').replace(/<[^>]*>/g, ' ').split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.round(words / 200));
@@ -283,11 +291,11 @@ const EventReviewEditorPage = () => {
     setArticle((a) => {
       if (a.title) return a;
       const title = `${ev.title}: our review`;
-      return { ...a, title, slug: slugTouched ? a.slug : slugify(title) };
+      return { ...a, title, slug: slugTouched ? a.slug : reviewSlug(ev, title) };
     });
   }
 
-  const onTitle = (v) => setArticle((a) => ({ ...a, title: v, slug: slugTouched ? a.slug : slugify(v) }));
+  const onTitle = (v) => setArticle((a) => ({ ...a, title: v, slug: slugTouched ? a.slug : reviewSlug(event, v) }));
 
   const uploadInto = useCallback((folder) => (file) => uploadReviewImage(file, { folder }), []);
 
