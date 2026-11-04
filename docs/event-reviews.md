@@ -11,7 +11,7 @@ Two rows, one editor:
 | Where | What |
 |---|---|
 | `blog_articles` | The story. A normal article with `category = 'event-reviews'` (`data/blogCategories.js` → `EVENT_REVIEWS_CATEGORY`), so it appears in the blog index, the category hub `/blog/category/event-reviews`, the sitemap and the prerenderer like any other article. |
-| `event_reviews` | The structured half, 1:1 with the article (`article_id` unique): `event_id`, `attended_on`, `overall_rating` (half stars, 0.5–5), `scores` (jsonb keyed by the five scorecard categories), `go_again` (`yes` / `maybe` / `no`), `verdict`, `ticket_paid_aud`, `hours_spent`, `crowd_level` (`quiet` / `steady` / `busy` / `packed`), `headline_pickup`, `gallery` (`[{url, caption, alt}]`), `video` (`{url, poster_url, caption}` or null — an upload to the `media` bucket or a YouTube/Vimeo link), `pickups` (`[{name, price_aud, url, image_url, note}]`). Migrations: `supabase/migrations/20261009213329_event_reviews.sql`, `20261027070258_event_review_video.sql` (the `video` column + video MIME types on the `media` bucket). |
+| `event_reviews` | The structured half, 1:1 with the article (`article_id` unique): `event_id`, `attended_on`, `overall_rating` (half stars, 0.5–5), `scores` (jsonb keyed by the five scorecard categories), `go_again` (`yes` / `maybe` / `no`), `verdict`, `ticket_paid_aud`, `hours_spent`, `crowd_level` (`quiet` / `steady` / `busy` / `packed`), `headline_pickup`, `gallery` (`[{url, caption, alt}]`), `videos` (up to 12 `{url, poster_url, caption}` in display order — uploads to the `media` bucket or YouTube/Vimeo links; the older single `video` column mirrors `videos[0]`), `deals` (**deals of the day**, up to 30 `{title, vendor, price_aud, was_price_aud, note, url, image_url}`), `pickups` (`[{name, price_aud, url, image_url, note}]`). Migrations: `supabase/migrations/20261009213329_event_reviews.sql`, `20261027070258_event_review_video.sql` (the `video` column + video MIME types on the `media` bucket), `20261104090000_event_review_videos_and_deals.sql` (`videos` + `deals`, existing videos carried over). |
 
 **Visibility follows the article.** The `event_reviews` SELECT policy returns a
 row when its article `is_published`, or to an admin. Only admins insert /
@@ -37,11 +37,15 @@ it:
   (`safeLink`: `http(s)://` or a site-relative `/path` only — a `javascript:`
   URL in a pickup link is dropped, never rendered).
 - `reviewPublishProblems()` — what publishing needs: a title, the event, and
-  **at least one of** a star rating, photos, a video or the written report.
-  Those four parts are independent — a review can be just a rating, just a
+  **at least one of** a star rating, photos, videos, deals of the day or the
+  written report. Those five parts are independent — a review can be just a rating, just a
   gallery, just a video or just the report, in any combination. A report that
   was started but is under 40 characters blocks publishing (finish it or clear
   it). Drafts save with anything.
+- `cleanVideos()` (ordered, de-duplicated, capped at `MAX_REVIEW_VIDEOS`; falls back
+  to the legacy `video`), `cleanDeals()` / `dealSavingPct()`, and
+  `buildReviewVideoJsonLds()` (one `VideoObject` per video, skipped without a
+  thumbnail).
 - `cleanVideo()` / `videoKind()` / `reviewVideoFileError()` — the video: kept
   only when it is a `.mp4/.webm/.mov/.m4v` URL (an upload) or a link
   `utils/videoEmbed.js` can embed (YouTube / Vimeo); uploads are capped at the
@@ -61,7 +65,7 @@ it:
   1. **Which event?** — searchable picker over `events` (admins read the table
      directly). Selecting an event defaults `attended_on` to its start date and
      suggests a title.
-  2. **The story** — title (auto-slug until the slug is edited), standfirst,
+  2. **The story** — title (the URL slug auto-fills as `<event-slug>-cardpop-review` until edited), standfirst,
      byline (defaults to the admin's display name), cover photo, and the body in
      `components/admin/RichTextEditor.jsx` (Tiptap). It reads and writes the same
      HTML `blog_articles.content` already stores, so the article renders through
@@ -71,8 +75,10 @@ it:
      a star = half score), the derived or hand-set overall, "Would you go
      again?", one-line verdict.
   4. **Quick facts**, 5. **Photo gallery** (multi-upload, captions, alt text,
-     reorder), 6. **Video** (upload a clip up to 50 MB, or paste a YouTube /
-     Vimeo link; optional caption; live preview), 7. **Pickups** (name, price
+     reorder), 6. **Videos** (upload several clips up to 50 MB each, and/or paste YouTube /
+     Vimeo links; per-video caption, reorder, live preview), 7. **Deals of the day**
+     (what, which table, deal price vs usual price with the % off worked out,
+     optional photo and link), 8. **Pickups** (name, price
      paid, optional CardPop link, optional photo, note), 8. **Publishing**
      (tags, SEO, featured).
 - The sticky bar saves a **draft** or **publishes**; Publish is disabled until
@@ -99,9 +105,10 @@ Supabase host, not the image CDN; the service worker never intercepts video.
   fetches the `event_reviews` row by `article_id` and the event from
   `events_public`. Scorecard (`components/reviews/EventReviewScorecard.jsx`) and
   quick facts (`EventReviewQuickFacts.jsx`) sit between the hero and the body;
-  video (`EventReviewVideo.jsx` — native `<video>` for an upload, a
+  videos (`EventReviewVideo.jsx` — native `<video>` for an upload, a
   `youtube-nocookie` / Vimeo iframe for a link), gallery
-  (`EventReviewGallery.jsx`, keyboard-navigable lightbox) and pickups
+  (`EventReviewGallery.jsx`, keyboard-navigable lightbox), deals of the day
+  (`EventReviewDeals.jsx`) and pickups
   (`EventReviewPickups.jsx`) follow the body. Each section renders nothing when
   its data is empty, so a review with no photos has no empty gallery heading,
   and a review published without a written report shows no "No content"
@@ -112,7 +119,10 @@ Supabase host, not the image CDN; the service worker never intercepts video.
   "CardPop was there" card — stars, verdict, standfirst, cover photo and a link
   to the full review. No review → nothing rendered.
 - **Prerender** (`api/prerender.js`): for `event-reviews` articles the bot HTML
-  adds the same `Review` node.
+  adds the same `Review` node, a `VideoObject` per video, **and** the structured
+  parts as plain HTML (`renderEventReviewHtml()` — scorecard, videos, photos with
+  alt text, deals, pickups). The crawler never runs the SPA, so without this the
+  gallery, deals and pickups were invisible to Google.
 
 ## Adding the first review
 

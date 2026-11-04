@@ -17,7 +17,8 @@ import EventReviewQuickFacts from '@/components/reviews/EventReviewQuickFacts.js
 import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
 import EventReviewPickups from '@/components/reviews/EventReviewPickups.jsx';
 import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
-import { buildEventReviewJsonLd, hasScorecard, hasQuickFacts, cleanVideo } from '@/utils/eventReview.js';
+import EventReviewDeals from '@/components/reviews/EventReviewDeals.jsx';
+import { buildEventReviewJsonLd, buildReviewVideoJsonLds, hasScorecard, hasQuickFacts, cleanVideos, cleanDeals } from '@/utils/eventReview.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -422,7 +423,9 @@ const BlogArticlePage = () => {
   // Review rich-result markup for event reviews (null when there's no rating).
   const eventReviewStructuredData = buildEventReviewJsonLd({ article, review: eventReview, event: reviewedEvent });
 
-  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, videoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
+  const reviewVideoStructuredData = eventReview ? buildReviewVideoJsonLds({ article, videos: cleanVideos(eventReview.videos, eventReview.video), event: reviewedEvent }) : [];
+
+  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, videoStructuredData, ...reviewVideoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -597,10 +600,11 @@ const BlogArticlePage = () => {
         )}
       </div>
 
-      {eventReview && (cleanVideo(eventReview.video) || eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
+      {eventReview && (cleanVideos(eventReview.videos, eventReview.video).length > 0 || cleanDeals(eventReview.deals).length > 0 || eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
         <div className="container-default max-w-4xl mx-auto -mt-10 mb-16 space-y-12">
-          <EventReviewVideo video={eventReview.video} />
+          <EventReviewVideo videos={eventReview.videos} video={eventReview.video} />
           <EventReviewGallery gallery={eventReview.gallery} />
+          <EventReviewDeals deals={eventReview.deals} />
           <EventReviewPickups pickups={eventReview.pickups} />
         </div>
       )}
