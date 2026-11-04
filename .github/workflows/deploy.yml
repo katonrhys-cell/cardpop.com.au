@@ -5,6 +5,14 @@ name: Deploy
 # it into a new release directory and restarts the systemd service on it.
 # Runbook: docs/vultr-rollout.md.
 #
+# PARKED until the VPS exists. The job runs only while the repository variable
+# VPS_DEPLOY_ENABLED is exactly "true" (Settings → Secrets and variables →
+# Actions → Variables). Until then every push to main skips it in a second —
+# no red run, no billed minute — and production keeps deploying through
+# Vercel's Git integration. Switching the VPS on is: provision the box, set the
+# four secrets below, then create the variable; deleting the variable parks it
+# again. Nothing else changes.
+#
 # This is the one workflow that runs on push to main, because deploying is the
 # one thing a PR run can't do (CLAUDE.md → Deployment). It is cheap on the
 # metered Actions minutes: deploy.sh --detach returns at once and the build
@@ -35,6 +43,7 @@ permissions:
 
 jobs:
   deploy:
+    if: ${{ vars.VPS_DEPLOY_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
