@@ -72,13 +72,15 @@ export const GRADING_COMPANIES = [
     name: 'ACE',
     full: 'ACE Grading',
     website: 'https://www.acegrading.com',
-    logo: '/images/grading/ace.svg',
+    logo: '/images/grading/ace.png',
+    logoDark: '/images/grading/ace-gold.png',
+    logoScale: 1.6, // the shield is near-square, so it needs more height than a wordmark to read
     brand: {
-      primary: '#C5A66C',
-      secondary: '#090F1B',
+      primary: '#BD9D62',
+      secondary: '#05172D',
       onDark: '#CBAA6D',
       verified: true,
-      source: 'Sampled from acegrading.com (gold shield mark on the navy site, navy Standard label with gold Gem Mint panel), 2026-11-04.',
+      source: 'Sampled from the ACE shield mark supplied 2026-11-04 (flat gold on navy); the label stock colours come from acegrading.com.',
     },
     // ACE's Standard label: navy, white card name with the set line in gold, and the grade
     // on an angled panel at the right — "a classic look, with a gold highlight for Gem Mint

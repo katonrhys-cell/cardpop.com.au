@@ -17,7 +17,6 @@ describe('gradingCompanies data', () => {
     for (const g of GRADING_COMPANIES) {
       expect(g.brand.primary).toMatch(/^#[0-9A-F]{6}$/i);
       expect(g.logo).toMatch(/^\/images\/grading\/[a-z-]+\.(svg|png)$/);
-      if (g.key === 'ACE') continue; // ACE still awaits a usable file
       expect(fs.existsSync(path.join(import.meta.dirname, '..', '..', 'public', g.logo))).toBe(true);
       expect(typeof g.brand.verified).toBe('boolean');
     }
