@@ -42,10 +42,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Pinned, never `latest`: Supabase CLI 3.0.0 (2026-11) changed three
+      # things under the same workflow at once — [inbucket] became [local_smtp]
+      # in config.toml (#1127), `db push` / `migration list` started targeting
+      # the LOCAL stack unless given --remote, and a non-interactive push now
+      # refuses without --yes. `latest` picked all of that up silently and the
+      # production push failed on every merge (keep this pin equal to the one in supabase-migrations.yml). Bump this deliberately, after
+      # trying the new version against a throwaway database (docs in CLAUDE.md
+      # → Supabase → Migrations).
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.0.0
 
       - name: Compare local migrations against production
         id: drift
@@ -55,25 +63,25 @@ jobs:
         run: |
           supabase link --project-ref vrfsaazuqjxotnieqlkd
 
-          # `migration list --linked` prints a LOCAL | REMOTE | TIME table. A row
-          # carrying a LOCAL version with an empty REMOTE column is a migration
-          # this repo has that the project's schema_migrations does not.
-          if ! supabase migration list --linked > list.txt 2>&1; then
+          # JSON, asked for explicitly: {"migrations":[{"local","remote","time"}]}.
+          # A row with a `local` version and an empty `remote` is a migration
+          # this repo has that the project's schema_migrations does not. (The
+          # old pipe-table parser read CLI 3.x output as "no rows" — a silent
+          # all-clear — so the shape is now checked before it is trusted.)
+          if ! supabase migration list --remote --output-format json > list.json 2> list.err; then
             echo "::error::supabase migration list failed — could not determine drift"
-            cat list.txt
+            cat list.err list.json
             exit 1
           fi
-          cat list.txt
+          cat list.json
+          if ! jq -e '.migrations | type == "array" and length > 0' list.json > /dev/null; then
+            echo "::error::supabase migration list returned no migration rows — could not determine drift"
+            exit 1
+          fi
 
-          # Strip everything but digits per column, which drops the header and
-          # the ---- separator rows without needing to match on their text.
-          pending=$(awk -F'|' '
-            NF >= 2 {
-              local = $1; remote = $2
-              gsub(/[^0-9]/, "", local)
-              gsub(/[^0-9]/, "", remote)
-              if (local != "" && remote == "") print local
-            }' list.txt)
+          pending=$(jq -r '.migrations[]
+            | select((.local // "") != "" and (.remote // "") == "")
+            | .local' list.json)
 
           if [ -z "$pending" ]; then
             echo "Production is up to date with supabase/migrations/."
