@@ -18,15 +18,17 @@ export const GRADING_COMPANIES = [
     name: 'PSA',
     full: 'Professional Sports Authenticator',
     website: 'https://www.psacard.com',
-    logo: '/images/grading/psa.svg',
+    logo: '/images/grading/psa.png',
     brand: {
-      primary: '#E4002B',
-      onDark: '#FF4D63',
-      verified: false,
-      source: 'PSA red (the wordmark/red label). Brand guide: psacard.com/logo — take the hex from the official SVG.',
+      primary: '#0350A1',
+      accent: '#E72332',
+      onDark: '#6FA3E8',
+      verified: true,
+      source: 'Sampled from the PSA logo (blue P/A, red S) supplied for the site, 2026-11-04.',
     },
-    // PSA's label: red band carrying the PSA mark, white body with black card details and
-    // the grade large on the right ("NM-MT 8"). One look for every grade.
+    // PSA's label: white, the blue/red PSA mark top-left, black card details and the grade
+    // large on the right ("NM-MT 8"), with the red rule PSA prints along the top. One look
+    // for every grade.
     label: { tiers: { default: 'psa' } },
   },
   {
@@ -34,28 +36,32 @@ export const GRADING_COMPANIES = [
     name: 'BGS',
     full: 'Beckett Grading Services',
     website: 'https://www.beckett.com/grading',
-    logo: '/images/grading/bgs.svg',
+    logo: '/images/grading/bgs.png',
+    logoDark: '/images/grading/bgs-white.png',
+    wordmark: 'BECKETT',
+    logoScale: 1.8, // the laurel crest is near-square, so it needs more height than a wordmark to read
     brand: {
-      primary: '#0C69A2',
-      onDark: '#4FA3DC',
-      verified: false,
-      source: 'Beckett blue as listed by Brandfetch for beckett.com (unclaimed listing) — confirm from the official SVG.',
+      primary: '#000000',
+      onDark: '#FFFFFF',
+      verified: true,
+      source: "Beckett's 2025 heritage identity: the laurel-wreath B and BECKETT wordmark in white on black (black on light stock).",
     },
-    // BGS labels are tiered by grade: silver below 9.5, gold for 9.5 and 10, and the Black
-    // Label for a 10 with four 10 sub-grades; the four sub-grades print down the label.
-    label: { tiers: { default: 'silver', gold: 'gold', black: 'black' }, showSubGrades: true },
+    // Beckett's 2025 label: the laurel B + BECKETT block on the left, the four sub-grades
+    // in a row, the grade printed straight onto the stock on the right. Silver below 9.5,
+    // gold for 9.5 and 10, and the Black Label (gold grade on black) for a 10 with four 10s.
+    label: { tiers: { default: 'silver', gold: 'gold', black: 'bgsBlack' }, showSubGrades: true },
   },
   {
     key: 'CGC',
     name: 'CGC',
     full: 'Certified Guaranty Company',
     website: 'https://www.cgccards.com',
-    logo: '/images/grading/cgc.svg',
+    logo: '/images/grading/cgc.png',
     brand: {
-      primary: '#BF0A19',
-      onDark: '#F0414F',
-      verified: false,
-      source: 'CGC red (CGC describes its own logo as red; hex from Brandfetch for cgccomics.com) — confirm from the official SVG.',
+      primary: '#BF3B2F',
+      onDark: '#E8584A',
+      verified: true,
+      source: 'Sampled from the CGC scales-and-wordmark logo supplied for the site, 2026-11-04.',
     },
     // CGC Cards: black label with white text and the grade boxed on the right; a Pristine
     // 10 is the gold label. Approximation — check against a slab before relying on it.
@@ -68,14 +74,16 @@ export const GRADING_COMPANIES = [
     website: 'https://www.acegrading.com',
     logo: '/images/grading/ace.svg',
     brand: {
-      primary: '#1F2937',
-      onDark: '#E5E7EB',
-      verified: false,
-      source: 'Not yet sourced — neutral placeholder until the hex is sampled from the official SVG.',
+      primary: '#C5A66C',
+      secondary: '#090F1B',
+      onDark: '#CBAA6D',
+      verified: true,
+      source: 'Sampled from acegrading.com (gold shield mark on the navy site, navy Standard label with gold Gem Mint panel), 2026-11-04.',
     },
-    // ACE: dark label, grade boxed on the right, gold for a 10. Approximation — ACE's
-    // artwork wasn't reachable when this was written; check against a slab.
-    label: { tiers: { default: 'black', perfect: 'gold' } },
+    // ACE's Standard label: navy, white card name with the set line in gold, and the grade
+    // on an angled panel at the right — "a classic look, with a gold highlight for Gem Mint
+    // 10s" (acegrading.com); the panel is light stock below a 10.
+    label: { tiers: { default: 'ace', perfect: 'aceGold' } },
   },
   {
     key: 'SGC',
@@ -149,33 +157,51 @@ export function graderStyle(grader) {
 // The "top of the slab" each company prints: background, ink, muted ink, the grade box and
 // (where the company prints one) a band above the body that carries the mark. Colours are
 // label stock, not brand colours — a silver BGS label is silver whatever Beckett's logo is.
-const GOLD = 'linear-gradient(180deg, #f7e2a0 0%, #d9b24a 55%, #b8921f 100%)';
-const SILVER = 'linear-gradient(180deg, #f4f4f4 0%, #d2d2d2 55%, #b3b3b3 100%)';
+const GOLD = 'linear-gradient(180deg, #D9C99A 0%, #AEA07E 55%, #8E7F5C 100%)';
+const SILVER = 'linear-gradient(180deg, #E8E8EB 0%, #CCCCD0 55%, #B0B0B4 100%)';
 
+// `band` is a rule printed above the body; `box` is the grade
+// panel on the right — `bg: 'transparent'` prints the grade straight onto the stock the way
+// Beckett does, `slant` cuts its left edge on the diagonal the way ACE does.
 export const SLAB_LABEL_LOOKS = {
   psa: {
-    band: { bg: '#E4002B', fg: '#FFFFFF' },
+    band: { bg: '#E72332', fg: '#FFFFFF', thin: true },
     bg: '#FFFFFF', fg: '#111111', muted: '#555555',
     box: { bg: '#FFFFFF', fg: '#111111', border: '#D9D9D9' },
     dark: false,
   },
   silver: {
-    bg: SILVER, fg: '#111111', muted: '#3F3F3F',
-    box: { bg: '#FFFFFF', fg: '#111111', border: '#9A9A9A' },
+    bg: SILVER, fg: '#202023', muted: '#4A4A4E',
+    box: { bg: 'transparent', fg: '#202023', border: '#9A9A9E' },
     dark: false,
   },
   gold: {
-    bg: GOLD, fg: '#1F1700', muted: '#4A3A08',
-    box: { bg: '#FFF8DC', fg: '#1F1700', border: '#9C7A18' },
+    bg: GOLD, fg: '#1B1712', muted: '#3F3522',
+    box: { bg: 'transparent', fg: '#1B1712', border: '#7A6B48' },
     dark: false,
+  },
+  bgsBlack: {
+    bg: '#0B0B0B', fg: '#FFFFFF', muted: '#B5B5B5',
+    box: { bg: 'transparent', fg: '#C8B573', border: '#2A2A2A' },
+    dark: true,
   },
   black: {
     bg: '#0B0B0B', fg: '#FFFFFF', muted: '#B5B5B5',
     box: { bg: '#FFFFFF', fg: '#0B0B0B', border: '#0B0B0B' },
     dark: true,
   },
+  ace: {
+    bg: '#090F1B', fg: '#FFFFFF', muted: '#C5A66C',
+    box: { bg: '#D9DADC', fg: '#090F1B', border: '#090F1B', slant: true },
+    dark: true,
+  },
+  aceGold: {
+    bg: '#090F1B', fg: '#FFFFFF', muted: '#C5A66C',
+    box: { bg: '#CBAA6D', fg: '#090F1B', border: '#090F1B', slant: true },
+    dark: true,
+  },
   tag: {
-    band: { bg: '#0F172A', fg: '#FFFFFF' },
+    band: { bg: '#0F172A', fg: '#FFFFFF', thin: true },
     bg: '#FFFFFF', fg: '#111111', muted: '#555555',
     box: { bg: '#0F172A', fg: '#FFFFFF', border: '#0F172A' },
     dark: false,

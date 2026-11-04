@@ -1,4 +1,6 @@
 import React from 'react';
+import fs from 'node:fs';
+import path from 'node:path';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import GraderLogo from '@/components/grading/GraderLogo.jsx';
@@ -15,6 +17,8 @@ describe('gradingCompanies data', () => {
     for (const g of GRADING_COMPANIES) {
       expect(g.brand.primary).toMatch(/^#[0-9A-F]{6}$/i);
       expect(g.logo).toMatch(/^\/images\/grading\/[a-z-]+\.(svg|png)$/);
+      if (!['PSA', 'BGS', 'CGC'].includes(g.key)) continue; // the others still await their official file
+      expect(fs.existsSync(path.join(import.meta.dirname, '..', '..', 'public', g.logo))).toBe(true);
       expect(typeof g.brand.verified).toBe('boolean');
     }
   });
@@ -33,7 +37,7 @@ describe('GraderLogo', () => {
   it('renders the official logo file when there is one', () => {
     render(<GraderLogo grader={psa} />);
     const img = screen.getByAltText('Professional Sports Authenticator logo');
-    expect(img.getAttribute('src')).toBe('/images/grading/psa.svg');
+    expect(img.getAttribute('src')).toBe('/images/grading/psa.png');
   });
 
   it('falls back to a brand-coloured wordmark when the file is missing', () => {
@@ -69,7 +73,7 @@ describe('slab label tiers', () => {
     expect(slabLabelTier(bgs, { estimate: 8.5 })).toBe('silver');
     expect(slabLabelTier(bgs, { estimate: 9.5 })).toBe('gold');
     expect(slabLabelTier(bgs, { estimate: 10, subGrades: { ...tens, surface: 9.5 } })).toBe('gold');
-    expect(slabLabelTier(bgs, { estimate: 10, subGrades: tens })).toBe('black');
+    expect(slabLabelTier(bgs, { estimate: 10, subGrades: tens })).toBe('bgsBlack');
   });
 
   it('keeps PSA and SGC on their one label whatever the grade', () => {
@@ -77,6 +81,8 @@ describe('slab label tiers', () => {
     expect(slabLabelTier(findGradingCompany('SGC'), { estimate: 10 })).toBe('black');
     expect(slabLabelTier(findGradingCompany('CGC'), { estimate: 10 })).toBe('gold');
     expect(slabLabelTier(findGradingCompany('CGC'), { estimate: '9.5' })).toBe('black');
+    expect(slabLabelTier(findGradingCompany('ACE'), { estimate: 9 })).toBe('ace');
+    expect(slabLabelTier(findGradingCompany('ACE'), { estimate: 10 })).toBe('aceGold');
   });
 
   it('falls back to the default tier for a non-numeric estimate', () => {
@@ -99,14 +105,27 @@ describe('SlabLabel', () => {
     expect(screen.getAllByText('8.5').length).toBeGreaterThan(1);
   });
 
-  it('puts the PSA mark in a red band above a white body', () => {
+  it('puts the PSA mark on a white body under its red rule, with the grade word beneath the number', () => {
     const { container } = render(<SlabLabel grader={psa} estimate={8} label="NM-MT" range="7-9" />);
     const root = container.firstChild;
     expect(root.getAttribute('data-slab-tier')).toBe('psa');
-    const band = root.firstChild;
-    expect(band.style.background.toLowerCase()).toMatch(/#e4002b|rgb\(228, 0, 43\)/);
+    const rule = root.firstChild;
+    expect(rule.style.background.toLowerCase()).toMatch(/#e72332|rgb\(231, 35, 50\)/);
+    expect(rule.textContent).toBe('');
     expect(screen.getByAltText('Professional Sports Authenticator logo').getAttribute('src')).toBe(psa.logo);
-    expect(screen.getByText('8')).toBeTruthy();
+    const number = screen.getByText('8');
+    expect(number.nextSibling.textContent).toBe('NM-MT');
+  });
+
+  it('cuts the ACE grade panel on the diagonal and turns it gold for a 10', () => {
+    const ace = findGradingCompany('ACE');
+    const { container, rerender } = render(<SlabLabel grader={ace} estimate={9} label="Gem Mint" range="8-10" />);
+    const panel = () => screen.getByText(/^(9|10)$/).parentElement;
+    expect(container.firstChild.getAttribute('data-slab-tier')).toBe('ace');
+    expect(panel().style.clipPath).toContain('polygon');
+    rerender(<SlabLabel grader={ace} estimate={10} label="Gem Mint" range="10" />);
+    expect(container.firstChild.getAttribute('data-slab-tier')).toBe('aceGold');
+    expect(panel().style.background.toLowerCase()).toMatch(/#cbaa6d|rgb\(203, 170, 109\)/);
   });
 
   it('shows the dash for a missing estimate rather than throwing', () => {

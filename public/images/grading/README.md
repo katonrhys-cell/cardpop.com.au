@@ -5,23 +5,22 @@ Official logo files for the grading companies named across the Grading Hub, read
 own published artwork goes here, unaltered** — if a file is missing the UI shows a plain
 wordmark in the brand colour rather than an approximation of the mark.
 
-| File | Company | Where the official file comes from |
+| File | Company | Status |
 |---|---|---|
-| `psa.svg` | PSA (Professional Sports Authenticator) | Brand guidelines / logo downloads at https://www.psacard.com/logo |
-| `bgs.svg` | Beckett Grading Services | https://www.beckett.com/grading (site header logo), or Beckett's press/brand kit |
-| `cgc.svg` | CGC Cards (Certified Guaranty Company) | https://www.cgccards.com (site header logo), or the CCG press kit |
-| `ace.svg` | ACE Grading | https://www.acegrading.com (site header logo) |
-| `sgc.svg` | SGC (Sportscard Guaranty Corporation) | https://www.gosgc.com (site header logo) |
-| `sgc-white.svg` | SGC — light-on-dark version, shown in dark mode | SGC publishes a white logo on gosgc.com |
-| `tag.svg` | TAG Grading | https://taggrading.com (site header logo) |
+| `psa.png` | PSA (Professional Sports Authenticator) | In place — the blue/red PSA mark, cut from the logo image supplied on 2026-11-04 (white knocked out to transparent). Replace with the SVG from https://www.psacard.com/logo when it can be fetched |
+| `bgs.png` / `bgs-white.png` | Beckett Grading Services | In place — Beckett's 2025 laurel-wreath B + BECKETT crest, black and white versions cut from the announcement artwork supplied on 2026-11-04. Replace with Beckett's own file (press/brand kit) when available |
+| `cgc.png` | CGC Cards (Certified Guaranty Company) | In place — the red scales + CGC® mark, cut from the logo image supplied on 2026-11-04. Replace with the vector from https://www.cgccards.com when available |
+| `ace.svg` | ACE Grading | **Missing** — the gold shield "A" at https://www.acegrading.com; the copies supplied so far were too small to use. Wordmark fallback until then |
+| `sgc.svg` / `sgc-white.svg` | SGC (Sportscard Guaranty Corporation) | **Missing** — https://www.gosgc.com publishes a white logo for dark backgrounds. Wordmark fallback until then |
+| `tag.svg` | TAG Grading | **Missing** — https://taggrading.com. Wordmark fallback until then |
 
-After dropping a file in, open it and copy the mark's primary fill into
-`brand.primary` for that company in `data/gradingCompanies.js`, pick a readable
-`brand.onDark`, and flip `verified` to `true` with the source noted. SVG is preferred (it
-scales and carries the exact colours); a PNG at 2× display size is fine if a company only
-publishes raster artwork — update the `logo` path to match.
+When a file lands or is replaced: point `logo` (and `logoDark` for a light-on-dark version)
+at it in `data/gradingCompanies.js`, sample the mark's primary fill into `brand.primary`,
+pick a readable `brand.onDark`, and set `verified: true` with the source noted. Tall,
+near-square marks (the Beckett crest) take `logoScale` so they get more height than a
+wordmark. SVG is preferred; a PNG with a transparent background at 2× display size is fine.
 
 Each company's name and logo are its trademark, used here to identify that company's
-service. Keep the marks unmodified (no recolouring, stretching or cropping) and don't use
-them to imply partnership or endorsement — check each company's logo-use guidelines (PSA
-publishes one at the link above).
+service. Keep the marks unmodified (no recolouring, stretching or cropping of the mark
+itself) and don't use them to imply partnership or endorsement — check each company's
+logo-use guidelines (PSA publishes one at the link above).

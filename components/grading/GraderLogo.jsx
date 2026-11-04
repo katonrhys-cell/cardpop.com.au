@@ -17,34 +17,37 @@ export default function GraderLogo({ grader, height = 24, className = '', wordma
 
   const showImage = Boolean(grader.logo) && !failed;
   const alt = `${grader.full || grader.name} logo`;
+  // A near-square crest (Beckett's laurel B) reads at a wordmark's height only if it is
+  // allowed to stand taller — `logoScale` grows the mark, and the row grows with it.
+  const imgHeight = Math.round(height * (showImage && grader.logoScale ? grader.logoScale : 1));
   const pinned = tone === 'dark' ? (grader.logoDark || grader.logo) : tone === 'light' ? grader.logo : null;
 
   return (
     <span
       className={`inline-flex items-center ${className}`}
-      style={{ ...graderStyle(grader), height }}
+      style={{ ...graderStyle(grader), height: imgHeight, '--grader-logo-h': `${imgHeight}px` }}
       data-grader={grader.key}
     >
       {showImage && pinned ? (
         <img
           src={pinned}
           alt={alt}
-          height={height}
+          height={imgHeight}
           loading="lazy"
           decoding="async"
           onError={() => setFailed(true)}
-          className="h-full w-auto max-w-[9rem] object-contain"
+          className="h-[var(--grader-logo-h)] w-auto max-w-[9rem] object-contain"
         />
       ) : showImage ? (
         <>
           <img
             src={grader.logo}
             alt={alt}
-            height={height}
+            height={imgHeight}
             loading="lazy"
             decoding="async"
             onError={() => setFailed(true)}
-            className={`h-full w-auto max-w-[9rem] object-contain ${grader.logoDark ? 'dark:hidden' : ''}`}
+            className={`h-[var(--grader-logo-h)] w-auto max-w-[9rem] object-contain ${grader.logoDark ? 'dark:hidden' : ''}`}
           />
           {grader.logoDark && (
             <img
@@ -54,7 +57,7 @@ export default function GraderLogo({ grader, height = 24, className = '', wordma
               loading="lazy"
               decoding="async"
               onError={() => setFailed(true)}
-              className="hidden h-full w-auto max-w-[9rem] object-contain dark:block"
+              className="hidden h-[var(--grader-logo-h)] w-auto max-w-[9rem] object-contain dark:block"
             />
           )}
         </>
@@ -64,7 +67,7 @@ export default function GraderLogo({ grader, height = 24, className = '', wordma
           style={ink ? { color: ink } : undefined}
           aria-label={alt}
         >
-          {grader.name}
+          {grader.wordmark || grader.name}
         </span>
       )}
     </span>
