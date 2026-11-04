@@ -17,7 +17,7 @@ describe('gradingCompanies data', () => {
     for (const g of GRADING_COMPANIES) {
       expect(g.brand.primary).toMatch(/^#[0-9A-F]{6}$/i);
       expect(g.logo).toMatch(/^\/images\/grading\/[a-z-]+\.(svg|png)$/);
-      if (!['PSA', 'BGS', 'CGC', 'TAG'].includes(g.key)) continue; // the others still await their official file
+      if (g.key === 'ACE') continue; // ACE still awaits a usable file
       expect(fs.existsSync(path.join(import.meta.dirname, '..', '..', 'public', g.logo))).toBe(true);
       expect(typeof g.brand.verified).toBe('boolean');
     }
@@ -78,7 +78,7 @@ describe('slab label tiers', () => {
 
   it('keeps PSA and SGC on their one label whatever the grade', () => {
     expect(slabLabelTier(findGradingCompany('PSA'), { estimate: 10 })).toBe('psa');
-    expect(slabLabelTier(findGradingCompany('SGC'), { estimate: 10 })).toBe('black');
+    expect(slabLabelTier(findGradingCompany('SGC'), { estimate: 10 })).toBe('sgc');
     expect(slabLabelTier(findGradingCompany('CGC'), { estimate: 10 })).toBe('gold');
     expect(slabLabelTier(findGradingCompany('CGC'), { estimate: '9.5' })).toBe('black');
     expect(slabLabelTier(findGradingCompany('ACE'), { estimate: 9 })).toBe('ace');
@@ -131,6 +131,21 @@ describe('SlabLabel', () => {
     expect(logo.getAttribute('src')).toBe(tag.logoDark);
     expect(logo.closest('.absolute')).not.toBeNull();
     expect(screen.getByText('10').nextSibling.textContent).toBe('Gem Mint');
+  });
+
+  it('draws the SGC label as a black strip with the mark over a white panel, the grade word as a badge', () => {
+    const sgc = findGradingCompany('SGC');
+    const { container } = render(<SlabLabel grader={sgc} estimate={10} label="Gem Mint" range="9-10" />);
+    const root = container.firstChild;
+    expect(root.getAttribute('data-slab-tier')).toBe('sgc');
+    expect(root.style.background.toLowerCase()).toMatch(/#ffffff|rgb\(255, 255, 255\)/);
+    const strip = root.firstChild;
+    expect(strip.style.background.toLowerCase()).toMatch(/#0b0b0b|rgb\(11, 11, 11\)/);
+    const logo = screen.getByAltText('Sportscard Guaranty Corporation logo');
+    expect(strip.contains(logo)).toBe(true);
+    expect(logo.getAttribute('src')).toBe(sgc.logoDark);
+    const word = screen.getByText('Gem Mint');
+    expect(word.style.background.toLowerCase()).toMatch(/#0b0b0b|rgb\(11, 11, 11\)/);
   });
 
   it('keeps the grade word beneath the number on a Beckett label', () => {

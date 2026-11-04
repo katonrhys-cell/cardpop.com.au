@@ -90,17 +90,18 @@ export const GRADING_COMPANIES = [
     name: 'SGC',
     full: 'Sportscard Guaranty Corporation',
     website: 'https://www.gosgc.com',
-    logo: '/images/grading/sgc.svg',
-    logoDark: '/images/grading/sgc-white.svg',
+    logo: '/images/grading/sgc.png',
+    logoDark: '/images/grading/sgc-white.png',
     brand: {
-      primary: '#000000',
+      primary: '#0B0B0B',
       onDark: '#FFFFFF',
-      accent: '#C9A227',
-      verified: false,
-      source: 'SGC identity is black with gold (and a purple heritage colour) per its brand agency; gold hex is a reference value — confirm from the official SVG.',
+      verified: true,
+      source: 'SGC is a black-and-white identity: the hexagon ball mark + SGC wordmark, from the artwork supplied 2026-11-04.',
     },
-    // SGC's "tuxedo" label: black, white text, the grade large on the right.
-    label: { tiers: { default: 'black' } },
+    // SGC's "tuxedo" label: a black strip carrying the SGC mark over a white panel with the
+    // card details in bold black, the grade huge at the right and its word in a small black
+    // badge. Every grade. From a slab photo supplied 2026-11-04.
+    label: { tiers: { default: 'sgc' } },
   },
   {
     key: 'TAG',
@@ -162,10 +163,12 @@ export function graderStyle(grader) {
 const GOLD = 'linear-gradient(180deg, #D9C99A 0%, #AEA07E 55%, #8E7F5C 100%)';
 const SILVER = 'linear-gradient(180deg, #E8E8EB 0%, #CCCCD0 55%, #B0B0B4 100%)';
 
-// `band` is a rule printed above the body and `frame` a border around the whole label;
+// `band` is a strip above the body (a bare rule, or with `logo` the company's mark in
+// `fg` at its left, SGC) and `frame` a border around the whole label;
 // `box` is the grade panel on the right — `bg: 'transparent'` prints the grade straight onto
 // the stock the way Beckett does, `slant` cuts its left edge on the diagonal the way ACE
-// does, `wordAbove` puts the grade word over the number the way PSA does. `logoAt` moves
+// does, `wordAbove` puts the grade word over the number the way PSA does, `badge` prints the
+// word as a small pill (SGC). `logoAt` moves
 // the mark to a row under the details (`bottom`, PSA) or centred on the top edge of the
 // `inset` frame (`top`, TAG).
 export const SLAB_LABEL_LOOKS = {
@@ -207,6 +210,15 @@ export const SLAB_LABEL_LOOKS = {
     bg: '#090F1B', fg: '#FFFFFF', muted: '#C5A66C',
     box: { bg: '#CBAA6D', fg: '#090F1B', border: '#090F1B', slant: true },
     dark: true,
+  },
+  // SGC: black frame and header strip (the mark in white) over a white panel; the grade
+  // word is a small black badge beside the number.
+  sgc: {
+    frame: '#0B0B0B',
+    band: { bg: '#0B0B0B', fg: '#FFFFFF', logo: true },
+    bg: '#FFFFFF', fg: '#111111', muted: '#555555',
+    box: { bg: 'transparent', fg: '#111111', border: 'transparent', align: 'end', badge: { bg: '#0B0B0B', fg: '#FFFFFF' } },
+    dark: false,
   },
   // TAG: black, a thin white inset frame, the mark centred on the frame's top edge.
   tag: {

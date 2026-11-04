@@ -10,7 +10,8 @@ function formatGrade(value) {
 
 /**
  * The estimate drawn as the label at the top of that company's slab — PSA's red-framed
- * white label with the mark along the bottom, TAG's black label with its white inset frame, Beckett's silver / gold / Black Label with the four sub-grades in a
+ * white label with the mark along the bottom, SGC's black strip over a white panel, TAG's
+ * black label with its white inset frame, Beckett's silver / gold / Black Label with the four sub-grades in a
  * row, ACE's navy label with the angled Gem Mint panel, SGC's black tuxedo label — with
  * the company's mark on the left and the grade, its word beneath it, on the right.
  * The look (`data/gradingCompanies.js` → `SLAB_LABEL_LOOKS`) is fixed label stock, so it
@@ -25,7 +26,8 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
   const logoTone = look.dark ? 'dark' : 'light';
   const logoAtBottom = look.logoAt === 'bottom';
   const logoAtTop = look.logoAt === 'top';
-  const logoInRow = !logoAtBottom && !logoAtTop;
+  const logoInBand = Boolean(look.band?.logo);
+  const logoInRow = !logoAtBottom && !logoAtTop && !logoInBand;
   const logo = (h, cls) => <GraderLogo grader={grader} height={h} tone={logoTone} ink={look.fg} wordmarkClassName={cls} />;
 
   return (
@@ -35,7 +37,14 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
       data-slab-tier={tier}
       aria-label={`${grader.name} ${formatGrade(estimate)} ${label || ''}`.trim()}
     >
-      {look.band && <div className="h-1.5" style={{ background: look.band.bg }} />}
+      {look.band && (logoInBand ? (
+        <div className="flex items-center justify-between px-3 py-1.5" style={{ background: look.band.bg, color: look.band.fg }}>
+          <GraderLogo grader={grader} height={16} tone="dark" ink={look.band.fg} wordmarkClassName="text-sm" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.18em] opacity-90">Estimate</span>
+        </div>
+      ) : (
+        <div className="h-1.5" style={{ background: look.band.bg }} />
+      ))}
 
       {/* `inset`: a thin frame inside the label, the mark sitting on its top edge (TAG) */}
       <div className={look.inset ? 'relative border rounded-sm mt-2.5' : ''} style={look.inset ? { borderColor: look.inset } : undefined}>
@@ -79,7 +88,12 @@ export default function SlabLabel({ grader, estimate, label, range, subGrades, c
         >
           <span className="text-3xl font-black tabular-nums leading-none">{formatGrade(estimate)}</span>
           {label && (
-            <span className={`text-[9px] font-bold uppercase tracking-wide leading-tight ${box.wordAbove ? 'mb-1' : 'mt-1'}`}>{label}</span>
+            <span
+              className={`text-[9px] font-bold uppercase tracking-wide leading-tight ${box.wordAbove ? 'mb-1' : 'mt-1'} ${box.badge ? 'rounded-sm px-1 py-0.5' : ''}`}
+              style={box.badge ? { background: box.badge.bg, color: box.badge.fg } : undefined}
+            >
+              {label}
+            </span>
           )}
         </div>
       </div>
