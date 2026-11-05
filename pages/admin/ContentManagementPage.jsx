@@ -96,13 +96,18 @@ const ContentManagementPage = () => {
 
   const handleQuickPublish = async (article) => {
     const next = !article.is_published;
+    // A first publish stamps the date (the DB trigger does too, for any other
+    // writer); re-publishing keeps the original date.
+    const patch = next && !article.published_at
+      ? { is_published: true, published_at: new Date().toISOString() }
+      : { is_published: next };
     try {
       const { error } = await supabase
         .from('blog_articles')
-        .update({ is_published: next })
+        .update(patch)
         .eq('id', article.id);
       if (error) throw error;
-      setArticles(prev => prev.map(a => a.id === article.id ? { ...a, is_published: next } : a));
+      setArticles(prev => prev.map(a => a.id === article.id ? { ...a, ...patch } : a));
       toast.success(next ? 'Article published.' : 'Article set to draft.');
     } catch (err) {
       toast.error('Failed to update status.');
