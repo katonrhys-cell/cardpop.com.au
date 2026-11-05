@@ -342,7 +342,29 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
     // Authoritative "real, deliverable address" gate. The client autocompletes
     // via Amazon Location Service, but a bypassed frontend can't slip a fake
     // address past this server-side check (fails open only when no key is set).
-    const addressCheck = await validateShippingAddress(shippingAddress || {});
+    //
+    // The geocode is a network round trip, so it runs alongside the code
+    // lookups and cart pricing below (all read-only) instead of before them;
+    // its verdict is still checked first, so an unverified address gets the
+    // same answer as before.
+    const addressCheckPending = validateShippingAddress(shippingAddress || {});
+    const promoCodeText = typeof promoCode === 'string' ? promoCode.trim() : '';
+    const sharedCode = userId && promoCodeText && !isWelcomeCodeFormat(promoCodeText);
+    const pricingPending = (async () => {
+      // Resolve an admin promo code or partner referral code up front (promo
+      // codes first — the two share a namespace). An invalid code throws here.
+      const promoFound = sharedCode ? await findPromoCode(promoCodeText) : null;
+      const promo = promoFound ? await validatePromoCode(promoFound, { userId, email }) : null;
+      const partner = sharedCode && !promo
+        ? await validatePartnerCode(userId, promoCodeText)
+        : null;
+      return { promo, partner, priced: await priceCart(items, userId) };
+    })();
+    // Settled either way so a pricing error can't surface as an unhandled
+    // rejection while the address verdict is being returned.
+    pricingPending.catch(() => {});
+
+    const addressCheck = await addressCheckPending;
     if (!addressCheck.valid) {
       const message = addressCheck.reason === 'request-failed'
         ? 'We could not verify that shipping address right now. Please try again.'
@@ -351,18 +373,9 @@ router.post('/create-cart-checkout', optionalAuthMiddleware, requireEmailVerifie
       return res.status(400).json({ error: message, code: 'address_unverified' });
     }
 
-    // Resolve an admin promo code or partner referral code up front (promo
-    // codes first — the two share a namespace). An invalid code throws here.
-    const promoCodeText = typeof promoCode === 'string' ? promoCode.trim() : '';
-    const sharedCode = userId && promoCodeText && !isWelcomeCodeFormat(promoCodeText);
-    const promoFound = sharedCode ? await findPromoCode(promoCodeText) : null;
-    const promo = promoFound ? await validatePromoCode(promoFound, { userId, email }) : null;
-    const partner = sharedCode && !promo
-      ? await validatePartnerCode(userId, promoCodeText)
-      : null;
-
+    const { promo, partner, priced } = await pricingPending;
     const { lineItems, orderLines, itemsCents, commissionCents, gstCents, includedGstCents, sellerGstCents, platformGstCents, shippingCents, processingCents, grandCents } =
-      await priceCart(items, userId);
+      priced;
 
     // Fraud control: cap order size / frequency for brand-new, unverified buyers
     // and guests. Applies to every order, Official CardPop Store listings

@@ -75,13 +75,13 @@ export const appearanceFor = (dark) => ({
 });
 
 const EXPRESS_OPTIONS = {
-  // Google Pay is the point of this row; 'always' shows the button even when
-  // the buyer has no card saved to Google yet (Google then offers to add one).
-  // Apple Pay appears on supported Apple devices. PayPal and Link are not
-  // offered (src/utils/checkoutPaymentMethods.js pins checkout to card).
+  // 'always' shows each wallet button even when the buyer has no card saved to
+  // it yet (the wallet then offers to add one). Apple Pay still only appears on
+  // devices/browsers that support it. PayPal and Link are not offered
+  // (src/utils/checkoutPaymentMethods.js pins checkout to card).
   paymentMethods: {
     googlePay: 'always',
-    applePay: 'auto',
+    applePay: 'always',
     paypal: 'never',
     link: 'never',
     amazonPay: 'never',
@@ -90,7 +90,15 @@ const EXPRESS_OPTIONS = {
   buttonType: { googlePay: 'buy', applePay: 'buy' },
   buttonTheme: { googlePay: 'black', applePay: 'black' },
   buttonHeight: 48,
+  // One full-width button per row, and never fold a wallet behind Stripe's
+  // "Show more" overflow toggle — on a phone the default layout hid the second
+  // wallet until the buyer tapped it.
+  layout: { maxColumns: 1, overflow: 'never' },
 };
+
+// Two stacked 48px buttons + the gap between them. Held open while the
+// wallets load so the card form doesn't jump down when they appear.
+const EXPRESS_RESERVED_HEIGHT = 'min-h-[108px]';
 
 const PAYMENT_OPTIONS = {
   layout: 'tabs',
@@ -111,6 +119,7 @@ const ErrorNote = ({ children }) => (
 const PaymentForm = () => {
   const result = useCheckoutElements();
   const [expressAvailable, setExpressAvailable] = useState(true);
+  const [expressReady, setExpressReady] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -147,11 +156,16 @@ const PaymentForm = () => {
     <div className="space-y-4">
       {expressAvailable && (
         <div className="space-y-3">
-          <ExpressCheckoutElement
-            options={EXPRESS_OPTIONS}
-            onReady={({ availablePaymentMethods }) => setExpressAvailable(!!availablePaymentMethods)}
-            onConfirm={(event) => confirm({ expressCheckoutConfirmEvent: event })}
-          />
+          <div className={expressReady ? undefined : EXPRESS_RESERVED_HEIGHT}>
+            <ExpressCheckoutElement
+              options={EXPRESS_OPTIONS}
+              onReady={({ availablePaymentMethods }) => {
+                setExpressAvailable(!!availablePaymentMethods);
+                setExpressReady(true);
+              }}
+              onConfirm={(event) => confirm({ expressCheckoutConfirmEvent: event })}
+            />
+          </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
             <span>or pay with card</span>
