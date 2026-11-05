@@ -4,7 +4,7 @@ import { ShieldCheck, Lock } from 'lucide-react';
 import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 
 /*
- * Payment step. Card and PayPal details are never entered on CardPop — the
+ * Payment step. Card details are never entered on CardPop — the
  * actual payment is completed on Stripe's PCI-compliant hosted checkout after
  * "Confirm & Pay". This panel sets that expectation clearly and shows exactly
  * which methods are accepted, with the trust signals a buyer expects before

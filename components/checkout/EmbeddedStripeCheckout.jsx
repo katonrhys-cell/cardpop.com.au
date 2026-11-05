@@ -8,7 +8,7 @@ import StripeElementsPayment from '@/components/checkout/StripeElementsPayment.j
 import { useCart } from '@/hooks/useCart.jsx';
 
 /*
- * Inline Stripe payment. Renders Stripe's Embedded Checkout (card / PayPal /
+ * Inline Stripe payment. Renders Stripe's Embedded Checkout (card /
  * wallets) directly on our page — the buyer never leaves
  * cardpop.com.au. Card data is entered inside Stripe's own secure iframe, so it
  * never touches our servers (PCI scope stays with Stripe).
