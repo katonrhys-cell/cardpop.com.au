@@ -91,7 +91,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: env.E2E == 'true'
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
