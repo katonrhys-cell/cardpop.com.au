@@ -241,11 +241,16 @@ in step. Change routing there, never in Express. Only once Vercel is fully
 decommissioned is the file to be renamed (see the runbook).
 
 GitHub Actions otherwise runs only the quality gates —
-`.github/workflows/ci.yml` (lint + tests + build) on pull requests and
-`e2e.yml` on **non-draft** pull requests **only** (the Playwright run is the
-most expensive workflow, so a draft PR skips it until it is marked ready for
-review) — plus the few schedules that need a runner (migration
-drift, git backup, merchant-listings check, the weekly Snyk sweep). On a push
+`.github/workflows/ci.yml` on pull requests — **one** `verify` job that runs
+the migration-version check, lint, tests, build, bundle budget and, once the PR
+is **ready for review** (drafts skip it), the Playwright E2E against that same
+build (`E2E_SKIP_BUILD`), because every job bills a rounded-up minute and the
+separate E2E / migration-check workflows each paid for their own install and
+build — plus the few schedules that need a runner (migration drift, git
+backup, merchant-listings check). The weekly Snyk sweep and the disabled
+Lighthouse workflow were removed in the 2026-11 cost review: the Snyk GitHub
+App still checks every PR, and Dependabot alerts cover advisories against an
+unchanged lockfile. On a push
 to `main` only the Supabase migration push (when `supabase/migrations/`
 changed) runs, plus `deploy.yml` once the VPS is enabled (it skips while parked): a private repo bills every run a whole
 metered minute, so the former post-merge `main-ci.yml` (the same `verify`

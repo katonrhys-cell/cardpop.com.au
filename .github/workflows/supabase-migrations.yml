@@ -26,13 +26,9 @@ on:
       # A change to how migrations are pushed is itself worth a push: it is
       # the only way a fix to this file gets proven on main.
       - '.github/workflows/supabase-migrations.yml'
-  # Duplicate-version check on PRs: two branches picking the same version
-  # prefix (e.g. both choosing <date>000001) has now broken db push twice —
-  # the version is the PRIMARY KEY of schema_migrations, so the second file
-  # can never be applied. Catch it before merge instead of at deploy time.
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
+  # The duplicate-version check also runs on every PR, as a step of CI's
+  # verify job (.github/workflows/ci.yml), so PRs no longer bill a separate
+  # one-minute job here.
   # Allow a manual re-run from the Actions tab if a push ever fails.
   workflow_dispatch:
 
@@ -62,8 +58,6 @@ jobs:
           echo "All migration versions unique."
 
   db-push:
-    # Deploy only on pushes to main; PRs run the version check alone.
-    if: github.event_name != 'pull_request'
     needs: check-versions
     runs-on: ubuntu-latest
     steps:

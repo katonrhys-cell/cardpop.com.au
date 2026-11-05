@@ -94,10 +94,6 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@babel/generator": "^7.26.3",
-    "@babel/parser": "^7.26.3",
-    "@babel/traverse": "^7.26.4",
-    "@babel/types": "^7.26.3",
     "@playwright/test": "^1.56.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

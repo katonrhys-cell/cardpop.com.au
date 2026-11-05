@@ -541,12 +541,6 @@ export default defineConfig({
 	},
 	build: {
 		rollupOptions: {
-			external: [
-				'@babel/parser',
-				'@babel/traverse',
-				'@babel/generator',
-				'@babel/types',
-			],
 			output: {
 				manualChunks(id) {
 					if (!id.includes('node_modules')) return;
