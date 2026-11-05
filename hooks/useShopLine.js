@@ -61,6 +61,7 @@ export default function useShopLine({ slug, sku, enabled = true }) {
     });
     return () => { cancelled = true; };
     // colourParam is read once per load; later changes come from selectColour.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-running on colourParam would reload the line on every colour pick
   }, [enabled, slug, sku]);
 
   const selected = family.find((s) => s.id === selectedId) || null;
