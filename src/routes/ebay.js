@@ -8,6 +8,7 @@ import * as ebayCache from '../utils/ebayCache.js';
 import { getUsdToAudRate } from '../utils/exchangeRates.js';
 import logger from '../utils/logger.js';
 import { queryString } from '../utils/queryString.js';
+import { publicCache, CACHE_PRICING } from '../middleware/publicCache.js';
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const router = express.Router();
  *
  * Response: array of listing objects (NOT wrapped in an envelope)
  */
-router.get('/search', async (req, res) => {
+router.get('/search', publicCache(CACHE_PRICING), async (req, res) => {
   const { limit = '20' } = req.query;
   const cardName = queryString(req.query.cardName);
 
@@ -85,7 +86,7 @@ router.get('/search', async (req, res) => {
  * Response:
  *   { count, avgPrice, minPrice, maxPrice, listings[] }
  */
-router.get('/price-estimate', async (req, res) => {
+router.get('/price-estimate', publicCache(CACHE_PRICING), async (req, res) => {
   const { gradeScore } = req.query;
   const name = queryString(req.query.name);
   const set = queryString(req.query.set);
@@ -266,7 +267,7 @@ router.get('/price-estimate', async (req, res) => {
  * GET /ebay/card-details/:cardId
  * Detailed price data for a single card (by eBay item ID).
  */
-router.get('/card-details/:cardId', async (req, res) => {
+router.get('/card-details/:cardId', publicCache(CACHE_PRICING), async (req, res) => {
   const { cardId } = req.params;
   if (!cardId?.trim()) {
     return res.status(400).json({ error: 'cardId parameter is required' });
@@ -286,7 +287,7 @@ router.get('/card-details/:cardId', async (req, res) => {
  * GET /ebay/sales
  * Sales data with filters (collection, dateRange, price range, condition, pagination).
  */
-router.get('/sales', async (req, res) => {
+router.get('/sales', publicCache(CACHE_PRICING), async (req, res) => {
   const {
     collection, dateRange = '7d', priceMin, priceMax, condition,
     page = '1', limit = '50',
@@ -315,7 +316,7 @@ router.get('/sales', async (req, res) => {
  * GET /ebay/statistics
  * Market statistics for a given timeframe and optional collection.
  */
-router.get('/statistics', async (req, res) => {
+router.get('/statistics', publicCache(CACHE_PRICING), async (req, res) => {
   const { timeframe = '7d', collection } = req.query;
   logger.info(`[EBAY_STATISTICS] timeframe=${timeframe} collection=${collection}`);
 
@@ -332,7 +333,7 @@ router.get('/statistics', async (req, res) => {
  * GET /ebay/popular-cards
  * Live eBay AU prices for the 16 curated popular cards. Cached for 1 hour.
  */
-router.get('/popular-cards', async (req, res) => {
+router.get('/popular-cards', publicCache(CACHE_PRICING), async (req, res) => {
   const CACHE_KEY = 'popular-cards';
   const cached = await ebayCache.getTiered(CACHE_KEY);
   if (cached) {

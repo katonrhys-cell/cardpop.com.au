@@ -3,11 +3,12 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import { findBestMatches, getDidYouMean } from '../../utils/fuzzyMatch.js';
 import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
+import { publicCache, CACHE_MEDIUM } from '../middleware/publicCache.js';
 
 const router = Router();
 
 // Get search suggestions based on query
-router.get('/', async (req, res) => {
+router.get('/', publicCache(CACHE_MEDIUM), async (req, res) => {
   try {
     const { q } = req.query;
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
