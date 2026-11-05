@@ -265,6 +265,96 @@ where slug = 'lance-franklin-rookie';
 update public.tracked_cards set active = false, updated_at = now()
 where slug in ('payne-haas-rookie', 'joseph-suaalii-rookie', 'patrick-cripps-rookie', 'sam-darcy-rookie');
 
+-- ── 2b. Repairs: existing searches that priced the wrong cards ───────────────
+-- Audited 2026-11-05 against live eBay AU listings. These queries let other
+-- printings into the average: Celebrations (2021) and "30th Celebration"
+-- (2026) reprints inside the Base Set searches, 1st Editions at five and six
+-- figures inside Neo Genesis, other cards of the same Pokémon inside long
+-- rarity-word searches, and parallels/reprints sharing a One Piece code.
+
+-- Two pages named the wrong card. 151 has no Mew ex special illustration
+-- rare: 205/165 is the gold hyper rare (slug kept so the URL and history
+-- stay). Leafeon VMAX's alternate art is 205/203; 204/203 is the rainbow.
+update public.tracked_cards set
+  name = 'Mew ex (Hyper Rare)',
+  search_query = 'Pokemon Mew ex 205/165',
+  blurb = 'The gold hyper rare Mew ex that closes out Scarlet & Violet 151 — Mew is the 151st Pokémon, the one the set is named for.',
+  updated_at = now()
+where slug = 'mew-ex-sir-151';
+
+update public.tracked_cards set
+  card_number = '205/203', search_query = 'Pokemon Leafeon VMAX 205/203', updated_at = now()
+where slug = 'leafeon-vmax-alt-art-evolving-skies';
+
+update public.tracked_cards set
+  card_number = '17/17',
+  search_query = 'Pokemon Umbreon Gold Star 17/17 -celebrations -celebration -classic -2021 -25th',
+  blurb = 'Arguably the most coveted Umbreon card in existence, distributed only through 2007 POP Series 5 packs. The 2021 Celebrations reprint is priced separately and kept out of this page.',
+  updated_at = now()
+where slug = 'umbreon-gold-star-pop5';
+
+update public.tracked_cards set
+  card_number = '269/193', search_query = 'Pokemon Iono 269/193', updated_at = now()
+where slug = 'iono-sar-paldea-evolved';
+
+-- Base Set holos: keep out Celebrations / 30th Celebration reprints, 1st
+-- Edition and Shadowless (each prices far above the unlimited card).
+update public.tracked_cards set search_query = 'Pokemon Charizard 4/102 base set -celebrations -celebration -classic -1st -shadowless', updated_at = now()
+where slug = 'charizard-base-set';
+update public.tracked_cards set search_query = 'Pokemon Blastoise 2/102 base set -celebrations -celebration -classic -1st -shadowless', updated_at = now()
+where slug = 'blastoise-base-set';
+update public.tracked_cards set search_query = 'Pokemon Venusaur 15/102 base set -celebrations -celebration -classic -1st -shadowless', updated_at = now()
+where slug = 'venusaur-base-set';
+update public.tracked_cards set search_query = 'Pokemon Charizard 4/102 Celebrations -30th -2026 -metal -gold -upc -ultra', updated_at = now()
+where slug = 'celebrations-charizard';
+update public.tracked_cards set search_query = 'Pokemon Lugia 9/111 Neo Genesis -1st -first -german', updated_at = now()
+where slug = 'lugia-neo-genesis';
+
+-- Modern Pokémon: name + number only.
+update public.tracked_cards set search_query = 'Pokemon Charizard ex 234/091', updated_at = now()
+where slug = 'charizard-ex-shiny-paldean-fates';
+update public.tracked_cards set search_query = 'Pokemon Charizard ex 223/197', updated_at = now()
+where slug = 'charizard-ex-sir-obsidian-flames';
+update public.tracked_cards set search_query = 'Pokemon Charizard V 154/172 -20pcs', updated_at = now()
+where slug = 'charizard-v-alt-art-brilliant-stars';
+update public.tracked_cards set search_query = 'Pokemon Rayquaza VMAX 218/203', updated_at = now()
+where slug = 'rayquaza-vmax-alt-art-evolving-skies';
+update public.tracked_cards set search_query = 'Pokemon Charizard GX SV49 -metal -fan -20pcs -gold', updated_at = now()
+where slug = 'shiny-charizard-gx-hidden-fates';
+
+-- Collector numbers several listing titles agree on (queries already clean).
+update public.tracked_cards set card_number = '167/131', updated_at = now() where slug = 'eevee-ex-sir-prismatic-evolutions' and card_number is null;
+update public.tracked_cards set card_number = '155/131', updated_at = now() where slug = 'espeon-ex-sir-prismatic-evolutions' and card_number is null;
+update public.tracked_cards set card_number = '156/131', updated_at = now() where slug = 'sylveon-ex-sir-prismatic-evolutions' and card_number is null;
+update public.tracked_cards set card_number = '214/167', updated_at = now() where slug = 'greninja-ex-sir-twilight-masquerade' and card_number is null;
+update public.tracked_cards set card_number = '239/191', updated_at = now() where slug = 'latias-ex-sir-surging-sparks' and card_number is null;
+
+-- One Piece: English/Japanese printings share a code, but parallels, manga,
+-- SP and reprint products (PRB, Ultra Deck, Three Captains, Anniversary) can
+-- be excluded by word.
+update public.tracked_cards set
+  name = 'Boa Hancock (Alternate Art)', set_name = '500 Years in the Future (OP-07)',
+  card_number = 'OP07-051',
+  search_query = 'One Piece Boa Hancock OP07-051 alt art -manga -binder -warlords -serial -SP',
+  updated_at = now()
+where slug = 'boa-hancock-op07';
+update public.tracked_cards set search_query = 'One Piece Luffy OP05-119 -alt -alternate -parallel -manga -anniversary', updated_at = now()
+where slug = 'luffy-gear-5-op05';
+update public.tracked_cards set search_query = 'One Piece Nami OP01-016 alt art -manga -SP -EB05 -PRB01 -gift -special -ST10 -errata -anniversary -captains', updated_at = now()
+where slug = 'nami-alt-art-op01';
+update public.tracked_cards set search_query = 'One Piece Ace OP02-013 alt art -manga -SP -anniversary -4x', updated_at = now()
+where slug = 'portgas-d-ace-alt-art-op02';
+update public.tracked_cards set search_query = 'One Piece Zoro OP01-025 alt art -manga -SP -ultra -captains -errata', updated_at = now()
+where slug = 'roronoa-zoro-alt-art-op01';
+update public.tracked_cards set search_query = 'One Piece Shanks OP01-120 -parallel -alt -alternate -PRB01 -reprint -manga', updated_at = now()
+where slug = 'shanks-op01-120';
+
+-- The OP01 Luffy leader parallel can't be told apart from its reprints by
+-- listing title (prices ran $22 to $1,200 for "the same card"), so there's
+-- no honest price to publish. Switched off like the sports pages above.
+update public.tracked_cards set active = false, updated_at = now()
+where slug = 'monkey-d-luffy-leader-parallel-op01';
+
 -- ── 3. Link new sports cards to their player pages ───────────────────────────
 -- Same name match as 20261018020526_players.sql: a tracker card belongs to a
 -- player when its name starts with the player's name or one of their aliases
