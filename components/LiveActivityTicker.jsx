@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
+import { fetchPublicJson, PUBLIC_TICKER_URL } from '@/lib/publicApi.js';
+import { queryTickerRows } from '@/lib/homepageQueries.js';
 import { getCardImage } from '@/utils/imageUrl.js';
 import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
@@ -34,19 +36,22 @@ const eventFromListing = (listing, kind) => {
   };
 };
 
-const TICKER_SELECT = 'id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))';
-
-/** The newest active and sold listings, merged newest-first. Exported for tests. */
+/**
+ * The newest active and sold listings, merged newest-first. Reads the
+ * edge-cached /public/ticker first (one cached answer for every visitor) and
+ * falls back to querying Supabase directly. Exported for tests.
+ */
 export async function loadTickerEvents(client = supabase) {
-  const [listed, sold] = await Promise.all([
-    client.from('listings').select(TICKER_SELECT)
-      .eq('status', 'active').order('created_at', { ascending: false }).limit(10),
-    client.from('listings').select(TICKER_SELECT)
-      .eq('status', 'sold').order('updated_at', { ascending: false }).limit(6),
-  ]);
+  let rows;
+  try {
+    rows = await fetchPublicJson(PUBLIC_TICKER_URL);
+    if (!Array.isArray(rows?.listed) || !Array.isArray(rows?.sold)) throw new Error('bad ticker payload');
+  } catch {
+    rows = await queryTickerRows(client);
+  }
   return [
-    ...(listed.data || []).map(l => eventFromListing(l, 'listed')),
-    ...(sold.data || []).map(l => eventFromListing(l, 'sold')),
+    ...rows.listed.map(l => eventFromListing(l, 'listed')),
+    ...rows.sold.map(l => eventFromListing(l, 'sold')),
   ].sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0)).slice(0, MAX_EVENTS);
 }
 
