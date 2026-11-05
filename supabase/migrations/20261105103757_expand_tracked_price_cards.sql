@@ -145,9 +145,58 @@ insert into public.tracked_cards (slug, name, set_name, card_number, category, s
  'Sabo''s manga rare from Carrying On His Will, alongside the set''s Luffy and Ace manga rares.'),
 ('jewelry-bonney-op12-118-manga', 'Jewelry Bonney (Manga Rare)', 'Legacy of the Master (OP-12)', 'OP12-118', 'one-piece',
  'One Piece Bonney OP12-118 manga',
- 'The Jewelry Bonney manga rare from Legacy of the Master.')
+ 'The Jewelry Bonney manga rare from Legacy of the Master.'),
 
--- @@SPORTS@@
+-- ── Basketball ───────────────────────────────────────────────────────────────
+-- Base card number + exclusions keep parallels of the right card and drop
+-- autographs, inserts and other products (Select, Optic, Mosaic…).
+('kevin-durant-topps-chrome-rookie', 'Kevin Durant Topps Chrome Rookie', '2007-08 Topps Chrome', '#131', 'basketball',
+ 'Kevin Durant 2007-08 Topps Chrome rookie',
+ 'The Topps Chrome rookie card of a four-time NBA scoring champion and two-time Finals MVP, and one of the key modern-era rookie cards.'),
+('tim-duncan-topps-chrome-rookie', 'Tim Duncan Topps Chrome Rookie', '1997-98 Topps Chrome', '#115', 'basketball',
+ 'Tim Duncan 1997-98 Topps Chrome rookie',
+ 'The Topps Chrome rookie card of the five-time champion Spurs great, one of the defining rookie cards of the late-1990s chrome era.'),
+('trae-young-prizm-rookie', 'Trae Young Prizm Rookie', '2018-19 Panini Prizm', '#78', 'basketball',
+ 'Trae Young 2018-19 Prizm rookie 78 -auto',
+ 'The Prizm rookie card of the Hawks'' All-Star point guard, from the 2018 draft class alongside Luka Dončić.'),
+('paolo-banchero-prizm-rookie', 'Paolo Banchero Prizm Rookie', '2022-23 Panini Prizm', '#249', 'basketball',
+ 'Paolo Banchero Prizm rookie 249 -select',
+ 'The Prizm rookie card of the 2022 first overall pick and Rookie of the Year for the Orlando Magic.'),
+('ben-simmons-prizm-rookie', 'Ben Simmons Prizm Rookie', '2016-17 Panini Prizm', '#1', 'basketball',
+ 'Ben Simmons 2016-17 Prizm rookie -select -spectra -mosaic -excalibur -optic',
+ 'The Prizm rookie card of the Melbourne-born 2016 first overall pick and Rookie of the Year — card #1 in the set, and a staple for Australian basketball collectors.'),
+('dyson-daniels-prizm-rookie', 'Dyson Daniels Prizm Rookie', '2022-23 Panini Prizm', '#233', 'basketball',
+ 'Dyson Daniels Prizm rookie 233 -select',
+ 'The Prizm rookie card of the Bendigo-born guard, a top-ten pick in the 2022 NBA Draft and one of the Australians collectors follow most closely.'),
+('caitlin-clark-prizm-rookie', 'Caitlin Clark Prizm Rookie', '2024 Panini Prizm WNBA', '#22', 'basketball',
+ 'Caitlin Clark Prizm rookie',
+ 'The WNBA Prizm rookie card of the 2024 first overall pick, whose arrival brought record attention to women''s basketball cards.'),
+('stephon-castle-prizm-rookie', 'Stephon Castle Prizm Rookie', '2024-25 Panini Prizm', '#234', 'basketball',
+ 'Stephon Castle Prizm rookie 234 -lot -hoops',
+ 'The Prizm rookie card of the San Antonio Spurs guard and 2024-25 Rookie of the Year.'),
+('victor-wembanyama-donruss-rated-rookie', 'Victor Wembanyama Donruss Rated Rookie', '2023-24 Panini Donruss', '#220', 'basketball',
+ 'Wembanyama Donruss Rated Rookie -optic',
+ 'Wembanyama''s Donruss Rated Rookie — the classic Rated Rookie design and a more accessible companion to his Prizm rookie.'),
+
+-- ── AFL ──────────────────────────────────────────────────────────────────────
+-- Recent AFL rookies are in Select Optimum (2022) and Legacy (2023), not
+-- Footy Stars. Draft-pick autographs are listed as "DPS"; `-auto -signature
+-- -signed -dps` keeps them from posing as the rookie card's price.
+('jason-horne-francis-rookie', 'Jason Horne-Francis Rookie Card', '2022 Select Optimum', NULL, 'afl',
+ 'Horne-Francis 2022 Optimum -auto -signature -signed -dps',
+ 'The rookie-year Optimum cards of the 2021 AFL Draft''s number one pick.'),
+('will-ashcroft-rookie', 'Will Ashcroft Rookie Card', '2023 Select Legacy', NULL, 'afl',
+ 'Will Ashcroft 2023 Legacy -auto -signature -signed -dps',
+ 'The rookie-year Legacy cards of the Brisbane Lions midfielder, a father-son selection and son of Lions great Marcus Ashcroft.'),
+('harry-sheezel-rookie', 'Harry Sheezel Rookie Card', '2023 Select Legacy', '#161', 'afl',
+ 'Harry Sheezel 2023 Legacy',
+ 'The rookie card of North Melbourne''s half-back, from 2023 Select Legacy — his debut season.'),
+
+-- ── NRL ──────────────────────────────────────────────────────────────────────
+('johnathan-thurston-rookie', 'Johnathan Thurston Rookie Card', '2003 Select', NULL, 'nrl',
+ 'Johnathan Thurston 2003 rookie',
+ 'The rookie-year card of the four-time Dally M Medallist and Cowboys premiership captain, one of the most decorated halves in rugby league history.')
+
 
 on conflict (slug) do nothing;
 
@@ -199,7 +248,12 @@ update public.tracked_cards set
   search_query = 'Tom Trbojevic 2016 rookie', updated_at = now()
 where slug = 'tom-trbojevic-rookie';
 
--- @@FRANKLIN@@
+-- The base rookie is the 2006 Select Champions #80; 2005 only has draft-pick
+-- autographs. "Buddy" in the query cut results to one.
+update public.tracked_cards set
+  set_name = '2006 Select Champions', card_number = '#80',
+  search_query = 'Lance Franklin 2006 Select Champions -signed', updated_at = now()
+where slug = 'lance-franklin-rookie';
 
 -- Switched off: no search finds enough of the actual rookie card to price
 -- it honestly. Payne Haas has almost no listings; Joseph Suaalii's are
