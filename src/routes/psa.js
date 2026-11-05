@@ -1,6 +1,7 @@
 import express from 'express';
 import { fetchPSACertification } from '../utils/psaScraper.js';
 import { psaApiClient } from '../utils/psaApiClient.js';
+import { getCachedPsaCertDetails, savePsaCertDetails } from '../services/gradingVerificationService.js';
 import logger from '../utils/logger.js';
 
 const router = express.Router();
@@ -31,8 +32,17 @@ router.get('/cert/:certNumber', async (req, res) => {
   try {
     let certData = null;
 
+    const cert = certNumber.trim();
+
+    // A cert looked up in the last 30 days is answered from the database —
+    // no PSA calls (see getCachedPsaCertDetails).
+    if (/^[A-Za-z0-9-]+$/.test(cert)) {
+      const cached = await getCachedPsaCertDetails(cert);
+      if (cached) certData = transformPSAApiResponse(cached.details, cached.images);
+    }
+
     // Try the official PSA API first if token is available
-    if (process.env.PSA_API_TOKEN) {
+    if (!certData && process.env.PSA_API_TOKEN) {
       try {
         logger.info(`[PSA_ROUTE] Attempting PSA API lookup for ${certNumber}`);
         // The cert record and its images are two separate endpoints; fetch both
@@ -44,6 +54,7 @@ router.get('/cert/:certNumber', async (req, res) => {
         ]);
         if (apiResult) {
           certData = transformPSAApiResponse(apiResult, images);
+          if (certData) await savePsaCertDetails(cert, apiResult, images);
         }
       } catch (apiError) {
         logger.warn(`[PSA_ROUTE] PSA API lookup failed: ${apiError.message}, falling back to scraper`);
