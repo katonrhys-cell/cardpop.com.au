@@ -7,10 +7,9 @@ Three independent, complementary systems run in production:
 | System | What it measures | Where |
 |---|---|---|
 | **Google Analytics 4** (`G-NCZ6K9VFF8`) | Visitors, page views, traffic sources, audience | `lib/analytics.js`, loaded lazily from `main.jsx` |
-| **Vercel Analytics + Speed Insights** | Page views + Core Web Vitals per deployment | `main.jsx` (`@vercel/analytics`, `@vercel/speed-insights`) |
 | **Cloudflare Web Analytics** *(optional)* | Privacy-friendly RUM at the edge | Beacon loaded in `main.jsx` when `VITE_CF_BEACON_TOKEN` is set |
 
-Sentry (errors + performance traces) also runs but isn't visitor analytics.
+Sentry (errors + performance traces) also runs but isn't visitor analytics. (Vercel Analytics and Speed Insights were removed in November 2026: they loaded on every page and duplicated GA4, the Cloudflare beacon and Sentry.)
 
 GA4's visitor counts are also pulled **into the app** nightly (home page
 "Visitors" tile, Admin → Dashboard → Visitors card) — see `docs/site-traffic.md`.

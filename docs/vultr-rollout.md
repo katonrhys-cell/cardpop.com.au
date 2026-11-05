@@ -198,9 +198,9 @@ internally — TTL doesn't matter).
    there, then delete the project. Delete the stale `cardpop-com-au` and
    `cardpop-com-au-343z` projects that have been posting "Deployment was
    blocked" on every PR. Finally open the follow-up PR that renames
-   `vercel.json` (see above), drops `@vercel/analytics` / `@vercel/speed-insights`
-   from `main.jsx` and `package.json`, and removes the Vercel wording from the
-   docs.
+   `vercel.json` (see above) and removes the Vercel wording from the docs.
+   (`@vercel/analytics` / `@vercel/speed-insights` were already removed in the
+   2026-11 cost review.)
 
 ### Rollback
 
@@ -299,11 +299,6 @@ Client → Cloudflare (TLS, WAF, cache, bot fight mode) → Node on the box
   back; Cloudflare's "Always Online" can mask it for cached pages. If that
   ever matters, the fix is a second process on another port and a proxy to
   switch between them — not needed today.
-- **`@vercel/analytics` and `@vercel/speed-insights`** load on any non-local
-  host and request `/_vercel/insights/script.js`, which now falls through to
-  `app.html`. The browser logs a script error and nothing else happens; they
-  are removed in the follow-up PR with the `vercel.json` rename. Web Analytics
-  continues in Cloudflare (`VITE_CF_BEACON_TOKEN`) and GA4.
 - **`VERCEL_URL` return-URL fallbacks** (`src/utils/returnUrl.js`) are simply
   unset; `APP_URL` and `CORS_ORIGIN` carry the allow-list.
 - **`npm start`** now runs the real server (`node server/index.js`), not
