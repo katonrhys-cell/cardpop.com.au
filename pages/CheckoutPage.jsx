@@ -839,7 +839,7 @@ const CheckoutPage = () => {
                   paymentBody) — a disabled fieldset disables every input,
                   checkbox and select trigger inside it. */}
               <fieldset disabled={readyToPay} className="m-0 min-w-0 space-y-6 border-0 p-0" data-testid="checkout-details">
-              <Section step={1} icon={MapPin} title="Contact & shipping">
+              <Section step={1} icon={MapPin} title="Contact & Shipping">
                 {savedAddresses.length > 0 && (
                   <div className="space-y-1">
                     <Label>Saved addresses</Label>

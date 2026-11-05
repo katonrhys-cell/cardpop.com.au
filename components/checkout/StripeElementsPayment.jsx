@@ -32,13 +32,45 @@ import { stripePromise } from '@/lib/stripeClient.js';
  */
 
 // Brand palette only — no blue (tailwind.config.js).
-const appearanceFor = (dark) => ({
+//
+// The fields render inside Stripe's cross-origin iframe, so the page's CSS
+// never reaches them: `fontFamily: 'inherit'` resolves to the iframe's own
+// default, which in Safari is Times (serif). Name the body stack explicitly —
+// it mirrors --font-sans in index.css and is all system fonts, so nothing has
+// to be loaded into the iframe.
+export const CHECKOUT_FONT_STACK = "'Helvetica Neue', Helvetica, Arial, sans-serif";
+
+export const appearanceFor = (dark) => ({
   theme: dark ? 'night' : 'stripe',
+  labels: 'above',
   variables: {
     colorPrimary: '#CE1126',
     colorDanger: '#CE1126',
+    colorText: dark ? '#F5F7FA' : '#1F2937',
+    colorTextSecondary: dark ? '#C4CED4' : '#6B7280',
+    colorTextPlaceholder: dark ? '#8A949C' : '#9CA3AF',
+    colorBackground: dark ? '#111827' : '#FFFFFF',
+    fontFamily: CHECKOUT_FONT_STACK,
+    fontSizeBase: '15px',
+    fontWeightNormal: '400',
+    fontWeightMedium: '500',
     borderRadius: '8px',
-    fontFamily: 'inherit',
+    spacingUnit: '4px',
+    gridRowSpacing: '16px',
+  },
+  rules: {
+    '.Label': { fontWeight: '500', fontSize: '14px', marginBottom: '6px' },
+    '.Input': {
+      border: `1px solid ${dark ? '#374151' : '#D1D5DB'}`,
+      boxShadow: 'none',
+      padding: '12px',
+    },
+    '.Input:focus': {
+      border: '1px solid #CE1126',
+      boxShadow: '0 0 0 3px rgba(206, 17, 38, 0.15)',
+    },
+    '.Input--invalid': { border: '1px solid #CE1126', boxShadow: 'none' },
+    '.Error': { fontSize: '13px' },
   },
 });
 
@@ -63,7 +95,10 @@ const EXPRESS_OPTIONS = {
 const PAYMENT_OPTIONS = {
   layout: 'tabs',
   // The wallets already have their own button above — don't repeat them as tabs.
-  wallets: { googlePay: 'never', applePay: 'never' },
+  // Link is off too: its "Save my information for faster checkout" opt-in adds
+  // its own email / mobile / full-name fields and a Link terms line under the
+  // card, which made the form long and read like a third-party sign-up.
+  wallets: { googlePay: 'never', applePay: 'never', link: 'never' },
 };
 
 const ErrorNote = ({ children }) => (
@@ -129,10 +164,15 @@ const PaymentForm = () => {
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
+      {/* Not disabled while the card is still empty: a pale disabled button
+          read as broken. Pressing it early runs Stripe's own validation, which
+          marks the missing fields inline. Only blocked while a payment runs. */}
       <Button
         size="lg"
         className="w-full font-semibold"
-        disabled={submitting || !checkout.canConfirm}
+        disabled={submitting}
+        aria-busy={submitting || undefined}
+        data-ready={checkout.canConfirm ? 'true' : 'false'}
         onClick={() => confirm()}
       >
         {submitting ? (
@@ -141,6 +181,13 @@ const PaymentForm = () => {
           <><Lock className="mr-2 h-4 w-4" /> Pay {checkout.total?.total?.amount ?? ''}</>
         )}
       </Button>
+
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+        <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>
+          Secured by <span className="font-semibold text-foreground">Stripe</span>. Your card details are encrypted and never reach CardPop.
+        </span>
+      </p>
     </div>
   );
 };
