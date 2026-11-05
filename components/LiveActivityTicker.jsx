@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatDistanceToNowStrict } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { fetchPublicJson, PUBLIC_TICKER_URL } from '@/lib/publicApi.js';
 import { queryTickerRows } from '@/lib/homepageQueries.js';
@@ -9,6 +8,20 @@ import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MAX_EVENTS = 16;
+
+// "5 minutes ago" without date-fns: this strip is on the homepage, and its one
+// call pulled the date-fns chunk onto the first load.
+const RELATIVE_UNITS = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+const relativeTime = typeof Intl !== 'undefined' && Intl.RelativeTimeFormat
+  ? new Intl.RelativeTimeFormat('en-AU', { numeric: 'always' })
+  : null;
+export function timeAgo(date, now = Date.now()) {
+  const seconds = Math.round((date.getTime() - now) / 1000);
+  const abs = Math.abs(seconds);
+  const [unit, size] = RELATIVE_UNITS.find(([, s]) => abs >= s) || ['second', 1];
+  const value = Math.round(seconds / size);
+  return relativeTime ? relativeTime.format(value, unit) : `${Math.abs(value)} ${unit}${Math.abs(value) === 1 ? '' : 's'} ago`;
+}
 
 // The strip shows each card at 80×112 px (160×224 on a 2× display), so serve
 // the pre-generated 480 px grid thumbnail wherever one exists (uploads since
@@ -123,7 +136,7 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
                 )}
                 {ev.at && (
                   <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                    {formatDistanceToNowStrict(ev.at, { addSuffix: true })}
+                    {timeAgo(ev.at)}
                   </span>
                 )}
               </div>

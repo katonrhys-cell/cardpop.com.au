@@ -152,7 +152,7 @@ const initSentry = () => {
         integrations: [
           Sentry.browserTracingIntegration(),
         ],
-        tracesSampleRate: 0.2,
+        tracesSampleRate: 0.05,
         environment: import.meta.env.MODE || 'production',
         // Drop errors the app already auto-recovers from (stale-chunk imports
         // handled by installChunkReloadGuard) and benign service-worker
