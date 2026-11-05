@@ -45,7 +45,7 @@ jobs:
       E2E: ${{ github.event.pull_request.draft == false }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # Two branches picking the same version prefix has broken `db push`
       # twice — the version is the PRIMARY KEY of schema_migrations, so the
