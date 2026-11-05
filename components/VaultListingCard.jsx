@@ -18,6 +18,8 @@ import SoldBadge from '@/components/SoldBadge.jsx';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge, { GRADE_BADGE } from '@/components/GradeBadge.jsx';
 import { getVaultListingBadge } from '@/utils/vaultListingBadge.js';
+import { offerWindowState, formatOfferRange } from '@/utils/offerEligibility.js';
+import { describeOfferWindow } from '@/utils/offerWindowDates.js';
 
 const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -28,6 +30,9 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
   // available on the homepage and every seller store.
   const liveListing = vaultItemListing(vaultItem, listing);
   const isSold = liveListing?.status === 'sold';
+  // An Expression of Interest has no price_aud — its price is the seller's
+  // range. Falling through to estimated_value_aud showed a stale vault estimate.
+  const isEoi = liveListing?.listing_type === 'expression_of_interest';
   // Try every place a photo may be stored, in priority order. Featured cards
   // promoted onto the homepage often have their only photo in `card_image` (a
   // storage path) with no `vault_images` rows, and some carry extra shots in
@@ -166,6 +171,21 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between">
+            {isEoi ? (
+              <span className={`font-extrabold tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'} ${liveListing.price_min_aud != null && liveListing.price_max_aud != null ? 'text-base' : 'text-xl'}`}>
+                {formatOfferRange(liveListing.price_min_aud, liveListing.price_max_aud) ?? 'Open to offers'}
+                {!isSold && (
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    {(() => {
+                      const state = offerWindowState(liveListing);
+                      if (state === 'upcoming') return describeOfferWindow(liveListing, state);
+                      if (state === 'closed') return 'Offers closed';
+                      return 'Seeking offers';
+                    })()}
+                  </span>
+                )}
+              </span>
+            ) : (
             <span className={`font-extrabold text-xl tabular-nums ${isSold ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               {/* Without a live listing the figure is the owner's estimate, not
                   an asking price — label it so a vault card can't read as buyable. */}
@@ -174,6 +194,7 @@ const VaultListingCard = ({ vaultItem, listing, priority = false }) => {
               )}
               ${Number(liveListing?.price_aud ?? vaultItem.estimated_value_aud ?? 0).toFixed(2)}
             </span>
+            )}
             {isSold && (
               <span className="text-xs font-bold uppercase tracking-wider text-brand-red">Sold</span>
             )}
