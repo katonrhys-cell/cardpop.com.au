@@ -8,64 +8,16 @@ import SEOHead from '@/components/SEOHead.jsx';
 import { Button } from '@/components/ui/button';
 import { useGradeEstimator } from '@/hooks/useGradeEstimator.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import GraderLogo from '@/components/grading/GraderLogo.jsx';
+import SlabLabel from '@/components/grading/SlabLabel.jsx';
+import { GRADING_COMPANIES, graderStyle } from '@/data/gradingCompanies.js';
+import { gradingPartnersPath } from '@/utils/gradingPartners.js';
 
 // ─── Grader config ────────────────────────────────────────────────────────────
-const GRADERS = [
-  {
-    key: 'PSA',
-    name: 'PSA',
-    full: 'Professional Sports Authenticator',
-    color: 'text-blue-600',
-    bg: 'bg-blue-600',
-    border: 'border-blue-600/30',
-    light: 'bg-blue-50 dark:bg-blue-950/30',
-  },
-  {
-    key: 'BGS',
-    name: 'BGS',
-    full: 'Beckett Grading Services',
-    color: 'text-orange-500',
-    bg: 'bg-orange-500',
-    border: 'border-orange-500/30',
-    light: 'bg-orange-50 dark:bg-orange-950/30',
-  },
-  {
-    key: 'CGC',
-    name: 'CGC',
-    full: 'Certified Guaranty Company',
-    color: 'text-violet-600',
-    bg: 'bg-violet-600',
-    border: 'border-violet-600/30',
-    light: 'bg-violet-50 dark:bg-violet-950/30',
-  },
-  {
-    key: 'ACE',
-    name: 'ACE',
-    full: 'ACE Grading (Australia)',
-    color: 'text-red-500',
-    bg: 'bg-red-500',
-    border: 'border-red-500/30',
-    light: 'bg-red-50 dark:bg-red-950/30',
-  },
-  {
-    key: 'SGC',
-    name: 'SGC',
-    full: 'Sportscard Guaranty Corporation',
-    color: 'text-slate-600',
-    bg: 'bg-slate-600',
-    border: 'border-slate-600/30',
-    light: 'bg-slate-50 dark:bg-slate-950/30',
-  },
-  {
-    key: 'TAG',
-    name: 'TAG',
-    full: 'TAG Grading',
-    color: 'text-emerald-600',
-    bg: 'bg-emerald-600',
-    border: 'border-emerald-600/30',
-    light: 'bg-emerald-50 dark:bg-emerald-950/30',
-  },
-];
+// Names, official logos and brand colours live in data/gradingCompanies.js (shared with the
+// rest of the Grading Hub); the results grid renders whatever keys the prompt returns that
+// this list carries.
+const GRADERS = GRADING_COMPANIES;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 // AI model JSON isn't guaranteed to return a number (a string like "9.5", or a
@@ -83,14 +35,6 @@ function gradeColor(estimate) {
   if (estimate >= 6) return 'text-amber-500';
   if (estimate >= 4) return 'text-orange-500';
   return 'text-red-500';
-}
-
-function gradeBg(estimate) {
-  if (estimate >= 9.5) return 'bg-emerald-500/10';
-  if (estimate >= 8) return 'bg-blue-500/10';
-  if (estimate >= 6) return 'bg-amber-500/10';
-  if (estimate >= 4) return 'bg-orange-500/10';
-  return 'bg-red-500/10';
 }
 
 function scoreIcon(score) {
@@ -236,22 +180,20 @@ function GraderCard({ grader, gradeData }) {
   const { estimate, range, label, confidence, notes, subGrades } = gradeData;
 
   return (
-    <div className={`bg-card border ${grader.border} rounded-2xl overflow-hidden`}>
-      <div className={`${grader.light} px-4 py-3 border-b ${grader.border}`}>
-        <div className="flex items-center justify-between">
-          <span className={`font-black text-lg tracking-tight ${grader.color}`}>{grader.name}</span>
-          <span className="text-xs text-muted-foreground">{grader.full}</span>
+    <div
+      className="bg-card border border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] rounded-2xl overflow-hidden"
+      style={graderStyle(grader)}
+    >
+      <div className="bg-[var(--grader-tint)] dark:bg-[var(--grader-tint-dark)] px-4 py-3 border-b border-[var(--grader-border)] dark:border-[var(--grader-border-dark)]">
+        <div className="flex items-center justify-between gap-3">
+          <GraderLogo grader={grader} height={24} wordmarkClassName="text-lg" />
+          <span className="text-xs text-muted-foreground text-right">{grader.full}</span>
         </div>
       </div>
 
       <div className="p-4 space-y-3">
-        <div className={`rounded-xl p-4 text-center ${gradeBg(estimate)}`}>
-          <div className={`text-5xl font-black ${gradeColor(estimate)}`}>
-            {formatGrade(estimate)}
-          </div>
-          <div className="text-sm font-semibold mt-1 text-foreground">{label}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">Range: {range}</div>
-        </div>
+        {/* The estimate drawn as the label on that company's slab */}
+        <SlabLabel grader={grader} estimate={estimate} label={label} range={range} subGrades={subGrades} />
 
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full flex-shrink-0 ${confidenceDot(confidence)}`} />
@@ -260,7 +202,7 @@ function GraderCard({ grader, gradeData }) {
           </span>
         </div>
 
-        {subGrades && (
+        {subGrades && !grader.label?.showSubGrades && (
           <div className="grid grid-cols-2 gap-1.5">
             {Object.entries(subGrades).map(([k, v]) => (
               <div key={k} className="bg-muted/50 rounded-lg px-2.5 py-1.5">
@@ -278,6 +220,13 @@ function GraderCard({ grader, gradeData }) {
             {notes}
           </p>
         )}
+
+        {/* → the Australian stores and services that submit to this company */}
+        <Button asChild variant="outline" size="sm" className="w-full border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] hover:bg-[var(--grader-tint)] dark:hover:bg-[var(--grader-tint-dark)]">
+          <Link to={gradingPartnersPath(grader.key)} data-grade-with={grader.key}>
+            Grade with {grader.name} <ChevronRight className="w-4 h-4 ml-1" />
+          </Link>
+        </Button>
       </div>
     </div>
   );
@@ -587,15 +536,22 @@ const GradeEstimatorPage = () => {
               <h2 className="text-xl font-bold mb-4">Grading Services Covered</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {GRADERS.map((g) => (
-                  <div key={g.key} className={`bg-card border ${g.border} rounded-xl px-4 py-3 flex items-center gap-3`}>
-                    <div className={`w-8 h-8 rounded-lg ${g.bg} flex items-center justify-center text-white text-xs font-black`}>
-                      {g.key}
+                  <Link
+                    key={g.key}
+                    to={gradingPartnersPath(g.key)}
+                    className="bg-card border border-[var(--grader-border)] dark:border-[var(--grader-border-dark)] rounded-xl px-4 py-3 flex items-center gap-3 hover:bg-[var(--grader-tint)] dark:hover:bg-[var(--grader-tint-dark)] transition-colors group"
+                    style={graderStyle(g)}
+                    title={`Australian stores that submit to ${g.name}`}
+                  >
+                    <div className="h-10 min-w-[2.5rem] px-2 rounded-lg bg-[var(--grader-tint)] dark:bg-[var(--grader-tint-dark)] flex items-center justify-center">
+                      <GraderLogo grader={g} height={22} wordmarkClassName="text-xs" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="font-semibold text-sm">{g.name}</div>
-                      <div className="text-xs text-muted-foreground">{g.full}</div>
+                      <div className="text-xs text-muted-foreground truncate">{g.full}</div>
+                      <div className="text-xs text-primary group-hover:underline">Grade with {g.name} →</div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

@@ -58,5 +58,45 @@ way `describeOcrFailure()` does for card scans, and the full error goes to the l
 ## Adding a grading company
 
 Add it to the scale reference and the JSON schema in `GradeEstimatorPrompt`
-(`src/constants/prompts.js`) and to `GRADERS` in `GradeEstimatorPage.jsx`; the results
-grid renders whatever keys the prompt returns that `GRADERS` lists.
+(`src/constants/prompts.js`) and to `GRADING_COMPANIES` in `data/gradingCompanies.js`; the
+results grid renders whatever keys the prompt returns that the list carries.
+
+## Company branding (logos and colours)
+
+Every grader card, and the "Grading Services Covered" strip, is themed from
+`data/gradingCompanies.js` — one entry per company with its `brand.primary` hex (the tint,
+border and fallback wordmark are derived from it via `graderStyle()`), an optional
+`brand.onDark` ink for dark mode, and the path of the company's **official logo file** in
+`public/images/grading/` (`logo`, plus `logoDark` where the company publishes a
+light-on-dark version). `components/grading/GraderLogo.jsx` shows that file and falls back
+to a plain wordmark in the brand colour if it is missing or fails to load — it never redraws
+a mark, so a missing file can't ship as a near-miss logo. The folder's README lists where
+each official file comes from; drop the file in, sample its primary fill into
+`brand.primary`, and set `verified: true`. Marks are the companies' trademarks: keep them
+unmodified and use them only to identify the service (PSA publishes logo-use guidelines at
+psacard.com/logo).
+
+**The estimate is drawn as that company's slab label.** `components/grading/SlabLabel.jsx`
+renders the grade box the way the top of the slab looks — PSA's red-framed white label
+with the grade word above the number and the blue/red mark along the bottom, Beckett's silver label (gold from 9.5, the Black Label with the
+grade in gold for a 10 with four 10 sub-grades) with the laurel crest and the four
+sub-grades in a row, ACE's navy label with the angled grade panel (light stock, gold for a
+Gem Mint 10), CGC's black label, SGC's black strip with the mark over a white panel and the grade word
+as a badge, TAG's black label with its white inset frame and the mark
+centred on the frame's top edge — with the
+mark on the left and the grade, its word beneath it, on the right. Which stock a company
+prints for a grade is `label.tiers` on its entry, resolved by `slabLabelTier()`, and the
+stock colours are `SLAB_LABEL_LOOKS`; both in `data/gradingCompanies.js`. Label stock is
+fixed colour (a black label stays black in light mode), so the logo is pinned with
+`GraderLogo`'s `tone` / `ink` props rather than following the theme. Every look but CGC's follows
+reference artwork supplied on 2026-11-04; CGC's black label is still an approximation —
+check it against a real slab.
+
+## "Grade with …" links
+
+Each grader card (and each tile in "Grading Services Covered") ends with a **Grade
+with PSA / BGS / …** button → `gradingPartnersPath(key)` from `utils/gradingPartners.js`,
+i.e. `/grading/submission-partners?company=psa`: the Submission Partners page opens on
+the Australian stores and services that submit to that company, under the company's
+own direct-submission note. The lists are the admin-maintained
+`grading_submission_partners` table — see `docs/grading-partners.md`.
