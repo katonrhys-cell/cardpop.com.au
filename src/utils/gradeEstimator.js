@@ -85,7 +85,7 @@ export function describeGradeFailure(err) {
  * @param {Array<{type: string, source: object}>} args.imageBlocks - Anthropic image blocks (front first)
  * @returns {Promise<string>}
  */
-export async function requestGradeEstimate({ apiKey, imageBlocks }) {
+export async function requestGradeEstimate({ apiKey, imageBlocks, onUsage }) {
 	const res = await fetch('https://api.anthropic.com/v1/messages', {
 		method: 'POST',
 		headers: {
@@ -117,6 +117,7 @@ export async function requestGradeEstimate({ apiKey, imageBlocks }) {
 	}
 
 	const data = await res.json();
+	if (data.usage) await onUsage?.({ model: GRADE_MODEL, usage: data.usage });
 	if (data.stop_reason === 'refusal') {
 		throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
 	}
@@ -140,8 +141,8 @@ function checkGrades(content) {
  * @param {Array<{type: string, source: object}>} args.imageBlocks
  * @returns {Promise<{ content: string, data: object }>}
  */
-export async function runGradeEstimate({ apiKey, imageBlocks }) {
-	const content = await requestGradeEstimate({ apiKey, imageBlocks });
+export async function runGradeEstimate({ apiKey, imageBlocks, onUsage }) {
+	const content = await requestGradeEstimate({ apiKey, imageBlocks, onUsage });
 	return { content, data: checkGrades(content) };
 }
 
@@ -155,6 +156,9 @@ export function parseAnthropicSseChunk(buffer) {
 	const rest = events.pop() ?? '';
 	const texts = [];
 	let error = null;
+	// Token usage: message_start carries the input side, message_delta the
+	// running output count. Merged across chunks by the caller.
+	let usage = null;
 	for (const event of events) {
 		for (const line of event.split('\n')) {
 			if (!line.startsWith('data:')) continue;
@@ -162,12 +166,16 @@ export function parseAnthropicSseChunk(buffer) {
 			try { payload = JSON.parse(line.slice(5).trim()); } catch { continue; }
 			if (payload?.type === 'content_block_delta' && payload.delta?.type === 'text_delta') {
 				texts.push(payload.delta.text ?? '');
+			} else if (payload?.type === 'message_start' && payload.message?.usage) {
+				usage = { ...usage, ...payload.message.usage };
+			} else if (payload?.type === 'message_delta' && payload.usage) {
+				usage = { ...usage, ...payload.usage };
 			} else if (payload?.type === 'error') {
 				error = payload.error?.message || 'stream error';
 			}
 		}
 	}
-	return { texts, rest, error };
+	return { texts, rest, error, usage };
 }
 
 /**
@@ -183,7 +191,7 @@ export function parseAnthropicSseChunk(buffer) {
  * @param {(text: string) => void} [args.onText]
  * @returns {Promise<{ content: string, data: object }>}
  */
-export async function streamGradeEstimate({ apiKey, imageBlocks, onText }) {
+export async function streamGradeEstimate({ apiKey, imageBlocks, onText, onUsage }) {
 	const res = await fetch('https://api.anthropic.com/v1/messages', {
 		method: 'POST',
 		headers: {
@@ -219,15 +227,22 @@ export async function streamGradeEstimate({ apiKey, imageBlocks, onText }) {
 	const decoder = new TextDecoder();
 	let buffer = '';
 	let content = '';
-	for await (const chunk of res.body) {
-		buffer += decoder.decode(chunk, { stream: true });
-		const { texts, rest, error } = parseAnthropicSseChunk(buffer);
-		buffer = rest;
-		if (error) throw new Error(`Anthropic stream error: ${error}`);
-		for (const text of texts) {
-			content += text;
-			onText?.(text);
+	let usage = null;
+	try {
+		for await (const chunk of res.body) {
+			buffer += decoder.decode(chunk, { stream: true });
+			const parsed = parseAnthropicSseChunk(buffer);
+			buffer = parsed.rest;
+			if (parsed.usage) usage = { ...usage, ...parsed.usage };
+			if (parsed.error) throw new Error(`Anthropic stream error: ${parsed.error}`);
+			for (const text of parsed.texts) {
+				content += text;
+				onText?.(text);
+			}
 		}
+	} finally {
+		// Billed even when the stream fails part-way.
+		if (usage) await onUsage?.({ model: GRADE_MODEL, usage });
 	}
 	return { content, data: checkGrades(content) };
 }

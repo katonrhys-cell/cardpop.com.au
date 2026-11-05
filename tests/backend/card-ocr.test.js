@@ -7,6 +7,15 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// The AI usage ledger and monthly allowance (src/utils/aiUsage.js) have their
+// own tests (tests/backend/aiUsage.test.js); here they must not reach Supabase
+// through the stubbed global fetch.
+const aiUsage = vi.hoisted(() => ({ record: vi.fn(async () => {}) }));
+vi.mock('../../src/utils/aiUsage.js', () => ({ recordAiUsage: aiUsage.record }));
+vi.mock('../../src/middleware/aiAllowance.js', () => ({
+  requireAiAllowance: () => (_req, _res, next) => next(),
+}));
+
 // Controllable auth: tests can clear authState.userId to simulate an
 // unauthenticated request (supabaseAuth passes through without setting userId)
 const authState = vi.hoisted(() => ({ userId: 'user-1' }));
@@ -244,6 +253,24 @@ describe('POST /scan — model escalation', () => {
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(JSON.parse(mockFetch.mock.calls[1][1].body).model).toBe('claude-sonnet-5-5');
     expect(res.text).toContain('Jungle');
+  });
+
+  it('records each billed call in the usage ledger, the escalation under its own feature', async () => {
+    mockFiles = oneFile();
+    const withUsage = (text, usage) => ({ ok: true, json: async () => ({ content: [{ type: 'text', text }], usage }) });
+    mockFetch
+      .mockResolvedValueOnce(withUsage(completeRead({ confidence: 'low' }), { input_tokens: 1200, output_tokens: 300 }))
+      .mockResolvedValueOnce(withUsage(completeRead({ cardSetName: 'Jungle' }), { input_tokens: 1300, output_tokens: 320 }));
+
+    await request(app).post('/scan');
+
+    expect(aiUsage.record).toHaveBeenCalledTimes(2);
+    expect(aiUsage.record).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      feature: 'card_scan', model: 'claude-haiku-5-5', userId: 'user-1', usage: { input_tokens: 1200, output_tokens: 300 },
+    }));
+    expect(aiUsage.record).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      feature: 'card_scan_escalation', model: 'claude-sonnet-5-5', userId: 'user-1',
+    }));
   });
 
   it('turns thinking off on the fast model and to between_tools on the strong one, at low effort', async () => {

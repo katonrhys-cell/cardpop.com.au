@@ -25,6 +25,15 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+// The AI usage ledger and monthly allowance (src/utils/aiUsage.js) have their
+// own tests (tests/backend/aiUsage.test.js); here they must not reach Supabase
+// through the stubbed global fetch.
+const aiUsage = vi.hoisted(() => ({ record: vi.fn(async () => {}) }));
+vi.mock('../../src/utils/aiUsage.js', () => ({ recordAiUsage: aiUsage.record }));
+vi.mock('../../src/middleware/aiAllowance.js', () => ({
+  requireAiAllowance: () => (_req, _res, next) => next(),
+}));
+
 import gradeEstimatorRouter from '../../src/routes/grade-estimator.js';
 
 function makeApp() {
@@ -175,3 +184,19 @@ describe('gradeEstimator helpers', () => {
     expect(buildGradePromptText(2)).toMatch(/second is the card back/i);
   });
 });
+
+describe('grade estimate usage', () => {
+  it('parseAnthropicSseChunk picks up usage from message_start and message_delta', async () => {
+    const { parseAnthropicSseChunk } = await import('../../src/utils/gradeEstimator.js');
+    const chunk = [
+      'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":2400,"cache_read_input_tokens":0,"output_tokens":1}}}',
+      'event: content_block_delta\ndata: {"type":"content_block_delta","delta":{"type":"text_delta","text":"{}"}}',
+      'event: message_delta\ndata: {"type":"message_delta","usage":{"output_tokens":850}}',
+      '',
+    ].join('\n\n');
+    const { usage, texts } = parseAnthropicSseChunk(chunk);
+    expect(texts).toEqual(['{}']);
+    expect(usage).toEqual({ input_tokens: 2400, cache_read_input_tokens: 0, output_tokens: 850 });
+  });
+});
+

@@ -2,6 +2,8 @@ import process from 'node:process';
 import { Router } from 'express';
 import { CardDescriptionPrompt } from '../constants/prompts.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
+import { recordAiUsage } from '../utils/aiUsage.js';
+import { requireAiAllowance } from '../middleware/aiAllowance.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import logger from '../utils/logger.js';
 
@@ -68,7 +70,7 @@ function buildCardSummary(card = {}) {
 		.join('\n');
 }
 
-router.post('/generate', integratedAiRateLimit, requireAuth, async (req, res) => {
+router.post('/generate', integratedAiRateLimit, requireAuth, requireAiAllowance('card_description'), async (req, res) => {
 	const apiKey = process.env.ANTHROPIC_API_KEY;
 	if (!apiKey) {
 		logger.error('[CARD_DESCRIPTION] ANTHROPIC_API_KEY is not set');
@@ -123,6 +125,7 @@ router.post('/generate', integratedAiRateLimit, requireAuth, async (req, res) =>
 		}
 
 		const data = await apiRes.json();
+		if (data.usage) await recordAiUsage({ feature: 'card_description', model: DESCRIPTION_MODEL, usage: data.usage, userId: req.userId });
 		const replyText = (Array.isArray(data.content) ? data.content : [])
 			.filter((block) => block?.type === 'text')
 			.map((block) => block.text ?? '')
