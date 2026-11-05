@@ -28,7 +28,7 @@ import { useCart } from '@/hooks/useCart.jsx';
  */
 const UI_MODE = import.meta.env.VITE_CHECKOUT_UI === 'embedded' ? 'embedded' : 'elements';
 
-const EmbeddedStripeCheckout = ({ requestBody }) => {
+const EmbeddedStripeCheckout = ({ requestBody, billingAddress }) => {
   const [clientSecret, setClientSecret] = useState(null);
   const [error, setError] = useState(null);
   // A listing that sold while the buyer was typing — the server names it so
@@ -131,7 +131,7 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
   }
 
   if (UI_MODE === 'elements') {
-    return <StripeElementsPayment clientSecret={clientSecret} />;
+    return <StripeElementsPayment clientSecret={clientSecret} billingAddress={billingAddress} />;
   }
 
   return (

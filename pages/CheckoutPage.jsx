@@ -930,7 +930,7 @@ const CheckoutPage = () => {
                           <Pencil className="mr-2 h-4 w-4" /> Edit details
                         </Button>
                       </div>
-                      <EmbeddedStripeCheckout requestBody={paymentBody} />
+                      <EmbeddedStripeCheckout requestBody={paymentBody} billingAddress={sameAsShipping ? shippingData : billingData} />
                     </div>
                   ) : (
                     <div className="space-y-3">

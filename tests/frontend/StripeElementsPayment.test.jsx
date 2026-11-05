@@ -11,7 +11,7 @@ vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'light' }) }))
 vi.mock('@stripe/react-stripe-js/checkout', async () => {
   const ReactMod = await import('react');
   return {
-    CheckoutElementsProvider: ({ children }) => <div>{children}</div>,
+    CheckoutElementsProvider: ({ children, options }) => { state.providerOptions = options; return <div>{children}</div>; },
     useCheckoutElements: () => state.result,
     PaymentElement: (props) => { state.paymentProps = props; return <div data-testid="payment-element" />; },
     ExpressCheckoutElement: (props) => {
@@ -22,7 +22,7 @@ vi.mock('@stripe/react-stripe-js/checkout', async () => {
   };
 });
 
-import StripeElementsPayment, { appearanceFor, CHECKOUT_FONT_STACK } from '@/components/checkout/StripeElementsPayment.jsx';
+import StripeElementsPayment, { appearanceFor, billingContactFor, CHECKOUT_FONT_STACK } from '@/components/checkout/StripeElementsPayment.jsx';
 
 const checkoutWith = (confirm) => ({
   type: 'success',
@@ -76,6 +76,23 @@ describe('StripeElementsPayment', () => {
     render(<StripeElementsPayment clientSecret="cs_secret" />);
     await waitFor(() => expect(screen.queryByTestId('express-element')).toBeNull());
     expect(screen.getByTestId('payment-element')).toBeTruthy();
+  });
+});
+
+describe('billing address prefill', () => {
+  it('opens the card form on Australia with the address the buyer entered', () => {
+    state.result = checkoutWith(vi.fn());
+    render(<StripeElementsPayment clientSecret="cs_secret" billingAddress={{
+      firstName: 'Sam', lastName: 'Lee', address: '1 George St', address2: '', suburb: 'Sydney', state: 'NSW', postcode: '2000',
+    }} />);
+    expect(state.providerOptions.defaultValues.billingAddress).toEqual({
+      name: 'Sam Lee',
+      address: { country: 'AU', line1: '1 George St', city: 'Sydney', state: 'NSW', postal_code: '2000' },
+    });
+  });
+
+  it('still pins the country to AU with no address yet', () => {
+    expect(billingContactFor(undefined)).toEqual({ address: { country: 'AU' } });
   });
 });
 

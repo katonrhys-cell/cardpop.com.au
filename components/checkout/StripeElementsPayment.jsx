@@ -109,6 +109,23 @@ const PAYMENT_OPTIONS = {
   wallets: { googlePay: 'never', applePay: 'never', link: 'never' },
 };
 
+/*
+ * The checkout form's billing address (or the shipping address when "Same as
+ * shipping" is ticked) in the shape Stripe's Checkout SDK prefills from. Left
+ * to itself the card form guesses the country from the buyer's IP — a
+ * shopper near the Tasman or on a VPN saw "New Zealand" on an Australia-only
+ * checkout. Country is always AU: checkAustralianAddress() refuses anything
+ * else server-side before the session exists.
+ */
+export const billingContactFor = (addr = {}) => {
+  const name = [addr.firstName, addr.lastName].filter(Boolean).join(' ').trim();
+  const pick = (v) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const address = { country: 'AU' };
+  const fields = { line1: pick(addr.address), line2: pick(addr.address2), city: pick(addr.suburb), state: pick(addr.state), postal_code: pick(addr.postcode) };
+  for (const [k, v] of Object.entries(fields)) if (v) address[k] = v;
+  return { ...(name ? { name } : {}), address };
+};
+
 const ErrorNote = ({ children }) => (
   <div role="alert" className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
     <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -206,12 +223,17 @@ const PaymentForm = () => {
   );
 };
 
-const StripeElementsPayment = ({ clientSecret }) => {
+const StripeElementsPayment = ({ clientSecret, billingAddress }) => {
   const { resolvedTheme } = useTheme();
-  // Appearance is read once when the SDK initialises; fix it per mount so a
-  // theme flip mid-checkout can't re-create the provider (and its session).
+  // Appearance and default values are read once when the SDK initialises; fix
+  // them per mount so a theme flip or an edit mid-checkout can't re-create
+  // the provider (and its session).
   const options = useMemo(
-    () => ({ clientSecret, elementsOptions: { appearance: appearanceFor(resolvedTheme === 'dark') } }),
+    () => ({
+      clientSecret,
+      elementsOptions: { appearance: appearanceFor(resolvedTheme === 'dark') },
+      defaultValues: { billingAddress: billingContactFor(billingAddress) },
+    }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [clientSecret],
   );
