@@ -25,7 +25,7 @@ import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
 import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout.jsx';
 import MarketplacePurchaseGate from '@/components/checkout/MarketplacePurchaseGate.jsx';
 import CheckoutReassurance from '@/components/checkout/CheckoutReassurance.jsx';
-import StripeMark from '@/components/checkout/StripeMark.jsx';
+import StripeMark, { StripeWordmark } from '@/components/checkout/StripeMark.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
 import { ADDRESS_AUTOCOMPLETE_ENABLED } from '@/lib/addressAutocomplete.js';
@@ -791,8 +791,10 @@ const CheckoutPage = () => {
           <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
             <Lock className="h-3.5 w-3.5" aria-hidden="true" />
             <span>Encrypted &amp; Processed by</span>
-            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
-              <StripeMark className="h-4 w-4" /> Stripe
+            <span className="inline-flex items-center gap-1">
+              <StripeMark className="h-4 w-4" />
+              <StripeWordmark className="h-[1.05rem] w-auto" />
+              <span className="sr-only">Stripe</span>
             </span>
             <span>— you’ll never leave this page.</span>
           </p>
