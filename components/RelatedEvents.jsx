@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import EventCard from '@/components/EventCard.jsx';
 import { toLocalDateStr } from '@/lib/eventSeo.js';
+import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 
 const RelatedEvents = ({ currentEventId, currentState }) => {
   const [relatedEvents, setRelatedEvents] = useState([]);
@@ -14,7 +15,7 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
         const todayStr = toLocalDateStr(new Date());
         let query = supabase
           .from('events_public')
-          .select('*')
+          .select(EVENT_CARD_COLUMNS)
           .eq('status', 'approved')
           .neq('id', currentEventId)
           .gte('start_date', todayStr)
@@ -29,7 +30,7 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
         if (currentState && (!data || data.length === 0)) {
           ({ data, error } = await supabase
             .from('events_public')
-            .select('*')
+            .select(EVENT_CARD_COLUMNS)
             .eq('status', 'approved')
             .neq('id', currentEventId)
             .gte('start_date', todayStr)

@@ -546,8 +546,6 @@ export default defineConfig({
 				'@babel/traverse',
 				'@babel/generator',
 				'@babel/types',
-				'onnxruntime-web',
-				'onnxruntime-web/webgpu',
 			],
 			output: {
 				manualChunks(id) {

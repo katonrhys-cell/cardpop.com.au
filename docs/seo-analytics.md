@@ -7,10 +7,9 @@ Three independent, complementary systems run in production:
 | System | What it measures | Where |
 |---|---|---|
 | **Google Analytics 4** (`G-NCZ6K9VFF8`) | Visitors, page views, traffic sources, audience | `lib/analytics.js`, loaded lazily from `main.jsx` |
-| **Vercel Analytics + Speed Insights** | Page views + Core Web Vitals per deployment | `main.jsx` (`@vercel/analytics`, `@vercel/speed-insights`) |
 | **Cloudflare Web Analytics** *(optional)* | Privacy-friendly RUM at the edge | Beacon loaded in `main.jsx` when `VITE_CF_BEACON_TOKEN` is set |
 
-Sentry (errors + performance traces) also runs but isn't visitor analytics.
+Sentry (errors + performance traces) also runs but isn't visitor analytics. (Vercel Analytics and Speed Insights were removed in November 2026: they loaded on every page and duplicated GA4, the Cloudflare beacon and Sentry.)
 
 GA4's visitor counts are also pulled **into the app** nightly (home page
 "Visitors" tile, Admin → Dashboard → Visitors card) — see `docs/site-traffic.md`.
@@ -61,6 +60,7 @@ only* leaves them off; *Cookie settings* in the footer shows the bar again.
 |---|---|---|
 | Google Ads conversion tracking | `VITE_GOOGLE_ADS_ID` (`AW-…`), `VITE_GOOGLE_ADS_PURCHASE_LABEL` | `config` on consent, a `conversion` event per purchase with value + `transaction_id` |
 | Meta Pixel (`lib/metaPixel.js`) | `VITE_META_PIXEL_ID` | `PageView` per route, `ViewContent`, `AddToCart`, `InitiateCheckout`, `AddPaymentInfo`, `Purchase` (with `eventID` = session id for dedup against a future Conversions API) |
+| Impact affiliate tag (`lib/impactTag.js`) | — (tag id in the file) | `transformLinks` + `trackImpression`; never started on `/checkout`, `/login`, `/signup`, `/admin`, `/account`, `/welcome`, `/reset-password` |
 
 GA4 itself runs regardless, with Google Consent Mode v2 defaults
 (`analytics_storage: granted`, `ad_storage` / `ad_user_data` /

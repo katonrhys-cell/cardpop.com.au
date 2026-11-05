@@ -1,12 +1,27 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { formatDistanceToNowStrict } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
+import { fetchPublicJson, PUBLIC_TICKER_URL } from '@/lib/publicApi.js';
+import { queryTickerRows } from '@/lib/homepageQueries.js';
 import { getCardImage } from '@/utils/imageUrl.js';
 import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
 const MAX_EVENTS = 16;
+
+// "5 minutes ago" without date-fns: this strip is on the homepage, and its one
+// call pulled the date-fns chunk onto the first load.
+const RELATIVE_UNITS = [['year', 31536000], ['month', 2592000], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+const relativeTime = typeof Intl !== 'undefined' && Intl.RelativeTimeFormat
+  ? new Intl.RelativeTimeFormat('en-AU', { numeric: 'always' })
+  : null;
+export function timeAgo(date, now = Date.now()) {
+  const seconds = Math.round((date.getTime() - now) / 1000);
+  const abs = Math.abs(seconds);
+  const [unit, size] = RELATIVE_UNITS.find(([, s]) => abs >= s) || ['second', 1];
+  const value = Math.round(seconds / size);
+  return relativeTime ? relativeTime.format(value, unit) : `${Math.abs(value)} ${unit}${Math.abs(value) === 1 ? '' : 's'} ago`;
+}
 
 // The strip shows each card at 80×112 px (160×224 on a 2× display), so serve
 // the pre-generated 480 px grid thumbnail wherever one exists (uploads since
@@ -34,19 +49,22 @@ const eventFromListing = (listing, kind) => {
   };
 };
 
-const TICKER_SELECT = 'id, price_aud, status, created_at, updated_at, vault_item:vault_items!inner(card_name, card_image, vault_images(storage_path))';
-
-/** The newest active and sold listings, merged newest-first. Exported for tests. */
+/**
+ * The newest active and sold listings, merged newest-first. Reads the
+ * edge-cached /public/ticker first (one cached answer for every visitor) and
+ * falls back to querying Supabase directly. Exported for tests.
+ */
 export async function loadTickerEvents(client = supabase) {
-  const [listed, sold] = await Promise.all([
-    client.from('listings').select(TICKER_SELECT)
-      .eq('status', 'active').order('created_at', { ascending: false }).limit(10),
-    client.from('listings').select(TICKER_SELECT)
-      .eq('status', 'sold').order('updated_at', { ascending: false }).limit(6),
-  ]);
+  let rows;
+  try {
+    rows = await fetchPublicJson(PUBLIC_TICKER_URL);
+    if (!Array.isArray(rows?.listed) || !Array.isArray(rows?.sold)) throw new Error('bad ticker payload');
+  } catch {
+    rows = await queryTickerRows(client);
+  }
   return [
-    ...(listed.data || []).map(l => eventFromListing(l, 'listed')),
-    ...(sold.data || []).map(l => eventFromListing(l, 'sold')),
+    ...rows.listed.map(l => eventFromListing(l, 'listed')),
+    ...rows.sold.map(l => eventFromListing(l, 'sold')),
   ].sort((a, b) => (b.at?.getTime() ?? 0) - (a.at?.getTime() ?? 0)).slice(0, MAX_EVENTS);
 }
 
@@ -118,7 +136,7 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
                 )}
                 {ev.at && (
                   <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                    {formatDistanceToNowStrict(ev.at, { addSuffix: true })}
+                    {timeAgo(ev.at)}
                   </span>
                 )}
               </div>

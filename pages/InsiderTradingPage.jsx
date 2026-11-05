@@ -39,7 +39,9 @@ const InsiderTradingPage = () => {
       setLoading(true);
       const { data: records, error: fetchError } = await supabase
         .from('business_profiles')
-        .select('*')
+        // Public-safe columns only: approved storefronts are world-readable,
+        // and the row also holds the owner's email, phone and ABN.
+        .select('id, business_name, tagline, logo_url, website_url, storefront_slug, created_at')
         .order('created_at', { ascending: false });
       if (fetchError) throw fetchError;
       setRetailers(records || []);

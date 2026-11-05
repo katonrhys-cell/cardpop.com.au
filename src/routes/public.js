@@ -2,7 +2,7 @@ import { Router } from 'express';
 import supabaseAnon from '../utils/supabaseAnonClient.js';
 import { createTtlCache } from '../utils/ttlCache.js';
 import logger from '../utils/logger.js';
-import { queryHomepageBundle, bundleHasErrors } from '../../lib/homepageQueries.js';
+import { queryHomepageBundle, bundleHasErrors, queryTickerRows, queryShowcaseRows } from '../../lib/homepageQueries.js';
 import { SHOP_FACET_COLUMNS } from '../../utils/shopColumns.js';
 import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
 import { loadPublicSettings } from './settings.js';
@@ -98,6 +98,47 @@ router.get('/shop/facets', async (req, res) => {
     logger.error(`[PUBLIC] shop facets failed: ${error.message}`);
     uncacheable(res);
     return res.status(503).json({ data: null, error: { message: 'Temporarily unavailable' } });
+  }
+});
+
+/**
+ * GET /public/ticker — the "Live on CardPop" strip on the homepage and the
+ * marketplace: the 10 newest active and 6 newest sold listings as raw rows
+ * ({ listed, sold }); the browser shapes them (components/LiveActivityTicker.jsx).
+ */
+router.get('/ticker', async (req, res) => {
+  try {
+    const rows = await publicReadCache.get('ticker', async () => {
+      const result = await queryTickerRows(supabaseAnon);
+      if (result.error) throw new PartialResult(null);
+      return { listed: result.listed, sold: result.sold };
+    });
+    edgeCacheable(res);
+    return res.json(rows);
+  } catch (error) {
+    if (!(error instanceof PartialResult)) logger.error(`[PUBLIC] ticker failed: ${error.message}`);
+    uncacheable(res);
+    return res.status(503).json({ error: 'Ticker unavailable' });
+  }
+});
+
+/**
+ * GET /public/hero — the admin-configured hero showcase cards (raw rows; the
+ * browser maps them with mapShowcaseRow in lib/heroShowcase.js).
+ */
+router.get('/hero', async (req, res) => {
+  try {
+    const rows = await publicReadCache.get('hero', async () => {
+      const { data, error } = await queryShowcaseRows(supabaseAnon);
+      if (error) throw new PartialResult(null);
+      return data || [];
+    });
+    edgeCacheable(res);
+    return res.json({ cards: rows });
+  } catch (error) {
+    if (!(error instanceof PartialResult)) logger.error(`[PUBLIC] hero failed: ${error.message}`);
+    uncacheable(res);
+    return res.status(503).json({ error: 'Hero cards unavailable' });
   }
 });
 
