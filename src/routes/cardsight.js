@@ -19,6 +19,7 @@ import { refreshCardMarketData } from '../utils/marketDataService.js';
 import { getSegmentsForCollection } from '../utils/collectionSegmentMap.js';
 import logger from '../utils/logger.js';
 import { queryString } from '../utils/queryString.js';
+import { publicCache, CACHE_PRICING, CACHE_CATALOGUE, CACHE_MEDIUM } from '../middleware/publicCache.js';
 
 const router = Router();
 
@@ -256,7 +257,7 @@ router.get('/status', (req, res) => {
 
 // ─── GET /cardsight/pricing/:cardId ──────────────────────────────────────────
 // Fetch current pricing for a known CardSight card ID, flattened to aggregates.
-router.get('/pricing/:cardId', async (req, res) => {
+router.get('/pricing/:cardId', publicCache(CACHE_PRICING), async (req, res) => {
   const { cardId } = req.params;
   const { parallel_id, grade_id, period, listing_type } = req.query;
 
@@ -283,7 +284,7 @@ router.get('/pricing/:cardId', async (req, res) => {
 
 // ─── GET /cardsight/autocomplete ─────────────────────────────────────────────
 // Lightweight card-name lookup used to resolve a name to a CardSight card ID.
-router.get('/autocomplete', async (req, res) => {
+router.get('/autocomplete', publicCache(CACHE_CATALOGUE), async (req, res) => {
   const { take } = req.query;
   const q = queryString(req.query.q);
   if (!q) return res.status(400).json({ error: 'q is required' });
@@ -300,7 +301,7 @@ router.get('/autocomplete', async (req, res) => {
 
 // ─── GET /cardsight/catalog/search ───────────────────────────────────────────
 // Fuzzy search across cards, sets, and releases.
-router.get('/catalog/search', async (req, res) => {
+router.get('/catalog/search', publicCache(CACHE_CATALOGUE), async (req, res) => {
   const { type, year, segment } = req.query;
   const q = queryString(req.query.q);
   if (!q) return res.status(400).json({ error: 'q is required' });
@@ -318,7 +319,7 @@ router.get('/catalog/search', async (req, res) => {
 
 // ─── GET /cardsight/marketplace/:cardId ──────────────────────────────────────
 // Active marketplace listings for a card.
-router.get('/marketplace/:cardId', async (req, res) => {
+router.get('/marketplace/:cardId', publicCache(CACHE_MEDIUM), async (req, res) => {
   const { cardId } = req.params;
   const client = getCardSightClient();
   const { data } = await client.marketplace.get(cardId);

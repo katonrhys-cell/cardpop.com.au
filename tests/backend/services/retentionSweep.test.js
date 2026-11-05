@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldEmailAbandoned, watchlistAlertFor, parseSavedSearch } from '../../../src/services/retentionSweepService.js';
+import { shouldEmailAbandoned, watchlistAlertFor, parseSavedSearch, savedSearchMayHaveNew } from '../../../src/services/retentionSweepService.js';
 
 const NOW = new Date('2026-10-04T08:00:00Z');
 const hoursAgo = (h) => new Date(NOW.getTime() - h * 3600 * 1000).toISOString();
@@ -54,5 +54,21 @@ describe('parseSavedSearch', () => {
   it('drops junk values', () => {
     expect(parseSavedSearch('min=abc&graded=weird')).toMatchObject({ min: null, graded: null, q: '' });
     expect(parseSavedSearch(null).q).toBe('');
+  });
+});
+
+describe('savedSearchMayHaveNew', () => {
+  const search = { created_at: '2026-10-01T00:00:00Z', last_alerted_at: '2026-10-03T00:00:00Z' };
+  it('skips a search when nothing was listed after its marker', () => {
+    expect(savedSearchMayHaveNew(search, '2026-10-02T12:00:00Z')).toBe(false);
+    expect(savedSearchMayHaveNew(search, '2026-10-03T00:00:00Z')).toBe(false);
+    expect(savedSearchMayHaveNew(search, null)).toBe(false);
+  });
+  it('checks a search when a newer listing exists, falling back to created_at', () => {
+    expect(savedSearchMayHaveNew(search, '2026-10-03T00:00:01Z')).toBe(true);
+    expect(savedSearchMayHaveNew({ created_at: '2026-10-01T00:00:00Z' }, '2026-10-02T00:00:00Z')).toBe(true);
+  });
+  it('checks every search when the newest listing is unknown', () => {
+    expect(savedSearchMayHaveNew(search, undefined)).toBe(true);
   });
 });

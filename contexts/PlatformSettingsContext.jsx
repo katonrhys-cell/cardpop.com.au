@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import apiServerClient from '@/lib/apiServerClient.js';
+import { fetchPublicJson, PUBLIC_SETTINGS_URL } from '@/lib/publicApi.js';
 
 // Runtime platform settings (feature flags, maintenance switch, listing-form
 // limits) read from the public settings endpoint. Defaults are FAIL-OPEN:
@@ -47,8 +48,10 @@ export const PlatformSettingsProvider = ({ children }) => {
 
   useEffect(() => {
     let cancelled = false;
-    apiServerClient.fetch('/settings/public')
-      .then((res) => (res.ok ? res.json() : null))
+    // The edge-cached copy first (no credentials, so Cloudflare can answer it);
+    // the old authenticated path only if that is unreachable.
+    fetchPublicJson(PUBLIC_SETTINGS_URL)
+      .catch(() => apiServerClient.fetch('/settings/public').then((res) => (res.ok ? res.json() : null)))
       .then((data) => {
         if (cancelled || !data || typeof data !== 'object') return;
         setSettings({ ...DEFAULTS, ...data });

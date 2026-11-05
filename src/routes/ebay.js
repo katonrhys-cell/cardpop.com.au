@@ -8,6 +8,7 @@ import * as ebayCache from '../utils/ebayCache.js';
 import { getUsdToAudRate } from '../utils/exchangeRates.js';
 import logger from '../utils/logger.js';
 import { queryString } from '../utils/queryString.js';
+import { publicCache, CACHE_PRICING } from '../middleware/publicCache.js';
 
 const router = express.Router();
 
@@ -21,7 +22,7 @@ const router = express.Router();
  *
  * Response: array of listing objects (NOT wrapped in an envelope)
  */
-router.get('/search', async (req, res) => {
+router.get('/search', publicCache(CACHE_PRICING), async (req, res) => {
   const { limit = '20' } = req.query;
   const cardName = queryString(req.query.cardName);
 
@@ -85,7 +86,7 @@ router.get('/search', async (req, res) => {
  * Response:
  *   { count, avgPrice, minPrice, maxPrice, listings[] }
  */
-router.get('/price-estimate', async (req, res) => {
+router.get('/price-estimate', publicCache(CACHE_PRICING), async (req, res) => {
   const { gradeScore } = req.query;
   const name = queryString(req.query.name);
   const set = queryString(req.query.set);
@@ -263,89 +264,10 @@ router.get('/price-estimate', async (req, res) => {
 });
 
 /**
- * GET /ebay/listings
- * Fetch live eBay AU listings with optional filters.
- *
- * Query params: keywords, category, condition, sort, limit (max 200), offset
- */
-router.get('/listings', async (req, res) => {
-  const {
-    keywords = '',
-    category = '',
-    condition = '',
-    sort = 'newlyListed',
-    limit = '50',
-    offset = '0',
-  } = req.query;
-
-  const limitNum  = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
-  const offsetNum = Math.max(0, parseInt(offset, 10) || 0);
-
-  logger.info(`[EBAY_LISTINGS] keywords="${keywords}" category="${category}" limit=${limitNum} offset=${offsetNum}`);
-
-  try {
-    let searchQuery = keywords || 'trading card';
-    if (category) searchQuery = `${searchQuery} ${category}`;
-
-    const filters = ['buyingOptions:{AUCTION|FIXED_PRICE}', 'itemLocationCountry:AU'];
-    const conditionMap = { 'new': '3000', 'like new': '3010', 'good': '3020', 'fair': '3030', 'used': '4000' };
-    const conditionId = conditionMap[condition.toLowerCase()];
-    if (conditionId) filters.push(`conditionIds:{${conditionId}}`);
-
-    const params = new URLSearchParams({
-      q: searchQuery,
-      filter: filters.join(','),
-      limit: limitNum,
-      offset: offsetNum,
-      sort,
-    });
-
-    const data = await callEbayApi(`/buy/browse/v1/item_summary/search?${params}`);
-
-    const listings = (data.itemSummaries || []).map(item => ({
-      itemId:       item.itemId,
-      title:        item.title,
-      price:        item.price?.value ? parseFloat(item.price.value) : 0,
-      condition:    parseCondition(item.condition),
-      imageUrl:     item.image?.imageUrl || '',
-      sellerName:   item.seller?.username || 'Unknown',
-      sellerRating: item.seller?.feedbackPercentage || 0,
-      listingUrl:   item.itemWebUrl || '',
-      category:     item.categories?.[0] || 'Uncategorized',
-      shippingPrice: item.shippingOptions?.[0]?.shippingCost?.value
-        ? parseFloat(item.shippingOptions[0].shippingCost.value)
-        : 0,
-      itemLocation: item.itemLocation?.country || 'Unknown',
-    }));
-
-    res.json({ success: true, listings, total: data.total || 0, limit: limitNum, offset: offsetNum, lastUpdated: new Date().toISOString() });
-  } catch (error) {
-    logger.error(`[EBAY_LISTINGS] Error: ${error.message}`);
-    res.status(502).json({ error: 'eBay API unavailable. Please try again later.' });
-  }
-});
-
-/**
- * GET /ebay/market-data
- * Aggregated market data across all tracked collections.
- */
-router.get('/market-data', async (req, res) => {
-  logger.info('[EBAY_MARKET_DATA] Fetching market data');
-  try {
-    const data = await getMarketData();
-    logger.info(`[EBAY_MARKET_DATA] ${data.cards.length} cards retrieved`);
-    res.json(data);
-  } catch (error) {
-    logger.error(`[EBAY_MARKET_DATA] Error: ${error.message}`);
-    res.status(502).json({ error: 'eBay market data unavailable. Please try again later.' });
-  }
-});
-
-/**
  * GET /ebay/card-details/:cardId
  * Detailed price data for a single card (by eBay item ID).
  */
-router.get('/card-details/:cardId', async (req, res) => {
+router.get('/card-details/:cardId', publicCache(CACHE_PRICING), async (req, res) => {
   const { cardId } = req.params;
   if (!cardId?.trim()) {
     return res.status(400).json({ error: 'cardId parameter is required' });
@@ -365,7 +287,7 @@ router.get('/card-details/:cardId', async (req, res) => {
  * GET /ebay/sales
  * Sales data with filters (collection, dateRange, price range, condition, pagination).
  */
-router.get('/sales', async (req, res) => {
+router.get('/sales', publicCache(CACHE_PRICING), async (req, res) => {
   const {
     collection, dateRange = '7d', priceMin, priceMax, condition,
     page = '1', limit = '50',
@@ -394,7 +316,7 @@ router.get('/sales', async (req, res) => {
  * GET /ebay/statistics
  * Market statistics for a given timeframe and optional collection.
  */
-router.get('/statistics', async (req, res) => {
+router.get('/statistics', publicCache(CACHE_PRICING), async (req, res) => {
   const { timeframe = '7d', collection } = req.query;
   logger.info(`[EBAY_STATISTICS] timeframe=${timeframe} collection=${collection}`);
 
@@ -411,7 +333,7 @@ router.get('/statistics', async (req, res) => {
  * GET /ebay/popular-cards
  * Live eBay AU prices for the 16 curated popular cards. Cached for 1 hour.
  */
-router.get('/popular-cards', async (req, res) => {
+router.get('/popular-cards', publicCache(CACHE_PRICING), async (req, res) => {
   const CACHE_KEY = 'popular-cards';
   const cached = await ebayCache.getTiered(CACHE_KEY);
   if (cached) {

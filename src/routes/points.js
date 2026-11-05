@@ -2,6 +2,7 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
+import { publicCache, CACHE_MEDIUM } from '../middleware/publicCache.js';
 
 const router = Router();
 
@@ -74,7 +75,7 @@ router.post('/claim', authMiddleware, async (req, res) => {
 });
 
 // Public: this month's top collectors.
-router.get('/leaderboard', async (_req, res) => {
+router.get('/leaderboard', publicCache(CACHE_MEDIUM), async (_req, res) => {
   try {
     const { data, error } = await supabase
       .rpc('points_leaderboard', { p_since: utcMonthStart(), p_limit: 20 });

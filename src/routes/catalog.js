@@ -5,6 +5,7 @@ import { searchInternalCatalogue } from '../utils/internalCatalogue.js';
 import { leadingCardNumber } from '../../utils/cardNumber.js';
 import logger from '../utils/logger.js';
 import { queryString } from '../utils/queryString.js';
+import { publicCache, CACHE_PRICING, CACHE_CATALOGUE } from '../middleware/publicCache.js';
 
 const router = Router();
 
@@ -113,7 +114,7 @@ async function runSearches(apis, q, take, opts = {}) {
 // name-only pass. The fallback matters because a number can be misread, or the
 // upstream can store it in a form the filter doesn't reach; degrading to
 // today's behaviour is better than returning nothing.
-router.get('/search', async (req, res) => {
+router.get('/search', publicCache(CACHE_CATALOGUE), async (req, res) => {
 	const { collection, segment, take = '10', number } = req.query;
 	const q = queryString(req.query.q);
 	if (!q) return res.status(400).json({ error: 'q is required' });
@@ -149,7 +150,7 @@ router.get('/search', async (req, res) => {
 
 // ── GET /catalog/autocomplete ─────────────────────────────────────────────────
 // Lightweight typeahead: name + set only, no images.
-router.get('/autocomplete', async (req, res) => {
+router.get('/autocomplete', publicCache(CACHE_CATALOGUE), async (req, res) => {
 	const { collection, take = '5' } = req.query;
 	const q = queryString(req.query.q);
 	if (q.length < 2) return res.json({ results: [] });
@@ -175,6 +176,7 @@ router.get('/autocomplete', async (req, res) => {
 		res.json({ results });
 	} catch (err) {
 		logger.warn(`[CATALOG_AUTOCOMPLETE] ${err.message}`);
+		res.locals.uncacheable = true;
 		res.json({ results: [] });
 	}
 });
@@ -183,7 +185,7 @@ router.get('/autocomplete', async (req, res) => {
 // eBay-backed pricing by card name. Returns a CardSight-compatible envelope so
 // callers don't need separate field mapping.
 // Query params: name (required), set (optional), grading_service, grade
-router.get('/pricing', async (req, res) => {
+router.get('/pricing', publicCache(CACHE_PRICING), async (req, res) => {
 	const { grade } = req.query;
 	const name = queryString(req.query.name);
 	const set = queryString(req.query.set);

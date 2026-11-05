@@ -30,7 +30,6 @@ const LISTINGS_COLUMNS = new Set([
 const KNOWN_BROKEN = {
   'pages/admin/CategoryMappingPage.jsx': ['category_id'],
   'utils/categoryMappingEngine.js': ['category_id'],
-  'src/routes/recommendations.js': ['category'],
 };
 
 const ROOT = path.resolve(import.meta.dirname, '../..');

@@ -72,6 +72,20 @@ export function watchlistAlertFor(row, listing) {
   return null;
 }
 
+/**
+ * Could this saved search have a new match? Only if a listing went live after
+ * its marker. `latestListingAt` is the newest active listing's created_at
+ * (null when there is none); an unknown latest (the lookup failed) means
+ * check anyway.
+ */
+export function savedSearchMayHaveNew(search, latestListingAt) {
+  if (latestListingAt === undefined) return true;
+  if (!latestListingAt) return false;
+  const since = search?.last_alerted_at || search?.created_at;
+  if (!since) return true;
+  return new Date(latestListingAt).getTime() > new Date(since).getTime();
+}
+
 /** Parse a saved search's URL params into the filters the sweep can apply. */
 export function parseSavedSearch(params) {
   const p = new URLSearchParams(String(params || ''));
@@ -144,22 +158,37 @@ export async function abandonedCheckouts({ limit = 40, now = new Date(), deadlin
 
 // ── 2. Watchlist alerts ─────────────────────────────────────────────────────
 
+// Pages of watchlist rows per run. The sweep used to read only the newest
+// `limit` rows, so once the table outgrew one page the older rows were never
+// checked again; it now walks every page until it runs out of rows or time.
+const WATCHLIST_MAX_PAGES = 50;
+
 export async function watchlistAlerts({ limit = 300, now = new Date(), deadline = null } = {}) {
   const out = { rows: 0, priceDrops: 0, sold: 0, errors: 0 };
   // Only a listing that is still for sale or has sold can earn an email, so
   // `!inner` + the status filter leave the rows for ended/withdrawn listings in
   // the database instead of pulling them (with their nested joins) every day
-  // just to skip them. Ordered so the page is stable rather than whatever the
-  // planner returns first.
-  const { data: rows, error } = await supabase
-    .from('watchlist')
-    .select('id, user_id, listing_id, price_at_add_aud, last_alert_price_aud, sold_alerted_at, listing:listings!inner(id, status, price_aud, shipping_cost_aud, vault_item:vault_items(card_name, set_name))')
-    .not('price_at_add_aud', 'is', null)
-    .in('listing.status', ['active', 'sold'])
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  for (const row of rows || []) {
+  // just to skip them. Ordered (with an id tie-break) so the pages are stable.
+  for (let page = 0; page < WATCHLIST_MAX_PAGES; page += 1) {
+    if (outOfTime(deadline)) { out.outOfTime = true; break; }
+    const from = page * limit;
+    const { data: rows, error } = await supabase
+      .from('watchlist')
+      .select('id, user_id, listing_id, price_at_add_aud, last_alert_price_aud, sold_alerted_at, listing:listings!inner(id, status, price_aud, shipping_cost_aud, vault_item:vault_items(card_name, set_name))')
+      .not('price_at_add_aud', 'is', null)
+      .in('listing.status', ['active', 'sold'])
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + limit - 1);
+    if (error) throw error;
+    await watchlistPage(rows || [], out, { now, deadline });
+    if (out.outOfTime || !rows || rows.length < limit) break;
+  }
+  return out;
+}
+
+async function watchlistPage(rows, out, { now, deadline }) {
+  for (const row of rows) {
     if (outOfTime(deadline)) { out.outOfTime = true; break; }
     out.rows += 1;
     try {
@@ -185,7 +214,6 @@ export async function watchlistAlerts({ limit = 300, now = new Date(), deadline 
       logger.error(`[RETENTION] watchlist alert failed for row ${row.id}: ${err.message}`);
     }
   }
-  return out;
 }
 
 // ── 3. Saved-search alerts ──────────────────────────────────────────────────
@@ -201,8 +229,28 @@ export async function savedSearchAlerts({ limit = 200, now = new Date(), deadlin
     .order('last_alerted_at', { ascending: true, nullsFirst: true })
     .limit(limit);
   if (error) throw error;
-  for (const s of searches || []) {
+  if (!searches?.length) return out;
+
+  // Most nights nothing new has been listed. One lookup of the newest active
+  // listing lets every search with nothing newer than its marker be skipped
+  // without a query or a write (it used to rewrite every marker every night).
+  // A failed lookup leaves `latest` undefined, which checks every search.
+  let latest;
+  {
+    const { data, error: latestErr } = await supabase
+      .from('listings')
+      .select('created_at')
+      .eq('status', 'active')
+      .neq('listing_type', 'vault')
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (latestErr) logger.warn(`[RETENTION] newest-listing lookup failed, checking every search: ${latestErr.message}`);
+    else latest = data?.[0]?.created_at ?? null;
+  }
+
+  for (const s of searches) {
     if (outOfTime(deadline)) { out.outOfTime = true; break; }
+    if (!savedSearchMayHaveNew(s, latest)) { out.skipped = (out.skipped || 0) + 1; continue; }
     out.searches += 1;
     try {
       const f = parseSavedSearch(s.params);
