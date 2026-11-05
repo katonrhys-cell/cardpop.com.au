@@ -118,3 +118,31 @@ describe('sitemap leaves thin pages out', () => {
     expect(body).toContain(`${loc('/community/forum')}\n    <lastmod>2026-09-14</lastmod>`);
   });
 });
+
+describe('sitemap event organiser pages', () => {
+  it('lists an organiser once a public event names them, dated by the newest event', async () => {
+    state.tables.event_organisers = [
+      { id: 'o1', name: 'Sports Addicts Australia', slug: 'sports-addicts-australia', updated_at: '2026-09-01T00:00:00Z' },
+      { id: 'o2', name: 'Quiet Org', slug: 'quiet-org', updated_at: '2026-09-01T00:00:00Z' },
+      { id: 'o3', name: 'No Slug Yet', slug: null },
+    ];
+    state.tables.events = [
+      { id: 'e1', organizer_name: 'Fast Break Trading Cards & Sports Addicts Australia', updated_at: '2026-10-20T00:00:00Z' },
+      { id: 'e2', organizer_name: 'Sports Addicts Australia', updated_at: '2026-10-05T00:00:00Z' },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/events/organisers/sports-addicts-australia')}\n    <lastmod>2026-10-20</lastmod>`);
+    // No events name them → their page is noindex, so it isn't advertised.
+    expect(body).not.toContain(loc('/events/organisers/quiet-org'));
+    expect(body).not.toContain('/events/organisers/null');
+  });
+});
+
+describe('sitemap grading scale pages', () => {
+  it('lists every company scale from the shared data file', async () => {
+    const { body } = await run();
+    for (const scale of ['psa', 'bgs', 'cgc', 'ace']) {
+      expect(body, scale).toContain(loc(`/grading/scales/${scale}`));
+    }
+  });
+});

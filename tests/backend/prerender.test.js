@@ -838,6 +838,64 @@ describe('prerender static content pages', () => {
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/analytics" />');
     expect(body).not.toContain('noindex');
   });
+
+  it('renders each company grading scale from the shared data', async () => {
+    const { status, body } = await run('/grading/scales/psa');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>PSA Grading Scale — Professional Sports Authenticator</h1>');
+    expect(body).toContain('PSA 10 — Gem Mint (GEM-MT)');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/grading/scales/psa" />');
+    expect(body).toContain('href="https://cardpop.com.au/grading/scales/bgs"');
+    expect(body).not.toContain('noindex');
+    for (const scale of ['bgs', 'cgc', 'ace']) {
+      expect((await run(`/grading/scales/${scale}`)).status, scale).toBe(200);
+    }
+  });
+
+  it('renders the conviction rating and card scanner pages', async () => {
+    let { status, body } = await run('/conviction-rating');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>The CardPop Conviction Rating</h1>');
+    expect(body).toContain('5 — Highest');
+    expect(body).toContain('Buy Conviction');
+    ({ status, body } = await run('/scan'));
+    expect(status).toBe(200);
+    expect(body).toContain('How the card scanner works');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/scan" />');
+  });
+});
+
+describe('prerender event organiser pages', () => {
+  it('lists the organiser and every event that names them', async () => {
+    state.result = { data: { id: 'o1', name: 'Sports Addicts Australia', slug: 'sports-addicts-australia', logo_url: 'https://cdn.test/logo.png' } };
+    state.listResult = { data: [
+      { id: 'e1', slug: 'future-show', title: 'Future Show', status: 'approved', start_date: '2999-01-01', organizer_name: 'Fast Break & Sports Addicts Australia' },
+      { id: 'e2', slug: 'old-show', title: 'Old Show', status: 'completed', start_date: '2026-01-01', organizer_name: 'Sports Addicts Australia' },
+      // ilike is a substring match — a longer different name is filtered out.
+      { id: 'e3', slug: 'other', title: 'Other Show', status: 'approved', start_date: '2999-02-01', organizer_name: 'Sports Addicts Australiana' },
+    ] };
+    const { status, body } = await run('/events/organisers/sports-addicts-australia');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Sports Addicts Australia</h1>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/organisers/sports-addicts-australia" />');
+    expect(body).toContain('Upcoming events (1)');
+    expect(body).toContain('Past events (1)');
+    expect(body).toContain('href="https://cardpop.com.au/events/future-show"');
+    expect(body).not.toContain('Other Show');
+    expect(body).toContain('"@type":"Organization"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('marks an organiser with no events noindex and 404s an unknown slug', async () => {
+    state.result = { data: { id: 'o2', name: 'Quiet Org', slug: 'quiet-org', logo_url: null } };
+    let { status, body } = await run('/events/organisers/quiet-org');
+    expect(status).toBe(200);
+    expect(body).toContain('noindex, follow');
+
+    state.result = { data: null };
+    ({ status } = await run('/events/organisers/nobody'));
+    expect(status).toBe(404);
+  });
 });
 
 describe('prerender blog index', () => {
