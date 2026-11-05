@@ -128,7 +128,6 @@ const STATIC_PAGES = [
   { loc: '/prices/nrl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
   { loc: '/analytics/buying-guides', lastmod: SITE_UPDATED,     freq: 'weekly',  pri: '0.7' },
   { loc: '/australian-markets',    lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/insider-trading',       lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.7' },
   { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   { loc: '/grading/what-is-grading', lastmod: SITE_UPDATED,    freq: 'monthly',  pri: '0.7' },
   { loc: '/grading/scales',        lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },

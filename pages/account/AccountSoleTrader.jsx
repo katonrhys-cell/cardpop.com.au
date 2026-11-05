@@ -69,18 +69,23 @@ const AccountSoleTrader = () => {
   useEffect(() => {
     if (!currentUser?.id) { setPageLoading(false); return; }
     let cancelled = false;
-    supabase.from('profiles')
-      .select('is_sole_trader, business_name, business_tagline, abn, business_logo_url, business_categories, dealer_trust_badges, dealer_shipping_policy, store_slug')
-      .eq('id', currentUser.id)
-      .single()
-      .then(({ data }) => {
+    // The ABN isn't in the public profile columns (it is never shown on the
+    // store page), so the owner reads their own through get_my_abn().
+    Promise.all([
+      supabase.from('profiles')
+        .select('is_sole_trader, business_name, business_tagline, business_logo_url, business_categories, dealer_trust_badges, dealer_shipping_policy, store_slug')
+        .eq('id', currentUser.id)
+        .single(),
+      supabase.rpc('get_my_abn').then((r) => r, () => ({ data: null })),
+    ])
+      .then(([{ data }, { data: abn }]) => {
         if (cancelled || !data) return;
         setIsSoleTrader(data.is_sole_trader ?? false);
         setSavedSoleTrader(data.is_sole_trader ?? false);
         setFormData({
           business_name:          data.business_name          ?? '',
           business_tagline:       data.business_tagline       ?? '',
-          abn:                    data.abn                    ?? '',
+          abn:                    abn                         ?? '',
           dealer_shipping_policy: data.dealer_shipping_policy ?? '',
         });
         setSelectedCategories(data.business_categories ?? []);
@@ -338,7 +343,7 @@ const AccountSoleTrader = () => {
                   <Input id="abn" name="abn" value={formData.abn}
                     onChange={handleChange} className="h-12 rounded-xl font-medium shadow-sm"
                     placeholder="e.g. 12 345 678 901" maxLength={14} />
-                  <p className="text-xs text-muted-foreground">Australian Business Number — displayed on your store page.</p>
+                  <p className="text-xs text-muted-foreground">Australian Business Number. Kept private: it is never shown on your store page.</p>
                 </div>
               </div>
 

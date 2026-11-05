@@ -41,6 +41,11 @@
       "permanent": true
     },
     {
+      "source": "/insider-trading",
+      "destination": "/partners",
+      "permanent": true
+    },
+    {
       "source": "/product/marketplace/:id/:slug*",
       "destination": "/marketplace/:id/:slug*",
       "permanent": true
@@ -313,7 +318,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|insider-trading|analytics|blog|partners|pricing|photography-standard|launch)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch)",
       "has": [
         {
           "type": "header",
