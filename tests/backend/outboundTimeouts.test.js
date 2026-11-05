@@ -20,6 +20,7 @@ const FETCH_SITES = [
   'src/utils/ebayClient.js',
   'src/utils/exchangeRates.js',
   'src/utils/ga4Client.js',
+  'src/utils/geocodeCache.js',
   'src/utils/gradeEstimator.js',
   'src/utils/newsletter.js',
   'src/utils/paypalClient.js',

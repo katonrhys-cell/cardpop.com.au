@@ -27,6 +27,7 @@ import shopReviewsRouter from './shop-reviews.js';
 import listingStatsRouter from './listing-stats.js';
 import pushRouter from './push.js';
 import pointsRouter from './points.js';
+import geocodeRouter from './geocode.js';
 import buyerProtectionRouter from './buyer-protection.js';
 import wishlistRouter from './wishlist.js';
 import offersRouter from './offers.js';
@@ -176,6 +177,10 @@ export default () => {
 
     router.use('/push', apiLimiter);
     router.use('/push', pushRouter);
+
+    // Local Map coordinates from the shared geocode cache
+    router.use('/geocode', apiLimiter);
+    router.use('/geocode', geocodeRouter);
 
     router.use('/points', apiLimiter);
     router.use('/points', pointsRouter);
