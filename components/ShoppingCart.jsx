@@ -11,7 +11,7 @@ import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen, ShieldCh
 import { useCart, maxQuantityFor } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import { supabase } from '@/lib/supabaseClient.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
@@ -23,7 +23,8 @@ import { marketplaceGate, hasMarketplaceLine } from '@/utils/marketplaceIdentity
 const aud = (n) => `$${Number(n || 0).toFixed(2)}`;
 
 // Storage path or absolute URL → CDN-aware public URL.
-const resolveImg = (path) => publicImageUrl(path);
+// Cart rows show a small square: the 480 px thumbnail when one exists.
+const resolveImg = (path) => cardThumbUrl(path);
 
 const ShoppingCart = () => {
   const { cartItems, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, getCartTotal } = useCart();
