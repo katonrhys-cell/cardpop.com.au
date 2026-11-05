@@ -2,7 +2,9 @@
 
 How the site is built to load fast, and the reasoning behind the parts that
 look odd. Measured with Lighthouse / PageSpeed Insights on `https://cardpop.com.au/`;
-the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
+`lighthouserc.cjs` holds the budgets for a local `npx @lhci/cli autorun` (the
+CI workflow for it was removed in November 2026; it had been disabled since
+`@lhci/cli` left the dependencies).
 
 ## How a page paints
 

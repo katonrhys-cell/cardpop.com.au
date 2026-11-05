@@ -30,7 +30,11 @@ export default defineConfig({
   // Bind to IPv4 explicitly (the default `--host ::` is unsupported in some
   // sandboxes).
   webServer: {
-    command: 'npm run build && vite preview --outDir dist --host 127.0.0.1 --port 3000',
+    // CI builds once in the verify job and sets E2E_SKIP_BUILD to serve that
+    // dist/ instead of building a second time.
+    command: process.env.E2E_SKIP_BUILD
+      ? 'vite preview --outDir dist --host 127.0.0.1 --port 3000'
+      : 'npm run build && vite preview --outDir dist --host 127.0.0.1 --port 3000',
     url: 'http://127.0.0.1:3000',
     timeout: 180_000,
     reuseExistingServer: !process.env.CI,
