@@ -114,12 +114,6 @@ vi.mock('@/contexts/AdminContext.jsx', () => ({ useAdmin: () => adminValue, Admi
 const categoryValue = { hierarchy: [], loading: false, error: null };
 vi.mock('@/contexts/CategoryContext.jsx', () => ({ useCategory: () => categoryValue, CategoryHierarchyProvider: passthrough }));
 
-const accountValue = {
-  stats: { listingsCount: 0, offersCount: 0, transactionsCount: 0, reviewsCount: 0, unreadNotifications: 0 },
-  loading: false,
-};
-vi.mock('@/contexts/AccountContext.jsx', () => ({ useAccount: () => accountValue, AccountProvider: passthrough }));
-
 const cartValue = {
   cartItems: [], isCartOpen: false, setIsCartOpen: vi.fn(),
   addToCart: vi.fn(), removeFromCart: vi.fn(), updateQuantity: vi.fn(),

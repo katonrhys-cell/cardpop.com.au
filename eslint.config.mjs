@@ -13,8 +13,6 @@ export default [
 			'vitest.config.js',
 			'pb_hooks/**',
 			'pb_migrations/**',
-			// CollectionsDropdown has dynamic imports that trigger ESLint false positives
-			'components/CollectionsDropdown.jsx',
 		],
 	},
 	{
