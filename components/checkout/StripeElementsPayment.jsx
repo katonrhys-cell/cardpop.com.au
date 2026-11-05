@@ -95,7 +95,10 @@ const EXPRESS_OPTIONS = {
 const PAYMENT_OPTIONS = {
   layout: 'tabs',
   // The wallets already have their own button above — don't repeat them as tabs.
-  wallets: { googlePay: 'never', applePay: 'never' },
+  // Link is off too: its "Save my information for faster checkout" opt-in adds
+  // its own email / mobile / full-name fields and a Link terms line under the
+  // card, which made the form long and read like a third-party sign-up.
+  wallets: { googlePay: 'never', applePay: 'never', link: 'never' },
 };
 
 const ErrorNote = ({ children }) => (
@@ -161,10 +164,15 @@ const PaymentForm = () => {
 
       {error && <ErrorNote>{error}</ErrorNote>}
 
+      {/* Not disabled while the card is still empty: a pale disabled button
+          read as broken. Pressing it early runs Stripe's own validation, which
+          marks the missing fields inline. Only blocked while a payment runs. */}
       <Button
         size="lg"
         className="w-full font-semibold"
-        disabled={submitting || !checkout.canConfirm}
+        disabled={submitting}
+        aria-busy={submitting || undefined}
+        data-ready={checkout.canConfirm ? 'true' : 'false'}
         onClick={() => confirm()}
       >
         {submitting ? (
@@ -173,6 +181,13 @@ const PaymentForm = () => {
           <><Lock className="mr-2 h-4 w-4" /> Pay {checkout.total?.total?.amount ?? ''}</>
         )}
       </Button>
+
+      <p className="flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+        <Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span>
+          Secured by <span className="font-semibold text-foreground">Stripe</span>. Your card details are encrypted and never reach CardPop.
+        </span>
+      </p>
     </div>
   );
 };
