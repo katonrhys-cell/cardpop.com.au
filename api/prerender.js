@@ -25,6 +25,7 @@ import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerPro
 import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
+import { shopShippingTerms, shopShippingDetailsLd, marketplaceShippingDetailsLd, SHOP_DELIVERY_TIMES } from '../utils/productShippingLd.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
@@ -640,7 +641,7 @@ async function renderListing(supabase, id, slugParam) {
   // fails the whole query, which used to 404 every listing for crawlers.
   const { data: listing, error: listingErr } = await supabase
     .from('listings')
-    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, price_aud, price_min_aud, price_max_aud, shipping_cost_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
   if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
@@ -700,6 +701,8 @@ async function renderListing(supabase, id, slugParam) {
           ...(schemaItemCondition(condition) ? { itemCondition: schemaItemCondition(condition) } : {}),
           url: canonical,
           seller: { '@type': 'Organization', name: sellerName },
+          // The seller's own postage for this listing (0 = free postage).
+          shippingDetails: marketplaceShippingDetailsLd(listing.shipping_cost_aud),
         } }
       // Expression of Interest: no fixed price, but the seller's offer range is
       // real — an AggregateOffer from the minimum (max is optional).
@@ -840,6 +843,10 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   const inStock = product.status === 'preorder' || product.stock_quantity == null || product.stock_quantity > 0;
   // Sold now, shipped when stock arrives: schema.org has a value for exactly that.
   const preorder = product.status === 'preorder';
+  // Coming soon is public but can't be bought: it carries no Offer (an Offer
+  // would claim InStock for something the checkout refuses).
+  const purchasable = isPurchasableStatus(product.status) && price > 0;
+  const shippingTerms = purchasable ? await loadShopShippingTerms(supabase) : null;
   const description = product.description
     || `${name}${product.category ? ` — ${product.category}` : ''} available from the CardPop official store. Fast shipping across Australia.`;
 
@@ -854,7 +861,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     // global identifiers Google's Merchant listings report asks for.
     ...shopProductIdentifiersLd(product),
     ...(await loadShopReviewLd(supabase, { familySku: product.family_sku, productId: product.family_sku ? null : product.id })),
-    ...(price > 0
+    ...(purchasable
       ? { offers: {
           '@type': 'Offer',
           price: Number(price).toFixed(2),
@@ -863,6 +870,8 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
           itemCondition: 'https://schema.org/NewCondition',
           url: canonical,
           seller: { '@type': 'Organization', name: 'CardPop' },
+          shippingDetails: shopShippingDetailsLd(price, shippingTerms),
+          hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
         } }
       : {}),
   };
@@ -882,7 +891,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${categoryUrl ? `<a href="${categoryUrl}">${esc(product.category)}</a> / ` : ''}${esc(name)}</nav>
   <h1>${esc(name)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
-  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${!inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>` : ''}
+  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${!purchasable ? 'Coming soon' : !inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>` : ''}
   ${product.category ? `<p>${esc(product.category)}</p>` : ''}
   ${descriptionParagraphs(product.description).map((p) => `<p>${esc(p)}</p>`).join('\n  ')}
 </main>`;
@@ -960,6 +969,28 @@ function isEligibleProductLd(ld) { return Boolean(ld && (ld.offers || ld.aggrega
 // Returns the schema.org aggregateRating/review properties for the Product, or
 // {} when there are none or the table isn't there yet: rating markup must only
 // ever describe reviews the page actually shows (components/shop/ProductReviews.jsx).
+// The shop's flat rate + free-shipping threshold for Offer.shippingDetails.
+// platform_settings is admin-only under RLS, so the anon client reads the two
+// keys through shop_shipping_terms() (20261105090739_shop_shipping_terms_rpc.sql).
+// Cached per instance for a minute — the same order as the API's settings
+// cache. Any failure (function not deployed yet, network) quotes the checkout
+// defaults and isn't cached.
+const SHIPPING_TERMS_TTL_MS = 60_000;
+let shippingTermsCache = null;
+async function loadShopShippingTerms(supabaseClient) {
+  if (shippingTermsCache && shippingTermsCache.expires > Date.now()) return shippingTermsCache.terms;
+  try {
+    const { data, error } = await supabaseClient.rpc('shop_shipping_terms');
+    if (error) throw error;
+    const terms = shopShippingTerms(data);
+    shippingTermsCache = { terms, expires: Date.now() + SHIPPING_TERMS_TTL_MS };
+    return terms;
+  } catch (e) {
+    console.error('[prerender] shop shipping terms lookup failed:', e?.message || e);
+    return shopShippingTerms(null);
+  }
+}
+
 async function loadShopReviewLd(supabaseClient, { familySku, productId, slug }) {
   try {
     const poolFor = async () => {
@@ -1072,6 +1103,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   const { price, rrp, inStock, preorder, isPurchasable, barcode } = await loadShopLineCommerce(
     supabaseClient, { slug: product.slug, sku: product.sku },
   );
+  const shippingTerms = isPurchasable ? await loadShopShippingTerms(supabaseClient) : null;
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -1093,6 +1125,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        shippingDetails: shopShippingDetailsLd(price, shippingTerms),
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -1186,6 +1219,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   const { price, rrp, inStock, preorder, isPurchasable, barcode } = await loadShopLineCommerce(
     supabaseClient, { slug: product.slug, sku: product.sku },
   );
+  const shippingTerms = isPurchasable ? await loadShopShippingTerms(supabaseClient) : null;
   // Product copy wins where it exists; the product type's shared copy is the
   // fallback. FAQs stay type-level — they are genuinely shared within a type.
   const description = product.metaDescription
@@ -1213,6 +1247,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia\u2122' },
+        shippingDetails: shopShippingDetailsLd(price, shippingTerms),
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -2175,8 +2210,8 @@ const STATIC_CONTENT = {
       { h2: 'CardPop Shop orders', items: [
         { text: 'Orders under $100: $15 flat-rate tracked shipping, charged once per order.' },
         { text: 'Orders of $100 or more: free tracked shipping.' },
-        { text: 'Dispatch: within 2 business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout).' },
-        { text: 'Delivery: typically 3–7 business days with Australia Post, depending on where you are.' },
+        { text: `Dispatch: within ${SHOP_DELIVERY_TIMES.dispatchBusinessDays} business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout).` },
+        { text: `Delivery: typically ${SHOP_DELIVERY_TIMES.transitMinBusinessDays}–${SHOP_DELIVERY_TIMES.transitMaxBusinessDays} business days with Australia Post, depending on where you are.` },
       ], paras: ['The $100 threshold is based on the CardPop Shop items in your cart. All prices include GST.'] },
       { h2: 'Marketplace cards (bought from other collectors)', items: [
         { text: 'Postage: set by each seller and shown on the listing and in your cart before you pay; many sellers offer free postage.' },

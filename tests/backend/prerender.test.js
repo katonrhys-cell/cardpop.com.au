@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // The prerender function builds its own Supabase client from @supabase/supabase-js,
 // so we mock that module and feed per-table results through a chainable builder.
-const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, listResultByTable: null, publicUrl: 'https://cdn.test/img.jpg' }));
+const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, listResultByTable: null, rpcResult: null, publicUrl: 'https://cdn.test/img.jpg' }));
 
 vi.mock('@supabase/supabase-js', () => {
   const builder = (table) => {
@@ -31,6 +31,8 @@ vi.mock('@supabase/supabase-js', () => {
   return {
     createClient: vi.fn(() => ({
       from: vi.fn((table) => builder(table)),
+      // shop_shipping_terms() — the shop's flat rate + free-shipping threshold.
+      rpc: vi.fn(() => Promise.resolve(state.rpcResult ?? { data: null, error: { message: 'not stubbed' } })),
       storage: { from: vi.fn(() => ({ getPublicUrl: () => ({ data: { publicUrl: state.publicUrl } }) })) },
     })),
   };
@@ -56,7 +58,7 @@ function run(path, query = {}) {
 
 const UUID = '11111111-2222-3333-4444-555555555555';
 
-beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; });
+beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; state.rpcResult = null; });
 
 describe('prerender blog articles', () => {
   it('renders an article with its title, description and featured image', async () => {
@@ -160,6 +162,17 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('<h1>Charizard</h1>');
     expect(body).toContain('Base Set · 1999');
     expect(body).toContain('Grade: PSA 9');
+  });
+
+  it("quotes the seller's postage as the Offer's shippingDetails", async () => {
+    state.result = { data: {
+      id: UUID, slug: 'charizard-base-set', price_aud: 1499.95, shipping_cost_aud: 9.5, status: 'active',
+      vault_item: { card_name: 'Charizard' },
+      seller: { username: 'ash' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/charizard-base-set');
+    expect(body).toContain('"shippingDetails":{"@type":"OfferShippingDetails","shippingRate":{"@type":"MonetaryAmount","value":9.5,"currency":"AUD"}');
+    expect(body).toContain('"addressCountry":"AU"');
   });
 
   it('gives the card a brand and MPN so Merchant listings has a global identifier', async () => {
@@ -271,6 +284,37 @@ describe('prerender shop products', () => {
     expect(body).toContain('schema.org/InStock');
     // canonical uses the slugified title, not the URL slug param
     expect(body).toContain('/product/shop/' + UUID + '/pokemon-scarlet-violet-booster-box');
+  });
+
+  // Runs before the next test: a successful settings read is cached per
+  // instance (a failed one never is), so order matters within this file.
+  it('quotes the default shipping when the settings read fails', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Booster Box', price_aud: 40, stock_quantity: 5, product_type: 'sealed', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/booster-box');
+    expect(body).toContain('"shippingRate":{"@type":"MonetaryAmount","value":15,"currency":"AUD"}');
+  });
+
+  it('carries shipping (from the live settings) and the shop return policy on the Offer', async () => {
+    state.rpcResult = { data: { default_shipping_rate_aud: 12, free_shipping_threshold_aud: 150 }, error: null };
+    state.result = { data: {
+      id: UUID, title: 'Booster Box', price_aud: 140, stock_quantity: 5, product_type: 'sealed', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/booster-box');
+    expect(body).toContain('"shippingRate":{"@type":"MonetaryAmount","value":12,"currency":"AUD"}');
+    expect(body).toContain('"hasMerchantReturnPolicy":{"@type":"MerchantReturnPolicy"');
+  });
+
+  it('gives a priced coming-soon product no Offer (and so no Product node)', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Next Set Booster Box', price_aud: 220, stock_quantity: 0, product_type: 'sealed', status: 'coming_soon',
+    } };
+    const { status, body } = await run('/product/shop/' + UUID + '/next-set-booster-box');
+    expect(status).toBe(200);
+    expect(body).not.toContain('"@type":"Product"');
+    expect(body).not.toContain('schema.org/InStock');
+    expect(body).toContain('Coming soon');
   });
 
   it('emits brand, sku, mpn and gtin so Merchant listings has a global identifier', async () => {

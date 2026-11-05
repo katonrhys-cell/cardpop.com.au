@@ -29,6 +29,8 @@ import {
 } from '@/data/shopBinderProducts.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
+import { shopShippingDetailsLd, shopShippingTerms } from '@/utils/productShippingLd.js';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { trackViewItem } from '@/lib/analytics.js';
 import { getCardImage } from '@/utils/imageUrl.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
@@ -59,6 +61,8 @@ const ShopBinderProductPage = () => {
   // Colours of one line share their reviews (family_sku = the line SKU).
   const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
   const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
+  // Shop flat rate + free-shipping threshold for the Offer's shippingDetails.
+  const { settings: platformSettings } = usePlatformSettings();
 
   // Not a catalogue binder (e.g. a CardPop house binder): same URL shape,
   // generic product page.
@@ -156,6 +160,7 @@ const ShopBinderProductPage = () => {
           : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        shippingDetails: shopShippingDetailsLd(price, shopShippingTerms(platformSettings)),
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
