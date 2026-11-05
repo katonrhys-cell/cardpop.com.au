@@ -45,6 +45,15 @@ describe('StripeElementsPayment', () => {
     expect(screen.getByRole('button', { name: /Pay A\$110\.00/ })).toBeTruthy();
   });
 
+  it('shows Apple Pay and Google Pay together, never behind a "Show more" toggle', () => {
+    state.result = checkoutWith(vi.fn());
+    render(<StripeElementsPayment clientSecret="cs_secret" />);
+    const { paymentMethods, layout } = state.expressProps.options;
+    expect(paymentMethods.applePay).toBe('always');
+    expect(paymentMethods.googlePay).toBe('always');
+    expect(layout).toEqual({ maxColumns: 1, overflow: 'never' });
+  });
+
   it('confirms the session with the Google Pay event', async () => {
     const confirm = vi.fn(async () => ({ type: 'success' }));
     state.result = checkoutWith(confirm);
