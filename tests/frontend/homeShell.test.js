@@ -86,7 +86,6 @@ describe('static homepage shell', () => {
   });
 
   it('bootstrap hash is pinned in every CSP header in vercel.json', () => {
-    // eslint-disable-next-line no-new-func
     new Function(bootstrap); // must at least parse
     const hash = `'sha256-${createHash('sha256').update(bootstrap, 'utf8').digest('base64')}'`;
     const headers = vercel.match(/"Content-Security-Policy"/g) || [];

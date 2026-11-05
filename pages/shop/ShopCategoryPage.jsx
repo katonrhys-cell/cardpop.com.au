@@ -146,6 +146,7 @@ const ShopCategoryPage = () => {
     // Depend on stable slug strings (not the derived path objects, which get new
     // identities every render and would re-run this effect needlessly). The
     // selection is tracked by value via selectionKey for the same reason.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- facets.selection is a new object every render; selectionKey/filterRows track it by value
   }, [categoryName, page, sort, debouncedSearch, contextLoading, selectionKey, filterRows, facets.waiting]);
 
   // Stock and price changes reach a returning visitor on the next look at the

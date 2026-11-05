@@ -68,6 +68,7 @@ export function useShopFacets({ scope, scopeKey, enabled = true, keys = DEFAULT_
     })();
     return () => { cancelled = true; };
     // `scope` is a fresh closure each render; scopeKey tracks it by value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scope is deliberately tracked via scopeKey
   }, [scopeKey, enabled]);
 
   const options = useMemo(() => buildFacetOptions(rows, keysKey.split(',')), [rows, keysKey]);

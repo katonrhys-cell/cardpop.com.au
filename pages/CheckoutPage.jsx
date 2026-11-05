@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -40,7 +40,6 @@ import {
   parseCheckoutLinkParams, normaliseSku, shopRowToCartLine, listingRowToCartLine,
   CHECKOUT_LINK_ID_PARAM, CHECKOUT_LINK_QUANTITY_PARAM,
 } from '@/utils/checkoutLink.js';
-import { Link } from 'react-router-dom';
 
 // The typed-in details survive a reload or a detour through sign-in. Per-tab
 // (sessionStorage), cleared once the order is paid (CheckoutSuccessPage).

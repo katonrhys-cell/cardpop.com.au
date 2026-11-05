@@ -120,7 +120,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     const io = new IntersectionObserver(([entry]) => setCtaOffscreen(!entry.isIntersecting && entry.boundingClientRect.top < 0), { threshold: 0 });
     io.observe(el);
     return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-observe when the CTA block (re)mounts
+    // Re-observe when the CTA block (re)mounts.
   }, [product?.id, product?.status]);
 
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;

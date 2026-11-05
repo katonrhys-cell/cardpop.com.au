@@ -7,7 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen } from 'lucide-react';
+import { ShoppingBag, X, Plus, Minus, Loader2, ArrowRight, PackageOpen, ShieldCheck, Truck } from 'lucide-react';
 import { useCart, maxQuantityFor } from '@/hooks/useCart.jsx';
 import { formatCurrency } from '@/utils/formatCurrency.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
@@ -19,7 +19,6 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { marketplaceGate, hasMarketplaceLine } from '@/utils/marketplaceIdentity.js';
-import { ShieldCheck, Truck } from 'lucide-react';
 
 const aud = (n) => `$${Number(n || 0).toFixed(2)}`;
 
