@@ -60,6 +60,7 @@ only* leaves them off; *Cookie settings* in the footer shows the bar again.
 |---|---|---|
 | Google Ads conversion tracking | `VITE_GOOGLE_ADS_ID` (`AW-…`), `VITE_GOOGLE_ADS_PURCHASE_LABEL` | `config` on consent, a `conversion` event per purchase with value + `transaction_id` |
 | Meta Pixel (`lib/metaPixel.js`) | `VITE_META_PIXEL_ID` | `PageView` per route, `ViewContent`, `AddToCart`, `InitiateCheckout`, `AddPaymentInfo`, `Purchase` (with `eventID` = session id for dedup against a future Conversions API) |
+| Impact affiliate tag (`lib/impactTag.js`) | — (tag id in the file) | `transformLinks` + `trackImpression`; never started on `/checkout`, `/login`, `/signup`, `/admin`, `/account`, `/welcome`, `/reset-password` |
 
 GA4 itself runs regardless, with Google Consent Mode v2 defaults
 (`analytics_storage: granted`, `ad_storage` / `ad_user_data` /

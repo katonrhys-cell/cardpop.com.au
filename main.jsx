@@ -10,6 +10,7 @@ import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
 import { GA_MEASUREMENT_ID, installGtag } from '@/lib/analytics.js';
 import { initMetaPixel } from '@/lib/metaPixel.js';
+import { initImpactTag } from '@/lib/impactTag.js';
 import { scheduleAdsenseLoad } from '@/lib/adsense.js';
 import { onFirstInteractionOrLoad } from '@/lib/deferredLoad.js';
 import { prefetchHomepageData } from '@/lib/homepageData.js';
@@ -213,16 +214,8 @@ const loadThirdPartyScripts = () => {
     } catch { /* analytics is non-critical */ }
   }
 
-  // Impact affiliate tracking
-  try {
-    (function (i, m, p, a, c, t) {
-      c.ire_o = p; c[p] = c[p] || function () { (c[p].a = c[p].a || []).push(arguments); };
-      t = a.createElement(m); const z = a.getElementsByTagName(m)[0];
-      t.async = 1; t.src = i; z.parentNode.insertBefore(t, z);
-    })('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js', 'script', 'impactStat', document, window);
-    window.impactStat('transformLinks');
-    window.impactStat('trackImpression');
-  } catch { /* affiliate tracking is non-critical */ }
+  // Impact affiliate tracking: only with marketing consent (lib/impactTag.js).
+  try { initImpactTag(); } catch { /* affiliate tracking is non-critical */ }
 };
 
 if (typeof window !== 'undefined') {
