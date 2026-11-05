@@ -5,11 +5,13 @@ import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { MARKETPLACE_PROTECTION } from '@/utils/buyerProtectionPolicy.js';
 import { CARRIERS } from '@/utils/shipmentTracking.js';
+import { SHOP_DELIVERY_TIMES as T } from '@/utils/productShippingLd.js';
 
 // Shop shipping numbers come from the same platform settings the server
 // prices with (free_shipping_threshold_aud / default_shipping_rate_aud), so an
 // admin change shows here without a deploy. Marketplace expectations come from
-// utils/buyerProtectionPolicy.js.
+// utils/buyerProtectionPolicy.js. The dispatch/delivery times are the ones the
+// product pages' structured data quotes (utils/productShippingLd.js).
 const ShippingPage = () => {
   const { settings } = usePlatformSettings();
   const threshold = Number(settings.free_shipping_threshold_aud) || 100;
@@ -28,8 +30,8 @@ const ShippingPage = () => {
       <ul>
         <li><strong>Orders under ${threshold}:</strong> ${rate} flat-rate tracked shipping, charged once per order</li>
         <li><strong>Orders of ${threshold} or more:</strong> free tracked shipping</li>
-        <li><strong>Dispatch:</strong> within 2 business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout)</li>
-        <li><strong>Delivery:</strong> typically 3–7 business days with Australia Post, depending on where you are</li>
+        <li><strong>Dispatch:</strong> within {T.dispatchBusinessDays} business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout)</li>
+        <li><strong>Delivery:</strong> typically {T.transitMinBusinessDays}–{T.transitMaxBusinessDays} business days with Australia Post, depending on where you are</li>
       </ul>
       <p>The ${threshold} threshold is based on the CardPop Shop items in your cart. All prices include GST.</p>
 

@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ShoppingBag, Search, SlidersHorizontal } from 'lucide-react';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
-import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, preorderCartFields, hasUnlimitedStock, isPurchasableStatus } from '@/utils/shopStock.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import { useShopFacets } from '@/hooks/useShopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
@@ -232,9 +232,10 @@ const ShopCategoryPage = () => {
       itemListElement: products.map((p, i) => {
         const price = Number(p.price_aud ?? 0);
         const url = `${SITE_ORIGIN}${shopProductPath(p)}`;
-        // Unpriced (e.g. coming soon): a Product without a real offer is
-        // rejected by Google, so list the URL only.
-        if (!(price > 0)) {
+        // Unpriced, or priced but not buyable yet (coming soon): a Product
+        // without a real offer is rejected by Google, and an Offer would claim
+        // InStock for something checkout refuses — list the URL only.
+        if (!(price > 0) || !isPurchasableStatus(p.status)) {
           return {
             '@type': 'ListItem',
             position: (page - 1) * PER_PAGE + i + 1,

@@ -119,6 +119,20 @@ tracking must be off, or every navigation counts twice:
   issue on failure, and is the first thing to run after a Search Console
   email about Merchant listings. Admin → Products warns when a non-`CP-` SKU
   is saved with the Brand blank.
+- **Merchant listings shipping & returns**: every product-page `Offer` carries
+  `shippingDetails` built by `utils/productShippingLd.js` — shop products quote
+  the live flat rate / free-shipping threshold (Admin → Settings; the bot
+  prerender reads them through the anon-callable `shop_shipping_terms()` RPC,
+  `20261105090739_shop_shipping_terms_rpc.sql`, falling back to the checkout
+  defaults), marketplace listings quote the seller's `shipping_cost_aud`.
+  Shop offers also carry `hasMerchantReturnPolicy` (`utils/shopReturnPolicy.js`).
+  Marketplace offers deliberately carry **no** return policy: schema.org can't
+  express "no change of mind, full refund when not as described", so a
+  "Missing field hasMerchantReturnPolicy" warning on marketplace URLs is
+  expected and does not make the item invalid. Delivery times are the
+  Shipping page's (`SHOP_DELIVERY_TIMES`, which that page reads). A product
+  that can't be bought (coming soon, unpriced) gets no `Offer`, and a Product
+  with no offer/review/rating is dropped (`isEligibleProductLd`).
 - **Prerendering for bots**: `api/prerender.js` serves real per-route HTML
   meta to crawlers (see `docs/` and `tests/backend/prerender.test.js`).
 - **Sitemap**: generated live at `https://cardpop.com.au/sitemap.xml`
