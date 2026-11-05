@@ -2,7 +2,7 @@
 // Must come first: registers the Trusted Types default policy before any code
 // touches a DOM XSS sink (the enforced CSP requires Trusted Types for scripts).
 import '@/lib/trustedTypesPolicy.js';
-import React, { Suspense } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '@/App.jsx';
 import { installChunkReloadGuard, dropRecoveredErrors } from '@/lib/chunkReload.js';
@@ -10,6 +10,7 @@ import { installImageCdnFallback } from '@/utils/imageCdnFallback.js';
 import { installWebMcp } from '@/lib/webmcp.js';
 import { GA_MEASUREMENT_ID, installGtag } from '@/lib/analytics.js';
 import { initMetaPixel } from '@/lib/metaPixel.js';
+import { initImpactTag } from '@/lib/impactTag.js';
 import { scheduleAdsenseLoad } from '@/lib/adsense.js';
 import { onFirstInteractionOrLoad } from '@/lib/deferredLoad.js';
 import { prefetchHomepageData } from '@/lib/homepageData.js';
@@ -72,33 +73,14 @@ const activateDeferredStylesheets = () => {
   return Promise.all(pending);
 };
 
-// Lazy-load Analytics and SpeedInsights to defer their JS loading
-const Analytics = React.lazy(() => import('@vercel/analytics/react').then(m => ({ default: m.Analytics })));
-const SpeedInsights = React.lazy(() => import('@vercel/speed-insights/react').then(m => ({ default: m.SpeedInsights })));
-
-// These inject /_vercel/{insights,speed-insights}/script.js, which only exist on
-// a Vercel deployment. On localhost (local `vite preview`, e2e/CI) those paths
-// 404 and the SPA fallback returns index.html, so the browser tries to execute
-// HTML as JS ("Unexpected token '<'"). Skip them off-deployment; they still run
-// on every real Vercel host (production and *.vercel.app previews).
+// Third-party analytics (gtag, the Cloudflare beacon, Impact…) are skipped on
+// localhost (local `vite preview`, e2e/CI) so test runs never report traffic.
 const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
 const analyticsEnabled = !/^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[?::1\]?)$/.test(hostname);
 
 const renderApp = () => {
   ReactDOM.createRoot(document.getElementById('root')).render(
-    <>
-      <App />
-      {analyticsEnabled && (
-        <Suspense fallback={null}>
-          <Analytics />
-        </Suspense>
-      )}
-      {analyticsEnabled && (
-        <Suspense fallback={null}>
-          <SpeedInsights />
-        </Suspense>
-      )}
-    </>
+    <App />
   );
 };
 
@@ -170,7 +152,7 @@ const initSentry = () => {
         integrations: [
           Sentry.browserTracingIntegration(),
         ],
-        tracesSampleRate: 0.2,
+        tracesSampleRate: 0.05,
         environment: import.meta.env.MODE || 'production',
         // Drop errors the app already auto-recovers from (stale-chunk imports
         // handled by installChunkReloadGuard) and benign service-worker
@@ -232,16 +214,8 @@ const loadThirdPartyScripts = () => {
     } catch { /* analytics is non-critical */ }
   }
 
-  // Impact affiliate tracking
-  try {
-    (function (i, m, p, a, c, t) {
-      c.ire_o = p; c[p] = c[p] || function () { (c[p].a = c[p].a || []).push(arguments); };
-      t = a.createElement(m); const z = a.getElementsByTagName(m)[0];
-      t.async = 1; t.src = i; z.parentNode.insertBefore(t, z);
-    })('https://utt.impactcdn.com/P-A7361090-8367-4d02-a53d-c4f13bef08391.js', 'script', 'impactStat', document, window);
-    window.impactStat('transformLinks');
-    window.impactStat('trackImpression');
-  } catch { /* affiliate tracking is non-critical */ }
+  // Impact affiliate tracking: only with marketing consent (lib/impactTag.js).
+  try { initImpactTag(); } catch { /* affiliate tracking is non-critical */ }
 };
 
 if (typeof window !== 'undefined') {

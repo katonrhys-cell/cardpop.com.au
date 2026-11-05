@@ -1,14 +1,20 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { getCategoryHierarchy } from '@/utils/categoryUtils.js';
 
 const CategoryContext = createContext(null);
 
+// The categories table is read only when a page actually asks for it (today
+// just ShopCategoryPage's legacy-slug fallback). The provider used to fetch
+// every row on mount, so every visit to any page paid for one query.
 export const CategoryHierarchyProvider = ({ children }) => {
   const [hierarchy, setHierarchy] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const requested = useRef(false);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    if (requested.current) return;
+    requested.current = true;
     const fetchHierarchy = async () => {
       try {
         setLoading(true);
@@ -46,7 +52,7 @@ export const CategoryHierarchyProvider = ({ children }) => {
     fetchHierarchy();
   }, []);
 
-  const value = useMemo(() => ({ hierarchy, loading, error }), [hierarchy, loading, error]);
+  const value = useMemo(() => ({ hierarchy, loading, error, load }), [hierarchy, loading, error, load]);
 
   return (
     <CategoryContext.Provider value={value}>
@@ -55,4 +61,9 @@ export const CategoryHierarchyProvider = ({ children }) => {
   );
 };
 
-export const useCategory = () => useContext(CategoryContext);
+/** The category hierarchy; the first component to call this starts the fetch. */
+export const useCategory = () => {
+  const ctx = useContext(CategoryContext);
+  useEffect(() => { ctx?.load?.(); }, [ctx]);
+  return ctx;
+};

@@ -142,7 +142,7 @@ async function searchBlog(tokens) {
 async function searchEvents(tokens) {
   // events_public is the curated, already-public view (approved events only).
   const { data, error } = await applyTokens(
-    supabase.from('events_public').select('*'),
+    supabase.from('events_public').select('id, slug, title, image_url, suburb, state, start_date'),
     tokens, ['title', 'suburb'],
   ).order('start_date', { ascending: true }).limit(OVER_FETCH);
   if (error) throw error;
