@@ -5,6 +5,7 @@ import logger from '../utils/logger.js';
 import { queryHomepageBundle, bundleHasErrors } from '../../lib/homepageQueries.js';
 import { SHOP_FACET_COLUMNS } from '../../utils/shopColumns.js';
 import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
+import { loadPublicSettings } from './settings.js';
 
 // Edge-cached public reads.
 //
@@ -97,6 +98,32 @@ router.get('/shop/facets', async (req, res) => {
     logger.error(`[PUBLIC] shop facets failed: ${error.message}`);
     uncacheable(res);
     return res.status(503).json({ data: null, error: { message: 'Temporarily unavailable' } });
+  }
+});
+
+/**
+ * GET /public/settings — the public platform settings (feature flags, the
+ * maintenance switch, listing and shipping limits) every page load reads.
+ * It lived at /settings/public, outside this path's Cloudflare cache rule and
+ * fetched with the member's bearer token, so every page view cost a function
+ * invocation and a database read. The whitelist is read with the service-role client (the
+ * table has no anon policy) but only the keys in PUBLIC_SETTINGS, so the
+ * answer is the same for every visitor, as this router requires. A failed
+ * read still answers the fail-open defaults, uncached.
+ */
+router.get('/settings', async (req, res) => {
+  try {
+    const settings = await publicReadCache.get('settings', async () => {
+      const { settings: loaded, ok } = await loadPublicSettings();
+      if (!ok) throw new PartialResult(loaded);
+      return loaded;
+    });
+    edgeCacheable(res);
+    return res.json(settings);
+  } catch (error) {
+    if (!(error instanceof PartialResult)) logger.error(`[PUBLIC] settings failed: ${error.message}`);
+    uncacheable(res);
+    return res.json(error instanceof PartialResult ? error.payload : (await loadPublicSettings()).settings);
   }
 });
 

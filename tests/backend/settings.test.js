@@ -89,3 +89,45 @@ describe('GET /settings/public', () => {
     expect(res.body).toEqual(PUBLIC_SETTINGS);
   });
 });
+
+describe('GET /public/settings (edge-cached copy)', () => {
+  // Imported lazily so the router picks up the same supabaseClient mock.
+  const loadPublic = async () => {
+    const { default: publicRouter, publicReadCache, EDGE_CACHE_CONTROL } = await import('../../src/routes/public.js');
+    const pub = express();
+    pub.use('/public', publicRouter);
+    return { pub, publicReadCache, EDGE_CACHE_CONTROL };
+  };
+
+  it('answers the merged settings with edge cache headers and reads the table once per TTL', async () => {
+    const { pub, publicReadCache, EDGE_CACHE_CONTROL } = await loadPublic();
+    publicReadCache.clear();
+    const key = Object.keys(PUBLIC_SETTINGS).find((k) => typeof PUBLIC_SETTINGS[k] === 'boolean');
+    mockIn.mockResolvedValue({ data: [{ key, value: !PUBLIC_SETTINGS[key] }], error: null });
+
+    const first = await request(pub).get('/public/settings');
+    expect(first.status).toBe(200);
+    expect(first.headers['cache-control']).toBe(EDGE_CACHE_CONTROL);
+    expect(first.body[key]).toBe(!PUBLIC_SETTINGS[key]);
+    expect(Object.keys(first.body).sort()).toEqual(Object.keys(PUBLIC_SETTINGS).sort());
+
+    await request(pub).get('/public/settings');
+    expect(mockIn).toHaveBeenCalledTimes(1);
+  });
+
+  it('serves the fail-open defaults uncached when the read fails, then retries', async () => {
+    const { pub, publicReadCache } = await loadPublic();
+    publicReadCache.clear();
+    mockIn.mockResolvedValueOnce({ data: null, error: { message: 'down' } });
+
+    const failed = await request(pub).get('/public/settings');
+    expect(failed.status).toBe(200);
+    expect(failed.headers['cache-control']).toMatch(/no-store/);
+    expect(failed.body).toEqual(PUBLIC_SETTINGS);
+
+    mockIn.mockResolvedValueOnce({ data: [], error: null });
+    const retried = await request(pub).get('/public/settings');
+    expect(retried.headers['cache-control']).not.toMatch(/no-store/);
+    expect(mockIn).toHaveBeenCalledTimes(2);
+  });
+});
