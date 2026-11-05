@@ -7,6 +7,15 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+// The AI usage ledger and monthly allowance (src/utils/aiUsage.js) have their
+// own tests (tests/backend/aiUsage.test.js); here they must not reach Supabase
+// through the stubbed global fetch.
+const aiUsage = vi.hoisted(() => ({ record: vi.fn(async () => {}) }));
+vi.mock('../../src/utils/aiUsage.js', () => ({ recordAiUsage: aiUsage.record }));
+vi.mock('../../src/middleware/aiAllowance.js', () => ({
+  requireAiAllowance: () => (_req, _res, next) => next(),
+}));
+
 // Controllable auth: tests can clear authState.userId to simulate an
 // unauthenticated request (supabaseAuth passes through without setting userId)
 const authState = vi.hoisted(() => ({ userId: 'user-1' }));

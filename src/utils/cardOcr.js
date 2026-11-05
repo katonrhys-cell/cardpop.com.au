@@ -131,7 +131,7 @@ export function buildPromptText(imageCount) {
 		: 'Analyze this trading card and extract all visible information as JSON.';
 }
 
-export async function requestOcr({ apiKey, model, system, promptText, imageBlocks, timeoutMs }) {
+export async function requestOcr({ apiKey, model, system, promptText, imageBlocks, timeoutMs, onUsage }) {
 	const res = await fetch('https://api.anthropic.com/v1/messages', {
 		method: 'POST',
 		headers: {
@@ -165,6 +165,8 @@ export async function requestOcr({ apiKey, model, system, promptText, imageBlock
 	}
 
 	const data = await res.json();
+	// Billed whether or not the reply is usable, so report it first.
+	if (data.usage) await onUsage?.({ model, usage: data.usage });
 	if (data.stop_reason === 'refusal') {
 		throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
 	}
@@ -180,7 +182,11 @@ export async function requestOcr({ apiKey, model, system, promptText, imageBlock
  * @param {(msg: string) => void} [args.log]
  * @returns {Promise<{ content: string, escalated: boolean, reason: string|null }>}
  */
-export async function runCardOcr({ apiKey, imageBlocks, log = () => {} }) {
+/**
+ * `onUsage({ model, usage, escalation })` is called after each billed call
+ * (src/utils/aiUsage.js records it).
+ */
+export async function runCardOcr({ apiKey, imageBlocks, log = () => {}, onUsage }) {
 	const ocrArgs = {
 		apiKey,
 		system: CardOCRPrompt,
@@ -188,7 +194,10 @@ export async function runCardOcr({ apiKey, imageBlocks, log = () => {} }) {
 		imageBlocks,
 	};
 
-	let content = await requestOcr({ ...ocrArgs, model: OCR_MODEL_FAST, timeoutMs: OCR_TIMEOUT_FAST });
+	let content = await requestOcr({
+		...ocrArgs, model: OCR_MODEL_FAST, timeoutMs: OCR_TIMEOUT_FAST,
+		onUsage: (u) => onUsage?.({ ...u, escalation: false }),
+	});
 
 	// Quality-gated escalation: only pay for the stronger model when the fast
 	// one left out something the rest of the pipeline depends on.
@@ -197,7 +206,10 @@ export async function runCardOcr({ apiKey, imageBlocks, log = () => {} }) {
 
 	log(`Escalating to ${OCR_MODEL_STRONG}: ${reason}`);
 	try {
-		const stronger = await requestOcr({ ...ocrArgs, model: OCR_MODEL_STRONG, timeoutMs: OCR_TIMEOUT_STRONG });
+		const stronger = await requestOcr({
+			...ocrArgs, model: OCR_MODEL_STRONG, timeoutMs: OCR_TIMEOUT_STRONG,
+			onUsage: (u) => onUsage?.({ ...u, escalation: true }),
+		});
 		// Only take the escalation when it actually read a card — a flaky or
 		// truncated second call must not replace a usable first one.
 		if (parseOcrJson(stronger)?.name) return { content: stronger, escalated: true, reason };
