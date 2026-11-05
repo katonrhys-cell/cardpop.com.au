@@ -261,7 +261,7 @@ export default async function handler(req, res) {
         .order('id'), MAX_ROWS.events),
       fetchAll(() => supabase
         .from('tracked_cards')
-        .select('id, slug, category, updated_at, card_price_snapshots(snapshot_date)')
+        .select('id, slug, category, updated_at, card_price_snapshots(snapshot_date, raw_count, graded_count)')
         .eq('active', true)
         .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
         .limit(1, { referencedTable: 'card_price_snapshots' })
@@ -485,10 +485,18 @@ export default async function handler(req, res) {
       }
     }
 
-    if (trackedCards.length > 0) {
-      parts.push('', `  <!-- Card price pages (${trackedCards.length}) -->`);
-      for (const card of trackedCards) {
-        const snapshotDate = card.card_price_snapshots?.[0]?.snapshot_date;
+    // A price page is advertised only once its latest snapshot found listings
+    // to price. A card with no snapshot yet, or whose eBay search came back
+    // empty, renders a page with no prices on it — thin content a reviewer
+    // shouldn't be pointed at. It rejoins the sitemap the day it prices.
+    const pricedCards = trackedCards.filter((card) => {
+      const latest = card.card_price_snapshots?.[0];
+      return latest && (Number(latest.raw_count) || 0) + (Number(latest.graded_count) || 0) > 0;
+    });
+    if (pricedCards.length > 0) {
+      parts.push('', `  <!-- Card price pages (${pricedCards.length}) -->`);
+      for (const card of pricedCards) {
+        const snapshotDate = card.card_price_snapshots[0].snapshot_date;
         const lastmod = snapshotDate || (card.updated_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/prices/${card.category}/${card.slug}`, lastmod, 'daily', '0.7'));
       }

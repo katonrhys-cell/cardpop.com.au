@@ -146,3 +146,23 @@ describe('sitemap grading scale pages', () => {
     }
   });
 });
+
+describe('sitemap card price pages', () => {
+  it('lists a price page only once its latest snapshot found listings', async () => {
+    state.tables.tracked_cards = [
+      { id: 'c1', slug: 'charizard-base-set', category: 'pokemon', card_price_snapshots: [{ snapshot_date: '2026-11-04', raw_count: 17, graded_count: 13 }] },
+      { id: 'c2', slug: 'graded-only', category: 'pokemon', card_price_snapshots: [{ snapshot_date: '2026-11-04', raw_count: 0, graded_count: 3 }] },
+      // eBay search came back empty → a page with no prices on it.
+      { id: 'c3', slug: 'empty-search', category: 'nrl', card_price_snapshots: [{ snapshot_date: '2026-11-04', raw_count: 0, graded_count: 0 }] },
+      // Just added; not priced yet.
+      { id: 'c4', slug: 'brand-new', category: 'afl', card_price_snapshots: [] },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/prices/pokemon/charizard-base-set')}\n    <lastmod>2026-11-04</lastmod>`);
+    expect(body).toContain(loc('/prices/pokemon/graded-only'));
+    expect(body).not.toContain(loc('/prices/nrl/empty-search'));
+    expect(body).not.toContain(loc('/prices/afl/brand-new'));
+    // The category hubs are always listed.
+    expect(body).toContain(loc('/prices/nrl'));
+  });
+});
