@@ -118,3 +118,51 @@ describe('sitemap leaves thin pages out', () => {
     expect(body).toContain(`${loc('/community/forum')}\n    <lastmod>2026-09-14</lastmod>`);
   });
 });
+
+describe('sitemap event organiser pages', () => {
+  it('lists an organiser once a public event names them, dated by the newest event', async () => {
+    state.tables.event_organisers = [
+      { id: 'o1', name: 'Sports Addicts Australia', slug: 'sports-addicts-australia', updated_at: '2026-09-01T00:00:00Z' },
+      { id: 'o2', name: 'Quiet Org', slug: 'quiet-org', updated_at: '2026-09-01T00:00:00Z' },
+      { id: 'o3', name: 'No Slug Yet', slug: null },
+    ];
+    state.tables.events = [
+      { id: 'e1', organizer_name: 'Fast Break Trading Cards & Sports Addicts Australia', updated_at: '2026-10-20T00:00:00Z' },
+      { id: 'e2', organizer_name: 'Sports Addicts Australia', updated_at: '2026-10-05T00:00:00Z' },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/events/organisers/sports-addicts-australia')}\n    <lastmod>2026-10-20</lastmod>`);
+    // No events name them → their page is noindex, so it isn't advertised.
+    expect(body).not.toContain(loc('/events/organisers/quiet-org'));
+    expect(body).not.toContain('/events/organisers/null');
+  });
+});
+
+describe('sitemap grading scale pages', () => {
+  it('lists every company scale from the shared data file', async () => {
+    const { body } = await run();
+    for (const scale of ['psa', 'bgs', 'cgc', 'ace']) {
+      expect(body, scale).toContain(loc(`/grading/scales/${scale}`));
+    }
+  });
+});
+
+describe('sitemap card price pages', () => {
+  it('lists a price page only once its latest snapshot found listings', async () => {
+    state.tables.tracked_cards = [
+      { id: 'c1', slug: 'charizard-base-set', category: 'pokemon', card_price_snapshots: [{ snapshot_date: '2026-11-04', raw_count: 17, graded_count: 13 }] },
+      { id: 'c2', slug: 'graded-only', category: 'pokemon', card_price_snapshots: [{ snapshot_date: '2026-11-04', raw_count: 0, graded_count: 3 }] },
+      // eBay search came back empty → a page with no prices on it.
+      { id: 'c3', slug: 'empty-search', category: 'nrl', card_price_snapshots: [{ snapshot_date: '2026-11-04', raw_count: 0, graded_count: 0 }] },
+      // Just added; not priced yet.
+      { id: 'c4', slug: 'brand-new', category: 'afl', card_price_snapshots: [] },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/prices/pokemon/charizard-base-set')}\n    <lastmod>2026-11-04</lastmod>`);
+    expect(body).toContain(loc('/prices/pokemon/graded-only'));
+    expect(body).not.toContain(loc('/prices/nrl/empty-search'));
+    expect(body).not.toContain(loc('/prices/afl/brand-new'));
+    // The category hubs are always listed.
+    expect(body).toContain(loc('/prices/nrl'));
+  });
+});
