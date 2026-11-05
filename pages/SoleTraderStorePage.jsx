@@ -421,14 +421,6 @@ const SoleTraderStorePage = () => {
             </div>
           )}
 
-          {/* ABN */}
-          {dealer.abn && (
-            <div className="bg-card rounded-[2rem] border border-border p-6 shadow-sm">
-              <h3 className="font-bold text-foreground mb-2 uppercase text-xs tracking-wider">ABN</h3>
-              <p className="text-sm font-mono text-muted-foreground">{dealer.abn}</p>
-            </div>
-          )}
-
           {/* Stats */}
           <div className="bg-card rounded-[2rem] border border-border p-6 shadow-sm space-y-4">
             <h3 className="font-bold text-foreground uppercase text-xs tracking-wider">Store Stats</h3>

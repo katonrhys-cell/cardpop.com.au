@@ -262,7 +262,6 @@ const ScanPage = lazy(() => import('@/pages/ScanPage.jsx'));
 // Info & Misc Pages
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage.jsx'));
 const DiagnosticsPage = lazy(() => import('@/pages/DiagnosticsPage.jsx'));
-const InsiderTradingPage = lazy(() => import('@/pages/InsiderTradingPage.jsx'));
 const SitemapPage = lazy(() => import('@/pages/SitemapPage.jsx'));
 
 // Corporate Info Pages
@@ -517,7 +516,6 @@ const App = () => {
                         {/* Search & Misc */}
                         <Route path="/search" element={<SearchResultsPage />} />
                         <Route path="/diagnostics" element={<DiagnosticsPage />} />
-                        <Route path="/insider-trading" element={<InsiderTradingPage />} />
                         <Route path="/sitemap" element={<SitemapPage />} />
                         
                         {/* Info Pages */}

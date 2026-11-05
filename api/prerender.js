@@ -2461,18 +2461,6 @@ const STATIC_CONTENT = {
     links: [{ text: 'Grading Hub', href: '/grading' }, { text: 'Browse the Marketplace', href: '/marketplace' }],
   },
 
-  '/insider-trading': {
-    title: 'Partner Deals | CardPop',
-    description: 'Shop with CardPop\'s trusted partner retailers and support the platform — deals on trading cards and accessories for Australian collectors.',
-    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Partner Deals', path: '/insider-trading' }],
-    h1: 'Partner Deals',
-    intro: 'Support CardPop Australia by shopping with our trusted affiliate partners. Get the best deals on premium trading cards and accessories from retailers vetted by the CardPop team.',
-    sections: [
-      { h2: 'Trusted partner retailers', paras: ['Browse curated affiliate partners offering premium trading cards, sealed product and accessories to Australian collectors.'] },
-    ],
-    links: [{ text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'The Shop', href: '/shop' }],
-  },
-
   '/analytics': {
     title: 'Card Market Analytics | CardPop',
     description: 'Track trading card market prices and trends for Pokemon, Magic: The Gathering, Yu-Gi-Oh and more in Australia.',
