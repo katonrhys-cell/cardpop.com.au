@@ -1,0 +1,233 @@
+-- Expand the /prices tracker and repair the pages whose eBay search found
+-- nothing. Companion to 20260703000003_seed_tracked_cards.sql.
+--
+-- Every search_query below was run against live eBay AU listings on
+-- 2026-11-05 (the daily job adds eBay US on top) and returned at least six
+-- listings of the right card. Card numbers were confirmed from several
+-- listing titles agreeing; where they didn't, the number is NULL — better
+-- absent than wrong on a public page. Blurbs are facts about the card, never
+-- prices (prices come from the snapshots).
+--
+-- How the queries are written, and why: the job passes search_query to eBay as
+-- `q` with no title filter, and eBay requires every word to match. Long
+-- queries with rarity words ("Special Illustration Rare", "Alternate Art")
+-- match item specifics rather than titles and let other printings of the same
+-- Pokémon into the average, while `Pokemon <name> <number>` stays clean; a
+-- leading `-word` excludes a known contaminant (`-102` keeps Base Set 4/102
+-- out of the Base Set 2 4/130 search).
+--
+-- Idempotent: inserts skip existing slugs; updates are keyed on slug, so a
+-- page keeps its URL and its price history.
+
+-- ── 1. New cards ──────────────────────────────────────────────────────────────
+
+insert into public.tracked_cards (slug, name, set_name, card_number, category, search_query, blurb) values
+
+-- ── Pokémon: vintage & reprints ──────────────────────────────────────────────
+('mewtwo-base-set', 'Mewtwo Holo', 'Base Set', '10/102', 'pokemon',
+ 'Pokemon Mewtwo Holo Base Set 10/102',
+ 'The Base Set holo of the original Legendary Pokémon. Alongside the three starters it is one of the most recognised holos of the 1999 set, and shadowless and 1st Edition copies carry a premium.'),
+('dark-charizard-team-rocket', 'Dark Charizard Holo', 'Team Rocket', '4/82', 'pokemon',
+ 'Pokemon Dark Charizard Holo Team Rocket 4/82',
+ 'The holo Charizard of the 2000 Team Rocket set, which introduced the "Dark" Pokémon. It is the chase card of the set and a staple of vintage Charizard collections, with 1st Edition copies the most sought after.'),
+('charizard-base-set-2', 'Charizard Holo', 'Base Set 2', '4/130', 'pokemon',
+ 'Pokemon Charizard 4/130 -102',
+ 'The Base Set 2 printing of the original Charizard holo — the same artwork as Base Set, renumbered 4/130 for the 2000 reprint set. It is a more affordable way into the classic Charizard than the 4/102 original.'),
+('charizard-evolutions', 'Charizard Holo', 'XY Evolutions', '11/108', 'pokemon',
+ 'Pokemon Charizard Evolutions 11/108 -reverse -prerelease',
+ 'The XY Evolutions holo that brought the original Base Set Charizard artwork back in 2016. A popular modern take on the classic card; reverse-holo and prerelease versions are tracked out of this price.'),
+
+-- ── Pokémon: Sword & Shield alternate arts ───────────────────────────────────
+('espeon-vmax-alt-art-fusion-strike', 'Espeon VMAX (Alternate Art)', 'Fusion Strike', '270/264', 'pokemon',
+ 'Pokemon Espeon VMAX Alternate Art Fusion Strike 270/264',
+ 'One of the Fusion Strike alternate-art secret rares, and part of the Eeveelution alternate-art run collectors chase across the Sword & Shield era.'),
+('mew-vmax-alt-art-fusion-strike', 'Mew VMAX (Alternate Art)', 'Fusion Strike', '269/264', 'pokemon',
+ 'Pokemon Mew VMAX 269/264',
+ 'Fusion Strike''s Mew VMAX alternate art, a headline pull from the set alongside Gengar VMAX. Some sellers list it as a full art or rainbow, so the price here is keyed on the 269/264 number.'),
+('rayquaza-v-alt-art-evolving-skies', 'Rayquaza V (Alternate Art)', 'Evolving Skies', '194/203', 'pokemon',
+ 'Pokemon Rayquaza V Alternate Art Evolving Skies 194/203',
+ 'The Rayquaza V alternate art from Evolving Skies — a companion to the set''s Rayquaza VMAX and one of the most collected V alternate arts of the era.'),
+('umbreon-v-alt-art-evolving-skies', 'Umbreon V (Alternate Art)', 'Evolving Skies', '189/203', 'pokemon',
+ 'Pokemon Umbreon V Alternate Art 189/203',
+ 'The Umbreon V alternate art from Evolving Skies, the smaller sibling of the "Moonbreon" VMAX and a key card for Umbreon collectors.'),
+('dragonite-v-alt-art-evolving-skies', 'Dragonite V (Alternate Art)', 'Evolving Skies', '192/203', 'pokemon',
+ 'Pokemon Dragonite V Alternate Art Evolving Skies 192/203',
+ 'Evolving Skies'' Dragonite V alternate art, one of the set''s run of dragon-type alternate arts and a favourite with collectors of the set.'),
+('tyranitar-v-alt-art-battle-styles', 'Tyranitar V (Alternate Art)', 'Battle Styles', '155/163', 'pokemon',
+ 'Pokemon Tyranitar V Alternate Art Battle Styles 155/163',
+ 'The chase alternate art of Battle Styles, and one of the standout V alternate arts of 2021.'),
+('blaziken-vmax-alt-art-chilling-reign', 'Blaziken VMAX (Alternate Art)', 'Chilling Reign', '201/198', 'pokemon',
+ 'Pokemon Blaziken VMAX Alternate Art Chilling Reign 201/198',
+ 'The Blaziken VMAX alternate-art secret rare from Chilling Reign, one of the set''s top pulls.'),
+
+-- ── Pokémon: Scarlet & Violet special illustration rares ─────────────────────
+('blastoise-ex-sir-151', 'Blastoise ex (Special Illustration Rare)', 'Scarlet & Violet 151', '200/165', 'pokemon',
+ 'Pokemon Blastoise ex 200/165',
+ 'One of the three starter special illustration rares from Scarlet & Violet 151, the set built around the original 151 Pokémon.'),
+('venusaur-ex-sir-151', 'Venusaur ex (Special Illustration Rare)', 'Scarlet & Violet 151', '198/165', 'pokemon',
+ 'Pokemon Venusaur ex 198/165',
+ 'The Venusaur ex special illustration rare from Scarlet & Violet 151, completing the starter trio with Charizard and Blastoise.'),
+('alakazam-ex-sir-151', 'Alakazam ex (Special Illustration Rare)', 'Scarlet & Violet 151', '201/165', 'pokemon',
+ 'Pokemon Alakazam ex 201/165',
+ 'The Alakazam ex special illustration rare from Scarlet & Violet 151.'),
+('erikas-invitation-sir-151', 'Erika''s Invitation (Special Illustration Rare)', 'Scarlet & Violet 151', '203/165', 'pokemon',
+ 'Pokemon Erika''s Invitation 203/165',
+ 'The trainer special illustration rare of Scarlet & Violet 151, featuring the Celadon City Gym Leader Erika.'),
+('gardevoir-ex-sir-scarlet-violet', 'Gardevoir ex (Special Illustration Rare)', 'Scarlet & Violet', '245/198', 'pokemon',
+ 'Pokemon Gardevoir ex 245/198',
+ 'A special illustration rare from the Scarlet & Violet base set, and a card that saw heavy competitive play as well as collector demand.'),
+('miraidon-ex-sir-scarlet-violet', 'Miraidon ex (Special Illustration Rare)', 'Scarlet & Violet', '244/198', 'pokemon',
+ 'Pokemon Miraidon ex 244/198',
+ 'The Miraidon ex special illustration rare from the Scarlet & Violet base set, featuring the Violet version''s box legendary.'),
+('roaring-moon-ex-sir-paradox-rift', 'Roaring Moon ex (Special Illustration Rare)', 'Paradox Rift', '251/182', 'pokemon',
+ 'Pokemon Roaring Moon ex 251/182',
+ 'The Roaring Moon ex special illustration rare from Paradox Rift, the set built around the ancient and future Paradox Pokémon.'),
+('terapagos-ex-sir-stellar-crown', 'Terapagos ex (Special Illustration Rare)', 'Stellar Crown', '170/142', 'pokemon',
+ 'Pokemon Terapagos ex 170/142',
+ 'The Terapagos ex special illustration rare from Stellar Crown, featuring the Stellar-type legendary.'),
+('vaporeon-ex-sir-prismatic-evolutions', 'Vaporeon ex (Special Illustration Rare)', 'Prismatic Evolutions', '149/131', 'pokemon',
+ 'Pokemon Vaporeon ex 149/131',
+ 'One of the Eeveelution special illustration rares from Prismatic Evolutions, the Eevee-themed set that became one of the most sought-after releases of the Scarlet & Violet era.'),
+('flareon-ex-sir-prismatic-evolutions', 'Flareon ex (Special Illustration Rare)', 'Prismatic Evolutions', '146/131', 'pokemon',
+ 'Pokemon Flareon ex 146/131',
+ 'The Flareon ex special illustration rare from Prismatic Evolutions, part of the set''s full run of Eeveelution special illustration rares.'),
+('jolteon-ex-sir-prismatic-evolutions', 'Jolteon ex (Special Illustration Rare)', 'Prismatic Evolutions', '153/131', 'pokemon',
+ 'Pokemon Jolteon ex 153/131',
+ 'The Jolteon ex special illustration rare from Prismatic Evolutions, part of the set''s full run of Eeveelution special illustration rares.'),
+('leafeon-ex-sir-prismatic-evolutions', 'Leafeon ex (Special Illustration Rare)', 'Prismatic Evolutions', '144/131', 'pokemon',
+ 'Pokemon Leafeon ex 144/131',
+ 'The Leafeon ex special illustration rare from Prismatic Evolutions, part of the set''s full run of Eeveelution special illustration rares.'),
+('glaceon-ex-sir-prismatic-evolutions', 'Glaceon ex (Special Illustration Rare)', 'Prismatic Evolutions', '150/131', 'pokemon',
+ 'Pokemon Glaceon ex 150/131',
+ 'The Glaceon ex special illustration rare from Prismatic Evolutions, part of the set''s full run of Eeveelution special illustration rares.'),
+('lillies-clefairy-ex-sir-journey-together', 'Lillie''s Clefairy ex (Special Illustration Rare)', 'Journey Together', '184/159', 'pokemon',
+ 'Pokemon Lillie''s Clefairy ex 184/159',
+ 'The chase card of Journey Together, the set that brought back trainer-owned Pokémon. It pairs Clefairy with the trainer Lillie.'),
+('ns-zoroark-ex-sir-journey-together', 'N''s Zoroark ex (Special Illustration Rare)', 'Journey Together', '185/159', 'pokemon',
+ 'Pokemon N''s Zoroark ex 185/159',
+ 'A special illustration rare from Journey Together, featuring the trainer N and his partner Zoroark.'),
+('team-rockets-mewtwo-ex-sir-destined-rivals', 'Team Rocket''s Mewtwo ex (Special Illustration Rare)', 'Destined Rivals', '231/182', 'pokemon',
+ 'Pokemon Team Rocket''s Mewtwo ex 231/182',
+ 'The top chase card of Destined Rivals, the set that brought Team Rocket''s Pokémon back to the TCG.'),
+('mega-charizard-x-ex-sir-phantasmal-flames', 'Mega Charizard X ex (Special Illustration Rare)', 'Phantasmal Flames', '125/094', 'pokemon',
+ 'Pokemon Mega Charizard X ex 125/094',
+ 'The Mega Charizard X ex special illustration rare from Phantasmal Flames, the headline Charizard of the Mega Evolution era.'),
+('mega-gardevoir-ex-sir-mega-evolution', 'Mega Gardevoir ex (Special Illustration Rare)', 'Mega Evolution', '178/132', 'pokemon',
+ 'Pokemon Mega Gardevoir ex 178/132',
+ 'A special illustration rare from the Mega Evolution base set, which brought Mega Evolution back to the Pokémon TCG.'),
+
+-- ── One Piece: manga rares ───────────────────────────────────────────────────
+-- `One Piece <name> <code> manga` — titles rarely carry "Card Game" or "rare".
+-- English and Japanese printings share a code and are priced together.
+('trafalgar-law-op10-119-manga', 'Trafalgar Law (Manga Rare)', 'Royal Blood (OP-10)', 'OP10-119', 'one-piece',
+ 'One Piece Trafalgar Law OP10-119 manga',
+ 'The manga rare of Royal Blood: Trafalgar Law in artwork drawn from the original manga panels.'),
+('silvers-rayleigh-op08-118-manga', 'Silvers Rayleigh (Manga Rare)', 'Two Legends (OP-08)', 'OP08-118', 'one-piece',
+ 'One Piece Rayleigh OP08-118 manga',
+ 'The manga rare of Two Legends, featuring the Roger Pirates'' first mate Silvers Rayleigh in manga-panel artwork.'),
+('roronoa-zoro-op06-118-manga', 'Roronoa Zoro (Manga Rare)', 'Wings of the Captain (OP-06)', 'OP06-118', 'one-piece',
+ 'One Piece Zoro OP06-118 manga',
+ 'The Zoro manga rare from Wings of the Captain. Most copies on the market are graded, so the graded price is the one to watch.'),
+('luffy-op09-119-manga', 'Monkey D. Luffy (Manga Rare)', 'Emperors in the New World (OP-09)', 'OP09-119', 'one-piece',
+ 'One Piece Luffy OP09-119 manga',
+ 'The Luffy manga rare from Emperors in the New World, the set built around the Four Emperors.'),
+('buggy-op09-051-manga', 'Buggy (Manga Rare)', 'Emperors in the New World (OP-09)', 'OP09-051', 'one-piece',
+ 'One Piece Buggy OP09-051 manga',
+ 'Buggy''s manga rare from Emperors in the New World, the set built around the Four Emperors.'),
+('luffy-op11-118-manga', 'Monkey D. Luffy (Manga Rare)', 'A Fist of Divine Speed (OP-11)', 'OP11-118', 'one-piece',
+ 'One Piece Luffy OP11-118 manga',
+ 'The Luffy manga rare from A Fist of Divine Speed.'),
+('portgas-d-ace-op13-119-manga', 'Portgas D. Ace (Manga Rare)', 'Carrying On His Will (OP-13)', 'OP13-119', 'one-piece',
+ 'One Piece Ace OP13-119 manga',
+ 'Ace''s manga rare from Carrying On His Will, one of the set''s run of manga rares for the three sworn brothers.'),
+('sabo-op13-120-manga', 'Sabo (Manga Rare)', 'Carrying On His Will (OP-13)', 'OP13-120', 'one-piece',
+ 'One Piece Sabo OP13-120 manga',
+ 'Sabo''s manga rare from Carrying On His Will, alongside the set''s Luffy and Ace manga rares.'),
+('jewelry-bonney-op12-118-manga', 'Jewelry Bonney (Manga Rare)', 'Legacy of the Master (OP-12)', 'OP12-118', 'one-piece',
+ 'One Piece Bonney OP12-118 manga',
+ 'The Jewelry Bonney manga rare from Legacy of the Master.')
+
+-- @@SPORTS@@
+
+on conflict (slug) do nothing;
+
+-- ── 2. Repairs: pages whose search found nothing ─────────────────────────────
+
+update public.tracked_cards set
+  card_number = 'OP09-004',
+  search_query = 'One Piece Shanks OP09-004 manga',
+  updated_at = now()
+where slug = 'shanks-op09-manga';
+
+-- Sports rookies: the stored years/products were wrong for several players
+-- (checked against listing titles), and "rookie card <year> NRL Traders"
+-- matched nothing because titles rarely carry all of those words.
+update public.tracked_cards set
+  set_name = '2003 Select XL', card_number = '#123',
+  search_query = 'Gary Ablett 2003 Select rookie', updated_at = now()
+where slug = 'gary-ablett-jr-rookie';
+
+update public.tracked_cards set
+  set_name = '2017 NRL Elite', card_number = '#87',
+  search_query = 'Kalyn Ponga 2017 rookie', updated_at = now()
+where slug = 'kalyn-ponga-rookie';
+
+update public.tracked_cards set
+  set_name = '2016 NRL Elite',
+  search_query = 'Latrell Mitchell 2016 Elite',
+  blurb = 'The rookie card of one of the NRL''s biggest personalities and most damaging attacking players, from 2016 NRL Elite.',
+  updated_at = now()
+where slug = 'latrell-mitchell-rookie';
+
+-- 2017 is his rookie year (Traders #104, Elite #103 — both priced here).
+update public.tracked_cards set
+  set_name = '2017 NRL Traders',
+  search_query = 'Nathan Cleary 2017 rookie NRL', updated_at = now()
+where slug = 'nathan-cleary-rookie';
+
+-- 2022 is his rookie year (Elite #135 and Rivalry).
+update public.tracked_cards set
+  set_name = '2022 NRL Elite',
+  search_query = 'Reece Walsh 2022 rookie',
+  blurb = 'The most chased NRL rookie card of recent years. Walsh''s highlight-reel play for the Broncos has made his 2022 rookies the headline cards of the NRL hobby.',
+  updated_at = now()
+where slug = 'reece-walsh-rookie';
+
+-- 2016 is his rookie year (Traders, Elite and Xtreme).
+update public.tracked_cards set
+  set_name = '2016 NRL Traders',
+  search_query = 'Tom Trbojevic 2016 rookie', updated_at = now()
+where slug = 'tom-trbojevic-rookie';
+
+-- @@FRANKLIN@@
+
+-- Switched off: no search finds enough of the actual rookie card to price
+-- it honestly. Payne Haas has almost no listings; Joseph Suaalii's are
+-- almost all cheap inserts; Patrick Cripps' volume is his /400 draft-pick
+-- autograph and Sam Darcy's is mostly autographs, both of which would
+-- publish an autograph price as the "rookie card" price. An inactive card's
+-- page 404s and drops out of the sitemap; the blog generator already skips
+-- inactive cards. Flip `active` back once a reliable query exists.
+update public.tracked_cards set active = false, updated_at = now()
+where slug in ('payne-haas-rookie', 'joseph-suaalii-rookie', 'patrick-cripps-rookie', 'sam-darcy-rookie');
+
+-- ── 3. Link new sports cards to their player pages ───────────────────────────
+-- Same name match as 20261018020526_players.sql: a tracker card belongs to a
+-- player when its name starts with the player's name or one of their aliases
+-- (e.g. "Victor Wembanyama Donruss Rated Rookie" → victor-wembanyama).
+
+update public.tracked_cards tc
+set player_id = p.id
+from public.players p
+where tc.player_id is null
+  and tc.category in ('basketball', 'afl', 'nrl')
+  and lower(tc.name) like lower(p.name) || ' %';
+
+update public.tracked_cards tc
+set player_id = p.id
+from public.players p
+where tc.player_id is null
+  and tc.category in ('basketball', 'afl', 'nrl')
+  and exists (
+    select 1 from unnest(p.aliases) a where lower(tc.name) like lower(a) || ' %'
+  );
