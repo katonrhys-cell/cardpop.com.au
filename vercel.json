@@ -307,6 +307,17 @@
       "destination": "/api/prerender?path=/events"
     },
     {
+      "source": "/events/organisers/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|mediapartners-google|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/events/organisers/:slug"
+    },
+    {
       "source": "/events/:slug",
       "has": [
         {
@@ -318,7 +329,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch|conviction-rating|scan)",
       "has": [
         {
           "type": "header",
@@ -349,6 +360,17 @@
         }
       ],
       "destination": "/api/prerender?path=/grading/:sub"
+    },
+    {
+      "source": "/grading/scales/:scale(psa|bgs|cgc|ace)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|mediapartners-google|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/grading/scales/:scale"
     },
     {
       "source": "/collections",

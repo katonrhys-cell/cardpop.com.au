@@ -2,11 +2,14 @@ import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { GRADING_COMPANIES } from '../data/gradingCompanies.js';
 import { GRADING_PARTNERS_SEED } from '../data/gradingPartnersSeed.js';
+import { GRADING_SCALES, GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
+import { CONVICTION_LEVELS, CONVICTION_TYPES, CONVICTION_TYPE_KEYS } from '../utils/convictionRating.js';
 import { partnersForCompany, partnerLineText, gradingPartnersPath } from '../utils/gradingPartners.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd, buildReviewVideoJsonLds, cleanVideos, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
+import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
@@ -1697,6 +1700,113 @@ function organiserLogoHtml(event) {
   return `<p><img src="${esc(url)}" alt="${esc(logoAltText(event))}" loading="lazy" /></p>`;
 }
 
+// ── Event organiser pages (/events/organisers/<slug>) ──────────────────────
+// Mirrors pages/community/EventOrganiserPage.jsx: the organiser's name and
+// logo plus every public event whose organizer_name names them (co-hosted
+// events included — namesOrganiser() keeps only whole-name matches, exactly
+// as the SPA does). An organiser with no public events is noindex, as in the
+// SPA; an unknown slug is a real 404.
+async function renderEventOrganiser(supabase, slug) {
+  const canonical = `${BASE_URL}/events/organisers/${encodeURIComponent(slug)}`;
+  const { data: org } = await supabase
+    .from('event_organisers')
+    .select('id, name, slug, logo_url')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!org) {
+    return notFound({
+      title: 'Organiser Not Found | CardPop Events',
+      description: 'This event organiser could not be found on CardPop.',
+      canonical,
+      bodyHtml: '<main><h1>Organiser Not Found</h1><p>This organiser page doesn’t exist or has moved.</p></main>',
+    });
+  }
+
+  const { data: rows } = await supabase
+    .from('events')
+    .select(EVENT_FIELDS)
+    .in('status', ['approved', 'completed'])
+    .ilike('organizer_name', ilikeContains(org.name))
+    .order('start_date', { ascending: false })
+    .limit(200);
+  const events = (rows || []).filter((e) => namesOrganiser(e.organizer_name, org.name));
+
+  const today = new Date().toISOString().split('T')[0];
+  const upcoming = [];
+  const past = [];
+  for (const ev of events) {
+    const last = ev.end_date || ev.start_date || '';
+    if (ev.status === 'approved' && last >= today) upcoming.push(ev); else past.push(ev);
+  }
+  upcoming.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
+
+  const name = org.name;
+  const title = `${name} — Card Shows & Events | CardPop`;
+  const description = `Card shows and trading card events hosted by ${name}: ${upcoming.length} upcoming and ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop.`;
+  const logo = safeLogoUrl(org.logo_url) && !isVideoLogoUrl(org.logo_url) ? safeLogoUrl(org.logo_url) : undefined;
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Events', item: `${BASE_URL}/events` },
+      { '@type': 'ListItem', position: 3, name, item: canonical },
+    ],
+  };
+  const organisation = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name,
+    url: canonical,
+    ...(logo ? { logo } : {}),
+  };
+  const jsonLdItems = [breadcrumb, organisation];
+  if (upcoming.length) {
+    jsonLdItems.push({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `Upcoming events by ${name}`,
+      numberOfItems: upcoming.length,
+      itemListElement: upcoming.map((ev, i) => {
+        const { '@context': _c, ...item } = buildEventLd(ev);
+        return { '@type': 'ListItem', position: i + 1, item };
+      }),
+    });
+  }
+
+  const itemHtml = (ev) => {
+    const when = eventDateLine(ev);
+    const where = eventLocationLine(ev);
+    return `    <li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}"><strong>${esc(ev.title || 'Event')}</strong></a>`
+      + `${when ? ` — ${esc(when)}` : ''}${where ? ` (${esc(where)})` : ''}</li>`;
+  };
+  const listSection = (h2, list) => (list.length
+    ? `  <section>\n  <h2>${esc(h2)} (${list.length})</h2>\n  <ul>\n${list.map(itemHtml).join('\n')}\n  </ul>\n  </section>`
+    : '');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
+  ${logo ? `<p><img src="${esc(logo)}" alt="${esc(name)} logo" loading="lazy" /></p>` : ''}
+  <p>Event organiser</p>
+  <h1>${esc(name)}</h1>
+  <p>${esc(description)}</p>
+${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
+  <p><a href="${BASE_URL}/events">Browse all trading card events in Australia</a></p>
+</main>`;
+
+  return htmlDoc({
+    title,
+    description,
+    canonical,
+    ogImage: logo || `${BASE_URL}/og-image.jpg`,
+    ogImageAlt: logo ? `${name} logo` : 'CardPop — trading card events across Australia',
+    robots: events.length ? undefined : 'noindex, follow',
+    jsonLdItems,
+    bodyHtml,
+  });
+}
+
 async function renderEvent(supabase, param) {
   const byUuid = UUID_RE.test(param);
   let query = supabase.from('events').select(EVENT_FIELDS);
@@ -2528,6 +2638,90 @@ const STATIC_CONTENT = {
     ],
     links: [{ text: 'Card Shop Directory', href: '/card-shops' }, { text: 'Upcoming Events', href: '/events' }, { text: 'List Your Store', href: '/card-shops/add' }],
   },
+};
+
+// Per-company grading scales (/grading/scales/psa …) — built from the same
+// data the SPA page renders (data/gradingScales.js), so the crawler copy can't
+// drift from what people see. /grading/guide/:scale is an SPA alias whose
+// canonical points here, so only these URLs are prerendered and advertised.
+for (const slug of GRADING_SCALE_SLUGS) {
+  const company = GRADING_SCALES[slug];
+  const others = GRADING_SCALE_SLUGS.filter((s) => s !== slug);
+  STATIC_CONTENT[`/grading/scales/${slug}`] = {
+    title: `${company.name} Grading Scale — ${company.full} | CardPop Grading Hub`,
+    description: `Complete ${company.name} grading scale breakdown for Australian collectors. Learn what each ${company.name} grade means and how to maximise your submission results.`,
+    breadcrumb: [
+      { name: 'Home', path: '/' },
+      { name: 'Grading', path: '/grading' },
+      { name: 'Grading Scales', path: '/grading/scales' },
+      { name: `${company.name} Grading Scale`, path: `/grading/scales/${slug}` },
+    ],
+    h1: `${company.name} Grading Scale — ${company.full}`,
+    intro: company.intro,
+    sections: [
+      { h2: `The ${company.name} grades`, items: company.scales.map((g) => ({ text: `${company.name} ${g.grade} — ${g.label}: ${g.condition}` })) },
+      { h2: `${company.name} for Australian collectors`, paras: [company.auNote] },
+    ],
+    links: [
+      ...others.map((s) => ({ text: `${GRADING_SCALES[s].name} Grading Scale`, href: `/grading/scales/${s}` })),
+      { text: 'All Grading Scales', href: '/grading/scales' },
+      { text: 'Compare Grading Companies', href: '/grading/companies' },
+      { text: 'Grade Estimator', href: '/grading/estimator' },
+      { text: `Grade with ${company.name}`, href: gradingPartnersPath(slug) },
+    ],
+  };
+}
+
+// The Conviction Rating explainer (pages/info/ConvictionRatingPage.jsx), from
+// the same level/type tables the article badges use (utils/convictionRating.js).
+STATIC_CONTENT['/conviction-rating'] = {
+  title: 'The CardPop Conviction Rating Explained | CardPop',
+  description: "What CardPop's 1–5 Conviction Rating means: the five strength levels (Minimal to Highest), the four rating types (Buy, Keeper, Grade, Impact), and the action each level implies.",
+  breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Conviction Rating', path: '/conviction-rating' }],
+  h1: 'The CardPop Conviction Rating',
+  intro: 'Anyone can say a card is “a good buy.” The CardPop Conviction Rating puts a number on it — a single, honest measure of how strongly our research stands behind the central call of an article. It’s the same scale on every piece, so a “4” on one article means the same thing as a “4” on the next.',
+  sections: [
+    { h2: 'It measures strength, not direction', paras: [
+      'The rating is one-directional: it runs from weak conviction to strong conviction. A high number does not automatically mean “price going up” — it means “we’re highly confident in the call this article is making.” A low number isn’t a failure either: a well-argued “we looked, and we’d pass” is one of the most valuable things we can tell you.',
+      'Because we publish the full range — including the low end — the ratings build a track record you can judge us on.',
+    ] },
+    { h2: 'The five levels', items: CONVICTION_LEVELS.filter(Boolean).map((l) => ({ text: `${l.value} — ${l.label}: ${l.blurb}` })) },
+    ...CONVICTION_TYPE_KEYS.map((key) => {
+      const t = CONVICTION_TYPES[key];
+      return {
+        h2: t.name,
+        paras: [t.question],
+        items: CONVICTION_LEVELS.filter(Boolean).map((l) => ({ text: `${l.value} — ${l.label}: ${t.actions[l.value]}` })),
+      };
+    }),
+    { h2: 'What it is — and isn’t', items: [
+      { text: 'It is our honest, on-the-record read at the time of writing.' },
+      { text: 'It is a starting point for your own research, not a substitute for it.' },
+      { text: 'It isn’t financial advice, a price prediction, or a guarantee.' },
+      { text: 'It isn’t static — markets move, and each article states its own time horizon.' },
+    ], paras: ['Educational and how-to articles carry no rating — there’s no call to make, so they show a read-time cue instead.'] },
+  ],
+  links: [{ text: 'Read the latest CardPop research', href: '/blog' }, { text: 'Card Price Guide', href: '/prices' }],
+};
+
+// The card scanner (pages/ScanPage.jsx) — an interactive tool, so the crawler
+// copy is the page's own hero text plus what the tool does.
+STATIC_CONTENT['/scan'] = {
+  title: 'Card Scanner — Free Price Check | CardPop Australia™',
+  description: 'Scan any trading card or graded slab with your camera and get an instant identification and live AUD price check. Pokémon, sports cards, TCGs — free with a CardPop account.',
+  breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Card Scanner', path: '/scan' }],
+  h1: 'Scan any card. Know what it’s worth.',
+  intro: 'Point your camera at a raw card or a graded slab. CardPop identifies it and checks live market prices in AUD — then lists it for sale in a couple of clicks.',
+  sections: [
+    { h2: 'How the card scanner works', items: [
+      { text: 'Take or upload a photo of the card — front on, filling the frame, in even light.' },
+      { text: 'CardPop reads the card: name, set, card number and year, plus the grading company, grade and cert number on a slab.' },
+      { text: 'The card is matched against the catalogue and checked against live market prices, shown in AUD.' },
+      { text: 'List it on the CardPop marketplace straight from the result, with the details already filled in.' },
+    ] },
+    { h2: 'What it scans', paras: ['Pokémon, sports cards and other TCGs — raw cards or graded slabs. Scanning is free with a CardPop account.'] },
+  ],
+  links: [{ text: 'Card Price Guide', href: '/prices' }, { text: 'Grade Estimator', href: '/grading/estimator' }, { text: 'Browse the Marketplace', href: '/marketplace' }],
 };
 
 // Ordered list -> XML/HTML helpers for the static renderer.
@@ -4299,6 +4493,13 @@ export default async function handler(req, res) {
 
     if (rawPath === '/events') {
       return sendDoc(res, await renderEventsLanding(supabase, null));
+    }
+
+    // Two segments — claimed before the single-event matcher below, which
+    // would otherwise read "organisers" as an event slug and 404.
+    const organiserMatch = rawPath.match(/^\/events\/organisers\/([^/?#]+)\/?$/);
+    if (organiserMatch) {
+      return sendDoc(res, await renderEventOrganiser(supabase, safeDecode(organiserMatch[1])));
     }
 
     const eventsMatch = rawPath.match(/^\/events\/([^/?#]+)/);

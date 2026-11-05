@@ -126,8 +126,12 @@ export async function buildSnapshotForCard(card, usdToAud) {
  * Runs with bounded concurrency and a wall-clock budget so it fits inside the
  * serverless maxDuration; anything left over is picked up by the next cron run
  * or the on-demand fallback.
+ *
+ * Concurrency 8 (two eBay calls per card, so up to 16 in flight): 5 workers
+ * measured ~5 cards/s in production (82 cards in ~16 s); 8 lifts a run to
+ * roughly 250 cards inside the 32 s budget, so the catalogue can keep growing.
  */
-export async function refreshTrackedCards({ timeBudgetMs = 32000, concurrency = 5 } = {}) {
+export async function refreshTrackedCards({ timeBudgetMs = 32000, concurrency = 8 } = {}) {
   const startedAt = Date.now();
   const today = new Date().toISOString().slice(0, 10);
 

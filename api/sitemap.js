@@ -9,6 +9,8 @@ import { PALMS_OFF_PRODUCTS } from '../data/palmsOffCatalogue.js';
 import { shopProductBasePath, legacyShopProductPath } from '../utils/shopProductUrl.js';
 import { PUBLIC_SHOP_STATUSES } from '../utils/shopStock.js';
 import { shopCategoryLeaves, productInShopCategory } from '../utils/shopCategoryPages.js';
+import { GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
+import { namesOrganiser, organiserPath } from '../utils/eventOrganisers.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -88,6 +90,8 @@ const MAX_ROWS = {
   players: 1000,
   stores: 3000,
   sellerProfiles: 10000,
+  organisers: 1000,
+  organiserEvents: 5000,
 };
 
 const STATIC_PAGES = [
@@ -131,10 +135,11 @@ const STATIC_PAGES = [
   { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
   { loc: '/grading/what-is-grading', lastmod: SITE_UPDATED,    freq: 'monthly',  pri: '0.7' },
   { loc: '/grading/scales',        lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
-  // Per-company grading scale pages (COMPANY_DATA in GradingScalePage.jsx).
-  // /grading/guide/:scale is an alias of the same page — only the canonical
-  // /grading/scales/:scale URLs are advertised.
-  ...['psa', 'bgs', 'cgc', 'ace'].map((scale) => (
+  // Per-company grading scale pages (data/gradingScales.js — the same list
+  // the SPA page and the prerender read). /grading/guide/:scale is an alias of
+  // the same page — only the canonical /grading/scales/:scale URLs are
+  // advertised.
+  ...GRADING_SCALE_SLUGS.map((scale) => (
     { loc: `/grading/scales/${scale}`, lastmod: SITE_UPDATED,   freq: 'monthly',  pri: '0.6' }
   )),
   { loc: '/grading/companies',     lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
@@ -255,7 +260,7 @@ export default async function handler(req, res) {
         .order('id'), MAX_ROWS.events),
       fetchAll(() => supabase
         .from('tracked_cards')
-        .select('id, slug, category, updated_at, card_price_snapshots(snapshot_date)')
+        .select('id, slug, category, updated_at, card_price_snapshots(snapshot_date, raw_count, graded_count)')
         .eq('active', true)
         .order('snapshot_date', { referencedTable: 'card_price_snapshots', ascending: false })
         .limit(1, { referencedTable: 'card_price_snapshots' })
@@ -300,6 +305,21 @@ export default async function handler(req, res) {
         .order('sort_order', { ascending: true })
         .order('name', { ascending: true })
         .limit(MAX_ROWS.players),
+      // Event organiser pages (/events/organisers/<slug>) plus the organiser
+      // names on every public event, past or upcoming — the content gate: an
+      // organiser page is listed only when at least one event names them
+      // (the page is noindex otherwise).
+      fetchAll(() => supabase
+        .from('event_organisers')
+        .select('id, name, slug, updated_at')
+        .not('slug', 'is', null)
+        .order('id'), MAX_ROWS.organisers),
+      fetchAll(() => supabase
+        .from('events')
+        .select('id, organizer_name, updated_at, created_at')
+        .in('status', ['approved', 'completed'])
+        .not('organizer_name', 'is', null)
+        .order('id'), MAX_ROWS.organiserEvents),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -318,6 +338,8 @@ export default async function handler(req, res) {
     const shopCategoryRows = rows(8);
     const forumPosts = rows(9);
     const players = rows(10);
+    const organisers = rows(11);
+    const organiserEvents = rows(12);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -351,6 +373,29 @@ export default async function handler(req, res) {
       for (const event of events) {
         const lastmod = (event.updated_at || event.created_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/events/${event.slug || event.id}`, lastmod, 'weekly', '0.6'));
+      }
+    }
+
+    // Organiser pages, each dated by the newest change to the organiser or to
+    // any event naming them (the page lists those events).
+    const organiserUrls = [];
+    for (const org of organisers) {
+      const path = organiserPath(org);
+      if (!path) continue;
+      let lastmod = '';
+      for (const ev of organiserEvents) {
+        if (!namesOrganiser(ev.organizer_name, org.name)) continue;
+        const updated = (ev.updated_at || ev.created_at || TODAY).split('T')[0];
+        if (updated > lastmod) lastmod = updated;
+      }
+      if (!lastmod) continue;
+      const own = (org.updated_at || '').split('T')[0];
+      organiserUrls.push({ path, lastmod: own > lastmod ? own : lastmod });
+    }
+    if (organiserUrls.length > 0) {
+      parts.push('', `  <!-- Event organisers (${organiserUrls.length}) -->`);
+      for (const { path, lastmod } of organiserUrls) {
+        parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.6'));
       }
     }
 
@@ -439,10 +484,18 @@ export default async function handler(req, res) {
       }
     }
 
-    if (trackedCards.length > 0) {
-      parts.push('', `  <!-- Card price pages (${trackedCards.length}) -->`);
-      for (const card of trackedCards) {
-        const snapshotDate = card.card_price_snapshots?.[0]?.snapshot_date;
+    // A price page is advertised only once its latest snapshot found listings
+    // to price. A card with no snapshot yet, or whose eBay search came back
+    // empty, renders a page with no prices on it — thin content a reviewer
+    // shouldn't be pointed at. It rejoins the sitemap the day it prices.
+    const pricedCards = trackedCards.filter((card) => {
+      const latest = card.card_price_snapshots?.[0];
+      return latest && (Number(latest.raw_count) || 0) + (Number(latest.graded_count) || 0) > 0;
+    });
+    if (pricedCards.length > 0) {
+      parts.push('', `  <!-- Card price pages (${pricedCards.length}) -->`);
+      for (const card of pricedCards) {
+        const snapshotDate = card.card_price_snapshots[0].snapshot_date;
         const lastmod = snapshotDate || (card.updated_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/prices/${card.category}/${card.slug}`, lastmod, 'daily', '0.7'));
       }
