@@ -2069,7 +2069,7 @@ const STATIC_CONTENT = {
     // Keep in step with pages/info/SafeBuyingPage.jsx — no cloaking.
     sections: [
       { h2: 'Every payment is secure', paras: [
-        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay, all in Australian dollars.',
+        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay, all in Australian dollars.',
       ] },
       { h2: 'Buyer protection on every order', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
       { h2: 'You only trade with verified people', paras: [
@@ -2185,7 +2185,7 @@ const STATIC_CONTENT = {
         { text: 'If it goes missing: a tracked parcel that never arrives is the seller’s loss, not yours — see Buyer Protection on the Returns page.' },
       ] },
       { h2: 'Carriers and tracking', paras: [`Tracking links on CardPop support ${Object.values(CARRIERS).filter((c) => c.trackUrl).map((c) => c.label).join(', ')}. Every shipped order shows its carrier and tracking number in My Account → Orders, and the shipped email carries the same link.`] },
-      { h2: 'Where we ship', paras: ['We currently ship to Australian addresses only, and accept payment from Australian-issued cards and PayPal.'] },
+      { h2: 'Where we ship', paras: ['We currently ship to Australian addresses only, and accept payment from Australian-issued cards.'] },
       { h2: 'Packaging standards', paras: ['Single cards are shipped in a penny sleeve and top loader (or team bag), secured between rigid cardboard to prevent bending in transit. Graded cards are shipped in protective sleeves with bubble wrap. Sealed product is boxed, not bagged. Sellers are held to the same standard — a card that arrives damaged because it was poorly packed is covered by Buyer Protection.'] },
     ],
     links: [{ text: 'Returns & Refunds', href: '/returns' }],
@@ -2199,7 +2199,7 @@ const STATIC_CONTENT = {
     intro: 'Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe.',
     // Keep in step with pages/info/TrustSafetyPage.jsx — no cloaking.
     sections: [
-      { h2: 'Secure payments', paras: ['Every purchase on CardPop is processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.'] },
+      { h2: 'Secure payments', paras: ['Every purchase on CardPop is processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay.'] },
       { h2: 'Buyer protection', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
       { h2: 'Seller protection', paras: ['Sellers are protected against fraudulent chargebacks and false claims. Ship to the buyer’s checkout address with tracking (signature on delivery for high-value cards), mark the order posted with the tracking number, and you’re covered — a would-be scammer can’t claim “item not received” against a tracked, delivered parcel. A sale is binding, so a buyer can’t return a card that matches its listing because they changed their mind.'] },
       { h2: 'Verified identity', paras: ['Real people stand behind every account. Before anyone can sell, they verify their identity through Stripe Identity: a photograph of a government-issued ID and a matching selfie. Buyers need a free account for any marketplace card and complete the same one-time check for larger orders. Stripe performs the check and confirms the match — CardPop never stores your document images.'] },
@@ -2207,7 +2207,7 @@ const STATIC_CONTENT = {
     ],
     faqs: [
       { q: 'Is my card information safe on CardPop?', a: 'Yes. Payments are processed by Stripe, a PCI-DSS Level 1 certified provider. Card details are entered inside Stripe’s encrypted checkout and are never stored on or transmitted through CardPop’s servers.' },
-      { q: 'What payment methods can I use?', a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.' },
+      { q: 'What payment methods can I use?', a: 'At checkout you can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay.' },
       { q: 'What happens if my card never arrives or is not as described?', a: `You’re covered by ${MP.name}. Report it from My Account → Orders within ${MP.claimWindowDaysFromDelivery} days of delivery (or after ${MP.notShippedClaimAfterDays} days if the seller never posts it). If the card is significantly not as described, damaged, counterfeit or missing, you’re refunded in full — the card, postage and every fee — to your original payment method.` },
       { q: 'Can I return a marketplace card if I change my mind?', a: 'No. A marketplace sale is binding once the card is as advertised — you’re buying from another collector, not a shop. Change-of-mind returns apply to new CardPop Shop products only.' },
       { q: 'When do I have to verify my ID?', a: 'To sell, always. To buy a marketplace card, you need a free account; a one-time Stripe Identity check (government ID plus a matching selfie) is asked for on larger marketplace orders. Stripe performs the check and CardPop never stores your document images.' },
@@ -3969,7 +3969,7 @@ const HOME_HOW_IT_WORKS = [
   },
   {
     title: 'Pay securely',
-    desc: 'Checkout in AUD through Stripe — card, PayPal, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
+    desc: 'Checkout in AUD through Stripe — card, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
   },
   {
     title: 'Get it delivered, protected',

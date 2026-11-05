@@ -45,8 +45,8 @@ const appearanceFor = (dark) => ({
 const EXPRESS_OPTIONS = {
   // Google Pay is the point of this row; 'always' shows the button even when
   // the buyer has no card saved to Google yet (Google then offers to add one).
-  // Apple Pay appears on supported Apple devices. PayPal and Link are offered
-  // in the card form below instead, so they aren't duplicated up here.
+  // Apple Pay appears on supported Apple devices. PayPal and Link are not
+  // offered (src/utils/checkoutPaymentMethods.js pins checkout to card).
   paymentMethods: {
     googlePay: 'always',
     applePay: 'auto',
@@ -119,7 +119,7 @@ const PaymentForm = () => {
           />
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
-            <span>or pay with card or PayPal</span>
+            <span>or pay with card</span>
             <span className="h-px flex-1 bg-border" />
           </div>
         </div>

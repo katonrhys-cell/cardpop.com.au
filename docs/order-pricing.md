@@ -170,9 +170,15 @@ CardPop sells and ships within Australia only, enforced in three places:
 ## Payment methods are pinned
 
 `src/utils/checkoutPaymentMethods.js` pins `payment_method_types` to
-**`['card', 'paypal']`** on both checkout paths. `card` covers Apple Pay, Google
+**`['card']`** on both checkout paths. `card` covers Apple Pay, Google
 Pay and saved cards — those are card payment methods wearing a wallet, not
 separate types.
+
+The default used to be `['card', 'paypal']`, but PayPal is not active on the
+Stripe account, so every checkout failed with *"The payment method type
+provided: paypal is invalid"* (2026-11-05). Once PayPal is switched on in the
+Stripe Dashboard (Settings → Payment methods), add it back with
+`STRIPE_PAYMENT_METHOD_TYPES=card,paypal`.
 
 This exists because Afterpay costs roughly **6% + $0.30** through Stripe. On a
 $100 order that is ~$6.30 against a processing fee sized for a card, so every
@@ -186,8 +192,8 @@ one makes `sessions.create` throw, which takes checkout down. Hence the override
 
 | `STRIPE_PAYMENT_METHOD_TYPES` | Effect |
 |---|---|
-| unset | `card,paypal` (the default) |
-| `card` | cards and card wallets only — use this if PayPal isn't active |
+| unset | `card` (the default) — cards and card wallets (Apple Pay, Google Pay) |
+| `card,paypal` | add PayPal, once it is active on the account |
 | `card,paypal,link` | add Link, once it is active on the account |
 | `auto` | hand control back to the Dashboard's dynamic selection |
 

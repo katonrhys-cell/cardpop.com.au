@@ -18,7 +18,7 @@ import {
 // about — how payments are secured, how purchases are protected, and how we
 // verify who's on the other end of a trade. Copy is deliberately accurate to
 // the integrations we run: Stripe for order checkout (PCI-DSS hosted payment,
-// with PayPal and wallets offered as methods), Stripe for membership
+// with card wallets offered as methods), Stripe for membership
 // billing, and Stripe Identity for the ID check. Every protection figure is
 // read from utils/buyerProtectionPolicy.js so this page can never promise a
 // window or a refund the Returns page and the refund code don't deliver.
@@ -81,7 +81,7 @@ const FAQ = [
   },
   {
     q: 'What payment methods can I use?',
-    a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.',
+    a: 'At checkout you can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay.',
   },
   {
     q: 'What happens if my card never arrives or is not as described?',
@@ -137,7 +137,7 @@ const TrustSafetyPage = () => {
       </div>
 
       <SectionHeading icon={Lock}>Secure Payments</SectionHeading>
-      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay</strong>. All traffic is protected by 256-bit SSL end to end.</p>
+      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, Apple Pay or Google Pay</strong>. All traffic is protected by 256-bit SSL end to end.</p>
 
       <SectionHeading icon={ShieldCheck}>Buyer Protection</SectionHeading>
       <p>{PROTECTION_COPY.marketplaceSummary}</p>

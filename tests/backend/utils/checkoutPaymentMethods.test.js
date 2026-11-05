@@ -11,9 +11,11 @@ describe('checkoutPaymentMethodTypes', () => {
     else process.env[ENV_KEY] = original;
   });
 
-  it('pins card and PayPal by default — no BNPL', () => {
+  it('pins card only by default — no BNPL, no inactive PayPal', () => {
     const types = checkoutPaymentMethodTypes();
-    expect(types).toEqual(['card', 'paypal']);
+    expect(types).toEqual(['card']);
+    // PayPal isn't active on the Stripe account; pinning it took checkout down.
+    expect(types).not.toContain('paypal');
     // The point of pinning: Afterpay's ~6% would sell an ordinary order at a
     // loss against a card-rate processing fee.
     expect(types).not.toContain('afterpay_clearpay');
@@ -36,14 +38,14 @@ describe('checkoutPaymentMethodTypes', () => {
 
   it('falls back to the default for blank or junk values', () => {
     process.env[ENV_KEY] = '   ';
-    expect(checkoutPaymentMethodTypes()).toEqual(['card', 'paypal']);
+    expect(checkoutPaymentMethodTypes()).toEqual(['card']);
     process.env[ENV_KEY] = ',,,';
-    expect(checkoutPaymentMethodTypes()).toEqual(['card', 'paypal']);
+    expect(checkoutPaymentMethodTypes()).toEqual(['card']);
   });
 
   it('returns a fresh array each call — a caller mutating it cannot poison the default', () => {
     const first = checkoutPaymentMethodTypes();
     first.push('afterpay_clearpay');
-    expect(checkoutPaymentMethodTypes()).toEqual(['card', 'paypal']);
+    expect(checkoutPaymentMethodTypes()).toEqual(['card']);
   });
 });

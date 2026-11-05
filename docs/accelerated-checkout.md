@@ -25,7 +25,7 @@ The checkout's payment step (`components/checkout/EmbeddedStripeCheckout.jsx`)
 renders the Stripe payment form on our own page. By default it uses a Checkout
 Session in `ui_mode: 'elements'` and lays the form out with Stripe Elements
 (`components/checkout/StripeElementsPayment.jsx`): an **inline "Buy with Google
-Pay" button** (Stripe's Express Checkout Element) above the card/PayPal form —
+Pay" button** (Stripe's Express Checkout Element) above the card form —
 see "Inline Google Pay button" below. `VITE_CHECKOUT_UI=embedded` (build-time)
 falls back to Stripe's full Embedded Checkout page. The Checkout Session **pins**
 `payment_method_types` (`src/utils/checkoutPaymentMethods.js`), so Stripe
@@ -35,7 +35,7 @@ presents exactly what is pinned — not everything enabled on the account:
 |---|---|---|
 | Card (Visa/MC/Amex) | Standard card entry | **Yes** — pinned |
 | Apple Pay / Google Pay | Device wallets | **Yes** — they ride on `card` (domain must be verified for Apple Pay) |
-| PayPal | — | **Yes** — pinned; must also be active in the Stripe Dashboard |
+| PayPal | — | No — not active on the Stripe account (pinning it broke checkout on 2026-11-05); add `paypal` to `STRIPE_PAYMENT_METHOD_TYPES` once it is |
 | **Link** | Stripe's saved-card, one-tap wallet | No — add `link` to `STRIPE_PAYMENT_METHOD_TYPES` once it's active in the Dashboard |
 | **Afterpay/Clearpay** | Buy now, pay in 4 | No — ~6% + $0.30 sells an order at a loss (`docs/order-pricing.md`) |
 | Zip | Buy now, pay later (AU) | No — same reason |
@@ -48,7 +48,7 @@ down, so make the Dashboard change first. Before adding a BNPL method, raise
 
 ## Buy-now-pay-later messaging (code)
 
-**Currently off.** Checkout pins its payment methods to card + PayPal
+**Currently off.** Checkout pins its payment methods to card
 (`src/utils/checkoutPaymentMethods.js`) because Afterpay costs ~6% + $0.30
 through Stripe — enough to sell an ordinary order at a loss against a card-rate
 processing fee (`docs/order-pricing.md`). The instalment copy is therefore
@@ -118,13 +118,12 @@ button for us.
 
 - **Server**: `POST /stripe/create-cart-checkout` with `uiMode: 'elements'`
   creates the **same** Checkout Session as the embedded page (same pricing,
-  pinned `card,paypal` methods, pending order row, `checkout.session.completed`
+  pinned `card` method, pending order row, `checkout.session.completed`
   fulfilment) with `ui_mode: 'elements'`, and returns its `clientSecret`.
 - **Client**: `StripeElementsPayment.jsx` mounts `CheckoutElementsProvider`
   (`@stripe/react-stripe-js/checkout`) with that secret, then an
   `ExpressCheckoutElement` (`googlePay: 'always'`, `buttonType: 'buy'`, black
-  theme, Apple Pay on Apple devices) above a `PaymentElement` for card and
-  PayPal. Both confirm via `checkout.confirm()`, which redirects to
+  theme, Apple Pay on Apple devices) above a `PaymentElement` for card. Both confirm via `checkout.confirm()`, which redirects to
   `/checkout-success?session_id=…`. Wallets are hidden from the Payment
   Element so Google Pay isn't offered twice.
 - Google Pay is a card payment wearing a wallet, so nothing new is needed in

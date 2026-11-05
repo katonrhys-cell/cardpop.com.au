@@ -48,7 +48,7 @@ const ShippingPage = () => {
       </p>
 
       <h2>Where we ship</h2>
-      <p>We currently ship to Australian addresses only, and accept payment from Australian-issued cards and PayPal.</p>
+      <p>We currently ship to Australian addresses only, and accept payment from Australian-issued cards.</p>
 
       <h2>Packaging standards</h2>
       <p>Single cards are shipped in a penny sleeve and top loader (or team bag), secured between rigid cardboard to prevent bending in transit. Graded cards are shipped in protective sleeves with bubble wrap. Sealed product is boxed, not bagged. Sellers are held to the same standard — a card that arrives damaged because it was poorly packed is covered by Buyer Protection.</p>
