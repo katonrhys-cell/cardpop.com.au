@@ -22,7 +22,7 @@ vi.mock('@stripe/react-stripe-js/checkout', async () => {
   };
 });
 
-import StripeElementsPayment from '@/components/checkout/StripeElementsPayment.jsx';
+import StripeElementsPayment, { appearanceFor, CHECKOUT_FONT_STACK } from '@/components/checkout/StripeElementsPayment.jsx';
 
 const checkoutWith = (confirm) => ({
   type: 'success',
@@ -67,5 +67,31 @@ describe('StripeElementsPayment', () => {
     render(<StripeElementsPayment clientSecret="cs_secret" />);
     await waitFor(() => expect(screen.queryByTestId('express-element')).toBeNull());
     expect(screen.getByTestId('payment-element')).toBeTruthy();
+  });
+});
+
+describe('Stripe Elements appearance', () => {
+  // The fields live in Stripe's cross-origin iframe: 'inherit' there means the
+  // iframe's default font — Times in Safari — not the site's.
+  it('names the site body font instead of inheriting into the iframe', () => {
+    for (const dark of [false, true]) {
+      const { variables } = appearanceFor(dark);
+      expect(variables.fontFamily).toBe(CHECKOUT_FONT_STACK);
+      expect(variables.fontFamily).not.toMatch(/inherit/);
+      expect(variables.fontFamily).toMatch(/sans-serif$/);
+    }
+  });
+
+  it('matches the --font-sans stack in index.css', async () => {
+    const fs = await import('node:fs');
+    const css = fs.readFileSync('index.css', 'utf8');
+    const m = css.match(/--font-sans:\s*([^;]+);/);
+    expect(m?.[1].trim().replace(/'/g, '"')).toBe(CHECKOUT_FONT_STACK.replace(/'/g, '"'));
+  });
+
+  it('uses brand colours only (no blue)', () => {
+    const json = JSON.stringify([appearanceFor(false), appearanceFor(true)]);
+    expect(json).toContain('#CE1126');
+    expect(json).not.toMatch(/#(0570de|3b82f6|2563eb|1d4ed8)/i);
   });
 });
