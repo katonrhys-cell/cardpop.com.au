@@ -24,7 +24,7 @@ import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
 import ListingWatchers from '@/components/ListingWatchers.jsx';
 import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
@@ -101,7 +101,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     addToRecentlyViewed({
       id: product.id,
       title: product.name,
-      image: publicImageUrl(product.images?.[0]),
+      // A small strip tile: the 480 px companion thumbnail when the upload has one.
+      image: cardThumbUrl(product.images?.[0]),
       price: product.price,
       type: source,
       url: window.location.pathname,

@@ -3,7 +3,7 @@ import { ShoppingBag, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { toCdnUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import BnplMessage from '@/components/BnplMessage.jsx';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 
@@ -39,7 +39,7 @@ const OrderSummary = ({ cartItems = [], hasPreorder = false, subtotal = 0, servi
               {cartItems.map((item, i) => (
                 <li key={item.id ?? i} className="flex items-center gap-3 text-sm">
                   {item.image && (
-                    <img src={toCdnUrl(item.image)} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
+                    <img src={cardThumbUrl(item.image)} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
                   )}
                   <span className="flex-1 min-w-0">
                     <span className="block font-medium">{item.name ?? 'Card'}</span>
