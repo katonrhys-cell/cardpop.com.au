@@ -4,6 +4,7 @@ import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import { reportLimiter } from '../middleware/endpoint-rate-limit.js';
 import logger from '../utils/logger.js';
+import { alertAdminsToReview } from '../services/adminReviewAlerts.js';
 
 // User-facing content reporting — the missing "report a scam/counterfeit/abuse"
 // primitive every marketplace needs. Reports are written with the service-role
@@ -113,20 +114,18 @@ async function maybeEscalate(target_type, target_id) {
   // Fire exactly once, on the report that crosses the threshold.
   if (count !== ESCALATION_THRESHOLD) return;
 
-  const { data: admins } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('is_admin', true);
-
-  if (!admins?.length) return;
-
-  const notifications = admins.map((a) => ({
-    user_id: a.id,
+  await alertAdminsToReview({
     type: 'report_escalation',
     title: 'Content flagged by multiple users',
     body: `A ${target_type} has reached ${count} independent reports and needs review.`,
-  }));
-  await supabase.from('notifications').insert(notifications).then(() => {}, () => {});
+    path: '/admin/reports',
+    relatedId: /^[0-9a-f-]{36}$/i.test(String(target_id)) ? target_id : null,
+    email: {
+      subject: `Content flagged by ${count} members: ${target_type}`,
+      intro: `A ${target_type} has been reported by ${count} different members and needs moderation.`,
+      rows: [['Type', target_type], ['ID', String(target_id)], ['Reports', String(count)]],
+    },
+  });
   logger.warn(`[REPORT] Escalated ${target_type}:${target_id} — ${count} distinct reports`);
 }
 
