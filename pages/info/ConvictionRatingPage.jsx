@@ -31,7 +31,7 @@ const ConvictionRatingPage = () => {
     >
       <SEOHead
         title="The CardPop Conviction Rating Explained | CardPop"
-        description="What CardPop's 1–5 Conviction Rating means: the five strength levels (Minimal to Highest), the four rating types (Buy, Keeper, Grade, Impact), and the action each level implies."
+        description="What CardPop's 1–5 Conviction Rating means: the five strength levels, the four rating types (Buy, Keeper, Grade, Impact) and what each level implies."
         canonicalUrl="/conviction-rating"
       />
 

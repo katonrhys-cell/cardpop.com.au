@@ -59,8 +59,8 @@ const SafeBuyingPage = () => {
       description="Australia's safest place to buy Pokémon, Magic and sports cards — secure Stripe payments, ID-verified sellers and buyer protection on every order."
     >
       <SEOHead
-        title="Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™"
-        description={`Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described or doesn't arrive.`}
+        title="Safe Buying — Buy Trading Cards Safely | CardPop™"
+        description={`Buy cards safely in Australia: Stripe payments, ID-verified sellers and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if not as described.`}
         structuredData={faqStructuredData}
       />
 

@@ -33,7 +33,7 @@ export const COLLECTION_CONFIGS = {
     tagline: 'Catch the Rarest Cards in Australia',
     seoTitle: 'Pokémon Cards for Sale in Australia | CardPop',
     seoDescription:
-      'Buy, sell and trade Pokémon Trading Card Game singles and sealed products from verified Australian sellers. Browse vintage holos, PSA-graded slabs, and the latest Scarlet & Violet expansions — all priced in AUD.',
+      'Buy, sell and trade Pokémon TCG singles and sealed product from verified Australian sellers — vintage holos, PSA slabs and the latest sets, priced in AUD.',
     seoIntro:
       'The Pokémon Trading Card Game has captivated collectors worldwide since 1999. From the iconic Base Set Charizard to the crown-jewels of modern Scarlet & Violet, Australian collectors have always been among the most passionate on the planet. CardPop is Australia\'s home for Pokémon cards — connecting buyers and sellers across every state with secure escrow trading, real-time market data, and a community of verified collectors who live and breathe the game. Whether you\'re hunting a PSA 10 Shadowless Blastoise or picking up the latest Paldea Evolved booster display, you\'ll find it here.',
     // Hero visual theme
@@ -67,7 +67,7 @@ export const COLLECTION_CONFIGS = {
     tagline: 'Command the Most Powerful Cards in the Multiverse',
     seoTitle: 'Magic: The Gathering Cards Australia | CardPop',
     seoDescription:
-      'Buy and sell MTG singles, sealed product and Commander staples from verified Australian sellers. Browse Standard, Pioneer, Modern and Legacy formats — priced in AUD.',
+      'Buy and sell MTG singles, sealed product and Commander staples from verified Australian sellers. Standard, Pioneer, Modern and Legacy — priced in AUD.',
     seoIntro:
       'Magic: The Gathering is the world\'s premier trading card game — a vast, ever-expanding multiverse spanning over 30 years of iconic cards. From the legendary Power Nine to the latest Bloomburrow and Duskmourn sets, Australian Magic players demand the best. CardPop connects you with verified local sellers for singles, sealed product, and rare foils across all formats and eras.',
     heroGradient: 'from-purple-600 via-violet-500 to-purple-800',
@@ -241,7 +241,7 @@ export const COLLECTION_CONFIGS = {
     categoryAliases: ['Riftbound'],
     tagline: 'Tear Through the Rift — Build Your Deck',
     seoTitle: 'Riftbound Cards Australia | CardPop',
-    seoDescription: 'Buy and sell Riftbound singles from verified Australian collectors.',
+    seoDescription: 'Buy and sell Riftbound cards from verified Australian collectors — get in early on the new TCG and start your collection, priced in AUD.',
     seoIntro: 'Riftbound is one of the exciting new entries in the TCG space, bringing dimensional rift mechanics to competitive and casual play. Get in early and start building your collection.',
     heroGradient: 'from-violet-600 via-purple-500 to-violet-800',
     heroTextDark: false,

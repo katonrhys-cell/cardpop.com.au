@@ -92,7 +92,7 @@ const ContactPage = () => {
           <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
           </div>
-          <h3 className="text-2xl font-bold mb-3">Message sent!</h3>
+          <h2 className="text-2xl font-bold mb-3">Message sent!</h2>
           <p className="text-muted-foreground mb-6">
             Thanks for reaching out — we've received your message and will get back to you within 1 business day (AEST).
           </p>
@@ -107,7 +107,7 @@ const ContactPage = () => {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           <div>
-            <h3 className="text-xl font-bold mb-3">Get in Touch</h3>
+            <h2 className="text-xl font-bold mb-3">Get in Touch</h2>
             <p className="text-muted-foreground leading-relaxed">
               Whether you have a question about an order, need help with your vault, or just want to share feedback, our team is ready to assist you.
             </p>

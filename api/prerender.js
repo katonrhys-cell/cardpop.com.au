@@ -918,7 +918,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
 function renderBindersHub() {
   const canonical = `${BASE_URL}/shop/binders`;
   const title = 'Palms Off Gaming Binders — Zip & Top Loader | CardPop';
-  const description = "Shop the full Palms Off Gaming binder range in Australia — Collector's Series and Stealth zip binders in 4, 9 and 12 pocket layouts, top loader binders and the ring binder.";
+  const description = "Shop the Palms Off Gaming binder range in Australia — Collector's Series and Stealth zip binders in 4, 9 and 12 pockets, top loader binders and the ring binder.";
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -1335,7 +1335,7 @@ const LANDINGS = {
   },
   '/marketplace': {
     title: 'Buy & Sell Trading Cards Online Australia | CardPop', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
-    description: 'Browse Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
+    description: 'Browse Pokémon, Magic, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade and price. Free to list — buy and sell cards online.',
     intro: "Discover cards directly from other collectors' vaults alongside official CardPop listings.",
   },
 };
@@ -1942,7 +1942,7 @@ const LOCAL_DISCLAIMER = 'CardPop is not affiliated with any grading service or 
 const STATIC_CONTENT = {
   '/grading': {
     title: "Grading Hub | CardPop — Australia's Card Grading Resource",
-    description: "Australia's go-to trading card grading resource. Compare PSA, BGS, CGC and ACE Grading, understand condition scales, and learn how to maximise the value of your collection.",
+    description: "Australia's trading card grading resource. Compare PSA, BGS, CGC and ACE Grading, understand condition scales and learn how grading adds value to a collection.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Grading', path: '/grading' }],
     h1: 'The Grading Handbook',
     intro: "An Australian collector's guide, from your very first raw card to a sealed, graded slab. Six chapters take you from curious beginner to confident submitter.",
@@ -2210,7 +2210,7 @@ const STATIC_CONTENT = {
 
   '/faq': {
     title: 'FAQ | CardPop Australia™ — Trading Card Marketplace',
-    description: "Answers to common questions about buying, selling and trading on CardPop™ — Australia's trusted trading card marketplace. Learn about fees, the Vault, trades, and payments.",
+    description: "Answers to common questions about buying, selling and trading on CardPop™, Australia's trading card marketplace — fees, the Vault, trades and payments.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }],
     h1: 'Frequently Asked Questions',
     intro: 'Find answers to common questions about buying, selling, and vaulting on CardPop™.',
@@ -2229,8 +2229,8 @@ const STATIC_CONTENT = {
   },
 
   '/safe-buying': {
-    title: "Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™",
-    description: `Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described or doesn't arrive.`,
+    title: "Safe Buying — Buy Trading Cards Safely | CardPop™",
+    description: `Buy cards safely in Australia: Stripe payments, ID-verified sellers and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if not as described.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Safe Buying', path: '/safe-buying' }],
     h1: 'Why CardPop Is Safe: Buyer Protection & Secure Payments',
     intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
@@ -2305,7 +2305,7 @@ const STATIC_CONTENT = {
 
   '/returns': {
     title: 'Returns & Refund Policy | CardPop',
-    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, and ${MP.name}: a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery when a marketplace card isn't as described or doesn't arrive.`,
+    description: `CardPop returns: ${SHOP_RETURN_POLICY.windowDays}-day returns on new Shop products, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Returns & Refunds', path: '/returns' }],
     h1: 'Returns & Refunds',
     intro: 'How returns, exchanges and refunds work for CardPop Shop products and cards bought from other collectors on the marketplace.',
@@ -2361,7 +2361,7 @@ const STATIC_CONTENT = {
 
   '/trust-safety': {
     title: 'Trust & Safety | CardPop™',
-    description: `How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`,
+    description: `How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, and ID-verified sellers.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Trust & Safety', path: '/trust-safety' }],
     h1: 'Trust & Safety',
     intro: 'Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe.',
@@ -2403,7 +2403,7 @@ const STATIC_CONTENT = {
 
   '/community': {
     title: 'Community Hub | CardPop',
-    description: 'The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, the community map, card shows and events, Whatnot shows and The Parallel Report.',
+    description: 'The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, card shows, Whatnot shows and The Parallel Report.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Community', path: '/community' }],
     h1: 'Community Hub',
     intro: 'A home for collectors. Talk cards on the forum, climb the monthly leaderboard, find traders and shows near you, and keep up with The Parallel Report — all in one place.',
@@ -2562,7 +2562,7 @@ const STATIC_CONTENT = {
   // 30-day trial).
   '/pricing': {
     title: 'Pricing — Hobby, Pro, Premium, Elite & Ultimate | CardPop',
-    description: 'CardPop is free to join. Buy instantly, and sell once your ID is verified — paying only a small fee per sale. Upgrade to Pro, Premium, Elite or Ultimate for more monthly listings, your own store page and premium display styles.',
+    description: 'CardPop is free to join. Buy instantly and sell once your ID is verified, for a small fee per sale. Upgrade for more listings, a store page and premium styles.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }],
     h1: 'Simple, fair pricing',
     intro: 'Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Upgrade when you want more monthly listings, your own store page and the premium showcase styles.',
@@ -2718,7 +2718,7 @@ for (const slug of GRADING_SCALE_SLUGS) {
 // the same level/type tables the article badges use (utils/convictionRating.js).
 STATIC_CONTENT['/conviction-rating'] = {
   title: 'The CardPop Conviction Rating Explained | CardPop',
-  description: "What CardPop's 1–5 Conviction Rating means: the five strength levels (Minimal to Highest), the four rating types (Buy, Keeper, Grade, Impact), and the action each level implies.",
+  description: "What CardPop's 1–5 Conviction Rating means: the five strength levels, the four rating types (Buy, Keeper, Grade, Impact) and what each level implies.",
   breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Conviction Rating', path: '/conviction-rating' }],
   h1: 'The CardPop Conviction Rating',
   intro: 'Anyone can say a card is “a good buy.” The CardPop Conviction Rating puts a number on it — a single, honest measure of how strongly our research stands behind the central call of an article. It’s the same scale on every piece, so a “4” on one article means the same thing as a “4” on the next.',
@@ -3104,7 +3104,7 @@ ${tipsHtml ? `  <section>\n  <h2>Collector tips</h2>\n  <ul>\n${tipsHtml}\n  </u
 async function renderBlogIndex(supabase) {
   const canonical = `${BASE_URL}/blog`;
   const title = 'The Parallel Report | CardPop';
-  const description = 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
+  const description = 'The Parallel Report by CardPop — trading card news, market analysis and grading guides for Australian Pokémon, MTG and sports card collectors.';
 
   const { data } = await supabase
     .from('blog_articles')
@@ -3281,7 +3281,7 @@ async function renderPricesHub(supabase, categorySlug) {
     : 'Trading Card Prices in AUD | CardPop';
   const description = categoryLabel
     ? `Live Australian-dollar market prices for ${categoryLabel} trading cards — raw and graded averages updated daily from live listings.`
-    : 'Live Australian-dollar market prices for Pokémon, NBA, One Piece, AFL and NRL trading cards. Raw and graded averages updated daily.';
+    : 'Live Australian-dollar prices for Pokémon, NBA, One Piece, AFL and NRL cards. Raw and graded averages updated daily — no USD conversion guesswork.';
 
   const grouped = {};
   for (const card of cards || []) (grouped[card.category] ||= []).push(card);
