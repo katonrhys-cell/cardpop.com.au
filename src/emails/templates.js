@@ -1145,3 +1145,26 @@ ${centred('We never ask a winner to pay postage or share card details. If an acc
     'You’re receiving this because you entered a CardPop giveaway with this account.',
   );
 }
+
+// ─── Admin review queue alert (generic) ──────────────────────────────────────
+
+// One template for every "a member submitted something an admin must check"
+// alert (src/services/adminReviewAlerts.js): store directory submissions,
+// partner applications, refund requests, product reviews, report escalations.
+// `rows` are [label, value] pairs (values escaped here); `path` is the admin
+// page that holds the queue.
+export function adminReviewAlertEmail({ heading, intro, rows = [], path = '/admin' }) {
+  const body = `<p>${esc(intro)}</p>
+${rows.length ? summaryTable(rows.map(([label, value]) => [esc(label), esc(value) || '—'])) : ''}
+<p>Open the admin queue to approve, reject or reply.</p>`;
+
+  return cpEmail(
+    esc(heading),
+    'Needs Your Review',
+    esc(heading),
+    body,
+    `https://cardpop.com.au${path}`,
+    'Review in Admin',
+    'You received this because you are a CardPop admin.',
+  );
+}
