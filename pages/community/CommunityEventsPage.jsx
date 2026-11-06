@@ -493,7 +493,9 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
               Organising a card show, tournament or trade night in Australia? List it on CardPop for
               free and reach collectors across Australia. Sign in and submit your event
               from <Link to="/account/events" className="text-primary font-semibold hover:underline">My Events</Link> in
-              your account — every submission is reviewed before it appears on the calendar. Between
+              your account — every submission is reviewed before it appears on the calendar. You can
+              also give CardPop members a ticket discount: see{' '}
+              <Link to="/list-your-event" className="text-primary font-semibold hover:underline">List your event</Link>. Between
               shows, explore the <Link to="/marketplace" className="text-primary font-semibold hover:underline">CardPop marketplace</Link> to
               buy and sell.
             </p>

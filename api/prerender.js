@@ -32,6 +32,7 @@ import { shopShippingTerms, shopShippingDetailsLd, marketplaceShippingDetailsLd,
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
+import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH } from '../data/listYourEvent.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
@@ -2513,6 +2514,25 @@ const STATIC_CONTENT = {
       { q: 'I run a game store — does this connect to the store directory?', a: "Yes. If your store is already listed on our card-shops directory you can link your listing in the application, and if it isn't we'll happily add it when you're approved." },
     ],
     links: [{ text: 'Apply as Partner', href: '/partners/apply' }, { text: 'Card Shop Directory', href: '/card-shops' }],
+  },
+
+  // Organiser landing page — copy shared with pages/community/ListYourEventPage.jsx.
+  '/list-your-event': {
+    title: LIST_EVENT_SEO.title,
+    description: LIST_EVENT_SEO.description,
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Events', path: '/events' }, { name: 'List your event', path: '/list-your-event' }],
+    h1: LIST_EVENT_HERO.h1,
+    intro: LIST_EVENT_HERO.intro,
+    sections: [
+      ...LIST_EVENT_TIERS.map((t) => ({
+        h2: `${t.name} (${t.price})`,
+        paras: [t.summary],
+        items: t.points.map((text) => ({ text })),
+      })),
+      { h2: 'How it works', items: LIST_EVENT_STEPS.map(({ step, body }) => ({ text: `${step}: ${body}` })) },
+    ],
+    faqs: LIST_EVENT_FAQS,
+    links: [{ text: 'Submit your event', href: SUBMIT_EVENT_PATH }, { text: 'Events calendar', href: '/events' }],
   },
 
   // Keep pricing copy in sync with config/plans.js + config/subscription.js

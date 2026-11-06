@@ -329,7 +329,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch|conviction-rating|scan)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch|conviction-rating|scan|list-your-event)",
       "has": [
         {
           "type": "header",
