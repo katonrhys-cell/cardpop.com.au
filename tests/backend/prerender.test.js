@@ -641,6 +641,32 @@ describe('prerender events', () => {
     expect(body).not.toContain('noindex');
   });
 
+  it('links a finished event to its next edition, and every event to its city page', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'hobby-hangout-xl-sydney-2025', title: 'Hobby Hangout XL Sydney 2025', status: 'approved',
+      start_date: '2025-11-01', state: 'NSW', organizer_name: 'The Hobby Hangout',
+    } };
+    state.listResult = { data: [
+      { id: 'n1', slug: 'tcxpo-2099', title: 'TCXPO', status: 'approved', organizer_name: 'TCXPO', state: 'NSW', start_date: '2099-01-01' },
+      { id: 'n2', slug: 'hobby-hangout-xl-melbourne-2099', title: 'Hobby Hangout XL Melbourne 2099', status: 'approved', organizer_name: 'The Hobby Hangout', state: 'VIC', start_date: '2099-04-24', venue_name: 'Royal Exhibition Building' },
+    ] };
+    let { body } = await run('/events/hobby-hangout-xl-sydney-2025');
+    expect(body).toContain('Next edition: <a href="https://cardpop.com.au/events/hobby-hangout-xl-melbourne-2099">Hobby Hangout XL Melbourne 2099</a>');
+    expect(body).not.toContain('/events/tcxpo-2099');
+    expect(body).toContain('<a href="https://cardpop.com.au/card-shows/sydney">More card shows in Sydney</a>');
+
+    // No next edition: point at the city page instead.
+    state.listResult = { data: [] };
+    ({ body } = await run('/events/hobby-hangout-xl-sydney-2025'));
+    expect(body).not.toContain('Next edition');
+    expect(body).toContain('See <a href="https://cardpop.com.au/card-shows/sydney">upcoming card shows in Sydney</a>.');
+
+    // An upcoming event says nothing about having finished.
+    state.result = { data: { id: UUID, slug: 'future', title: 'Future Show', status: 'approved', start_date: '2099-01-01', state: 'VIC' } };
+    ({ body } = await run('/events/future'));
+    expect(body).not.toContain('This event has finished');
+  });
+
   it('shows an image organiser logo to bots and puts it on the Organization, but never a video loop', async () => {
     const base = { id: UUID, slug: 'con', title: 'Collect-It Con', status: 'approved', start_date: '2026-11-14', organizer_name: 'Collect-It' };
     state.result = { data: { ...base, organizer_logo_url: 'https://cdn.test/logo.gif' } };
