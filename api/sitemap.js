@@ -11,6 +11,7 @@ import { PUBLIC_SHOP_STATUSES } from '../utils/shopStock.js';
 import { shopCategoryLeaves, productInShopCategory } from '../utils/shopCategoryPages.js';
 import { GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
 import { namesOrganiser, organiserPath } from '../utils/eventOrganisers.js';
+import { eventRegionPath, regionsWithEvents } from '../data/eventRegions.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -254,7 +255,7 @@ export default async function handler(req, res) {
         .order('id'), MAX_ROWS.products),
       fetchAll(() => supabase
         .from('events')
-        .select('id, slug, updated_at, created_at')
+        .select('id, slug, state, status, start_date, end_date, updated_at, created_at')
         .in('status', ['approved', 'completed'])
         .gte('start_date', EVENTS_SINCE)
         .order('start_date', { ascending: true })
@@ -374,6 +375,20 @@ export default async function handler(req, res) {
       for (const event of events) {
         const lastmod = (event.updated_at || event.created_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/events/${event.slug || event.id}`, lastmod, 'weekly', '0.6'));
+      }
+    }
+
+    // City card-show pages (/card-shows/<city>) — only for states with an
+    // upcoming event; an empty city page is noindex (AdSense readiness).
+    const regions = regionsWithEvents(events, TODAY);
+    if (regions.length > 0) {
+      parts.push('', `  <!-- Card shows by city (${regions.length}) -->`);
+      for (const region of regions) {
+        const inState = events.filter((e) => String(e.state || '').toUpperCase() === region.state);
+        const lastmod = inState
+          .map((e) => (e.updated_at || e.created_at || TODAY).split('T')[0])
+          .sort().pop() || TODAY;
+        parts.push(xmlUrl(`${BASE_URL}${eventRegionPath(region)}`, lastmod, 'daily', '0.7'));
       }
     }
 

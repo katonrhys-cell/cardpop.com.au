@@ -196,6 +196,7 @@ const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEvents
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
 const EventOrganiserPage = lazy(() => import('@/pages/community/EventOrganiserPage.jsx'));
 const ListYourEventPage = lazy(() => import('@/pages/community/ListYourEventPage.jsx'));
+const EventRegionPage = lazy(() => import('@/pages/community/EventRegionPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
 const CommunityDiscussionNewPage = lazy(() => import('@/pages/community/CommunityDiscussionNewPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
@@ -506,6 +507,7 @@ const App = () => {
                         <Route path="/events/store-events" element={<CommunityEventsPage defaultType="lgs_event" />} />
                         <Route path="/events/organisers/:slug" element={<EventOrganiserPage />} />
                         <Route path="/list-your-event" element={<ListYourEventPage />} />
+                        <Route path="/card-shows/:city" element={<EventRegionPage />} />
                         <Route path="/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/events" element={<Navigate to="/events" replace />} />
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />

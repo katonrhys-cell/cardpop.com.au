@@ -49,6 +49,7 @@ export const LIST_EVENT_TIERS = [
       'Links to your website, socials and trader applications',
       'Shown to Google with full event details',
       'Reviewed by a person, usually within a few days',
+      'A "Listed on CardPop" badge for your own website',
     ],
     cta: { label: 'Submit your event', href: SUBMIT_EVENT_PATH },
   },

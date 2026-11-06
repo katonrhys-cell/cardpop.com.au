@@ -831,6 +831,35 @@ describe('prerender static content pages', () => {
     expect(body).toContain('"@type":"Question"');
   });
 
+  it('renders a city card-show page with its events and city links', async () => {
+    state.listResult = { data: [{
+      id: UUID, slug: 'melbourne-card-show', title: 'Melbourne Card Show', status: 'approved',
+      state: 'VIC', suburb: 'Docklands', venue_name: 'Marvel Stadium', start_date: '2099-03-01',
+    }] };
+    const { status, body } = await run('/card-shows/melbourne');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Card Shows in Melbourne</h1>');
+    expect(body).toContain('Melbourne Card Show');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/card-shows/melbourne" />');
+    expect(body).toContain('href="https://cardpop.com.au/card-shows/sydney"');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('noindexes a city with no upcoming events and 404s an unknown city', async () => {
+    const empty = await run('/card-shows/darwin');
+    expect(empty.status).toBe(200);
+    expect(empty.body).toContain('noindex, follow');
+    const unknown = await run('/card-shows/atlantis');
+    expect(unknown.status).toBe(404);
+  });
+
+  it('links the events landing to every city page', async () => {
+    const { body } = await run('/events');
+    expect(body).toContain('href="https://cardpop.com.au/card-shows/brisbane"');
+    expect(body).toContain('href="https://cardpop.com.au/list-your-event"');
+  });
+
   it('renders the organiser landing page from the shared copy', async () => {
     const { status, body } = await run('/list-your-event');
     expect(status).toBe(200);

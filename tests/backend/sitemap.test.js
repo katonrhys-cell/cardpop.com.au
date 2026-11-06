@@ -166,3 +166,16 @@ describe('sitemap card price pages', () => {
     expect(body).toContain(loc('/prices/nrl'));
   });
 });
+
+describe('sitemap city card-show pages', () => {
+  it('lists a city only while its state has an upcoming approved event', async () => {
+    state.tables.events = [
+      { id: 'e1', slug: 'vic-show', state: 'VIC', status: 'approved', start_date: '2099-01-10', updated_at: '2026-10-20T00:00:00Z' },
+      { id: 'e2', slug: 'nsw-old', state: 'NSW', status: 'completed', start_date: '2099-01-10', updated_at: '2026-10-20T00:00:00Z' },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/card-shows/melbourne')}\n    <lastmod>2026-10-20</lastmod>`);
+    expect(body).not.toContain(loc('/card-shows/sydney'));
+    expect(body).not.toContain(loc('/card-shows/darwin'));
+  });
+});
