@@ -80,7 +80,7 @@ const Footer = () => {
               finishes flush with the container (and header) edge. */}
           <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-10 sm:gap-12 lg:flex lg:justify-between lg:gap-8">
             <div>
-              <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Explore</h4>
+              <h2 className="font-bold mb-6 uppercase tracking-wider text-sm">Explore</h2>
               <ul className="space-y-4 text-sm text-muted-foreground font-medium">
                 <li><Link to="/shop" className="hover:text-primary transition-colors">Shop</Link></li>
                 {settings.enable_marketplace !== false && (
@@ -98,7 +98,7 @@ const Footer = () => {
             </div>
 
             <div>
-              <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Connect</h4>
+              <h2 className="font-bold mb-6 uppercase tracking-wider text-sm">Connect</h2>
               <ul className="space-y-4 text-sm text-muted-foreground font-medium">
                 {settings.enable_blog !== false && (
                   <>
@@ -115,7 +115,7 @@ const Footer = () => {
             </div>
 
             <div>
-              <h4 className="font-bold mb-6 uppercase tracking-wider text-sm">Support & Legal</h4>
+              <h2 className="font-bold mb-6 uppercase tracking-wider text-sm">Support & Legal</h2>
               <ul className="space-y-4 text-sm text-muted-foreground font-medium">
                 <li><Link to="/login" className="hover:text-primary transition-colors">Sign In</Link></li>
                 <li><Link to="/signup" className="hover:text-primary transition-colors">Create Account</Link></li>

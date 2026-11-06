@@ -75,7 +75,7 @@ const BINDER_ROWS = [
       'ZB-04-BLK_collectors-series-4-pocket-zip-binder-black_pkg2.png',
       'ZB-04-BLK_collectors-series-4-pocket-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Zip Binder",
     metaDescription:
       "The 4-pocket Collector's Series zip binder from Palms Off Gaming — side-loading archival pockets, a padded PU leather cover and a full metal zip. Eight colours, shipped Australia-wide.",
     intro:
@@ -130,7 +130,7 @@ const BINDER_ROWS = [
       'ZB-09-BLK_collectors-series-9-pocket-zip-binder-black_pkg2.png',
       'ZB-09-BLK_collectors-series-9-pocket-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 9-Pocket Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming Collector's Series 9-Pocket Zip Binder",
     metaDescription:
       "The 9-pocket Collector's Series zip binder from Palms Off Gaming — side-loading archival pockets, padded PU leather and a full metal zip. Eight colours, shipped Australia-wide.",
     intro:
@@ -185,7 +185,7 @@ const BINDER_ROWS = [
       'ZB-12-BLK_collectors-series-12-pocket-zip-binder-black_pkg2.png',
       'ZB-12-BLK_collectors-series-12-pocket-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 12-Pocket Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming Collector's Series 12-Pocket Zip Binder",
     metaDescription:
       "The 12-pocket Collector's Series zip binder from Palms Off Gaming — the highest-capacity layout in the range, with side-loading archival pockets and a full metal zip. Eight colours.",
     intro:
@@ -242,7 +242,7 @@ const BINDER_ROWS = [
       'TOP-04-BLK_collectors-series-4-pocket-top-loader-zip-binder-black_pkg2.png',
       'TOP-04-BLK_collectors-series-4-pocket-top-loader-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Top Loader Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming 4-Pocket Top Loader Zip Binder | CardPop",
     metaDescription:
       'A zip binder with pockets cut for 35pt top loaders, four to a page — store cards already in loaders without taking them out. Eight colours, shipped Australia-wide from CardPop.',
     intro:
@@ -297,7 +297,7 @@ const BINDER_ROWS = [
       'TOP-09-BLK_collectors-series-9-pocket-top-loader-zip-binder-black_pkg2.png',
       'TOP-09-BLK_collectors-series-9-pocket-top-loader-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 9-Pocket Top Loader Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming 9-Pocket Top Loader Zip Binder | CardPop",
     metaDescription:
       'Nine 35pt top loaders to a page in a zipped, archival-safe binder — the highest-capacity way to store loaded cards without unloading them. Eight colours, shipped Australia-wide.',
     intro:
@@ -353,7 +353,7 @@ const BINDER_ROWS = [
       'STL-09-BLK_stealth-9-pocket-zip-binder-black_logo.png',
       'STL-09-BLK_stealth-9-pocket-zip-binder-black_pkg2.png',
     ],
-    metaTitle: 'Palms Off Gaming Stealth 9-Pocket Zip Binder | CardPop Australia',
+    metaTitle: 'Palms Off Gaming Stealth 9-Pocket Zip Binder | CardPop',
     metaDescription:
       'The Stealth 9-pocket zip binder from Palms Off Gaming — a understated, blacked-out take on the nine-pocket zip binder with side-loading archival pockets. Seven colours.',
     intro:
@@ -403,7 +403,7 @@ const BINDER_ROWS = [
       'STL-12-BLK_stealth-12-pocket-zip-binder-black_logo.png',
       'STL-12-BLK_stealth-12-pocket-zip-binder-black_pkg2.png',
     ],
-    metaTitle: 'Palms Off Gaming Stealth 12-Pocket Zip Binder | CardPop Australia',
+    metaTitle: 'Palms Off Gaming Stealth 12-Pocket Zip Binder | CardPop',
     metaDescription:
       'The Stealth 12-pocket zip binder from Palms Off Gaming — maximum capacity in an understated finish, with side-loading archival pockets and a full metal zip. Seven colours.',
     intro:
@@ -452,7 +452,7 @@ const BINDER_ROWS = [
       'RB-BLK_collectors-series-ring-binder-black_open2.png',
       'RB-BLK_collectors-series-ring-binder-black_empty.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series Ring Binder | CardPop Australia",
+    metaTitle: "Palms Off Gaming Collector's Series Ring Binder | CardPop",
     metaDescription:
       "The Collector's Series ring binder from Palms Off Gaming — takes interchangeable pages, including PSA 4-slot graded card pages, so a collection can be re-ordered rather than re-filed.",
     intro:

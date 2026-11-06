@@ -39,6 +39,7 @@ import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
 } from '../utils/players.js';
+import { brandedTitle, SHORT_BRAND_SUFFIXES } from '../utils/seoTitle.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -904,7 +905,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   // The first paragraph of a shop description is written to stand alone as the
   // meta description; the rest is page body only.
   const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
-  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
+  return htmlDoc({ title: brandedTitle(name, { suffixes: SHORT_BRAND_SUFFIXES }), description: metaDescription, canonical, ogImage: image, jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -916,7 +917,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
 
 function renderBindersHub() {
   const canonical = `${BASE_URL}/shop/binders`;
-  const title = 'Palms Off Gaming Binders | Zip & Top Loader Binders | CardPop Australia';
+  const title = 'Palms Off Gaming Binders — Zip & Top Loader | CardPop';
   const description = "Shop the full Palms Off Gaming binder range in Australia — Collector's Series and Stealth zip binders in 4, 9 and 12 pocket layouts, top loader binders and the ring binder.";
 
   const itemList = {
@@ -1304,7 +1305,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
 </main>`;
 
   return htmlDoc({
-    title: `${product.title} | CardPop Australia`,
+    title: brandedTitle(product.seoName || product.title),
     description,
     canonical,
     ogImage: images[0],
@@ -1333,7 +1334,7 @@ const LANDINGS = {
     intro: 'Hand-picked individual cards from the CardPop official store.',
   },
   '/marketplace': {
-    title: 'Buy & Sell Trading Cards Online Australia | CardPop Marketplace', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
+    title: 'Buy & Sell Trading Cards Online Australia | CardPop', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
     description: 'Browse Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
     intro: "Discover cards directly from other collectors' vaults alongside official CardPop listings.",
   },
