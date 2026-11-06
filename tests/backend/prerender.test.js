@@ -831,6 +831,16 @@ describe('prerender static content pages', () => {
     expect(body).toContain('"@type":"Question"');
   });
 
+  it('renders the organiser landing page from the shared copy', async () => {
+    const { status, body } = await run('/list-your-event');
+    expect(status).toBe(200);
+    expect(body).toContain('Put your card show in front of Australian collectors.');
+    expect(body).toContain('Member ticket offer (Free)');
+    expect(body).toContain('Who sees my discount code?');
+    expect(body).toContain('href="https://cardpop.com.au/account/events"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/list-your-event" />');
+  });
+
   it('renders the analytics page', async () => {
     const { status, body } = await run('/analytics');
     expect(status).toBe(200);

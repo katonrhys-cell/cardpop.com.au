@@ -176,6 +176,7 @@ const STATIC_PAGES = [
   // live, and it carries noindex.
   { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
   { loc: '/partners',              lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
+  { loc: '/list-your-event',       lastmod: '2026-11-06', freq: 'monthly', pri: '0.6' },
   { loc: '/pricing',               lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
   { loc: '/photography-standard',  lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.5' },
   { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
