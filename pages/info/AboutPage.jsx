@@ -37,7 +37,7 @@ const CONTAINER = 'max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16';
 const AboutPage = () => {
   return (
     <>
-      <SEOHead title="About CardPop™ | Australia's Trading Card Marketplace" description="CardPop™ is Australia's home for trading card collectors — recreating the trust, excitement and community of card shows online. Buy, sell, trade, learn and connect." />
+      <SEOHead title="About CardPop™ | Australia's Trading Card Marketplace" description="CardPop™ is Australia's home for trading card collectors — the trust, excitement and community of card shows, online. Buy, sell, trade, learn and connect." />
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden bg-foreground text-background py-16 md:py-20">

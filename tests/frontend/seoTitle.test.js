@@ -3,6 +3,7 @@ import { brandedTitle, SEO_TITLE_MAX, SHORT_BRAND_SUFFIXES } from '@/utils/seoTi
 import { PALMS_OFF_PRODUCTS } from '@/data/palmsOffCatalogue.js';
 import { BINDER_PRODUCTS } from '@/data/shopBinderProducts.js';
 import { SHOP_COLLECTION_SEO } from '@/data/shopCollectionSeo.js';
+import { COLLECTION_SEO } from '@/data/collectionSeo.js';
 
 describe('brandedTitle', () => {
   it('adds the full brand when it fits', () => {
@@ -43,4 +44,19 @@ describe('static shop titles fit a search result', () => {
   it.each(Object.values(SHOP_COLLECTION_SEO).map((c) => [c.slug, c]))('supply collection %s', (_slug, c) => {
     expect(c.title.length).toBeLessThanOrEqual(SEO_TITLE_MAX);
   });
+});
+
+// Google shows ~160 characters of a meta description; the audit flags anything
+// longer and anything under 70 as too thin to earn the click.
+describe('static descriptions fit a search result', () => {
+  const fits = (d) => {
+    expect(d.length).toBeGreaterThanOrEqual(70);
+    expect(d.length).toBeLessThanOrEqual(160);
+  };
+
+  it.each(BINDER_PRODUCTS.map((p) => [p.slug, p]))('binder %s', (_slug, p) => fits(p.metaDescription));
+
+  it.each(Object.values(SHOP_COLLECTION_SEO).map((c) => [c.slug, c]))('supply collection %s', (_slug, c) => fits(c.description));
+
+  it.each(Object.entries(COLLECTION_SEO))('collection %s', (_slug, c) => fits(c.description));
 });

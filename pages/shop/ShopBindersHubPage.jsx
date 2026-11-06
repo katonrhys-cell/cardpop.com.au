@@ -12,7 +12,7 @@ const CANONICAL = `${SITE_ORIGIN}/shop/binders`;
 
 const TITLE = 'Palms Off Gaming Binders — Zip & Top Loader | CardPop';
 const DESCRIPTION =
-  'Shop the full Palms Off Gaming binder range in Australia — Collector\'s Series and Stealth zip binders in 4, 9 and 12 pocket layouts, top loader binders and the ring binder. Archival-safe, side-loading pockets.';
+  'Shop the Palms Off Gaming binder range in Australia — Collector\'s Series and Stealth zip binders in 4, 9 and 12 pockets, top loader binders and the ring binder.';
 
 /**
  * /shop/binders — the parent of every /shop/binders/:slug product page.

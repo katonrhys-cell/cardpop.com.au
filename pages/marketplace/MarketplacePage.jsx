@@ -882,7 +882,7 @@ const MarketplacePage = () => {
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
       <SEOHead
         title="Buy & Sell Trading Cards Online Australia | CardPop"
-        description="Browse Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia."
+        description="Browse Pokémon, Magic, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade and price. Free to list — buy and sell cards online."
         canonicalUrl="https://cardpop.com.au/marketplace"
       />
 
