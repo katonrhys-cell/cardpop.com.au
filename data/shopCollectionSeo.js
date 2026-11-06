@@ -17,7 +17,7 @@ export const SHOP_COLLECTION_SEO = {
     slug: 'protection',
     name: 'Card Protection',
     group: 'Protection',
-    title: 'Card Protection Supplies Australia — Sleeves, Toploaders & Holders | CardPop',
+    title: 'Card Sleeves, Toploaders & Holders Australia | CardPop',
     description:
       'Shop trading card protection supplies in Australia — penny sleeves, premium matte sleeves, perfect fit sleeves, top loaders, magnetic one-touch holders, semi-rigid card savers and graded slab protectors. Fast tracked shipping, priced in AUD.',
     intro:
@@ -36,7 +36,7 @@ export const SHOP_COLLECTION_SEO = {
     slug: 'storage',
     name: 'Card Storage',
     group: 'Storage',
-    title: 'Card Storage Supplies Australia — Boxes, Binders & Pages | CardPop',
+    title: 'Card Storage Boxes, Binders & Pages Australia | CardPop',
     description:
       'Shop trading card storage in Australia — bulk storage boxes, zip and premium collector binders, 9-pocket and specialty pages, and tabbed dividers. Fast tracked shipping, priced in AUD.',
     intro:
@@ -54,7 +54,7 @@ export const SHOP_COLLECTION_SEO = {
     slug: 'display',
     name: 'Card Display',
     group: 'Display',
-    title: 'Card Display Supplies Australia — Stands, Cases & Frames | CardPop',
+    title: 'Card Display Stands, Cases & Frames Australia | CardPop',
     description:
       'Shop trading card display supplies in Australia — acrylic card stands, UV display cases, wall mounts and floating frames for raw and graded cards. Fast tracked shipping, priced in AUD.',
     intro:
@@ -71,7 +71,7 @@ export const SHOP_COLLECTION_SEO = {
     slug: 'shipping',
     name: 'Card Shipping',
     group: 'Shipping',
-    title: 'Card Shipping Supplies Australia — Mailers, Team Bags & Tape | CardPop',
+    title: 'Card Shipping Mailers & Team Bags Australia | CardPop',
     description:
       'Shop trading card shipping supplies in Australia — team bags, padded bubble mailers, rigid cardboard mailers, packing tape, tag sleeves and tamper seals. Post cards safely with tracked AUD shipping.',
     intro:
@@ -89,7 +89,7 @@ export const SHOP_COLLECTION_SEO = {
     slug: 'grading',
     name: 'Card Grading',
     group: 'Grading',
-    title: 'Card Grading Supplies Australia — Submission Kits & Prep Tools | CardPop',
+    title: 'Card Grading Supplies & Submission Kits Australia | CardPop',
     description:
       'Shop trading card grading supplies in Australia — submission kits, anti-static cleaning cloths, handling gloves, microfiber cloths and centering tools. Get cards submission-ready with tracked AUD shipping.',
     intro:

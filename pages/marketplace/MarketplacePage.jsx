@@ -881,7 +881,7 @@ const MarketplacePage = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col font-sans pb-20">
       <SEOHead
-        title="Buy & Sell Trading Cards Online Australia | CardPop Marketplace"
+        title="Buy & Sell Trading Cards Online Australia | CardPop"
         description="Browse Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia."
         canonicalUrl="https://cardpop.com.au/marketplace"
       />
@@ -897,6 +897,9 @@ const MarketplacePage = () => {
       </section>
 
       <section className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 mt-8 w-full flex-1">
+        {/* Outline only: the listing cards are <h3>s, so they need an <h2>
+            above them or the page jumps straight from the <h1> to <h3>. */}
+        <h2 className="sr-only">Trading cards for sale</h2>
 
         <LiveActivityTicker className="mb-6" />
 

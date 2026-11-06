@@ -562,7 +562,7 @@ describe('prerender landing pages', () => {
       { id: UUID, slug: 'charizard', title: 'Charizard', price_aud: 1000, vault_item: { card_name: 'Charizard' } },
     ] };
     const { body } = await run('/marketplace');
-    expect(body).toContain('Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop</title>');
     expect(body).toContain('/marketplace/' + UUID + '/charizard');
     expect(body).toContain('"@type":"ItemList"');
   });
@@ -570,7 +570,7 @@ describe('prerender landing pages', () => {
   it('renders an empty but valid landing when there are no items', async () => {
     state.listResult = { data: [] };
     const { body } = await run('/marketplace');
-    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace</title>');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop</title>');
     expect(body).toContain('No items available right now.');
     expect(body).not.toContain('noindex');
   });
