@@ -32,6 +32,7 @@ import { shopShippingTerms, shopShippingDetailsLd, marketplaceShippingDetailsLd,
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
+import { EVENT_REGIONS, eventRegionBySlug, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH } from '../data/listYourEvent.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
@@ -1624,9 +1625,21 @@ function buildEventOffers(event, canonical, startDate) {
   return offers.length === 1 ? offers[0] : offers;
 }
 
-async function renderEventsLanding(supabase, categorySlug) {
+// "Card shows by city" — internal links to every /card-shows/<city> page.
+const eventRegionLinksHtml = (current) => `  <h2>Card shows by city</h2>
+  <ul>
+${EVENT_REGIONS.map((r) => (r.slug === current?.slug
+    ? `    <li>Card shows in ${esc(r.city)}</li>`
+    : `    <li><a href="${BASE_URL}${eventRegionPath(r)}">Card shows in ${esc(r.city)}</a></li>`)).join('\n')}
+  </ul>`;
+
+// `region` (data/eventRegions.js) renders /card-shows/<city>: every upcoming
+// approved event in that state. A city with nothing listed is noindex.
+async function renderEventsLanding(supabase, categorySlug, region = null) {
   const cfg = categorySlug ? EVENT_CATEGORIES[categorySlug] : null;
-  const canonical = categorySlug ? `${BASE_URL}/events/${categorySlug}` : `${BASE_URL}/events`;
+  const regionSeo = region ? eventRegionSeo(region) : null;
+  const canonical = region ? `${BASE_URL}${regionSeo.path}`
+    : categorySlug ? `${BASE_URL}/events/${categorySlug}` : `${BASE_URL}/events`;
   const today = new Date().toISOString().split('T')[0];
 
   let q = supabase
@@ -1635,12 +1648,14 @@ async function renderEventsLanding(supabase, categorySlug) {
     .eq('status', 'approved')
     .gte('start_date', today);
   if (cfg?.type) q = q.eq('event_type', cfg.type);
+  if (region) q = q.eq('state', region.state);
   const { data } = await q.order('start_date', { ascending: true }).limit(100);
   const events = data || [];
 
-  const h1 = cfg ? cfg.h1 : 'Trading Card Events in Australia';
-  const title = cfg ? `${cfg.h1} | CardPop` : 'Trading Card Events, Shows & Expos in Australia | CardPop';
-  const description = cfg
+  const h1 = regionSeo ? regionSeo.heading : cfg ? cfg.h1 : 'Trading Card Events in Australia';
+  const title = regionSeo ? regionSeo.title
+    : cfg ? `${cfg.h1} | CardPop` : 'Trading Card Events, Shows & Expos in Australia | CardPop';
+  const description = regionSeo ? regionSeo.description : cfg
     ? `Upcoming ${cfg.label} for trading card collectors across Australia. Find dates, venues and details on CardPop.`
     : 'Find upcoming trading card shows, expos, tournaments and community events across Australia. Dates, venues and details for Pokémon, Magic, Yu-Gi-Oh and sports card collectors on CardPop.';
 
@@ -1648,7 +1663,7 @@ async function renderEventsLanding(supabase, categorySlug) {
     { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
     { '@type': 'ListItem', position: 2, name: 'Events', item: `${BASE_URL}/events` },
   ];
-  if (cfg) breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: cfg.h1, item: canonical });
+  if (cfg || region) breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: h1, item: canonical });
   const breadcrumb = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
 
   const itemList = {
@@ -1680,16 +1695,22 @@ async function renderEventsLanding(supabase, categorySlug) {
   const imageAlt = firstCover ? (firstCover.title || h1) : 'CardPop — trading card events across Australia';
 
   const bodyHtml = `<main>
-  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a>${cfg ? ` / ${esc(cfg.h1)}` : ''}</nav>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a>${cfg || region ? ` / ${esc(h1)}` : ''}</nav>
   <h1>${esc(h1)}</h1>
   <p>${esc(description)}</p>
-  <h2>Upcoming Events (${events.length})</h2>
+${region ? `  <p>${esc(region.intro)}${region.nearby.length ? ` Includes events in ${esc(region.nearby.join(', '))}.` : ''}</p>\n` : ''}  <h2>Upcoming Events (${events.length})</h2>
   <ul>
 ${itemsHtml || '    <li>No upcoming events listed right now — check back soon.</li>'}
   </ul>
+${eventRegionLinksHtml(region)}
+  <p><a href="${BASE_URL}/list-your-event">Running a card show? List it free on CardPop</a></p>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogImageAlt: imageAlt, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+  return htmlDoc({
+    title, description, canonical, ogImage: image, ogImageAlt: imageAlt,
+    robots: region && events.length === 0 ? 'noindex, follow' : undefined,
+    jsonLdItems: [breadcrumb, itemList], bodyHtml,
+  });
 }
 
 // The organiser's logo (events.organizer_logo_url) for a crawler: an image
@@ -4513,6 +4534,13 @@ export default async function handler(req, res) {
 
     if (rawPath === '/events') {
       return sendDoc(res, await renderEventsLanding(supabase, null));
+    }
+
+    const regionMatch = rawPath.match(/^\/card-shows\/([^/?#]+)\/?$/);
+    if (regionMatch) {
+      const region = eventRegionBySlug(safeDecode(regionMatch[1]));
+      if (!region) return sendDoc(res, notFound({ title: 'Page not found | CardPop', description: 'This page could not be found.', canonical: `${BASE_URL}/events` }));
+      return sendDoc(res, await renderEventsLanding(supabase, null, region));
     }
 
     // Two segments — claimed before the single-event matcher below, which

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
+import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,6 +29,7 @@ const AccountEvents = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [isVerifiedOrganiser, setIsVerifiedOrganiser] = useState(false);
   const [vendorsEvent, setVendorsEvent] = useState(null);
+  const [badgeEvent, setBadgeEvent] = useState(null);
 
   const fetchMyEvents = useCallback(async () => {
     if (!currentUser?.id) return;
@@ -140,7 +142,7 @@ const AccountEvents = () => {
                     </p>
                   )}
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-wrap gap-2 shrink-0">
                   {isVerifiedOrganiser && (
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setVendorsEvent(event)}>
                       <Store className="w-3.5 h-3.5" /> Vendors
@@ -149,6 +151,11 @@ const AccountEvents = () => {
                   {event.status === 'pending_review' && (
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
                       <Pencil className="w-3.5 h-3.5" /> Edit
+                    </Button>
+                  )}
+                  {event.status === 'approved' && (
+                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setBadgeEvent(event)}>
+                      <BadgeCheck className="w-3.5 h-3.5" /> Website badge
                     </Button>
                   )}
                   {event.status === 'approved' && (
@@ -166,6 +173,7 @@ const AccountEvents = () => {
       )}
 
       <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
+      <EventBadgeDialog event={badgeEvent} onClose={() => setBadgeEvent(null)} />
 
       <EventFormModal
         isOpen={isModalOpen}
