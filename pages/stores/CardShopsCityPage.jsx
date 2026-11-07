@@ -9,6 +9,8 @@ import {
   fetchStores,
   fetchUpcomingEventsByState,
 } from '@/lib/storeDirectory.js';
+import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '@/utils/cardShopSeo.js';
+import { eventRegionByState, eventRegionPath } from '@/data/eventRegions.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -38,23 +40,11 @@ const CardShopsCityPage = () => {
 
   if (!cityInfo) return <Navigate to="/card-shops" replace />;
 
-  const title = `Card Shops in ${cityInfo.label} — Pokémon, TCG & Sports Card Stores | CardPop`;
-  const description = `Find trading card shops in ${cityInfo.label}, ${cityInfo.state}: local stores for Pokémon, sports cards, One Piece and other TCGs, plus upcoming card shows near ${cityInfo.label}.`;
-
-  const faqs = [
-    {
-      q: `Where can I buy Pokémon or sports cards in ${cityInfo.label}?`,
-      a: `The stores listed above stock trading cards in and around ${cityInfo.label}. Many also run trade nights and tournaments — check their websites for hours and stock. You can also buy from verified Australian sellers online via the CardPop marketplace.`,
-    },
-    {
-      q: `Are there card shows near ${cityInfo.label}?`,
-      a: `Upcoming card shows and collector events for ${cityInfo.state} are listed on this page as they're announced, with full details on the CardPop events calendar.`,
-    },
-    {
-      q: 'How do I get a store added to this page?',
-      a: 'Store owners (or regulars!) can submit a store for free using the "Add your store" form. Submissions are reviewed before going live to keep the directory accurate.',
-    },
-  ];
+  // Until the stores load the title has no count; it settles on the real one.
+  const title = cardShopCityTitle(cityInfo.label, stores?.length ?? 0);
+  const description = cardShopCityDescription(cityInfo.label, cityInfo.state, stores?.length ?? 0);
+  const faqs = cardShopCityFaqs(cityInfo.label, cityInfo.state);
+  const showsRegion = eventRegionByState(cityInfo.state);
 
   const structuredData = [
     {
@@ -86,15 +76,7 @@ const CardShopsCityPage = () => {
         },
       })),
     } : null,
-    {
-      '@context': 'https://schema.org',
-      '@type': 'FAQPage',
-      mainEntity: faqs.map(({ q, a }) => ({
-        '@type': 'Question',
-        name: q,
-        acceptedAnswer: { '@type': 'Answer', text: a },
-      })),
-    },
+    faqPageLd(faqs),
   ].filter(Boolean);
 
   return (
@@ -202,9 +184,16 @@ const CardShopsCityPage = () => {
                 </li>
               ))}
             </ul>
-            <Link to="/events" className="inline-block mt-3 text-sm text-primary hover:underline">
-              All card events →
-            </Link>
+            <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {showsRegion && (
+                <Link to={eventRegionPath(showsRegion)} className="text-primary hover:underline">
+                  Card shows in {showsRegion.city} &amp; {showsRegion.stateName} →
+                </Link>
+              )}
+              <Link to="/events" className="text-primary hover:underline">
+                All card events →
+              </Link>
+            </div>
           </section>
         )}
 

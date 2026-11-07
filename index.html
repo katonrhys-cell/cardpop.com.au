@@ -136,8 +136,13 @@
          still has a plain form on record — it can decline to print a decorative
          character, and if the line ever reverts to the domain, dropping the ™
          from these naming fields (only) is the first thing to try. -->
+    <!-- data-rh="true" hands these tags to react-helmet (components/SEOHead.jsx
+         emits every one of them on every route), so a page's own description
+         and social tags replace these defaults instead of sitting beside them.
+         Without it each SPA page carried two meta descriptions and crawlers read
+         the first — the homepage's. -->
     <title>CardPop Australia™ | Trading Card Marketplace</title>
-    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop Australia™ — Australia's trusted online trading card marketplace. Browse cards from verified Australian sellers, check live AUD prices, and shop sealed boxes." />
+    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop Australia™ — Australia's trusted online trading card marketplace. Browse cards from verified Australian sellers, check live AUD prices, and shop sealed boxes." data-rh="true" />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
     <meta name="author" content="CardPop™" />
     <meta name="application-name" content="CardPop Australia™" />
@@ -145,22 +150,22 @@
          conflicts with a static tag. The www host 301-redirects to apex (vercel.json). -->
 
     <!-- Open Graph (Facebook, Discord, Slack previews) -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://cardpop.com.au/" />
-    <meta property="og:site_name" content="CardPop Australia™" />
-    <meta property="og:title" content="CardPop Australia™ | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
-    <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia™ — Australia's most trusted trading card platform." />
-    <meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />
+    <meta property="og:type" content="website" data-rh="true" />
+    <meta property="og:url" content="https://cardpop.com.au/" data-rh="true" />
+    <meta property="og:site_name" content="CardPop Australia™" data-rh="true" />
+    <meta property="og:title" content="CardPop Australia™ | Australia's Trusted Digital Card Show - Trading Card Marketplace" data-rh="true" />
+    <meta property="og:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia™ — Australia's most trusted trading card platform." data-rh="true" />
+    <meta property="og:image" content="https://cardpop.com.au/og-image.jpg" data-rh="true" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="en_AU" />
 
     <!-- Twitter / X card -->
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:card" content="summary_large_image" data-rh="true" />
     <meta name="twitter:site" content="@cardpopau" />
-    <meta name="twitter:title" content="CardPop Australia™ | Australia's Trusted Digital Card Show - Trading Card Marketplace" />
-    <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia™ — Australia's most trusted trading card platform." />
-    <meta name="twitter:image" content="https://cardpop.com.au/og-image.jpg" />
+    <meta name="twitter:title" content="CardPop Australia™ | Australia's Trusted Digital Card Show - Trading Card Marketplace" data-rh="true" />
+    <meta name="twitter:description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop Australia™ — Australia's most trusted trading card platform." data-rh="true" />
+    <meta name="twitter:image" content="https://cardpop.com.au/og-image.jpg" data-rh="true" />
 
     <!-- Favicon — CardPop card-holder icon in brand red -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 56 68' fill='none'><rect x='17' y='0.5' width='22' height='11' rx='4' stroke='%23CE1126' stroke-width='2.5'/><rect x='20.5' y='3' width='15' height='5' rx='2' fill='%23CE1126' opacity='0.22'/><rect x='1.5' y='9' width='53' height='58' rx='6' stroke='%23CE1126' stroke-width='2.5'/><rect x='8' y='17' width='40' height='43' rx='4' stroke='%23CE1126' stroke-width='2'/><rect x='14' y='23' width='28' height='31' rx='2.5' stroke='%23CE1126' stroke-width='1.5' opacity='0.6'/></svg>" />

@@ -21,7 +21,7 @@ const ReturnsPage = () => {
     >
       <SEOHead
         title="Returns & Refund Policy | CardPop"
-        description={`CardPop's returns policy — ${windowDays}-day returns and exchanges on new CardPop Shop products, and ${MP.name}: a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery when a marketplace card isn't as described or doesn't arrive.`}
+        description={`CardPop returns: ${windowDays}-day returns on new Shop products, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described.`}
       />
 
       <h2>Overview</h2>

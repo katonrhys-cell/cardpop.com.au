@@ -39,6 +39,7 @@ import { shopShippingDetailsLd, shopShippingTerms } from '@/utils/productShippin
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { trackViewItem } from '@/lib/analytics.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
+import { brandedTitle } from '@/utils/seoTitle.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -221,7 +222,7 @@ const ShopProductPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title={`${product.title} | CardPop Australia`}
+        title={brandedTitle(product.seoName || product.title)}
         description={description}
         canonicalUrl={canonical}
         ogImage={images[0]}

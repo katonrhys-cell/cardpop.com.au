@@ -104,7 +104,7 @@ const TYPE_SEO = {
 const ALL_SEO = {
   path: '/events',
   title: 'Trading Card Shows & TCG Events in Australia 2026 | CardPop',
-  description: "Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets.",
+  description: "Australia's trading card event calendar — card shows, TCG expos and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth, with dates and venues.",
   heading: 'Trading Card Events Across Australia',
   subheading: 'Your go-to directory for TCG tournaments, card fairs, and collector shows happening nationwide. Find events near you — from major expos to local meetups.',
 };

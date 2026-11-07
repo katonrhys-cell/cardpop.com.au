@@ -84,7 +84,7 @@ const PricingPage = () => {
         <title>Pricing — Hobby, Pro, Premium, Elite &amp; Ultimate | CardPop</title>
         <meta
           name="description"
-          content="CardPop is free to join. Buy instantly, and sell once your ID is verified — paying only a small fee per sale. Upgrade to Pro, Premium, Elite or Ultimate for more monthly listings, your own store page and premium display styles."
+          content="CardPop is free to join. Buy instantly and sell once your ID is verified, for a small fee per sale. Upgrade for more listings, a store page and premium styles."
         />
       </Helmet>
 

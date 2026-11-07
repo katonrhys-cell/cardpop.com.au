@@ -268,7 +268,7 @@ const CommunityPage = () => {
     <div className="min-h-screen bg-background">
       <SEOHead
         title="Community Hub | CardPop"
-        description="The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, the community map, card shows and events, Whatnot shows and The Parallel Report."
+        description="The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, card shows, Whatnot shows and The Parallel Report."
       />
 
       {/* ── Hero ── */}
