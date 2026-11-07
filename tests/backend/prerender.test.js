@@ -641,6 +641,29 @@ describe('prerender events', () => {
     expect(body).not.toContain('noindex');
   });
 
+  it('renders a card-shop city page with the store count, upcoming events, the card-shows link and an FAQ', async () => {
+    const stores = ['A', 'B', 'C', 'D'].map((n) => ({ slug: `shop-${n}`, name: `Shop ${n}`, suburb: 'Carlton', state: 'VIC', city: 'melbourne' }));
+    state.listResultByTable = {
+      local_game_stores: { data: stores },
+      events: { data: [{ id: 'e1', slug: 'vic-show', title: 'VIC Card Show', start_date: '2099-01-10', venue_name: 'Town Hall', suburb: 'Malvern', state: 'VIC' }] },
+    };
+    const { status, body } = await run('/card-shops/melbourne');
+    expect(status).toBe(200);
+    expect(body).toMatch(/<title>4 Card Shops in Melbourne \([A-Z][a-z]{2} \d{4}\) — Pokémon, TCG &amp; Sports Cards<\/title>/);
+    expect(body).toContain('4 trading card shops in Melbourne, VIC');
+    expect(body).toContain('<a href="https://cardpop.com.au/events/vic-show">VIC Card Show</a>');
+    expect(body).toContain('<a href="https://cardpop.com.au/card-shows/melbourne">Card shows in Melbourne &amp; Victoria</a>');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('<h3>Where can I buy Pokémon or sports cards in Melbourne?</h3>');
+  });
+
+  it('keeps the plain card-shop title when a city lists only a couple of stores', async () => {
+    state.listResultByTable = { local_game_stores: { data: [{ slug: 's', name: 'Only Shop', state: 'NT', city: 'darwin' }] }, events: { data: [] } };
+    const { body } = await run('/card-shops/darwin');
+    expect(body).toContain('<title>Card Shops in Darwin — Pokémon, TCG &amp; Sports Card Stores | CardPop</title>');
+    expect(body).not.toContain('Upcoming card events in');
+  });
+
   it('shows an image organiser logo to bots and puts it on the Organization, but never a video loop', async () => {
     const base = { id: UUID, slug: 'con', title: 'Collect-It Con', status: 'approved', start_date: '2026-11-14', organizer_name: 'Collect-It' };
     state.result = { data: { ...base, organizer_logo_url: 'https://cdn.test/logo.gif' } };
