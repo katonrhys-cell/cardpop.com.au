@@ -8,8 +8,12 @@ import { Button } from '@/components/ui/button';
 import { BADGES, BADGE_WIDTH, BADGE_HEIGHT } from '@/utils/websiteBadge.js';
 
 // Shared "copy this badge onto your website" dialog (utils/websiteBadge.js).
-const WebsiteBadgeDialog = ({ open, onClose, kind, snippet, title, description }) => {
-  const badge = BADGES[kind];
+// `preview` ({ src, alt, width, height }) overrides the static badge image —
+// the price widget passes its live SVG (utils/priceWidget.js).
+const WebsiteBadgeDialog = ({ open, onClose, kind, snippet, title, description, preview }) => {
+  const badge = preview || (BADGES[kind]
+    ? { src: BADGES[kind].path, alt: `${BADGES[kind].alt} (preview)`, width: BADGE_WIDTH, height: BADGE_HEIGHT }
+    : null);
 
   const copy = async () => {
     try {
@@ -29,7 +33,7 @@ const WebsiteBadgeDialog = ({ open, onClose, kind, snippet, title, description }
         </DialogHeader>
         {badge && (
           <div className="flex justify-center rounded-xl border border-border bg-muted/40 p-5">
-            <img src={badge.path} alt={`${badge.alt} (preview)`} width={BADGE_WIDTH} height={BADGE_HEIGHT} />
+            <img src={badge.src} alt={badge.alt} width={badge.width} height={badge.height} className="max-w-full h-auto" />
           </div>
         )}
         <textarea
