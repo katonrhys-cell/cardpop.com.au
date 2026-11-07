@@ -36,6 +36,31 @@ carries the disclaimer and the prompt is told to be conservative.
    corners, edges, surface), strengths/issues, then one card per grader with the estimate,
    range, label, confidence and notes (BGS also carries sub-grades).
 
+## Results page: the photo, marked up
+
+The results open with the card's details, then **Grades at a Glance**, a table with one
+row per company showing the estimate, its label word, the range and the confidence. Each
+company links down to its full slab-label card. Next is **Condition Inspection**, which
+shows the member's own upload again (the `File` the page still holds, via a `blob:` URL,
+never stored) with the estimate drawn on it:
+
+- The prompt asks for three located fields, all **in percent of the photo as supplied**
+  (not of the card, since the photo may include a desk, sleeve or slab):
+  `cardLocation.{front,back}` (box around the card), `centeringMeasured.{front,back}`
+  (`"55/45"` ratios) and `findings[]` (0–8 spots: `factor`, `side`, `x/y/w/h`,
+  `severity`, short `description`). `max_tokens` went to 4500 to make room.
+- `utils/gradeFindings.js` → `normaliseGradeGeometry()` is the one cleaner. It clamps
+  every box onto the photo, scales 0–1 fractions up, drops unknown factors and sides,
+  drops back-side data when no back was uploaded, and numbers findings front-first in
+  reading order. An older reply without these fields still renders: the photo shows
+  without markers.
+- `components/grading/GradeInspectionPhoto.jsx` draws the overlay: card outline,
+  centering centre lines with the L/R and T/B ratios, corner brackets / edge bands /
+  surface tint for a factor with no pinpointed spot (coloured by its score), and a
+  numbered, tappable box for each finding (amber minor, orange moderate, brand red
+  major). The factor tabs filter the overlay and list that factor's spots. Tapping a
+  spot echoes it under the photo, because on a phone the list is below the fold.
+
 ## Configuration
 
 Needs `ANTHROPIC_API_KEY` (shared with card OCR, the blog generator and the event scan).
