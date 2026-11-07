@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins, Sparkles } from 'lucide-react';
+import { List, Plus, RefreshCw, AlertCircle, Trash2, Edit, PackageOpen, ShoppingCart, ArrowRightLeft, Layers, Tag, HandCoins, Sparkles, BadgeCheck } from 'lucide-react';
+import WebsiteBadgeDialog from '@/components/WebsiteBadgeDialog.jsx';
+import { sellerBadgeSnippet } from '@/utils/websiteBadge.js';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +81,8 @@ const getCardDetails = (listing) => {
 };
 
 const AccountListings = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, profile } = useAuth();
+  const [badgeOpen, setBadgeOpen] = useState(false);
   const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -207,6 +210,9 @@ const AccountListings = () => {
         <>
           <Button variant="outline" size="sm" onClick={() => fetchRef.current?.()} disabled={loading} className="rounded-xl shadow-sm h-10 px-4 font-bold">
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setBadgeOpen(true)} disabled={!currentUser?.id} className="rounded-xl shadow-sm h-10 px-4 font-bold">
+            <BadgeCheck className="w-4 h-4 mr-2" /> Website badge
           </Button>
           <Button asChild size="sm" className="rounded-xl shadow-sm h-10 px-4 font-bold">
             <Link to="/vault/add">
@@ -452,6 +458,14 @@ const AccountListings = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <WebsiteBadgeDialog
+        open={badgeOpen}
+        onClose={() => setBadgeOpen(false)}
+        kind="seller"
+        snippet={currentUser?.id ? sellerBadgeSnippet({ id: currentUser.id, name: profile?.display_name || profile?.username }) : ''}
+        title="Add a CardPop badge to your website"
+        description="Paste this code on your website, blog or link page. It links buyers straight to your CardPop storefront, which also helps your listings appear in Google."
+      />
     </AccountPageShell>
   );
 };
