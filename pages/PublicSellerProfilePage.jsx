@@ -155,7 +155,6 @@ const PublicSellerProfilePage = () => {
                 profile={seller}
                 size="xl"
                 name={seller.display_name || seller.name}
-                className="border-4 border-card shadow-xl"
               />
               {sellerVerified && (
                 <div className="absolute -bottom-2 -right-2 bg-[hsl(var(--verified-badge))] text-white p-2 rounded-xl shadow-lg border-2 border-card" title="Verified Collector">

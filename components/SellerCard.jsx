@@ -42,7 +42,6 @@ const SellerCard = ({ seller }) => {
           size="lg"
           preferBusinessLogo
           name={sellerName}
-          className="ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all"
         />
       </div>
 
