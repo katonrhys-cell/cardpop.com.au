@@ -83,7 +83,10 @@ retailers and need inventory before SEO can help. Don't chase them first.
    real snapshot data (never a made-up number; `docs/adsense-readiness.md`).
 5. **Backlinks from organisers.** The organiser badge and `/list-your-event`
    (#1170, #1171) are the outreach tool: every organiser who links "Listed on
-   CardPop" adds a relevant Australian backlink.
+   CardPop" adds a relevant Australian backlink. Sellers (Account → Listings)
+   and grading partners (Admin → Grading Partners) have the same badge — see
+   `docs/event-exposure.md`. Price pages carry an embeddable price widget
+   (`docs/price-widget.md`) for collectors' blogs and forums.
 
 ## How we'll know it's working
 - Clicks to `/events/*` pages of **finished** shows should fall more slowly

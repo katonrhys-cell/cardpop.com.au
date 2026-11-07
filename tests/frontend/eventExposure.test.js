@@ -83,3 +83,28 @@ describe('organiser website badge', () => {
     expect(eventPublicUrl({ id: 'abc-123' })).toBe('https://cardpop.com.au/events/abc-123');
   });
 });
+
+describe('seller and grading partner website badges', () => {
+  it('links a seller badge to their storefront and escapes the name', async () => {
+    const { sellerBadgeSnippet } = await import('@/utils/websiteBadge.js');
+    const html = sellerBadgeSnippet({ id: 'abc-123', name: 'Ash & "Co" <Cards>' });
+    expect(html).toContain('href="https://cardpop.com.au/seller/abc-123"');
+    expect(html).toContain('Ash &amp; &quot;Co&quot; &lt;Cards&gt; on CardPop');
+    expect(html).toContain('src="https://cardpop.com.au/badges/sell-on-cardpop.svg"');
+    expect(html).not.toMatch(/nofollow/);
+  });
+
+  it('links a grading partner badge to the submission partners page', async () => {
+    const { gradingPartnerBadgeSnippet } = await import('@/utils/websiteBadge.js');
+    const html = gradingPartnerBadgeSnippet({ name: 'Cherry Collectables' });
+    expect(html).toContain('href="https://cardpop.com.au/grading/submission-partners"');
+    expect(html).toContain('src="https://cardpop.com.au/badges/grading-partner-cardpop.svg"');
+    expect(html).not.toMatch(/nofollow/);
+  });
+
+  it('ships every badge image', async () => {
+    const { existsSync } = await import('node:fs');
+    const { BADGES } = await import('@/utils/websiteBadge.js');
+    for (const b of Object.values(BADGES)) expect(existsSync(`public${b.path}`)).toBe(true);
+  });
+});

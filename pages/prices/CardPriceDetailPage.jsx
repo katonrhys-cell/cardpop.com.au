@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ExternalLink, TrendingUp, Code2 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -14,6 +14,11 @@ import {
   formatAud,
 } from '@/lib/cardPrices.js';
 import { cardIdentifiersLd } from '@/utils/productIdentifiers.js';
+import { Button } from '@/components/ui/button';
+import WebsiteBadgeDialog from '@/components/WebsiteBadgeDialog.jsx';
+import {
+  priceWidgetSnippet, priceWidgetImageUrl, PRICE_WIDGET_WIDTH, PRICE_WIDGET_HEIGHT,
+} from '@/utils/priceWidget.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -36,6 +41,7 @@ const CardPriceDetailPage = () => {
   const { category, slug } = useParams();
   const [card, setCard] = useState(undefined); // undefined = loading, null = not found
   const [related, setRelated] = useState([]);
+  const [embedOpen, setEmbedOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -247,9 +253,14 @@ const CardPriceDetailPage = () => {
         </section>
 
         <section>
-          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-primary" /> Price history
-          </h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-2xl font-bold flex items-center gap-2">
+              <TrendingUp className="w-6 h-6 text-primary" /> Price history
+            </h2>
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setEmbedOpen(true)}>
+              <Code2 className="w-4 h-4" /> Embed this price
+            </Button>
+          </div>
           {chartData.length >= 2 ? (
             <div className="bg-card border border-border rounded-3xl p-4 h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -353,6 +364,21 @@ const CardPriceDetailPage = () => {
           not financial advice.
         </p>
       </div>
+
+      <WebsiteBadgeDialog
+        open={embedOpen}
+        onClose={() => setEmbedOpen(false)}
+        snippet={priceWidgetSnippet(card)}
+        preview={{
+          // Same-origin path so the preview also works on preview deployments.
+          src: priceWidgetImageUrl(card.slug).replace('https://cardpop.com.au', ''),
+          alt: `${fullName} price widget preview`,
+          width: PRICE_WIDGET_WIDTH,
+          height: PRICE_WIDGET_HEIGHT,
+        }}
+        title="Embed this price on your site"
+        description={`Paste this code into a blog post, forum or club page. It shows ${card.name}'s live AUD price, refreshed daily, and links readers to the full price history on CardPop.`}
+      />
     </div>
   );
 };
