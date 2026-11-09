@@ -483,6 +483,7 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
                       key={event.id}
                       event={event}
                       isAdmin={false}
+                      inFeaturedSection
                       rsvpData={rsvpDataById[event.id]}
                       onView={ev => { setSelectedEvent(ev); setIsDetailOpen(true); }}
                     />
