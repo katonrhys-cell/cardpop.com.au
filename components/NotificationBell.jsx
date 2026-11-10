@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Bell, DollarSign, Hammer, TrendingUp, TrendingDown, Clock, Award,
@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { useNotifications } from '@/hooks/useNotifications.js';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -53,13 +54,14 @@ const TYPE_CONFIG = {
   system:                   { icon: Bell,          color: 'text-slate-500' },
 };
 
-const NotificationItem = ({ notification, onRead }) => {
+const NotificationItem = ({ notification, onRead, onNavigate }) => {
   const cfg = TYPE_CONFIG[notification.type] || TYPE_CONFIG.system;
   const Icon = cfg.icon;
   const timeAgo = formatDistanceToNow(new Date(notification.created_at), { addSuffix: true });
 
   const handleClick = () => {
     if (!notification.is_read) onRead(notification.id);
+    onNavigate?.();
   };
 
   const inner = (
@@ -96,43 +98,34 @@ const NotificationItem = ({ notification, onRead }) => {
 const NotificationBell = () => {
   const { notifications, unreadCount, loading, markRead, markAllRead } = useNotifications();
   const [open, setOpen] = useState(false);
-  const panelRef = useRef(null);
-  const buttonRef = useRef(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e) => {
-      if (!panelRef.current?.contains(e.target) && !buttonRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
+  // Radix Popover portals the panel to <body> and keeps it inside the
+  // viewport, so it works on phones too — the old absolutely-positioned
+  // 360px panel hung off the left edge of a narrow screen.
   return (
-    <div className="relative">
-      <Button
-        ref={buttonRef}
-        variant="ghost"
-        size="icon"
-        className="relative rounded-xl hover:bg-muted"
-        aria-label="Notifications"
-        onClick={() => setOpen(v => !v)}
-      >
-        <Bell className="h-5 w-5" />
-        {unreadCount > 0 && (
-          <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground border-none font-bold tabular-nums shadow-sm">
-            {unreadCount > 99 ? '99+' : unreadCount}
-          </Badge>
-        )}
-      </Button>
-
-      {open && (
-        <div
-          ref={panelRef}
-          className="absolute right-0 top-full mt-2 w-[360px] max-h-[520px] bg-card border border-border rounded-2xl shadow-xl z-50 flex flex-col overflow-hidden"
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative shrink-0 rounded-xl hover:bg-muted"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount > 99 ? '99+' : unreadCount} unread` : 'Notifications'}
         >
+          <Bell className="h-5 w-5" />
+          {unreadCount > 0 && (
+            <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-[10px] bg-primary text-primary-foreground border-none font-bold tabular-nums shadow-sm">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+
+      <PopoverContent
+        align="end"
+        sideOffset={8}
+        collisionPadding={12}
+        className="p-0 w-[min(360px,calc(100vw-1.5rem))] max-h-[min(520px,calc(100dvh-6rem))] bg-card border border-border rounded-2xl shadow-xl flex flex-col overflow-hidden"
+      >
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
             <h3 className="font-bold text-base">Notifications</h3>
@@ -163,7 +156,7 @@ const NotificationBell = () => {
             ) : (
               <div className="p-2 space-y-0.5">
                 {notifications.map(n => (
-                  <NotificationItem key={n.id} notification={n} onRead={(id) => { markRead(id); }} />
+                  <NotificationItem key={n.id} notification={n} onRead={(id) => { markRead(id); }} onNavigate={() => setOpen(false)} />
                 ))}
               </div>
             )}
@@ -179,9 +172,8 @@ const NotificationBell = () => {
               View all notifications
             </Link>
           </div>
-        </div>
-      )}
-    </div>
+      </PopoverContent>
+    </Popover>
   );
 };
 
