@@ -274,7 +274,6 @@ const SoleTraderStorePage = () => {
                 size="xl"
                 preferBusinessLogo
                 name={displayName}
-                className="border-4 border-card shadow-xl"
               />
               {isDealer && (
                 <div className="absolute -bottom-2 -right-2 text-white p-2 rounded-xl shadow-lg border-2 border-card" style={{ backgroundColor: `hsl(var(--verified-badge))` }} title="Verified Dealer">

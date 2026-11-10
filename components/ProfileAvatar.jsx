@@ -16,6 +16,10 @@ import { profilePhotoUrl, isOfficialProfile } from '@/utils/profileAvatar.js';
  * Sizes:  xs 24px (comments, lists) · sm 32px (cards) · md 48px (seller boxes)
  *         lg 64px (dashboards) · xl 128–160px (profile headers)
  *
+ * A photo or logo sits on no background of its own: a logo is usually its own
+ * circle, and a tint behind it (or a border/shadow from the caller) shows up
+ * as extra rings around it. Only the letter placeholder gets the brand tint.
+ *
  * `src` overrides the resolved photo (e.g. an unsaved upload preview, or
  * `null` to force the placeholder while a photo is being removed).
  */
@@ -52,7 +56,7 @@ const ProfileAvatar = ({
 
   return (
     <div
-      className={`${dims.box} ${dims.text} rounded-full bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0 overflow-hidden ${className}`}
+      className={`${dims.box} ${dims.text} rounded-full ${url ? '' : 'bg-primary/10 text-primary'} flex items-center justify-center font-bold shrink-0 overflow-hidden ${className}`}
     >
       {url ? (
         <img src={url} alt={label} className="w-full h-full object-cover" decoding="async" loading="lazy" />
