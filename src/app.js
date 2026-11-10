@@ -47,7 +47,7 @@ export function scrubSentryEvent(event) {
 }
 
 Sentry.init({
-	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
+	dsn: process.env.SENTRY_DSN || 'https://fe32f5ea5d8c9f4196ec601fae47e046@o4511766283026432.ingest.us.sentry.io/4511767250141184',
 	// Error capture only. Tracing was sampled at 20%, but ESM hoists imports,
 	// so `express` was loaded before this init ran and Sentry's Express
 	// auto-instrumentation never attached — the sampled traces carried no
