@@ -36,11 +36,15 @@ export function esc(v) {
 export const EMAIL_LOGO_URL = 'https://cardpop.com.au/images/email/cardpop-logo-v1.png';
 const EMAIL_LOGO_BG = '#0A0A0A';
 const EMAIL_LOGO_WIDTH = 220; // 440px source ÷ 2
+// The footer repeats the logo smaller. The footer band uses the same
+// near-black ground as the header, so the email opens and closes in black and
+// the PNG's edges stay invisible there too.
+const EMAIL_FOOTER_LOGO_WIDTH = 160;
 
 // Email palette — the brand palette from tailwind.config.js (`brand.*`) plus
 // the neutral greys the body copy uses. Everything below reads from here so a
-// colour change is one edit. The header band is the logo artwork's own
-// near-black ground (EMAIL_LOGO_BG), not a palette colour.
+// colour change is one edit. The header and footer bands are the logo
+// artwork's own near-black ground (EMAIL_LOGO_BG), not a palette colour.
 const RED = '#CE1126';      // brand-red
 const CHARCOAL = '#1F2937'; // brand-charcoal
 const SILVER = '#C4CED4';   // brand-silver
@@ -79,8 +83,10 @@ export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaTex
   const footerNoteRow = footerNote
     ? `<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">${footerNote}</p>`
     : '';
+  // nowrap keeps a two-word label ("My Account") on one line when the
+  // footer row wraps on a phone; only the gaps between links can break.
   const footerLink = (href, label, colour = SILVER) =>
-    `<a href="${href}" style="color:${colour};text-decoration:none;">${label}</a>`;
+    `<a href="${href}" style="color:${colour};text-decoration:none;white-space:nowrap;">${label}</a>`;
   const dot = '<span style="color:#4B5563;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>';
 
   return `<!DOCTYPE html>
@@ -121,11 +127,11 @@ ${cta}
 <tr><td class="cp-pad" style="background:${PANEL};border-top:1px solid ${RULE};padding:20px 40px;">
 <p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};">Questions about this email? Our team is at <a href="mailto:support@cardpop.com.au" style="color:${RED};text-decoration:none;font-weight:600;">support@cardpop.com.au</a>.</p>
 </td></tr>
-<tr><td class="cp-pad" style="background:${CHARCOAL};border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
-<p style="margin:0 0 4px;font-size:15px;font-weight:700;color:#FFFFFF;letter-spacing:-0.2px;">CardPop Australia</p>
-<p style="margin:0 0 16px;font-size:12px;color:${SILVER};">Australia's premium trading card marketplace</p>
+<tr><td class="cp-pad" style="background:${EMAIL_LOGO_BG};border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
+<a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;margin:0 0 14px;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_FOOTER_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_FOOTER_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-family:${FONT};font-size:15px;font-weight:700;color:#FFFFFF;text-align:center;"></a>
+<p style="margin:0 0 16px;font-size:12px;color:${SILVER};">Australia's Premium Trading Card Marketplace</p>
 <p style="margin:0;font-size:12px;line-height:1.8;">${footerLink('https://cardpop.com.au', 'cardpop.com.au', '#FFFFFF')}${dot}${footerLink('https://cardpop.com.au/marketplace', 'Marketplace')}${dot}${footerLink('https://cardpop.com.au/account', 'My Account')}${dot}${footerLink('mailto:support@cardpop.com.au', 'Support')}</p>
-<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">&copy; ${year} CardPop Australia. All rights reserved.</p>
+<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">&copy; ${year} CardPop Australia. All Rights Reserved.</p>
 ${footerNoteRow}
 </td></tr>
 </table>
