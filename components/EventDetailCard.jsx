@@ -314,7 +314,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
             {!isPast && (
             <div className="space-y-3 pt-4">
-              <EventTicketOffer eventId={event.id} offer={ticketOffer} />
+              {!event.tickets_sold_out && <EventTicketOffer eventId={event.id} offer={ticketOffer} />}
               {event.tickets_sold_out ? (
                 <>
                   <Button className="w-full h-12 text-base font-bold" variant="secondary" disabled>
