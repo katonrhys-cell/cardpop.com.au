@@ -55,6 +55,19 @@ describe('ga4Client configuration', () => {
     expect(parseServiceAccount(expanded).privateKey).toBe('-----BEGIN-----\nabc\n-----END-----\n');
   });
 
+  it('accepts a key whose quotes were made typographic or spaces non-breaking', () => {
+    const raw = JSON.stringify({ type: 'service_account', client_email: 'ga@p.iam.gserviceaccount.com', private_key: 'k' }, null, 2);
+    const smart = raw.replace(/"([^"]*)"/g, '\u201C$1\u201D').replace(/ {2}/g, '\u00A0\u00A0');
+    expect(parseServiceAccount(smart)).toMatchObject({ clientEmail: 'ga@p.iam.gserviceaccount.com' });
+  });
+
+  it('says where a full-length but altered key stops parsing, naming only punctuation', () => {
+    const msg = describeServiceAccountProblem(`{"type": "service_account", "private_key": "abc"${'x'.repeat(2100)}}`);
+    expect(msg).toMatch(/length looks right/);
+    expect(msg).toMatch(/character \d+ of/);
+    expect(msg).not.toMatch(/abc/);
+  });
+
   it('explains why a key or property id is unusable without echoing the value', () => {
     expect(describeServiceAccountProblem(keyJson)).toBeNull();
     expect(describeServiceAccountProblem('')).toMatch(/not set/);
@@ -62,7 +75,7 @@ describe('ga4Client configuration', () => {
     expect(oauth).toMatch(/OAuth client/);
     expect(oauth).not.toMatch(/secret-ish/);
     const cut = describeServiceAccountProblem('{"type":"service_account","private_key":"-----BEGIN');
-    expect(cut).toMatch(/isn't valid JSON/);
+    expect(cut).toMatch(/cut short/);
     expect(cut).not.toMatch(/BEGIN/);
     expect(describePropertyIdProblem('123456')).toBeNull();
     expect(describePropertyIdProblem('G-NCZ6K9VFF8')).toMatch(/measurement id/);

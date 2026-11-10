@@ -25,10 +25,23 @@ const API = 'https://www.googleapis.com/webmasters/v3/sites';
 
 /** Trimmed GSC_SITE_URL, or null when unset / not a property name. */
 export const getSiteUrl = (raw = process.env.GSC_SITE_URL) => {
-  const url = String(raw || '').trim();
-  if (/^sc-domain:[a-z0-9.-]+$/i.test(url)) return url;
+  let url = String(raw || '').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').trim();
+  if (/^(['"\u201C\u2018]).*(['"\u201D\u2019])$/s.test(url)) url = url.slice(1, -1).trim();
+  url = url.replace(/^sc-domain:\s+/i, 'sc-domain:');
+  if (/^sc-domain:[a-z0-9.-]+$/i.test(url)) return url.toLowerCase();
   if (/^https?:\/\/[^\s]+$/i.test(url)) return url.endsWith('/') ? url : `${url}/`;
+  // A bare domain ("cardpop.com.au") almost always means the Domain property.
+  if (/^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(url)) return `sc-domain:${url.toLowerCase()}`;
   return null;
+};
+
+/** Why GSC_SITE_URL is unusable, or null. The value is a site name, not a secret. */
+export const describeSiteUrlProblem = (raw = process.env.GSC_SITE_URL) => {
+  if (!raw || !String(raw).trim()) return null;
+  if (getSiteUrl(raw)) return null;
+  const shown = JSON.stringify(String(raw).trim().slice(0, 60));
+  return `GSC_SITE_URL is ${shown}; it must be exactly sc-domain:cardpop.com.au (Domain property) `
+    + 'or https://cardpop.com.au/ (URL-prefix property)';
 };
 
 export const isSearchConsoleConfigured = () => Boolean(getSiteUrl() && parseServiceAccount());

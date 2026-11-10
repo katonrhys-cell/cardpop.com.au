@@ -64,12 +64,46 @@ const serviceAccountCandidates = (raw) => {
   if (!text.startsWith('{')) {
     try { forms.push(Buffer.from(text.replace(/\s+/g, ''), 'base64').toString('utf8').trim()); } catch { /* not base64 */ }
   }
+  // Typographic quotes, non-breaking spaces and zero-width characters, which
+  // a notes app or "smart punctuation" swaps in; none can appear in a real key.
+  for (const form of [...forms]) {
+    const plain = normaliseTypography(form);
+    if (plain !== form) forms.push(plain);
+  }
   const out = [];
   for (const form of forms) {
     out.push(form);
     if (/[\r\n]/.test(form)) out.push(escapeBreaksInStrings(form));
   }
   return out;
+};
+
+const normaliseTypography = (text) => text
+  .replace(/[\u201C\u201D\u201E\u201F\u2033\uFF02]/g, '"')
+  .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+  .replace(/[\u00A0\u2007\u202F]/g, ' ')
+  .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
+
+/**
+ * Where JSON.parse gives up on the value, described without echoing it: the
+ * character position and, only when it is punctuation or whitespace (never a
+ * letter or digit, which could be part of the key), which character it is.
+ */
+const describeParseFailure = (text) => {
+  try {
+    JSON.parse(text);
+    return '';
+  } catch (err) {
+    const match = /position (\d+)/.exec(err.message || '');
+    if (!match) return ' JSON.parse stopped before the end of the value.';
+    const pos = Number(match[1]);
+    const ch = text[pos];
+    const safe = ch && !/[A-Za-z0-9+/=_-]/.test(ch);
+    const what = safe
+      ? ` (${JSON.stringify(ch)}, U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`
+      : '';
+    return ` It stops parsing at character ${pos + 1} of ${text.length}${what}.`;
+  }
 };
 
 const parseCandidate = (candidate) => {
@@ -115,9 +149,13 @@ export const describeServiceAccountProblem = (raw = process.env.GA4_SERVICE_ACCO
     return `GA4_SERVICE_ACCOUNT_JSON is JSON but not a service-account key (it has: ${keys})${hint}. `
       + 'Download a key from IAM & Admin → Service Accounts → Keys → Add key → JSON';
   }
+  const text = String(raw).replace(/^\uFEFF/, '').trim();
+  const where = text.startsWith('{') ? describeParseFailure(text) : '';
+  const cause = length < 2000
+    ? 'it looks cut short (a full key is about 2,300 characters)'
+    : 'its length looks right, so something in it was altered when pasted';
   return `GA4_SERVICE_ACCOUNT_JSON is set (${length} characters) but isn't valid JSON or base64 JSON — `
-    + 'it was probably cut short or altered when pasted. A full key is about 2,300 characters; '
-    + 'paste the whole downloaded file, or its base64';
+    + `${cause}.${where} Paste the whole downloaded file again, or its base64`;
 };
 
 /** Why GA4_PROPERTY_ID is unusable, or null when it is a numeric id. */
