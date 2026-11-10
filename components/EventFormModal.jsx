@@ -30,6 +30,10 @@ import { findOrganiser } from '@/utils/eventOrganisers.js';
 import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
 import { createStepRunner, reportStalledStep, UPLOAD_STEP_TIMEOUT_MS } from '@/utils/saveSteps.js';
 import { toast } from 'sonner';
+import {
+  validateEventForm, normalizeEventUrl, describeEventSaveError, eventImageFileError,
+  EVENT_IMAGE_ACCEPT, EVENT_URL_FIELDS,
+} from '@/utils/eventFormValidation.js';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 
@@ -111,7 +115,7 @@ const INITIAL_STATE = {
 };
 
 // Simple tag input — press Enter or comma to add
-const TagInput = ({ value = [], onChange, placeholder }) => {
+const TagInput = ({ id, value = [], onChange, placeholder, disabled }) => {
   const [inputVal, setInputVal] = useState('');
   const handleKey = (e) => {
     if ((e.key === 'Enter' || e.key === ',') && inputVal.trim()) {
@@ -119,7 +123,15 @@ const TagInput = ({ value = [], onChange, placeholder }) => {
       const tag = inputVal.trim().replace(/,$/, '');
       if (tag && !value.includes(tag)) onChange([...value, tag]);
       setInputVal('');
+    } else if (e.key === 'Backspace' && !inputVal && value.length) {
+      onChange(value.slice(0, -1));
     }
+  };
+  // A typed tag that wasn't followed by Enter is kept, not silently dropped.
+  const commitPending = () => {
+    const tag = inputVal.trim().replace(/,$/, '');
+    if (tag && !value.includes(tag)) onChange([...value, tag]);
+    setInputVal('');
   };
   const remove = (tag) => onChange(value.filter(t => t !== tag));
   return (
@@ -127,15 +139,18 @@ const TagInput = ({ value = [], onChange, placeholder }) => {
       {value.map(tag => (
         <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
           {tag}
-          <button type="button" onClick={() => remove(tag)} className="hover:text-destructive"><X className="w-3 h-3" /></button>
+          <button type="button" onClick={() => remove(tag)} disabled={disabled} aria-label={`Remove ${tag}`} className="rounded-full hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="w-3 h-3" aria-hidden="true" /></button>
         </span>
       ))}
       <input
+        id={id}
         className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         placeholder={value.length ? '' : placeholder}
         value={inputVal}
         onChange={e => setInputVal(e.target.value)}
         onKeyDown={handleKey}
+        onBlur={commitPending}
+        disabled={disabled}
       />
     </div>
   );
@@ -223,6 +238,30 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [offerForm, setOfferForm] = useState(EMPTY_OFFER_FORM);
   const [existingOffer, setExistingOffer] = useState(null);
 
+  // Anything typed or picked since the form opened — closing then asks first,
+  // so a stray click outside the dialog can't throw a long form away.
+  const dirtyRef = useRef(false);
+  const markDirty = () => { dirtyRef.current = true; };
+  const requestClose = () => {
+    if (loading) return;
+    if (dirtyRef.current && !window.confirm('Discard your unsaved changes to this event?')) return;
+    onClose();
+  };
+  const changeGallery = (v) => { markDirty(); setGallery(v); };
+  const changeVideos = (v) => { markDirty(); setVideos(v); };
+  const changeOffer = (v) => { markDirty(); setOfferForm(v); };
+
+  // Switch to the tab holding a field and put the cursor in it, so an error
+  // toast always lands the organiser on the thing to fix.
+  const focusField = (tab, fieldId) => {
+    setActiveTab(tab);
+    if (!fieldId) return;
+    setTimeout(() => {
+      const el = document.getElementById(fieldId);
+      if (el) { el.focus(); el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); }
+    }, 50);
+  };
+
   const handleWatchLoaded = useCallback((watch) => {
     setExistingWatch(watch);
     setRescanWeekly(watch ? watch.is_active : true);
@@ -252,6 +291,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
   useEffect(() => {
     if (!isOpen) return;
+    dirtyRef.current = false;
     setRescanWeekly(true);
     setExistingWatch(null);
     setOfferForm(EMPTY_OFFER_FORM);
@@ -332,8 +372,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         postcode:            event.postcode || '',
         start_date:          event.start_date || '',
         end_date:            event.end_date || '',
-        start_time:          event.start_time || '',
-        end_time:            event.end_time || '',
+        start_time:          event.start_time ? String(event.start_time).slice(0, 5) : '',
+        end_time:            event.end_time ? String(event.end_time).slice(0, 5) : '',
         organizer_name:      event.organizer_name || '',
         organizer_email:     event.organizer_email || '',
         organizer_phone:     event.organizer_phone || '',
@@ -406,6 +446,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const processLogoFile = (file) => {
     const problem = logoFileError(file);
     if (problem) { toast.error(problem); return; }
+    markDirty();
     setLogoFile(file);
     setPickedLogoUrl(null);
     setLogoIsVideo(isVideoLogoFile(file));
@@ -416,6 +457,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const pickOrganiser = (id) => {
     const org = organisers.find(o => o.id === id);
     if (!org) return;
+    markDirty();
     set('organizer_name', org.name);
     setLogoFile(null);
     if (logoInputRef.current) logoInputRef.current.value = '';
@@ -446,6 +488,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   };
 
   const clearLogo = () => {
+    markDirty();
     setLogoFile(null);
     setPickedLogoUrl(null);
     setLogoPreview(null);
@@ -454,61 +497,88 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
-  const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+  const set = (field, value) => { markDirty(); setFormData(prev => ({ ...prev, [field]: value })); };
 
   const handleChange = (e) => set(e.target.name, e.target.value);
 
   const toggleCardGame = (game) => {
-    set('featured_card_games', formData.featured_card_games.includes(game)
-      ? formData.featured_card_games.filter(g => g !== game)
-      : [...formData.featured_card_games, game]);
+    markDirty();
+    setFormData(prev => ({
+      ...prev,
+      featured_card_games: prev.featured_card_games.includes(game)
+        ? prev.featured_card_games.filter(g => g !== game)
+        : [...prev.featured_card_games, game],
+    }));
   };
 
   const processFile = (file) => {
     if (!file) return;
-    if (file.size > 20971520) { toast.error('Image exceeds 20MB.'); return; }
-    if (!file.type.startsWith('image/')) { toast.error('Only images allowed.'); return; }
+    const problem = eventImageFileError(file);
+    if (problem) {
+      toast.error(problem);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    markDirty();
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
     setRemoveExistingImage(false);
   };
 
   const clearImage = () => {
+    markDirty();
     setImageFile(null);
     setImagePreview(null);
     setRemoveExistingImage(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const clearForm = () => {
+    if (dirtyRef.current && !window.confirm('Clear everything you’ve entered on this form?')) return;
+    setFormData(INITIAL_STATE);
+    setImagePreview(null);
+    setImageFile(null);
+    setRemoveExistingImage(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    clearLogo();
+    setGallery([emptyAlbum()]);
+    setVideos([emptyVideo()]);
+    setOfferForm(EMPTY_OFFER_FORM);
+    setActiveTab('details');
+    dirtyRef.current = false;
+  };
+
   // `asDraft` (the "Save Draft" button): keep the event private, unsubmitted.
   const handleSubmit = async (e, { asDraft = false } = {}) => {
     e?.preventDefault?.();
 
-    if (!formData.title.trim()) {
-      toast.error('Event title is required.');
-      setActiveTab('details');
-      return;
-    }
-
-    if (!formData.start_date) {
-      toast.error('Start date is required.');
-      setActiveTab('venue');
+    // The form validates itself (noValidate): the browser's own bubbles only
+    // fire for fields on the open tab, and refused links typed without https://.
+    const formError = validateEventForm(formData);
+    if (formError) {
+      toast.error(formError.message);
+      focusField(formError.tab, formError.field);
       return;
     }
 
     const ticketPriceError = formData.is_free ? null : ticketPricesFormError(formData.ticket_prices);
     if (ticketPriceError) {
       toast.error(ticketPriceError);
-      setActiveTab('organiser');
+      focusField('organiser');
       return;
     }
 
     const offerError = validateOfferForm(offerForm);
     if (offerError) {
       toast.error(offerError);
-      setActiveTab('offer');
+      focusField('offer');
       return;
     }
+
+    // Links as typed ("instagram.com/show") → full https:// URLs, shown back
+    // in the form so what's saved is what the organiser sees.
+    const urls = Object.fromEntries(Object.keys(EVENT_URL_FIELDS).map(f => [f, normalizeEventUrl(formData[f])]));
+    setFormData(prev => ({ ...prev, ...urls }));
 
     setLoading(true);
     // Every upload and write runs as a named step with a deadline, so a stalled
@@ -600,17 +670,17 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         organizer_logo_url,
         organizer_email:     formData.organizer_email.trim() || null,
         organizer_phone:     formData.organizer_phone.trim() || null,
-        website_url:         formData.website_url.trim() || null,
-        ticket_url:          formData.ticket_url.trim() || null,
-        instagram_url:       formData.instagram_url.trim() || null,
-        facebook_url:        formData.facebook_url.trim() || null,
+        website_url:         urls.website_url || null,
+        ticket_url:          urls.ticket_url || null,
+        instagram_url:       urls.instagram_url || null,
+        facebook_url:        urls.facebook_url || null,
         youtube_url:         event_videos[0]?.url || null,
-        youtube_channel_url: formData.youtube_channel_url.trim() || null,
-        tiktok_url:          formData.tiktok_url.trim() || null,
-        x_url:               formData.x_url.trim() || null,
-        discord_url:         formData.discord_url.trim() || null,
-        vendor_application_url: formData.vendor_application_url.trim() || null,
-        facebook_video_url:  formData.facebook_video_url.trim() || null,
+        youtube_channel_url: urls.youtube_channel_url || null,
+        tiktok_url:          urls.tiktok_url || null,
+        x_url:               urls.x_url || null,
+        discord_url:         urls.discord_url || null,
+        vendor_application_url: urls.vendor_application_url || null,
+        facebook_video_url:  urls.facebook_video_url || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
         ticket_prices:       formData.is_free ? [] : cleanTicketPrices(formData.ticket_prices),
@@ -633,8 +703,14 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         // NB: organiser_id is deliberately NOT in the update payload — editing
         // an event (incl. an admin fixing a user submission) must not reassign
         // its owner to the editor.
-        const { error } = await step('Saving the event', () => supabase.from('events').update(payload).eq('id', event.id));
+        const { data: updated, error } = await step('Saving the event', () => supabase.from('events').update(payload).eq('id', event.id).select('id'));
         if (error) throw error;
+        // RLS answers a refused update with zero rows and no error — e.g. the
+        // team cancelled or archived the event while the form was open. Don't
+        // report that as saved.
+        if (Array.isArray(updated) && updated.length === 0) {
+          throw Object.assign(new Error('row-level security: no rows updated'), { code: '42501' });
+        }
         // Submitted just now (a draft or a rejected event going to review).
         const justSubmitted = isUserMode && payload.status === 'pending_review' && event.status !== 'pending_review';
         toast.success(isLiveEdit
@@ -733,7 +809,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       onClose();
     } catch (err) {
       console.error('Event save error:', err);
-      toast.error(err.message || 'Failed to save event', err?.name === 'SaveStepTimeoutError' && /Saving the event/.test(err.step || '')
+      toast.error(describeEventSaveError(err), err?.name === 'SaveStepTimeoutError' && /Saving the event/.test(err.step || '')
         ? { description: 'It may still have saved — check your events list before trying again.', duration: 12000 }
         : undefined);
     } finally {
@@ -745,7 +821,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const inputCls = 'bg-background rounded-xl h-11';
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !loading && !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) requestClose(); }}>
       <DialogContent className="sm:max-w-[860px] w-[95vw] h-[92vh] sm:h-auto max-h-[92vh] flex flex-col p-0 overflow-hidden bg-card border-border shadow-xl">
         <DialogHeader className="px-6 py-5 border-b border-border bg-muted/20 shrink-0">
           <div className="flex items-center gap-3">
@@ -769,10 +845,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+        {/* The fields scroll; the footer (Save / Submit) stays pinned so it's
+            always reachable, however long the open tab is. */}
+        <form onSubmit={handleSubmit} noValidate aria-busy={loading} className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="px-6 border-b border-border sticky top-0 bg-card z-10 pt-2">
-              <TabsList className="w-full justify-start h-12 bg-transparent p-0 gap-0">
+              <TabsList aria-label="Event form sections" className="w-full justify-start h-12 bg-transparent p-0 gap-0 overflow-x-auto overflow-y-hidden">
                 {[
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
@@ -783,7 +862,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 font-bold text-sm h-full"
+                    className="shrink-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-3 sm:px-4 font-bold text-sm h-full"
                   >
                     {tab.label}
                   </TabsTrigger>
@@ -797,8 +876,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               <TabsContent value="details" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="sm:col-span-2 space-y-2">
-                    <Label htmlFor="title" className="font-bold">Event Title <span className="text-destructive">*</span></Label>
-                    <Input id="title" name="title" value={formData.title} onChange={handleChange} className={inputCls} disabled={loading} required />
+                    <Label htmlFor="title" className="font-bold">Event Title <span className="text-destructive" aria-hidden="true">*</span></Label>
+                    <Input id="title" name="title" value={formData.title} onChange={handleChange} className={inputCls} disabled={loading} required aria-required="true" maxLength={200} />
                   </div>
 
                   <div className="sm:col-span-2 space-y-2">
@@ -825,9 +904,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-bold">Event Type</Label>
+                    <Label htmlFor="event_type" className="font-bold">Event Type</Label>
                     <Select value={formData.event_type} onValueChange={v => set('event_type', v)} disabled={loading}>
-                      <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="event_type" className={inputCls}><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {EVENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                       </SelectContent>
@@ -836,9 +915,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
                   {!isUserMode && (
                     <div className="space-y-2">
-                      <Label className="font-bold">Status</Label>
+                      <Label htmlFor="event_status" className="font-bold">Status</Label>
                       <Select value={formData.status} onValueChange={v => set('status', v)} disabled={loading}>
-                        <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                        <SelectTrigger id="event_status" className={inputCls}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                         </SelectContent>
@@ -867,13 +946,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 )}
 
                 {/* Featured Card Games */}
-                <div className="space-y-2">
-                  <Label className="font-bold">Featured Card Games</Label>
+                <div className="space-y-2" role="group" aria-labelledby="featured_card_games_label">
+                  <p id="featured_card_games_label" className="text-sm font-bold leading-none">Featured Card Games</p>
                   <div className="flex flex-wrap gap-2">
                     {CARD_GAMES.map(game => (
                       <button
                         key={game} type="button"
                         onClick={() => toggleCardGame(game)}
+                        aria-pressed={formData.featured_card_games.includes(game)}
+                        disabled={loading}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                           formData.featured_card_games.includes(game)
                             ? 'bg-primary text-primary-foreground border-primary'
@@ -888,29 +969,29 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
                 {!isUserMode && (
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} />
+                    <Switch id="is_featured" checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} aria-describedby="is_featured_hint" />
                     <div>
-                      <p className="text-sm font-semibold">Feature on Homepage</p>
-                      <p className="text-xs text-muted-foreground">Appears in the featured events section</p>
+                      <Label htmlFor="is_featured" className="text-sm font-semibold cursor-pointer">Feature on Homepage</Label>
+                      <p id="is_featured_hint" className="text-xs text-muted-foreground">Appears in the featured events section</p>
                     </div>
                   </div>
                 )}
 
                 {/* Image upload */}
                 <div className="space-y-2">
-                  <Label className="font-bold">Cover Image</Label>
+                  <p id="cover_image_label" className="text-sm font-bold leading-none">Cover Image</p>
                   <div
                     className={`border-2 border-dashed rounded-2xl transition-all ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/40'}`}
                     onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
-                    onDrop={e => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }}
+                    onDrop={e => { e.preventDefault(); setIsDragging(false); if (!loading && e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }}
                   >
                     {imagePreview ? (
                       <div className="relative p-2">
                         <div className="relative aspect-[21/9] rounded-xl overflow-hidden bg-black/5">
-                          <img src={imagePreview} alt="Preview" className="w-full h-full object-contain" />
-                          <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow" onClick={clearImage}>
-                            <X className="w-4 h-4" />
+                          <img src={imagePreview} alt="Cover image preview" className="w-full h-full object-contain" />
+                          <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow" onClick={clearImage} disabled={loading} aria-label="Remove cover image">
+                            <X className="w-4 h-4" aria-hidden="true" />
                           </Button>
                         </div>
                       </div>
@@ -918,7 +999,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                       <div
                         role="button"
                         tabIndex={0}
-                        aria-label="Upload image — click or press Enter to choose a file"
+                        aria-label="Upload cover image — click or press Enter to choose a file"
                         className="flex flex-col items-center justify-center py-8 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => fileInputRef.current?.click()}
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
@@ -928,13 +1009,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                         <p className="text-xs text-muted-foreground">Max 20MB — JPG, PNG, WEBP</p>
                       </div>
                     )}
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={e => e.target.files[0] && processFile(e.target.files[0])} disabled={loading} />
+                    <input type="file" ref={fileInputRef} className="hidden" accept={EVENT_IMAGE_ACCEPT} aria-labelledby="cover_image_label" tabIndex={-1} onChange={e => e.target.files[0] && processFile(e.target.files[0])} disabled={loading} />
                   </div>
                 </div>
 
-                <EventGalleryEditor value={gallery} onChange={setGallery} disabled={loading} />
+                <EventGalleryEditor value={gallery} onChange={changeGallery} disabled={loading} />
 
-                <EventVideosEditor value={videos} onChange={setVideos} disabled={loading} />
+                <EventVideosEditor value={videos} onChange={changeVideos} disabled={loading} />
               </TabsContent>
 
               {/* ── TAB 2: VENUE & DATES ── */}
@@ -953,9 +1034,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Input id="suburb" name="suburb" value={formData.suburb} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-bold">State</Label>
+                    <Label htmlFor="state" className="font-bold">State</Label>
                     <Select value={formData.state} onValueChange={v => set('state', v)} disabled={loading}>
-                      <SelectTrigger className={inputCls}><SelectValue placeholder="Select state" /></SelectTrigger>
+                      <SelectTrigger id="state" className={inputCls}><SelectValue placeholder="Select state" /></SelectTrigger>
                       <SelectContent>
                         {AUS_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
@@ -963,7 +1044,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="postcode" className="font-bold">Postcode</Label>
-                    <Input id="postcode" name="postcode" value={formData.postcode} onChange={handleChange} className={inputCls} maxLength={4} disabled={loading} />
+                    <Input id="postcode" name="postcode" value={formData.postcode} onChange={handleChange} className={inputCls} maxLength={4} inputMode="numeric" autoComplete="postal-code" disabled={loading} />
                   </div>
                 </div>
 
@@ -971,12 +1052,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Dates & Times</p>
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label htmlFor="start_date" className="font-bold">Start Date</Label>
-                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Label htmlFor="start_date" className="font-bold">Start Date <span className="text-destructive" aria-hidden="true">*</span></Label>
+                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={inputCls} aria-required="true" disabled={loading} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="end_date" className="font-bold">End Date</Label>
-                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} min={formData.start_date || undefined} onChange={handleChange} className={inputCls} disabled={loading} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="start_time" className="font-bold">Start Time</Label>
@@ -1013,7 +1094,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Input id="organizer_name" name="organizer_name" value={formData.organizer_name} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
-                    <Label className="font-bold">Organiser Logo <span className="text-muted-foreground font-normal text-xs">(optional — shown beside the event title, above Event Details)</span></Label>
+                    <p className="text-sm font-bold leading-none">Organiser Logo <span className="text-muted-foreground font-normal text-xs">(optional — shown beside the event title, above Event Details)</span></p>
                     <div className="border-2 border-dashed rounded-2xl border-border bg-muted/20 hover:bg-muted/40 transition-all">
                       {logoPreview ? (
                         <div className="relative p-3 flex items-center justify-center min-h-[7rem]">
@@ -1040,7 +1121,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                           <p className="text-xs text-muted-foreground">PNG, JPG, WebP or GIF — or a short MP4 / WebM loop for a moving logo. Max {LOGO_MAX_LABEL}</p>
                         </div>
                       )}
-                      <input type="file" ref={logoInputRef} className="hidden" accept={LOGO_ACCEPT} onChange={e => e.target.files[0] && processLogoFile(e.target.files[0])} disabled={loading} />
+                      <input type="file" ref={logoInputRef} className="hidden" tabIndex={-1} aria-label="Organiser logo file" accept={LOGO_ACCEPT} onChange={e => e.target.files[0] && processLogoFile(e.target.files[0])} disabled={loading} />
                     </div>
                     {!isUserMode && (
                       <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -1054,11 +1135,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="organizer_email" className="font-bold">Contact Email</Label>
-                    <Input id="organizer_email" name="organizer_email" type="email" value={formData.organizer_email} onChange={handleChange} className={inputCls} disabled={loading} />
+                    <Input id="organizer_email" name="organizer_email" type="email" autoComplete="email" value={formData.organizer_email} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="organizer_phone" className="font-bold">Contact Phone</Label>
-                    <Input id="organizer_phone" name="organizer_phone" value={formData.organizer_phone} onChange={handleChange} className={inputCls} disabled={loading} />
+                    <Input id="organizer_phone" name="organizer_phone" type="tel" autoComplete="tel" value={formData.organizer_phone} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="website_url" className="font-bold">Event Website</Label>
@@ -1122,21 +1203,21 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 <div className="pt-2 border-t border-border space-y-5">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Entry & Capacity</p>
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} />
+                    <Switch id="is_free" checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} aria-describedby="is_free_hint" />
                     <div>
-                      <p className="text-sm font-semibold">Free Entry</p>
-                      <p className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
+                      <Label htmlFor="is_free" className="text-sm font-semibold cursor-pointer">Free Entry</Label>
+                      <p id="is_free_hint" className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
                     </div>
                   </div>
                   {!formData.is_free && (
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-2">
                         <Label htmlFor="entry_fee_aud" className="font-bold">Entry Fee (AUD)</Label>
-                        <Input id="entry_fee_aud" name="entry_fee_aud" type="number" min="0" step="0.01" value={formData.entry_fee_aud} onChange={handleChange} className={inputCls} placeholder="0.00" disabled={loading} />
+                        <Input id="entry_fee_aud" name="entry_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.entry_fee_aud} onChange={handleChange} className={inputCls} placeholder="0.00" disabled={loading} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="presale_fee_aud" className="font-bold">Presale / Early Bird (AUD)</Label>
-                        <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
+                        <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
                       </div>
                     </div>
                   )}
@@ -1146,11 +1227,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-2">
                       <Label htmlFor="capacity" className="font-bold">Max Capacity</Label>
-                      <Input id="capacity" name="capacity" type="number" min="1" value={formData.capacity} onChange={handleChange} className={inputCls} placeholder="e.g. 500" disabled={loading} />
+                      <Input id="capacity" name="capacity" type="number" min="1" step="1" inputMode="numeric" value={formData.capacity} onChange={handleChange} className={inputCls} placeholder="e.g. 500" disabled={loading} />
                     </div>
                     <div className="flex items-center gap-3 pt-8">
-                      <Switch checked={formData.registration_required} onCheckedChange={v => set('registration_required', v)} disabled={loading} />
-                      <Label className="font-semibold text-sm cursor-pointer">Registration Required</Label>
+                      <Switch id="registration_required" checked={formData.registration_required} onCheckedChange={v => set('registration_required', v)} disabled={loading} />
+                      <Label htmlFor="registration_required" className="font-semibold text-sm cursor-pointer">Registration Required</Label>
                     </div>
                   </div>
                 </div>
@@ -1181,13 +1262,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="font-bold">SEO Keywords <span className="text-muted-foreground font-normal text-xs">(press Enter to add)</span></Label>
-                  <TagInput value={formData.seo_keywords} onChange={v => set('seo_keywords', v)} placeholder="Add keywords and press Enter..." />
+                  <Label htmlFor="seo_keywords" className="font-bold">SEO Keywords <span className="text-muted-foreground font-normal text-xs">(press Enter to add)</span></Label>
+                  <TagInput id="seo_keywords" value={formData.seo_keywords} onChange={v => set('seo_keywords', v)} placeholder="Add keywords and press Enter..." disabled={loading} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="font-bold">Event Tags <span className="text-muted-foreground font-normal text-xs">(for search & filtering)</span></Label>
-                  <TagInput value={formData.tags} onChange={v => set('tags', v)} placeholder="Add tags and press Enter..." />
+                  <Label htmlFor="event_tags" className="font-bold">Event Tags <span className="text-muted-foreground font-normal text-xs">(for search & filtering)</span></Label>
+                  <TagInput id="event_tags" value={formData.tags} onChange={v => set('tags', v)} placeholder="Add tags and press Enter..." disabled={loading} />
                 </div>
 
                 {isUserMode && formData.source_url && (
@@ -1202,7 +1283,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               <TabsContent value="offer" className="mt-0 animate-in fade-in">
                 <EventTicketOfferPanel
                   value={offerForm}
-                  onChange={setOfferForm}
+                  onChange={changeOffer}
                   stats={existingOffer}
                   ticketUrl={formData.ticket_url.trim()}
                   disabled={loading}
@@ -1212,18 +1293,23 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
             </div>
           </Tabs>
+          </div>
 
-          <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row gap-3 sm:justify-between shrink-0">
-            <Button
-              type="button" variant="outline"
-              onClick={() => { setFormData(INITIAL_STATE); setImagePreview(null); setImageFile(null); setRemoveExistingImage(true); clearLogo(); }}
-              disabled={loading}
-              className="rounded-xl font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-transparent hover:border-destructive/20"
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Clear Form
-            </Button>
-            <div className="flex gap-3 sm:justify-end">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
+          <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row gap-3 sm:justify-between shrink-0 sm:space-x-0">
+            {/* Clearing only makes sense on a blank new event — on a saved one
+                it would wipe the organiser's work, so it isn't offered there. */}
+            {!event?.id ? (
+              <Button
+                type="button" variant="outline"
+                onClick={clearForm}
+                disabled={loading}
+                className="order-last sm:order-first rounded-xl font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-transparent hover:border-destructive/20"
+              >
+                <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" /> Clear Form
+              </Button>
+            ) : <span className="hidden sm:block" />}
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+              <Button type="button" variant="ghost" onClick={requestClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
               {canSaveDraft && (
                 <Button
                   type="button"
@@ -1232,12 +1318,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   onClick={(e) => { setSavingDraft(true); handleSubmit(e, { asDraft: true }).finally(() => setSavingDraft(false)); }}
                   className="rounded-xl font-bold"
                 >
-                  {loading && savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {loading && savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                   {loading && savingDraft && saveStep ? `${saveStep}…` : 'Save Draft'}
                 </Button>
               )}
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
-                {loading && !savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {loading && !savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
                 {loading && !savingDraft && saveStep
                   ? `${saveStep}…`
                   : isLiveEdit ? 'Save & Publish Changes'
@@ -1247,6 +1333,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                           : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
+            {/* Announces the slow steps ("Uploading photo 2 of 5") to screen readers. */}
+            <p className="sr-only" role="status" aria-live="polite">{loading ? (saveStep || 'Saving…') : ''}</p>
           </DialogFooter>
         </form>
       </DialogContent>

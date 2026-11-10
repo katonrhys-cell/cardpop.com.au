@@ -51,6 +51,27 @@ scanner's finds (`auto_discovered`) are left to their own queue.
 Organisers can turn their approve / reject emails and bells off under Account →
 Notification Settings → *Events you organise*.
 
+## The form (components/EventFormModal.jsx)
+
+The form checks itself (`noValidate`) through `utils/eventFormValidation.js`
+rather than leaving it to the browser, whose bubbles only show for the open tab:
+
+- **Errors land on the field.** `validateEventForm()` returns the field and tab
+  (title, start date, end before start, a same-day end time before the start,
+  a 4-digit postcode, the contact email, every link, prices, capacity); the form
+  switches tab and focuses it.
+- **Links are fixed, not refused.** `normalizeEventUrl()` turns
+  `instagram.com/show` / `www.show.com.au` into `https://…` before saving.
+- **Photos are checked when picked** (`eventImageFileError()`): only the types
+  the `events` bucket stores (JPG, PNG, WebP, GIF, 20MB), with a plain message
+  for iPhone HEIC — it used to fail deep in the upload as "mime type not supported".
+- **A refused save is never "saved".** An update RLS refuses returns zero rows
+  and no error, so the form asks for the row back and reports it;
+  `describeEventSaveError()` turns RLS / storage / network errors into English.
+- **Nothing is lost by accident.** Closing (Cancel, Escape, a click outside)
+  asks first once anything has been changed; **Clear Form** is offered only on a
+  new event. The Save / Submit footer stays pinned while the fields scroll.
+
 ## Where it lives
 
 - **Change log:** `event_change_log` — one row per organiser save on a live

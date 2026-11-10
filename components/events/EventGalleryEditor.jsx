@@ -9,9 +9,9 @@ import {
   MAX_EVENT_GALLERY_PHOTOS,
   MAX_ALBUM_TITLE_CHARS,
 } from '@/utils/eventGallery.js';
+import { eventImageFileError, EVENT_IMAGE_ACCEPT } from '@/utils/eventFormValidation.js';
 
 export { MAX_EVENT_GALLERY_PHOTOS };
-const MAX_FILE_BYTES = 20971520;
 
 export const emptyAlbum = () => ({ title: '', photos: [] });
 
@@ -31,10 +31,15 @@ const AlbumEditor = ({ album, index, count, onChange, onRemove, onMove, disabled
     const files = Array.from(fileList || []);
     if (!files.length) return;
     const room = MAX_EVENT_GALLERY_PHOTOS - photos.length;
-    const images = files.filter((f) => f.type.startsWith('image/'));
-    const sized = images.filter((f) => f.size <= MAX_FILE_BYTES);
-    if (images.length < files.length) toast.error('Only images can be added to the gallery.');
-    if (sized.length < images.length) toast.error('Photos over 20MB were skipped.');
+    // Only the types the events bucket stores — a HEIC or other format used
+    // to be accepted here and then fail the whole save at upload time.
+    const problems = files.map((f) => eventImageFileError(f));
+    const sized = files.filter((_, i) => !problems[i]);
+    const firstProblem = problems.find(Boolean);
+    if (firstProblem) {
+      const skipped = problems.filter(Boolean).length;
+      toast.error(skipped === 1 ? firstProblem : `${skipped} files were skipped. ${firstProblem}`);
+    }
     if (sized.length > room) toast.error(`An album holds up to ${MAX_EVENT_GALLERY_PHOTOS} photos — add another album for the rest.`);
     const added = sized.slice(0, Math.max(room, 0)).map((file) => ({ file, preview: URL.createObjectURL(file) }));
     if (added.length) onChange({ ...album, photos: [...photos, ...added] });
@@ -130,8 +135,9 @@ const AlbumEditor = ({ album, index, count, onChange, onRemove, onMove, disabled
         <span className="text-xs text-muted-foreground">Max 20MB each — compressed before upload. The first photo is the biggest tile.</span>
       </button>
       <input
-        ref={inputRef} type="file" multiple className="hidden"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        ref={inputRef} type="file" multiple className="hidden" tabIndex={-1}
+        aria-label={`Add photos to album ${n}`}
+        accept={EVENT_IMAGE_ACCEPT}
         onChange={(e) => addFiles(e.target.files)} disabled={disabled}
       />
     </div>
