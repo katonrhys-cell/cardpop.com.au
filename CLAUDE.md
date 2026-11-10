@@ -253,7 +253,16 @@ build — plus the few schedules that need a runner (migration drift, git
 backup, merchant-listings check). The weekly Snyk sweep and the disabled
 Lighthouse workflow were removed in the 2026-11 cost review: the Snyk GitHub
 App still checks every PR, and Dependabot alerts cover advisories against an
-unchanged lockfile. On a push
+unchanged lockfile. **The `verify` job can run on a self-hosted runner** — a
+separate small Vultr box bootstrapped by `deploy/setup-runner.sh`, never the
+production VPS, because CI executes PR code — selected by the `CI_RUNS_ON`
+repository variable (`runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}`):
+set to the runner's label list it bills no metered minutes, deleted it falls
+back to GitHub-hosted runners with no code change. The deploy, migration and
+schedule workflows stay hosted on purpose so a dead CI box can't block a
+deploy; `tests/backend/workflowRunners.test.js` pins which is which. The box
+has Chromium's system libraries and the AWS CLI pre-installed and grants the
+runner no sudo — see `docs/ci-runner.md`. On a push
 to `main` only the Supabase migration push (when `supabase/migrations/`
 changed) runs, plus `deploy.yml` once the VPS is enabled (it skips while parked): a private repo bills every run a whole
 metered minute, so the former post-merge `main-ci.yml` (the same `verify`

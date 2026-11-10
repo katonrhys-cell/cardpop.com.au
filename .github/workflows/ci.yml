@@ -20,6 +20,10 @@ name: CI
 # Draft PRs skip the E2E steps (the most expensive part: a Chromium install
 # and a real browser run); marking the PR "Ready for review" re-runs this job
 # with them.
+#
+# Runs on the self-hosted runner (deploy/setup-runner.sh) when the CI_RUNS_ON
+# repository variable is set, so it costs no metered minutes; without the
+# variable it falls back to GitHub-hosted runners. See docs/ci-runner.md.
 
 on:
   pull_request:
@@ -35,7 +39,11 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # Self-hosted when the CI_RUNS_ON repository variable is set (to the JSON
+    # label list the runner was registered with, e.g.
+    # ["self-hosted","linux","x64","cardpop-ci"]); GitHub-hosted otherwise.
+    # Jobs on the self-hosted box bill no metered minutes — docs/ci-runner.md.
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}
     # A hung step must not run to the 6-hour default and eat the Actions budget.
     timeout-minutes: 30
     env:
@@ -101,12 +109,18 @@ jobs:
       # `apt-get update` inside `playwright install --with-deps`. They aren't
       # needed for Chromium's system libraries, so drop them first.
       - name: Remove broken Microsoft apt repos
-        if: env.E2E == 'true'
+        if: env.E2E == 'true' && runner.environment == 'github-hosted'
         run: sudo rm -f /etc/apt/sources.list.d/*microsoft* /etc/apt/sources.list.d/*azure*
 
       - name: Install Playwright Chromium
-        if: env.E2E == 'true'
+        if: env.E2E == 'true' && runner.environment == 'github-hosted'
         run: npx playwright install --with-deps chromium
+
+      # The self-hosted box has Chromium's system libraries pre-installed
+      # (deploy/setup-runner.sh) and grants the runner no sudo.
+      - name: Install Playwright Chromium (self-hosted)
+        if: env.E2E == 'true' && runner.environment == 'self-hosted'
+        run: npx playwright install chromium
 
       # E2E_SKIP_BUILD: serve the dist/ built above instead of building again.
       - name: Run E2E tests
