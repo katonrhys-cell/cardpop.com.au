@@ -187,12 +187,28 @@ const HERO_CARDS = [
 ];
 
 // ─── Stat counter item ────────────────────────────────────────────────────────
-const StatItem = ({ value, suffix, label, sub, isDecimal, inView }) => {
+// The display face (Syne) is very wide: at 30px "99,962" is ~163px, more than
+// a third of a phone's panel, so a six-digit figure used to wrap mid-number.
+// Each tile is a size container and the number's font-size is capped at
+// `100cqw / its width in em` — the longest figure in the panel decides, so the
+// three tiles stay the same size — never larger than the text-3xl/4xl class.
+// Widths measured from public/fonts/syne-latin-var.woff2 (800, tracking-tight).
+const statFigure = ({ value, suffix, isDecimal }) =>
+  `${isDecimal ? value : Number(value || 0).toLocaleString('en-AU')}${suffix || ''}`;
+const statWidthEm = (text) =>
+  [...text].reduce((em, ch) => em + (/[0-9]/.test(ch) ? 1.03 : /[,.]/.test(ch) ? 0.32 : 0.95), 0);
+
+const StatItem = ({ value, suffix, label, sub, isDecimal, inView, fitEm }) => {
   const count = useCountUp(value, inView, isDecimal);
   return (
-    <div className="px-2 text-center sm:px-3">
+    <div className="px-1 text-center sm:px-3 [container-type:inline-size]">
       <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums tracking-tight">
-        {isDecimal ? count : count.toLocaleString('en-AU')}{suffix}
+        <span
+          className="whitespace-nowrap"
+          style={fitEm ? { fontSize: `min(1em, ${(100 / fitEm).toFixed(2)}cqw)` } : undefined}
+        >
+          {isDecimal ? count : count.toLocaleString('en-AU')}{suffix}
+        </span>
       </div>
       <div className="mt-1 text-xs font-semibold leading-snug text-muted-foreground sm:text-sm">{label}</div>
       {sub && <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums sm:text-xs">{sub}</div>}
@@ -209,42 +225,45 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
  * count-up tiles separated by hairlines, a footnote, and (community panel,
  * signed-out visitors) a "Join free" call to action.
  */
-const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testId }) => (
-  <div
-    className="relative flex flex-col rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6 md:p-7"
-    data-testid={testId}
-  >
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Icon className="h-5 w-5" aria-hidden="true" />
-        </span>
-        <div className="leading-tight">
-          <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
-          <p className="mt-0.5 text-sm font-semibold text-foreground sm:text-base">{title}</p>
+const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testId }) => {
+  const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
+  return (
+    <div
+      className="relative flex flex-col rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6 md:p-7"
+      data-testid={testId}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <Icon className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <div className="leading-tight">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
+            <p className="mt-0.5 text-sm font-semibold text-foreground sm:text-base">{title}</p>
+          </div>
         </div>
+        {cta && (
+          <Button asChild size="sm" className="hidden shrink-0 rounded-full font-bold sm:inline-flex">
+            <Link to={cta.to}>{cta.label} <ArrowRight className="ml-1 h-4 w-4" /></Link>
+          </Button>
+        )}
       </div>
-      {cta && (
-        <Button asChild size="sm" className="hidden shrink-0 rounded-full font-bold sm:inline-flex">
-          <Link to={cta.to}>{cta.label} <ArrowRight className="ml-1 h-4 w-4" /></Link>
-        </Button>
-      )}
+      <div className={`mt-6 grid flex-1 items-start divide-x divide-border ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
+        {stats.map((stat) => (
+          <StatItem key={stat.key} {...stat} inView={inView} fitEm={fitEm} />
+        ))}
+      </div>
+      <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground sm:text-xs">
+        <span>{note}</span>
+        {cta && (
+          <Link to={cta.to} className="shrink-0 font-bold text-primary hover:underline sm:hidden">
+            {cta.label} <ArrowRight className="inline h-3 w-3 align-[-1px]" />
+          </Link>
+        )}
+      </div>
     </div>
-    <div className={`mt-6 grid flex-1 items-start divide-x divide-border ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
-      {stats.map((stat) => (
-        <StatItem key={stat.key} {...stat} inView={inView} />
-      ))}
-    </div>
-    <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground sm:text-xs">
-      <span>{note}</span>
-      {cta && (
-        <Link to={cta.to} className="shrink-0 font-bold text-primary hover:underline sm:hidden">
-          {cta.label} <ArrowRight className="inline h-3 w-3 align-[-1px]" />
-        </Link>
-      )}
-    </div>
-  </div>
-);
+  );
+};
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const HomePage = () => {
