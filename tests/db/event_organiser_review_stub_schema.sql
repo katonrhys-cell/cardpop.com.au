@@ -80,3 +80,25 @@ create policy "Admins manage event ticket offers" on public.event_ticket_offers 
   using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.is_admin = true))
   with check (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.is_admin = true));
 grant select, insert, update, delete on public.event_ticket_offers to authenticated;
+
+-- Event info board (20260820081848_event_forums_and_info_board.sql), with the
+-- original vendor-inclusive can_manage_event_board() the migration tightens.
+create table public.event_rsvps (event_id uuid references public.events(id) on delete cascade, user_id uuid, role text);
+create table public.event_board_posts (
+  id uuid primary key default gen_random_uuid(),
+  event_id uuid not null references public.events(id) on delete cascade,
+  author_id uuid not null, body text
+);
+create or replace function public.can_manage_event_board(p_event_id uuid) returns boolean
+language sql stable security definer set search_path to 'public' as $$
+  select exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true)
+      or exists (select 1 from public.events where id = p_event_id and organiser_id = (select auth.uid()))
+      or exists (select 1 from public.event_rsvps where event_id = p_event_id and user_id = (select auth.uid()) and role = 'vendor');
+$$;
+alter table public.event_board_posts enable row level security;
+create policy "Anyone reads board posts" on public.event_board_posts for select using (true);
+create policy "Managers can create board posts" on public.event_board_posts for insert
+  with check ((select auth.uid()) = author_id and public.can_manage_event_board(event_id));
+create policy "Authors and admins can update board posts" on public.event_board_posts for update
+  using ((select auth.uid()) = author_id or exists (select 1 from public.profiles where id = (select auth.uid()) and is_admin = true));
+grant select, insert, update, delete on public.event_board_posts, public.event_rsvps to authenticated;

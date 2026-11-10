@@ -4,7 +4,7 @@ import {
   Bell, DollarSign, Hammer, TrendingUp, TrendingDown, Clock, Award,
   Tag, CheckCircle2, XCircle, RefreshCw, MessageSquare, UserPlus,
   Star, ShieldCheck, ShieldAlert, Shield, Settings, Check, CalendarClock,
-  ShoppingBag, UserCheck, ArrowRightLeft, CalendarCheck, CalendarX, CalendarCog, CalendarPlus,
+  ShoppingBag, UserCheck, ArrowRightLeft, CalendarCheck, CalendarX, CalendarCog, CalendarPlus, FilePen,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,6 +37,7 @@ const TYPE_CONFIG = {
   event_pending_review:     { icon: CalendarClock, color: 'text-blue-500' },
   event_change_requested:   { icon: CalendarCog,   color: 'text-amber-500' },
   event_created:            { icon: CalendarPlus,  color: 'text-emerald-500' },
+  event_updated:            { icon: FilePen,       color: 'text-amber-500' },
   event_approved:           { icon: CalendarCheck, color: 'text-emerald-500' },
   event_rejected:           { icon: CalendarX,     color: 'text-red-500' },
   order_placed:             { icon: ShoppingBag,   color: 'text-emerald-500' },

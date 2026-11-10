@@ -27,8 +27,7 @@ import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
 import { findOrganiser } from '@/utils/eventOrganisers.js';
-import { diffEventChanges, ticketOfferChange } from '@/utils/eventChangeRequests.js';
-import { notifyEventDecision } from '@/lib/eventReviewApi.js';
+import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -172,20 +171,16 @@ const CharCount = ({ value = '', max, warn = 0.85 }) => {
   );
 };
 
-// mode="admin" exposes status/featured/SEO controls; mode="user" locks
-// submissions to pending_review so they go through the admin approval queue.
-//
-// In user mode a live (approved) event isn't edited directly: the save becomes
-// a change request (utils/eventChangeRequests.js) that an admin applies, and
-// the live page is untouched until then. For that, `event` is the live row with
-// any open request's changes laid over it (to prefill), `baseEvent` the live
-// row itself (to diff against) and `changeRequest` the open request, if any.
-const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeRequest = null, scrapedData, onSaved, mode = 'admin' }) => {
+// mode="admin" exposes status/featured/SEO controls; mode="user" is an
+// organiser on their OWN event (RLS refuses anyone else's): a new submission or
+// an edit of a pending / rejected one goes (back) to the review queue; an edit
+// of their live event goes live straight away, and the database logs exactly
+// what changed for the admins (event_change_log, utils/eventChangeLog.js).
+const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = 'admin' }) => {
   const { currentUser } = useAuth();
   const isUserMode = mode === 'user';
-  const liveEvent = baseEvent || event;
-  const isChangeRequest = isUserMode && Boolean(liveEvent?.id) && liveEvent.status === 'approved';
-  const isResubmission = isUserMode && liveEvent?.status === 'rejected';
+  const isLiveEdit = isUserMode && Boolean(event?.id) && event.status === 'approved';
+  const isResubmission = isUserMode && event?.status === 'rejected';
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
@@ -368,22 +363,16 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
       setActiveTab('details');
 
       // Member offer: admins and the event's own organiser can read it (RLS).
-      // An open change request's offer (laid over `event` as ticket_offer)
-      // prefills the form instead of the live one.
-      const requestedOffer = isUserMode && event && Object.prototype.hasOwnProperty.call(event, 'ticket_offer')
-        ? event.ticket_offer
-        : undefined;
       const toOfferForm = (row) => ({
         offer_text: row?.offer_text || '',
         discount_code: row?.discount_code || '',
         referral_url: row?.referral_url || '',
         is_active: row ? row.is_active !== false : true,
       });
-      if (requestedOffer !== undefined) setOfferForm(toOfferForm(requestedOffer));
       loadAdminTicketOffer(event.id).then((row) => {
         if (cancelled || !row) return;
         setExistingOffer(row);
-        if (requestedOffer === undefined) setOfferForm(toOfferForm(row));
+        setOfferForm(toOfferForm(row));
       }).catch(() => toast.error("Couldn't load this event's member offer."));
 
     } else {
@@ -566,8 +555,9 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
         accessibility_info:  formData.accessibility_info.trim() || null,
         age_restrictions:    formData.age_restrictions.trim() || null,
         event_type:          formData.event_type,
-        // User submissions always enter the review queue — RLS enforces this too
-        status:              isUserMode ? 'pending_review' : formData.status,
+        // An organiser never picks the status: a live event stays live, anything
+        // else (re-)enters the review queue. The DB guard enforces this too.
+        status:              isUserMode ? (isLiveEdit ? 'approved' : 'pending_review') : formData.status,
         featured_card_games: formData.featured_card_games.length ? formData.featured_card_games : null,
         is_featured:         isUserMode ? false : formData.is_featured,
         image_url,
@@ -619,54 +609,17 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
         payload.rejection_reason = formData.rejection_reason.trim() || null;
       }
 
-      if (isChangeRequest) {
-        // Live event: record the difference as a change request; the event row
-        // itself is untouched until an admin applies it.
-        const changes = diffEventChanges(liveEvent, payload);
-        // The member offer lives in its own table; a change to it rides along.
-        const offerChange = ticketOfferChange(existingOffer, offerForm);
-        if (offerChange !== undefined) changes.ticket_offer = offerChange;
-        if (Object.keys(changes).length === 0) {
-          if (changeRequest?.id) {
-            const { error } = await supabase.from('event_change_requests').delete().eq('id', changeRequest.id);
-            if (error) throw error;
-            toast.success('Your change request was withdrawn — nothing differs from the live event.');
-            if (onSaved) onSaved();
-            onClose();
-          } else {
-            toast.info('Nothing has changed yet — edit a field, then submit.');
-          }
-          return;
-        }
-        let requestId = changeRequest?.id ?? null;
-        if (requestId) {
-          const { error } = await supabase.from('event_change_requests').update({ changes }).eq('id', requestId);
-          if (error) throw error;
-        } else {
-          const { data: inserted, error } = await supabase
-            .from('event_change_requests')
-            .insert({ event_id: liveEvent.id, organiser_id: currentUser?.id, changes })
-            .select('id')
-            .single();
-          if (error) throw error;
-          requestId = inserted?.id ?? null;
-        }
-        toast.success('Changes sent for review. Your event stays live as it is until they’re approved.');
-        if (requestId) {
-          // Fire-and-forget email to the admins; the bell comes from a DB trigger.
-          apiServerClient
-            .fetch(`/events/change-requests/${requestId}/notify-admins`, { method: 'POST' })
-            .catch(() => {});
-        }
-      } else if (event?.id) {
+      if (event?.id) {
         // NB: organiser_id is deliberately NOT in the update payload — editing
         // an event (incl. an admin fixing a user submission) must not reassign
         // its owner to the editor.
         const { error } = await supabase.from('events').update(payload).eq('id', event.id);
         if (error) throw error;
-        toast.success(isResubmission
-          ? 'Event resubmitted — our team will review it again before it goes live.'
-          : isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
+        toast.success(isLiveEdit
+          ? 'Changes saved and live. The CardPop team has been notified of what changed.'
+          : isResubmission
+            ? 'Event resubmitted — our team will review it again before it goes live.'
+            : isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
         if (isResubmission) {
           // Same admin email a fresh submission gets.
           apiServerClient
@@ -713,15 +666,18 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
 
       // Member offer — saved after the event so a new event has its id. The
       // event is already saved, so a failure here is reported, not fatal. An
-      // organiser can write it while the event is under review (RLS); on a
-      // live event it went into the change request above.
-      if (savedId && !isChangeRequest) {
+      // organiser can write the offer on their own event (RLS).
+      if (savedId) {
         try {
           await saveAdminTicketOffer(savedId, offerForm, existingOffer);
         } catch (err) {
           toast.error(err.message || 'Event saved, but the member offer failed to save.');
         }
       }
+
+      // An organiser's edit to their live event: email every admin exactly what
+      // changed (event and offer together; the bells are DB triggers).
+      if (isLiveEdit && savedId) notifyEventChanges(savedId);
 
       // Weekly re-scan of the website to scrape. The event is already saved, so
       // a problem here is reported but doesn't fail the save.
@@ -762,7 +718,7 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
         <DialogHeader className="px-6 py-5 border-b border-border bg-muted/20 shrink-0">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-2xl font-bold font-heading text-foreground">
-              {isChangeRequest ? 'Request Changes' : isResubmission ? 'Edit & Resubmit' : event?.id ? 'Edit Event' : 'Create New Event'}
+              {isLiveEdit ? 'Edit Live Event' : isResubmission ? 'Edit & Resubmit' : event?.id ? 'Edit Event' : 'Create New Event'}
             </DialogTitle>
             {scrapedData && (
               <Badge variant="secondary" className="bg-primary/10 text-primary border-none shadow-sm h-6 font-semibold px-3">
@@ -771,8 +727,8 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
             )}
           </div>
           <DialogDescription className="text-muted-foreground mt-1">
-            {isChangeRequest
-              ? 'Your event is live. Edit anything below and submit — our team reviews the changes, and the live page stays as it is until they’re approved.'
+            {isLiveEdit
+              ? 'Your event is live. Changes you save go live straight away, and the CardPop team is notified of exactly what changed.'
               : isResubmission
                 ? 'Fix what the review asked for, then resubmit. Our team will review it again before it goes live.'
                 : isUserMode
@@ -1238,7 +1194,7 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
               <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isChangeRequest ? 'Submit Changes for Review' : isResubmission ? 'Resubmit for Review' : event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
+                {isLiveEdit ? 'Save & Publish Changes' : isResubmission ? 'Resubmit for Review' : event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
           </DialogFooter>

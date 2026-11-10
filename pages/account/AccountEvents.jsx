@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, FilePen, RotateCcw } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
@@ -11,7 +11,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { eventPath, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
-import { withRequestedChanges } from '@/utils/eventChangeRequests.js';
 
 const STATUS_BADGES = {
   pending_review: { label: 'Pending Review', cls: 'bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400' },
@@ -31,33 +30,19 @@ const AccountEvents = () => {
   const [isVerifiedOrganiser, setIsVerifiedOrganiser] = useState(false);
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
-  // The latest change request per live event (open, or the last decided one).
-  const [requests, setRequests] = useState(() => new Map());
 
   const fetchMyEvents = useCallback(async () => {
     if (!currentUser?.id) return;
     setIsLoading(true);
     setLoadError(null);
     try {
-      const [{ data, error }, { data: requestRows }] = await Promise.all([
-        supabase
-          .from('events')
-          .select('*')
-          .eq('organiser_id', currentUser.id)
-          .order('start_date', { ascending: false }),
-        // A failure here just hides the request badges.
-        supabase
-          .from('event_change_requests')
-          .select('id, event_id, status, changes, review_note, reviewed_at, created_at')
-          .eq('organiser_id', currentUser.id)
-          .order('created_at', { ascending: false })
-          .limit(200),
-      ]);
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .eq('organiser_id', currentUser.id)
+        .order('start_date', { ascending: false });
       if (error) throw error;
       setEvents(data || []);
-      const latest = new Map();
-      for (const r of requestRows || []) if (!latest.has(r.event_id)) latest.set(r.event_id, r);
-      setRequests(latest);
     } catch (err) {
       console.error('Failed to load your events:', err);
       setLoadError('We couldn’t load your events right now. Please try again shortly.');
@@ -85,14 +70,6 @@ const AccountEvents = () => {
 
   const openSubmit = () => { setEditingEvent(null); setIsModalOpen(true); };
   const openEdit = (event) => { setEditingEvent(event); setIsModalOpen(true); };
-  const editingRequest = editingEvent?.status === 'approved' && requests.get(editingEvent.id)?.status === 'pending'
-    ? requests.get(editingEvent.id)
-    : null;
-  // Memoised: the form resets whenever its `event` prop changes identity.
-  const formEvent = useMemo(
-    () => (editingRequest ? withRequestedChanges(editingEvent, editingRequest) : editingEvent),
-    [editingEvent, editingRequest],
-  );
 
   return (
     <AccountPageShell
@@ -113,7 +90,8 @@ const AccountEvents = () => {
           Every submission is reviewed by the CardPop team before it appears on the{' '}
           <Link to="/events" className="text-primary font-semibold hover:underline">public events calendar</Link>.
           You can edit an event while it&apos;s pending review, or edit and resubmit it if it wasn&apos;t approved.
-          Once it&apos;s live, use <strong>Request changes</strong> — the live page stays as it is until we approve them.
+          Once it&apos;s live, your edits go live straight away and our team is notified of what changed.
+          You can only see and edit events you submitted.
         </p>
       </div>
 
@@ -145,19 +123,12 @@ const AccountEvents = () => {
         <div className="space-y-4">
           {events.map(event => {
             const badge = STATUS_BADGES[event.status] || STATUS_BADGES.pending_review;
-            const request = event.status === 'approved' ? requests.get(event.id) : null;
-            const openRequest = request?.status === 'pending' ? request : null;
             return (
               <div key={event.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 flex-wrap mb-1.5">
                     <h3 className="text-lg font-bold text-foreground truncate">{event.title}</h3>
                     <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
-                    {openRequest && (
-                      <Badge variant="outline" className="font-semibold bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400">
-                        Changes pending review
-                      </Badge>
-                    )}
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-sm text-muted-foreground">
                     <span className="flex items-center gap-1.5">
@@ -172,11 +143,6 @@ const AccountEvents = () => {
                       Reason: {event.rejection_reason}
                     </p>
                   )}
-                  {request?.status === 'dismissed' && (
-                    <p className="mt-2 text-sm text-muted-foreground bg-muted/40 border border-border rounded-lg px-3 py-2">
-                      Your last requested changes weren&apos;t applied{request.review_note ? `: ${request.review_note}` : '.'}
-                    </p>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-2 shrink-0">
                   {isVerifiedOrganiser && (
@@ -184,7 +150,7 @@ const AccountEvents = () => {
                       <Store className="w-3.5 h-3.5" /> Vendors
                     </Button>
                   )}
-                  {event.status === 'pending_review' && (
+                  {(event.status === 'pending_review' || event.status === 'approved') && (
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
                       <Pencil className="w-3.5 h-3.5" /> Edit
                     </Button>
@@ -192,11 +158,6 @@ const AccountEvents = () => {
                   {event.status === 'rejected' && (
                     <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
                       <RotateCcw className="w-3.5 h-3.5" /> Edit &amp; resubmit
-                    </Button>
-                  )}
-                  {event.status === 'approved' && (
-                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
-                      <FilePen className="w-3.5 h-3.5" /> {openRequest ? 'Edit requested changes' : 'Request changes'}
                     </Button>
                   )}
                   {event.status === 'approved' && (
@@ -224,9 +185,7 @@ const AccountEvents = () => {
       <EventFormModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        event={formEvent}
-        baseEvent={editingEvent}
-        changeRequest={editingRequest}
+        event={editingEvent}
         mode="user"
         onSaved={fetchMyEvents}
       />

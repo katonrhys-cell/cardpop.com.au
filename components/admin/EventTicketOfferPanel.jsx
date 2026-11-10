@@ -8,7 +8,8 @@ import { MousePointerClick, Eye } from 'lucide-react';
 // The event form's "Member Offer" tab — for admins (Admin → Events) and for an
 // organiser on their own event (Account → My Events; `audience="organiser"`).
 // Controlled: the form owns the state and saves it with the event
-// (lib/eventTicketOffers.js), or into the change request on a live event.
+// (lib/eventTicketOffers.js). An organiser's change to a live event's offer is
+// logged for the admins like any other edit (docs/event-submissions.md).
 const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled, audience = 'admin' }) => {
   const isOrganiser = audience === 'organiser';
   const set = (field, v) => onChange({ ...value, [field]: v });

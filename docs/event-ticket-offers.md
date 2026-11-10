@@ -13,11 +13,10 @@ code, routes the click and counts both.
 
 Either side can set it, on the event form's **Member Offer** tab:
 
-- **The organiser**, on their own event (Account → My Events): while it's a
-  submission (pending review, or rejected and being resubmitted) the offer is
-  saved with it and reviewed with it. On a **live** event their change to the
-  offer is part of their change request — the live code and link stay as they
-  are until an admin applies it (`docs/event-submissions.md`).
+- **The organiser**, on their own event only (Account → My Events): saved
+  with the event. On a submission it's reviewed with it; on a **live** event
+  the change is immediate and every admin is alerted with the before → after
+  (`docs/event-submissions.md`).
 - **An admin**, on any event: Admin → Events → edit the event.
 
 Fields:
@@ -64,11 +63,10 @@ referral report.
 - `supabase/migrations/20261025075600_event_ticket_offers.sql` —
   `event_ticket_offers` (1:1 with `events`). `events` is publicly readable,
   so the code lives in this table, which has **no public SELECT**; admins
-  manage it through RLS. An event's organiser can read their own row (with
-  its counts) and write it while the event is pending review or rejected
-  (`20261110002320_event_organiser_offers_and_admin_alerts.sql`); on a live
-  event their change goes through `event_change_requests` as `ticket_offer`
-  and `apply_event_change_request()` writes it. The page reads it through security-definer functions:
+  manage it through RLS. An event's organiser can read and write their own
+  event's row (pending / rejected / approved —
+  `20261110002320_event_organiser_offers_and_admin_alerts.sql`); their changes
+  on a live event are logged to `event_change_log` and alert every admin. The page reads it through security-definer functions:
   `get_event_ticket_offer()` (teaser, anon + signed in — never the code),
   `reveal_event_ticket_code()` (signed in only, counts a reveal) and
   `record_event_ticket_click()`. A trigger stops a form save from resetting
