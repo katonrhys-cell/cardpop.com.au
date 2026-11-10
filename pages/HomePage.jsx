@@ -195,7 +195,7 @@ const StatItem = ({ value, suffix, label, sub, isDecimal, inView }) => {
         {isDecimal ? count : count.toLocaleString('en-AU')}{suffix}
       </div>
       <div className="mt-1 text-xs font-semibold leading-snug text-muted-foreground sm:text-sm">{label}</div>
-      {sub && <div className="mt-0.5 text-[11px] text-muted-foreground/80 tabular-nums sm:text-xs">{sub}</div>}
+      {sub && <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums sm:text-xs">{sub}</div>}
     </div>
   );
 };
