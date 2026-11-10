@@ -424,7 +424,8 @@ describe('EventDetailCard — sold out + waitlist', () => {
 });
 
 describe('EventDetailModal — sold out', () => {
-  const soldOut = { ...baseEvent, ticket_url: 'https://tickets.example.com/x', tickets_sold_out: true };
+  // Dated far ahead: the modal hides ticket buttons for a finished event.
+  const soldOut = { ...baseEvent, start_date: '2099-01-01', ticket_url: 'https://tickets.example.com/x', tickets_sold_out: true };
 
   it('swaps Tickets & Info for a Join the waitlist link', () => {
     renderModal({ ...soldOut, waitlist_url: 'https://collectitcon.com.au/waitlist' });
