@@ -17,6 +17,10 @@ vi.mock('../../src/middleware/requireAal2.js', () => ({
   decodeAal: () => 'aal2',
   default: (_req, _res, next) => next(),
 }));
+// Admin bell + email after a review is submitted — reads admin addresses with
+// the service client, which is fine; the review WRITE must stay caller-scoped.
+const mockAlert = vi.hoisted(() => vi.fn(async () => ({ belled: 0, emailed: true })));
+vi.mock('../../src/services/adminReviewAlerts.js', () => ({ alertAdminsToReview: mockAlert }));
 vi.mock('../../src/middleware/auth.js', () => ({
   authMiddleware: (req, _res, next) => { req.user = { id: 'buyer-1' }; next(); },
   optionalAuthMiddleware: (_req, _res, next) => next(),
@@ -64,6 +68,9 @@ describe('POST /', () => {
     expect(res.body.status).toBe('pending');
     expect(mockCreateScoped).toHaveBeenCalledWith('tok-123');
     expect(mockService.from).not.toHaveBeenCalled();
+    expect(mockAlert).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'product_review_pending', bell: false, path: '/admin/product-reviews',
+    }));
     expect(b.insert).toHaveBeenCalledWith({
       order_id: ORDER, product_id: PRODUCT, reviewer_id: 'buyer-1', rating: 5, title: 'Great', body: 'Holds heaps',
     });

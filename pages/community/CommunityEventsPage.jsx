@@ -470,17 +470,9 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
           <div className="space-y-14">
             {featuredEvents.length > 0 && (
               <section aria-labelledby="featured-events-heading" className="rounded-3xl border border-amber-400/60 bg-amber-50/60 dark:bg-amber-400/5 p-5 sm:p-6">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-3 sm:gap-x-3 mb-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-6">
                   <Star className="w-5 h-5 shrink-0 text-amber-500 fill-current" />
                   <h2 id="featured-events-heading" className="text-xl sm:text-2xl font-bold whitespace-nowrap">Featured events</h2>
-                  <Link
-                    to="/list-your-event"
-                    className="group/feature sm:ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-background px-3 py-1.5 text-xs sm:text-sm font-bold tracking-tight text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" aria-hidden="true" />
-                    Feature your event
-                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover/feature:translate-x-0.5" aria-hidden="true" />
-                  </Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {featuredEvents.map(event => (
@@ -493,6 +485,17 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
                       onView={ev => { setSelectedEvent(ev); setIsDetailOpen(true); }}
                     />
                   ))}
+                </div>
+                {/* The call to action closes the strip, after the featured cards. */}
+                <div className="mt-6 flex justify-center">
+                  <Link
+                    to="/list-your-event"
+                    className="group/feature inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-background px-3 py-1.5 text-xs sm:text-sm font-bold tracking-tight text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" aria-hidden="true" />
+                    Feature your event
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover/feature:translate-x-0.5" aria-hidden="true" />
+                  </Link>
                 </div>
               </section>
             )}

@@ -10,6 +10,7 @@ import HalfStars from '@/components/reviews/HalfStars.jsx';
 import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import { isPastEvent } from '@/utils/eventPast.js';
 import { isFeaturedEvent, FEATURED_CARD_CLASS, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
+import { eventImageFit } from '@/utils/eventImageFit.js';
 
 // `reviewStats` ({ review_count, average_rating }) is the past grid's star
 // summary, batch-loaded by the page; an upcoming event never shows one.
@@ -34,27 +35,33 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
   const rawImageUrl = publicImageUrl(event.image_url || event.image || null);
   const [imgSrc, setImgSrc] = useState(() => cardThumbUrl(event.image_url || event.image || null));
   const imgError = !imgSrc;
+  const [imgFit, setImgFit] = useState('cover');
 
   return (
     <Card className={`flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group ${featured ? FEATURED_CARD_CLASS : 'border-border'}`}>
       <div className="relative h-48 w-full overflow-hidden bg-muted flex items-center justify-center">
         {rawImageUrl && !imgError ? (
           <>
-            {/* The poster is shown whole (contain) so its text isn't cropped;
-                a blurred cover copy of the same image fills the letterbox so
-                the card never shows empty bands between poster and border. */}
-            <img
-              src={imgSrc}
-              alt=""
-              aria-hidden="true"
-              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-70"
-              loading="lazy"
-            />
+            {/* The photo fills the frame edge to edge (cover), so there is
+                never a band between the card border and the image. Only a
+                poster whose shape is far from the frame's (a tall portrait
+                flyer) is shown whole instead, over a blurred copy of itself,
+                so its text isn't cropped away. */}
+            {imgFit === 'contain' && (
+              <img
+                src={imgSrc}
+                alt=""
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-70"
+                loading="lazy"
+              />
+            )}
             <img
               src={imgSrc}
               alt={eventTitle}
-              className="relative object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
+              className={`absolute inset-0 w-full h-full ${imgFit === 'contain' ? 'object-contain' : 'object-cover'} object-center group-hover:scale-105 transition-transform duration-500`}
               loading="lazy"
+              onLoad={(e) => setImgFit(eventImageFit(e.currentTarget))}
               onError={() => setImgSrc(imgSrc !== rawImageUrl ? rawImageUrl : null)}
             />
           </>

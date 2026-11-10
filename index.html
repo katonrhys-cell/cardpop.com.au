@@ -149,7 +149,10 @@
     <!-- Canonical is emitted per-route by SEOHead (apex-normalised) so it never
          conflicts with a static tag. The www host 301-redirects to apex (vercel.json). -->
 
-    <!-- Open Graph (Facebook, Discord, Slack previews) -->
+    <!-- Open Graph (Facebook, Discord, Slack previews). The tags SEOHead also
+         emits carry data-rh="true" so react-helmet-async reconciles them per
+         route instead of leaving a second og:image/og:title behind the real
+         one (the static tag came first in the DOM and won). -->
     <meta property="og:type" content="website" data-rh="true" />
     <meta property="og:url" content="https://cardpop.com.au/" data-rh="true" />
     <meta property="og:site_name" content="CardPop Australia™" data-rh="true" />

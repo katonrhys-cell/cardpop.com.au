@@ -1,6 +1,7 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { escapeLike } from '../utils/escapeLike.js';
+import { alertAdminsToReview } from './adminReviewAlerts.js';
 
 /**
  * Partner program: approved partners (local game stores, content creators)
@@ -134,6 +135,18 @@ export async function submitPartnerApplication(userId, body = {}) {
   }
 
   logger.info(`[PARTNER] New application from ${userId} (${partnerType}: ${businessName})`);
+  await alertAdminsToReview({
+    type: 'partner_application',
+    title: `New partner application: ${businessName}`,
+    body: `${businessName} (${partnerType}) applied to the partner program.`,
+    path: '/admin/partners',
+    relatedId: inserted?.id || null,
+    email: {
+      subject: `New partner application: ${businessName}`,
+      intro: 'Someone has applied to the CardPop partner program and is waiting for approval.',
+      rows: [['Business', businessName], ['Type', partnerType], ['Website', website || ''], ['Requested code', preferredCode || '']],
+    },
+  });
   return inserted;
 }
 

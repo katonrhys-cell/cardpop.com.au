@@ -9,6 +9,7 @@
 // as unreadable rather than guessed at.
 import { extractTextFromHtml } from './safeFetch.js';
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
+import { recordAiUsage } from './aiUsage.js';
 import { normaliseSupplierUrl } from '../../utils/supplierUrl.js';
 
 // Pulling one price out of up to 20,000 characters of page text under a
@@ -178,6 +179,8 @@ Page text:
 ${text}`,
     }],
   });
+  // Recorded before any check below: the call is billed either way.
+  await recordAiUsage({ feature: 'supplier_price', model: message.model || MODEL, usage: message.usage });
 
   if (message.stop_reason === 'refusal') throw new Error('The price check was declined by the model.');
   if (message.stop_reason === 'max_tokens') throw new Error('The price check ran out of output tokens.');

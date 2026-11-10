@@ -6,6 +6,7 @@ import {
   Landmark, Calendar as CalendarIcon, Info,
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
+import AiSpendCard from '@/components/admin/AiSpendCard.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -219,6 +220,9 @@ const FinanceTaxPage = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── AI spend ─────────────────────────────────────────────────── */}
+      <AiSpendCard period={period} earningsEx={(marketplace.feesEx || 0) + (shop.grossProfit || 0)} />
 
       {/* ── Inventory ────────────────────────────────────────────────── */}
       <Card className="shadow-sm border-border">

@@ -6,6 +6,7 @@ import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import { sendSoleTraderChanged } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
+import { alertAdminsToReview } from '../services/adminReviewAlerts.js';
 
 const router = express.Router();
 
@@ -162,7 +163,7 @@ router.post('/submit', async (req, res) => {
     let n = 2;
     while (taken.has(slug)) slug = `${baseSlug}-${n++}`;
 
-    const { error: insertError } = await supabase.from('local_game_stores').insert({
+    const { data: insertedStore, error: insertError } = await supabase.from('local_game_stores').insert({
       slug,
       name,
       suburb: suburb || null,
@@ -174,10 +175,22 @@ router.post('/submit', async (req, res) => {
       submitter_email: email || null,
       submitted_by: req.user?.id || null,
       status: 'pending',
-    });
+    }).select('id').maybeSingle();
     if (insertError) throw new Error(insertError.message);
 
     logger.info(`[STORES_SUBMIT] New pending store "${name}" (${city}, ${state})`);
+    await alertAdminsToReview({
+      type: 'store_submitted',
+      title: `New store submitted: ${name}`,
+      body: `${name} (${suburb ? `${suburb}, ` : ''}${city} ${state}) wants to be listed in the card shop directory.`,
+      path: '/admin/store-directory',
+      relatedId: insertedStore?.id || null,
+      email: {
+        subject: `New card shop submitted for the directory: ${name}`,
+        intro: 'A store has been submitted to the card shop directory and is waiting for approval.',
+        rows: [['Store', name], ['Location', [suburb, city, state].filter(Boolean).join(', ')], ['Website', website || ''], ['Contact email', email || '']],
+      },
+    });
     res.json({ ok: true });
   } catch (error) {
     logger.error(`[STORES_SUBMIT] ${error.message}`);

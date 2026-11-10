@@ -16,6 +16,9 @@ import { fetch } from 'undici';
 import logger from '../utils/logger.js';
 import { runSupplierPriceWatch } from '../services/supplierPriceWatchService.js';
 import { syncSiteTraffic, Ga4NotConfiguredError } from '../services/siteTrafficService.js';
+import { getUsdToAudRate } from '../utils/exchangeRates.js';
+import { AI_ALLOWANCES } from '../utils/aiUsage.js';
+import { getPlatformSetting } from '../utils/platformSettings.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
 import { grantAdminComplimentaryMembership, revokeAdminComplimentaryMembership } from '../services/subscriptionService.js';
 import adminInvoicesRouter from './admin-invoices.js';
@@ -1332,6 +1335,53 @@ router.post('/site-traffic/sync', async (req, res) => {
     }
     logger.error(`[ADMIN] Site traffic sync failed: ${err.message}`);
     res.status(502).json({ error: 'Site traffic sync failed. Check the GA4 service account and property id.' });
+  }
+});
+
+/**
+ * GET /admin/ai-usage?from=YYYY-MM-DD&to=YYYY-MM-DD
+ * AI spend for Admin → Finance: calls, tokens and cost per feature and model
+ * from the ai_usage_events ledger (src/utils/aiUsage.js), in USD as billed and
+ * converted to AUD at the cached daily rate. `to` is inclusive. Defaults to
+ * the current month.
+ */
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+router.get('/ai-usage', async (req, res) => {
+  const now = new Date();
+  const defaultFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().slice(0, 10);
+  const from = ISO_DAY.test(String(req.query.from || '')) ? req.query.from : defaultFrom;
+  const to = ISO_DAY.test(String(req.query.to || '')) ? req.query.to : now.toISOString().slice(0, 10);
+  if (from > to) return res.status(400).json({ error: 'from must be on or before to' });
+  // Days are counted in AEST (UTC+10) all year. During daylight saving that
+  // puts the boundary an hour off local midnight, which a spend report can bear.
+  const fromTs = `${from}T00:00:00+10:00`;
+  const toExclusive = new Date(`${to}T00:00:00+10:00`);
+  toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+  try {
+    const { data, error } = await supabase.rpc('ai_usage_summary', { p_from: fromTs, p_to: toExclusive.toISOString() });
+    if (error) throw error;
+    const rows = (data || []).map((r) => ({ ...r, cost_usd: Number(r.cost_usd) || 0 }));
+    const totalUsd = rows.reduce((sum, r) => sum + r.cost_usd, 0);
+    let usdToAud = null;
+    try { usdToAud = await getUsdToAudRate(); } catch { /* AUD column stays empty */ }
+    res.json({
+      from,
+      to,
+      rows,
+      totals: {
+        calls: rows.reduce((sum, r) => sum + Number(r.calls || 0), 0),
+        cost_usd: Math.round(totalUsd * 100) / 100,
+        cost_aud: usdToAud ? Math.round(totalUsd * usdToAud * 100) / 100 : null,
+      },
+      usd_to_aud: usdToAud,
+      allowances: Object.fromEntries(await Promise.all(Object.entries(AI_ALLOWANCES).map(async ([k, v]) => {
+        const limit = Number(await getPlatformSetting(v.setting, v.default));
+        return [k, { setting: v.setting, limit: Number.isFinite(limit) ? limit : v.default }];
+      }))),
+    });
+  } catch (err) {
+    logger.error(`[ADMIN] AI usage summary failed: ${err.message}`);
+    res.status(502).json({ error: 'Could not load AI usage.' });
   }
 });
 
