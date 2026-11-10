@@ -135,7 +135,8 @@ const AlbumEditor = ({ album, index, count, onChange, onRemove, onMove, disabled
         <span className="text-xs text-muted-foreground">Max 20MB each — compressed before upload. The first photo is the biggest tile.</span>
       </button>
       <input
-        ref={inputRef} type="file" multiple className="hidden"
+        ref={inputRef} type="file" multiple className="hidden" tabIndex={-1}
+        aria-label={`Add photos to album ${n}`}
         accept={EVENT_IMAGE_ACCEPT}
         onChange={(e) => addFiles(e.target.files)} disabled={disabled}
       />

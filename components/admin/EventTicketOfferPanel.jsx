@@ -65,10 +65,10 @@ const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled, au
       </div>
 
       <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-        <Switch checked={value.is_active} onCheckedChange={v => set('is_active', v)} disabled={disabled} />
+        <Switch id="offer_is_active" checked={value.is_active} onCheckedChange={v => set('is_active', v)} disabled={disabled} aria-describedby="offer_is_active_hint" />
         <div>
-          <p className="text-sm font-semibold">Offer live</p>
-          <p className="text-xs text-muted-foreground">Switch off to hide the code and referral link without losing them.</p>
+          <Label htmlFor="offer_is_active" className="text-sm font-semibold cursor-pointer">Offer live</Label>
+          <p id="offer_is_active_hint" className="text-xs text-muted-foreground">Switch off to hide the code and referral link without losing them.</p>
         </div>
       </div>
 
