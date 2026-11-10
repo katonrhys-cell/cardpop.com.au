@@ -10,6 +10,7 @@
 import { extractTextFromHtml } from './safeFetch.js';
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import { recordAiUsage } from './aiUsage.js';
+import { traceMessagesCreate } from './aiTracing.js';
 import { normaliseSupplierUrl } from '../../utils/supplierUrl.js';
 
 // Pulling one price out of up to 20,000 characters of page text under a
@@ -156,7 +157,7 @@ export async function extractPriceWithModel(html, pageUrl) {
   const text = extractTextFromHtml(html, { maxLength: MAX_MODEL_TEXT });
   if (!text.trim()) return { price: null, currency: null, reason: 'The page has no readable text (it may need a browser to load).' };
 
-  const message = await (await anthropic()).beta.messages.create({
+  const message = await traceMessagesCreate('Supplier price reader', {
     model: MODEL,
     // Thinking counts toward max_tokens on this model; at low effort it is
     // brief or skipped, and the answer itself is a few dozen tokens.
@@ -178,7 +179,7 @@ Page URL: ${pageUrl}
 Page text:
 ${text}`,
     }],
-  });
+  }, async (params) => (await anthropic()).beta.messages.create(params));
   // Recorded before any check below: the call is billed either way.
   await recordAiUsage({ feature: 'supplier_price', model: message.model || MODEL, usage: message.usage });
 

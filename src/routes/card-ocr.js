@@ -5,6 +5,7 @@ import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { runCardOcr, toImageBlocks, describeOcrFailure } from '../utils/cardOcr.js';
 import { recordAiUsage } from '../utils/aiUsage.js';
+import { withAiConversation } from '../utils/aiTracing.js';
 import { requireAiAllowance } from '../middleware/aiAllowance.js';
 import logger from '../utils/logger.js';
 
@@ -43,7 +44,8 @@ router.post('/scan', integratedAiRateLimit, requireAuth, requireAiAllowance('car
 	res.setHeader('X-Accel-Buffering', 'no');
 
 	try {
-		const { content } = await runCardOcr({
+		// Sentry agent tracing: the scan is tagged with the member (id only).
+		const { content } = await withAiConversation({ userId: req.userId }, () => runCardOcr({
 			apiKey,
 			imageBlocks: toImageBlocks(req.files),
 			log: msg => logger.info(`[CARD_OCR] ${msg}`),
@@ -51,7 +53,7 @@ router.post('/scan', integratedAiRateLimit, requireAuth, requireAiAllowance('car
 				feature: escalation ? 'card_scan_escalation' : 'card_scan',
 				model, usage, userId: req.userId,
 			}),
-		});
+		}));
 
 		sseWrite(res, 'content', content);
 		sseWrite(res, 'completed', '[COMPLETED]');

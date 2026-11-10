@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import './instrument.js';
 import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
@@ -13,62 +14,10 @@ import { secureHeadersMiddleware, noCacheHeaders } from './middleware/secureHead
 import logger from './utils/logger.js';
 import { BodyLimit } from './constants/common.js';
 
-// Sentry captures every 5xx via setupExpressErrorHandler below. With the
-// default request-data integration that included the JSON body and every
-// header — so a throw inside /auth/password/change shipped the user's current
-// AND new password, plus their bearer token, to a third party. Bodies, cookies
-// and headers are now excluded outright and a final scrub strips anything
-// secret-shaped that still reaches an event.
-const SENSITIVE_KEY = /pass(word)?|token|secret|authorization|cookie|otp|code|card|cvc|ssn|api[-_]?key/i;
-export function scrubSentryEvent(event) {
-	if (event?.request) {
-		delete event.request.data;
-		delete event.request.cookies;
-		if (event.request.headers) {
-			for (const k of Object.keys(event.request.headers)) {
-				if (/^(authorization|cookie|x-csrf-token|x-api-key)$/i.test(k)) delete event.request.headers[k];
-			}
-		}
-		if (typeof event.request.query_string === 'string' && /token|code|secret|key/i.test(event.request.query_string)) {
-			event.request.query_string = '[Filtered]';
-		}
-	}
-	const scrub = (obj, depth = 0) => {
-		if (!obj || typeof obj !== 'object' || depth > 6) return;
-		for (const k of Object.keys(obj)) {
-			if (SENSITIVE_KEY.test(k)) obj[k] = '[Filtered]';
-			else scrub(obj[k], depth + 1);
-		}
-	};
-	scrub(event?.extra);
-	scrub(event?.contexts);
-	if (event?.user) event.user = event.user.id ? { id: event.user.id } : undefined;
-	return event;
-}
-
-Sentry.init({
-	dsn: process.env.SENTRY_DSN || 'https://6477807dc7f2422d3cf0eacd260645b3@o4511534905884672.ingest.us.sentry.io/4511534929543168',
-	// Error capture only. Tracing was sampled at 20%, but ESM hoists imports,
-	// so `express` was loaded before this init ran and Sentry's Express
-	// auto-instrumentation never attached — the sampled traces carried no
-	// route spans, while every request still paid the span bookkeeping and
-	// the sampled ones an extra outbound envelope. Sampling at 0 keeps the
-	// error path (5xx via setupExpressErrorHandler, captureMessage in the
-	// reconciler and Connect service) and drops the rest. If tracing is ever
-	// wanted, initialise Sentry through `node --import` so it precedes
-	// express, and set SENTRY_TRACES_SAMPLE_RATE. The SDK import itself is
-	// ~300 ms of the ~800 ms cold start and is not avoidable while Sentry is
-	// in use — see docs/performance.md.
-	tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE ?? 0) || 0,
-	environment: process.env.NODE_ENV || 'production',
-	sendDefaultPii: false,
-	integrations: [
-		Sentry.requestDataIntegration({
-			include: { cookies: false, data: false, headers: false, ip: false, query_string: true, url: true, user: false },
-		}),
-	],
-	beforeSend: scrubSentryEvent,
-});
+// Sentry is initialised in ./instrument.js (imported above, before any other
+// app module) so the separate long-running functions in api/ share the same
+// config — see that file for the scrubbing and sampling rules.
+export { scrubSentryEvent } from './instrument.js';
 
 const app = express();
 

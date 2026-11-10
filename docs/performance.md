@@ -172,10 +172,14 @@ Rules that keep it from growing:
 - **Tokens are shared.** eBay's OAuth token request is de-duplicated in
   flight (a cold `/ebay/popular-cards` fans out sixteen searches), and the
   PayPal client-credentials token is cached for its `expires_in`.
-- **Sentry is error capture only** (`tracesSampleRate` 0, overridable with
-  `SENTRY_TRACES_SAMPLE_RATE`). Express auto-instrumentation never attached
-  because ESM hoists `express` above `Sentry.init`, so the sampled traces had
-  no route spans. Tracing would need Sentry initialised via `node --import`.
+- **Sentry request tracing is off** (`SENTRY_TRACES_SAMPLE_RATE`, default 0,
+  applied through `aiTracesSampler` in `src/instrument.js`). Express
+  auto-instrumentation never attached because ESM hoists `express` above
+  `Sentry.init`, so the sampled traces had no route spans. Request tracing
+  would need Sentry initialised via `node --import`. The one exception is
+  **agent tracing**: each Claude feature run is its own small root trace
+  (`docs/agent-tracing.md`). That is a few spans per scan or nightly job, not
+  per request, and on Vercel it adds one flush after the model call.
 - **The function bundle ships only the sharp build it can run.**
   `vercel.json` `includeFiles` is `node_modules/@img/sharp-*linux-x64/**`
   (the glibc x64 binary + libvips, ~19 MB) rather than `@img/**` (~46 MB,

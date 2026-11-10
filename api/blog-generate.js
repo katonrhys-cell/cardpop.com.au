@@ -1,3 +1,5 @@
+// Sentry (errors + agent tracing) before anything else — see src/instrument.js.
+import '../src/instrument.js';
 import crypto from 'node:crypto';
 import { runScheduledGeneration } from '../src/utils/blogArticleGenerator.js';
 import logger from '../src/utils/logger.js';

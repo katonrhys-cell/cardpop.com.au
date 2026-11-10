@@ -11,6 +11,7 @@
 
 import { GradeEstimatorPrompt } from '../constants/prompts.js';
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
+import { traceAiAgent, traceChat, recordChatResponse } from './aiTracing.js';
 
 // Grading needs to see corner whitening and surface scratches, so this is the
 // stronger model rather than the cheap one the OCR pass starts with.
@@ -21,6 +22,8 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 export const GRADE_MODEL = 'claude-sonnet-5-5';
 const GRADE_THINKING = { type: 'between_tools' };
 const GRADE_MAX_TOKENS = 4500;
+// The agent name grade estimates appear under in Sentry agent tracing.
+const GRADE_AGENT = 'Grade estimator';
 
 /** Joins a Messages API reply's text blocks; thinking blocks are skipped. */
 function textFromContent(content) {
@@ -87,43 +90,47 @@ export function describeGradeFailure(err) {
  * @returns {Promise<string>}
  */
 export async function requestGradeEstimate({ apiKey, imageBlocks, onUsage }) {
-	const res = await fetch('https://api.anthropic.com/v1/messages', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'x-api-key': apiKey,
-			'anthropic-version': '2023-06-01',
-		},
-		body: JSON.stringify({
-			model: GRADE_MODEL,
-			// Six grader blocks with notes, four assessments and up to eight
-			// located findings: a truncated reply reads as unparseable JSON,
-			// so leave headroom.
-			max_tokens: GRADE_MAX_TOKENS,
-			thinking: GRADE_THINKING,
-			system: GradeEstimatorPrompt,
-			messages: [{
-				role: 'user',
-				content: [
-					{ type: 'text', text: buildGradePromptText(imageBlocks.length) },
-					...imageBlocks,
-				],
-			}],
-		}),
-		signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.anthropicGrade),
+	const messages = [{
+		role: 'user',
+		content: [
+			{ type: 'text', text: buildGradePromptText(imageBlocks.length) },
+			...imageBlocks,
+		],
+	}];
+	return traceChat({ model: GRADE_MODEL, system: GradeEstimatorPrompt, messages, maxTokens: GRADE_MAX_TOKENS }, async (span) => {
+		const res = await fetch('https://api.anthropic.com/v1/messages', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': apiKey,
+				'anthropic-version': '2023-06-01',
+			},
+			body: JSON.stringify({
+				model: GRADE_MODEL,
+				// Six grader blocks with notes, four assessments and up to eight
+				// located findings: a truncated reply reads as unparseable JSON,
+				// so leave headroom.
+				max_tokens: GRADE_MAX_TOKENS,
+				thinking: GRADE_THINKING,
+				system: GradeEstimatorPrompt,
+				messages,
+			}),
+			signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.anthropicGrade),
+		});
+
+		if (!res.ok) {
+			const errBody = await res.text().catch(() => '');
+			throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+		}
+
+		const data = await res.json();
+		recordChatResponse(span, data);
+		if (data.usage) await onUsage?.({ model: GRADE_MODEL, usage: data.usage });
+		if (data.stop_reason === 'refusal') {
+			throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
+		}
+		return textFromContent(data.content);
 	});
-
-	if (!res.ok) {
-		const errBody = await res.text().catch(() => '');
-		throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
-	}
-
-	const data = await res.json();
-	if (data.usage) await onUsage?.({ model: GRADE_MODEL, usage: data.usage });
-	if (data.stop_reason === 'refusal') {
-		throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
-	}
-	return textFromContent(data.content);
 }
 
 /** Throws when the reply doesn't carry the grades object the page renders. */
@@ -143,9 +150,11 @@ function checkGrades(content) {
  * @param {Array<{type: string, source: object}>} args.imageBlocks
  * @returns {Promise<{ content: string, data: object }>}
  */
-export async function runGradeEstimate({ apiKey, imageBlocks, onUsage }) {
-	const content = await requestGradeEstimate({ apiKey, imageBlocks, onUsage });
-	return { content, data: checkGrades(content) };
+export function runGradeEstimate({ apiKey, imageBlocks, onUsage }) {
+	return traceAiAgent(GRADE_AGENT, async () => {
+		const content = await requestGradeEstimate({ apiKey, imageBlocks, onUsage });
+		return { content, data: checkGrades(content) };
+	});
 }
 
 /**
@@ -193,58 +202,72 @@ export function parseAnthropicSseChunk(buffer) {
  * @param {(text: string) => void} [args.onText]
  * @returns {Promise<{ content: string, data: object }>}
  */
-export async function streamGradeEstimate({ apiKey, imageBlocks, onText, onUsage }) {
-	const res = await fetch('https://api.anthropic.com/v1/messages', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'x-api-key': apiKey,
-			'anthropic-version': '2023-06-01',
-		},
-		body: JSON.stringify({
-			model: GRADE_MODEL,
-			max_tokens: GRADE_MAX_TOKENS,
-			stream: true,
-			thinking: GRADE_THINKING,
-			system: GradeEstimatorPrompt,
-			messages: [{
-				role: 'user',
-				content: [
-					{ type: 'text', text: buildGradePromptText(imageBlocks.length) },
-					...imageBlocks,
-				],
-			}],
-		}),
-		// Covers the whole stream, not just the headers: aborting the signal
-		// rejects the pending body read too.
-		signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.anthropicGrade),
+export function streamGradeEstimate({ apiKey, imageBlocks, onText, onUsage }) {
+	const messages = [{
+		role: 'user',
+		content: [
+			{ type: 'text', text: buildGradePromptText(imageBlocks.length) },
+			...imageBlocks,
+		],
+	}];
+	const request = { model: GRADE_MODEL, system: GradeEstimatorPrompt, messages, maxTokens: GRADE_MAX_TOKENS, stream: true };
+	return traceAiAgent(GRADE_AGENT, async () => {
+		const content = await streamGradeReply({ apiKey, request, onText, onUsage });
+		return { content, data: checkGrades(content) };
 	});
+}
 
-	if (!res.ok) {
-		const errBody = await res.text().catch(() => '');
-		throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
-	}
-	if (!res.body) throw new Error('Anthropic API returned no body');
+function streamGradeReply({ apiKey, request, onText, onUsage }) {
+	const { messages } = request;
+	return traceChat(request, async (span) => {
+		const res = await fetch('https://api.anthropic.com/v1/messages', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': apiKey,
+				'anthropic-version': '2023-06-01',
+			},
+			body: JSON.stringify({
+				model: GRADE_MODEL,
+				max_tokens: GRADE_MAX_TOKENS,
+				stream: true,
+				thinking: GRADE_THINKING,
+				system: GradeEstimatorPrompt,
+				messages,
+			}),
+			// Covers the whole stream, not just the headers: aborting the signal
+			// rejects the pending body read too.
+			signal: AbortSignal.timeout(OUTBOUND_TIMEOUT_MS.anthropicGrade),
+		});
 
-	const decoder = new TextDecoder();
-	let buffer = '';
-	let content = '';
-	let usage = null;
-	try {
-		for await (const chunk of res.body) {
-			buffer += decoder.decode(chunk, { stream: true });
-			const parsed = parseAnthropicSseChunk(buffer);
-			buffer = parsed.rest;
-			if (parsed.usage) usage = { ...usage, ...parsed.usage };
-			if (parsed.error) throw new Error(`Anthropic stream error: ${parsed.error}`);
-			for (const text of parsed.texts) {
-				content += text;
-				onText?.(text);
-			}
+		if (!res.ok) {
+			const errBody = await res.text().catch(() => '');
+			throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
 		}
-	} finally {
-		// Billed even when the stream fails part-way.
-		if (usage) await onUsage?.({ model: GRADE_MODEL, usage });
-	}
-	return { content, data: checkGrades(content) };
+		if (!res.body) throw new Error('Anthropic API returned no body');
+
+		const decoder = new TextDecoder();
+		let buffer = '';
+		let content = '';
+		let usage = null;
+		try {
+			for await (const chunk of res.body) {
+				buffer += decoder.decode(chunk, { stream: true });
+				const parsed = parseAnthropicSseChunk(buffer);
+				buffer = parsed.rest;
+				if (parsed.usage) usage = { ...usage, ...parsed.usage };
+				if (parsed.error) throw new Error(`Anthropic stream error: ${parsed.error}`);
+				for (const text of parsed.texts) {
+					content += text;
+					onText?.(text);
+				}
+			}
+		} finally {
+			// What arrived, even when the stream fails part-way.
+			recordChatResponse(span, { model: GRADE_MODEL, usage, content: [{ type: 'text', text: content }] });
+			// Billed even when the stream fails part-way.
+			if (usage) await onUsage?.({ model: GRADE_MODEL, usage });
+		}
+		return content;
+	});
 }
