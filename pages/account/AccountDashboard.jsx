@@ -76,7 +76,8 @@ const AccountDashboard = () => {
           if (error) { console.error('Failed to load event stats:', error); setEventCounts(null); return false; }
           setEventCounts(countMyEventBuckets(data, todayInAustralia()));
           return true;
-        }, () => false);
+        })
+        .catch((err) => { console.error('Failed to load event stats:', err); return false; });
 
       let statsOk = false;
 
@@ -99,7 +100,7 @@ const AccountDashboard = () => {
             .eq('status', 'proposed'),
         ]);
 
-        if (cancelled) return false;
+        if (cancelled) return null;
 
         // Log individual errors without crashing the whole dashboard. Supabase
         // resolves (never rejects) a failed query, so a per-query error here
@@ -129,6 +130,7 @@ const AccountDashboard = () => {
         if (!cancelled) setStatsLoading(false);
       }
       const eventsOk = await eventsRead;
+      if (cancelled) return null; // unmounted / user changed: no verdict
       return statsOk && eventsOk !== false;
     };
 
@@ -146,8 +148,7 @@ const AccountDashboard = () => {
 
     // Resolves true on success; `silent` as for the stats fetch.
     const run = async (page = vaultPage, { silent = false } = {}) => {
-      if (!silent) setVaultLoading(true);
-      setVaultError(null);
+      if (!silent) { setVaultLoading(true); setVaultError(null); }
       try {
         const from = (page - 1) * 10;
         const { data: items, count, error: vaultFetchError } = await supabase
@@ -156,13 +157,15 @@ const AccountDashboard = () => {
           .order('created_at', { ascending: false })
           .range(from, from + 9);
         if (vaultFetchError) throw vaultFetchError;
-        if (cancelled) return false;
+        if (cancelled) return null;
+        setVaultError(null);
         setVaultItems(items ?? []);
         setVaultPage(page);
         setVaultTotalPages(Math.ceil((count ?? 0) / 10));
         return true;
       } catch (err) {
-        if (!cancelled) setVaultError(err.message || 'Failed to load vault items.');
+        if (cancelled) return null;
+        setVaultError(err.message || 'Failed to load vault items.');
         return false;
       } finally {
         if (!cancelled) setVaultLoading(false);
@@ -223,6 +226,8 @@ const AccountDashboard = () => {
         fetchStatsRef.current?.() ?? true,
         fetchVaultRef.current?.() ?? true,
       ]);
+      // null = the page went away mid-refresh: say nothing.
+      if (statsOk === null || vaultOk === null) return;
       if (statsOk && vaultOk) toast.success('Dashboard refreshed');
       else toast.error('Some of your dashboard couldn’t be refreshed. Please try again.');
     } finally {

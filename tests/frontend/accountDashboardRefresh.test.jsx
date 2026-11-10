@@ -73,6 +73,17 @@ describe('Dashboard refresh', () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
+  it('stays quiet when the page goes away mid-refresh', async () => {
+    const { unmount } = renderPage();
+    const button = screen.getByRole('button', { name: /Refresh Data/ });
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+    unmount();
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
   it('refetches quietly on return to the tab after a while away', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
