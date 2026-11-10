@@ -133,7 +133,11 @@ const OrganiserRequestsAdminPage = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setData(await callApi('/organiser-requests/admin'));
+      const body = await callApi('/organiser-requests/admin');
+      setData({
+        requests: Array.isArray(body.requests) ? body.requests : [],
+        organisers: Array.isArray(body.organisers) ? body.organisers : [],
+      });
     } catch (err) {
       toast.error(`Failed to load requests: ${err.message}`);
     } finally {
