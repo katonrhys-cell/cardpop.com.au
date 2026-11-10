@@ -130,4 +130,9 @@ describe('GET /public/settings (edge-cached copy)', () => {
     expect(retried.headers['cache-control']).not.toMatch(/no-store/);
     expect(mockIn).toHaveBeenCalledTimes(2);
   });
+
+  it('publishes the Google Workspace referral link and switch', () => {
+    expect(PUBLIC_SETTINGS.google_workspace_referral_enabled).toBe(true);
+    expect(PUBLIC_SETTINGS.google_workspace_referral_url).toMatch(/^https:\/\//);
+  });
 });
