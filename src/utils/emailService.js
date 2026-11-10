@@ -273,11 +273,12 @@ export async function sendShopEnquiry({ to, productTitle, productSku, productId,
 // Admin heads-up when a user submits an event to the community calendar. Sent to
 // admin accounts (and the configurable admin contact address), not to a customer.
 // `to` may be a single address or an array of addresses.
-export async function sendEventSubmitted({ to, event }) {
+export async function sendEventSubmitted({ to, event, addedBy = null, byAdmin = false }) {
+  const pending = !event?.status || event.status === 'pending_review';
   return send({
     to,
-    subject: `New event pending review: ${event?.title || 'Untitled'}`,
-    html: eventSubmittedEmail({ event }),
+    subject: `${pending ? 'New event pending review' : 'New event added'}: ${event?.title || 'Untitled'}`,
+    html: eventSubmittedEmail({ event, addedBy, byAdmin }),
   });
 }
 

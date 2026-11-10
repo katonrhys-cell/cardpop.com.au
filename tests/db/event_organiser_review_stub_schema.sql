@@ -64,3 +64,19 @@ $$ insert into public.notifications (user_id, type, title, body, link, related_i
 grant select on public.profiles to authenticated, anon;
 grant select, insert, update, delete on public.events to authenticated;
 grant select on public.events to anon;
+
+-- Member ticket offers (20261025075600_event_ticket_offers.sql), as far as the
+-- organiser-offer migration (20261110002320) touches them.
+create table public.event_ticket_offers (
+  event_id uuid primary key references public.events(id) on delete cascade,
+  offer_text text, discount_code text,
+  referral_url text check (referral_url is null or referral_url ~* '^https?://[^[:space:]]+$'),
+  is_active boolean not null default true,
+  ticket_clicks integer not null default 0, code_reveals integer not null default 0,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+alter table public.event_ticket_offers enable row level security;
+create policy "Admins manage event ticket offers" on public.event_ticket_offers for all to authenticated
+  using (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.is_admin = true))
+  with check (exists (select 1 from public.profiles p where p.id = (select auth.uid()) and p.is_admin = true));
+grant select, insert, update, delete on public.event_ticket_offers to authenticated;

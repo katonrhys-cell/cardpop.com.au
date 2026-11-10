@@ -7,12 +7,21 @@ calendar, keeps it up to date, and hears back from us.
 
 | Stage | Organiser (Account → My Events) | Admin (Admin → Event Management) |
 |---|---|---|
-| **Submit** | **Submit Event** → the form in user mode (no Status, Featured, Member Offer or re-scan controls). Saved as `pending_review`. | Bell (`event_pending_review`, DB trigger) + email (`POST /events/notify-submission`). |
+| **Submit** | **Submit Event** → the form in user mode (no Status, Featured or re-scan controls). Saved as `pending_review`. The **Member Offer** tab takes their own ticket discount code and referral link, saved with the submission (`docs/event-ticket-offers.md`). | Every admin: bell (`event_pending_review`, DB trigger) + email (`POST /events/notify-submission`). |
 | **Pending** | **Edit** freely. | Toggle on = approve. **Ban** icon = reject with a reason. Or set the status in the form (a *Reason for the organiser* box appears for Rejected). |
 | **Approved** | Bell `event_approved` + email "Your event is live". Badge **Live**, **View Live**, **Website badge**, **Request changes**. | — |
 | **Rejected** | Bell `event_rejected` + email with the reason. Reason shown on the row. **Edit & resubmit** puts it back to `pending_review` (admins are belled and emailed again). | — |
 | **Live, needs a change** | **Request changes** opens the same form prefilled. Saving records only the changed fields as an `event_change_requests` row. **The live page is unchanged** until an admin applies it. Badge **Changes pending review**; editing again updates the same request (saving with no differences withdraws it). | Bell `event_change_requested` + email listing the fields. **Change requests (n)** filter / **Changes requested** badge opens a current → requested comparison. **Apply changes** or **Dismiss**, with an optional note. |
 | **Changes decided** | Bell + email: "Your event changes are live" / "weren't applied" (+ note). A dismissed request's note shows on the row. | — |
+
+**Every event a person adds alerts every admin** — a member's submission or
+resubmission (`event_pending_review`), and an admin's own event, often live
+straight away (`event_created`), which goes to every *other* admin. Bell from
+`notify_admins_on_event_submission()`; email from `POST /events/notify-submission`,
+which the form calls after every insert and resubmission, sent to every admin
+account plus the Notification Email (minus whoever added it) and claimed once
+through `events.admins_notified_at` (cleared again on a resubmission). The
+nightly scanner's finds (`auto_discovered`) are left to their own queue.
 
 Organisers can turn the two organiser emails/bells off under Account →
 Notification Settings → *Events you organise*.

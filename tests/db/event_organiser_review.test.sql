@@ -208,4 +208,118 @@ do $$ begin
                   and type = 'event_rejected' and body like '%Title must match your website%'), 'organiser belled with the note';
 end $$;
 
+-- ════ 20261110002320: organiser offers + admin alerts ═════════════════════
+insert into public.profiles (id, display_name, is_admin) values
+  ('00000000-0000-0000-0000-00000000000d', 'Second Admin', true);
+delete from public.notifications;
+
+-- Every admin hears about a member's submission.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+insert into public.events (id, organiser_id, title, slug, status, start_date, admins_notified_at)
+values ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-00000000000b', 'CollectFest Perth', 'collectfest-perth',
+        'pending_review', current_date + 90, now());
+reset role;
+do $$ begin
+  assert (select count(*) from public.notifications where type = 'event_pending_review' and related_id = '00000000-0000-0000-0000-0000000000e3') = 2,
+    'both admins are belled about a submission';
+  assert (select body from public.notifications where type = 'event_pending_review' limit 1) like '%from Bec Organiser%',
+    'the bell names the submitter';
+  assert (select admins_notified_at from public.events where id = '00000000-0000-0000-0000-0000000000e3') is null,
+    'a member cannot pre-stamp the admin email as sent';
+end $$;
+
+-- An admin's own live event bells the *other* admins.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+insert into public.events (id, organiser_id, title, status) values
+  ('00000000-0000-0000-0000-0000000000e4', '00000000-0000-0000-0000-00000000000a', 'Admin Live Show', 'approved');
+reset role;
+do $$ begin
+  assert exists (select 1 from public.notifications where type = 'event_created' and user_id = '00000000-0000-0000-0000-00000000000d'
+                   and body like '%is live on the calendar%'), 'the other admin hears about a live event';
+  assert not exists (select 1 from public.notifications where type = 'event_created' and user_id = '00000000-0000-0000-0000-00000000000a'),
+    'the admin who added it is not belled';
+end $$;
+
+-- The nightly scanner's finds stay out of the bell.
+insert into public.events (title, status, auto_discovered) values ('Scanner Find', 'pending_review', true);
+do $$ begin
+  assert not exists (select 1 from public.notifications n join public.events e on e.id = n.related_id where e.title = 'Scanner Find'),
+    'auto-discovered events are not belled';
+end $$;
+
+-- Organiser writes a ticket offer on their pending event, and reads it back.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+insert into public.event_ticket_offers (event_id, offer_text, discount_code, referral_url)
+values ('00000000-0000-0000-0000-0000000000e3', '10% off GA', 'CARDPOP10', 'https://tix.example/collectfest?ref=cardpop');
+do $$ begin
+  assert (select discount_code from public.event_ticket_offers where event_id = '00000000-0000-0000-0000-0000000000e3') = 'CARDPOP10',
+    'the organiser can read their own offer';
+end $$;
+-- …but not on someone else's event.
+do $$ begin
+  insert into public.event_ticket_offers (event_id, discount_code) values ('00000000-0000-0000-0000-0000000000e4', 'MINE');
+  raise exception 'expected a refusal';
+exception when insufficient_privilege then null;
+end $$;
+do $$ begin
+  assert not exists (select 1 from public.event_ticket_offers where event_id = '00000000-0000-0000-0000-0000000000e4'),
+    'another event''s offer is invisible';
+end $$;
+reset role;
+
+-- Once the event is live, the organiser can't edit the offer directly…
+update public.events set status = 'approved' where id = '00000000-0000-0000-0000-0000000000e3';
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.event_ticket_offers set referral_url = 'https://evil.example' where event_id = '00000000-0000-0000-0000-0000000000e3';
+do $$ begin
+  assert (select referral_url from public.event_ticket_offers where event_id = '00000000-0000-0000-0000-0000000000e3')
+    = 'https://tix.example/collectfest?ref=cardpop', 'a live offer is not directly editable';
+end $$;
+-- …only request it.
+insert into public.event_change_requests (id, event_id, organiser_id, changes)
+values ('00000000-0000-0000-0000-00000000c004', '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-00000000000b',
+        '{"ticket_offer": {"offer_text": "15% off GA", "discount_code": "CARDPOP15", "referral_url": "https://tix.example/new", "is_active": true}}');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.apply_event_change_request('00000000-0000-0000-0000-00000000c004');
+reset role;
+do $$ declare o record; begin
+  select * into o from public.event_ticket_offers where event_id = '00000000-0000-0000-0000-0000000000e3';
+  assert o.discount_code = 'CARDPOP15' and o.referral_url = 'https://tix.example/new' and o.offer_text = '15% off GA',
+    'an applied offer change updates the offer';
+end $$;
+
+-- Removing the offer through a request deletes a row with no history.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+insert into public.event_change_requests (id, event_id, organiser_id, changes)
+values ('00000000-0000-0000-0000-00000000c005', '00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-00000000000b',
+        '{"ticket_offer": null, "title": "CollectFest Perth 2027"}');
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000a', false);
+select public.apply_event_change_request('00000000-0000-0000-0000-00000000c005');
+reset role;
+do $$ begin
+  assert not exists (select 1 from public.event_ticket_offers where event_id = '00000000-0000-0000-0000-0000000000e3'),
+    'a removed offer with no clicks is deleted';
+  assert (select title from public.events where id = '00000000-0000-0000-0000-0000000000e3') = 'CollectFest Perth 2027',
+    'event fields in the same request still apply';
+end $$;
+
+-- Resubmitting a rejected event clears the admin-email stamp so admins are emailed again.
+update public.events set status = 'rejected', admins_notified_at = now() where id = '00000000-0000-0000-0000-0000000000e3';
+delete from public.notifications;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.events set status = 'pending_review' where id = '00000000-0000-0000-0000-0000000000e3';
+reset role;
+do $$ begin
+  assert (select admins_notified_at from public.events where id = '00000000-0000-0000-0000-0000000000e3') is null,
+    'a resubmission is emailed again';
+  assert (select count(*) from public.notifications where title = 'Event resubmitted for review') = 2,
+    'both admins are belled about the resubmission';
+end $$;
+
 \echo 'event organiser review: all checks passed'

@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toCdnUrl } from '@/utils/imageUrl.js';
-import { EVENT_CHANGE_LABELS, describeEventValue, isImageChangeField } from '@/utils/eventChangeRequests.js';
+import { EVENT_CHANGE_LABELS, describeEventValue, isImageChangeField, ticketOfferValue } from '@/utils/eventChangeRequests.js';
 import { applyChangeRequest, dismissChangeRequest } from '@/lib/eventReviewApi.js';
+import { loadAdminTicketOffer } from '@/lib/eventTicketOffers.js';
 
 // Admin → Event Management: an organiser's requested changes to their live
 // event, field by field (current → requested). Apply writes them to the event
@@ -24,8 +25,22 @@ const Value = ({ field, value }) => {
 const EventChangeReviewDialog = ({ event, request, onClose, onDecided }) => {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(null);
+  // The live member offer (its own table), when the request changes it.
+  const [liveOffer, setLiveOffer] = useState(null);
 
   useEffect(() => { if (request) setNote(''); }, [request]);
+
+  useEffect(() => {
+    setLiveOffer(null);
+    if (!request?.changes || !('ticket_offer' in request.changes) || !event?.id) return undefined;
+    let cancelled = false;
+    loadAdminTicketOffer(event.id)
+      .then((row) => { if (!cancelled) setLiveOffer(row); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [request, event?.id]);
+
+  const currentValue = (field) => (field === 'ticket_offer' ? ticketOfferValue(liveOffer) : event?.[field]);
 
   const decide = async (kind) => {
     if (!request) return;
@@ -69,7 +84,7 @@ const EventChangeReviewDialog = ({ event, request, onClose, onDecided }) => {
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-2 sm:items-start">
                   <div className="text-muted-foreground line-through decoration-muted-foreground/40">
-                    <Value field={field} value={event?.[field]} />
+                    <Value field={field} value={currentValue(field)} />
                   </div>
                   <ArrowRight className="hidden sm:block w-4 h-4 mt-0.5 text-muted-foreground" aria-hidden="true" />
                   <div className="font-medium text-foreground">

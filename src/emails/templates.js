@@ -521,39 +521,53 @@ ${centred(`The refund goes back to your original payment method within ${MARKETP
 // Sent to the admin notification recipient when a user submits an event to the
 // community calendar. It's an internal heads-up, not a customer email, so it
 // links straight to the moderation queue rather than a public page.
-export function eventSubmittedEmail({ event }) {
+export function eventSubmittedEmail({ event, addedBy = null, byAdmin = false }) {
   const EVENT_TYPE_LABELS = {
     card_show: 'Card Show',
     trade_event: 'Trade Event',
     community_event: 'Community Event',
     lgs_event: 'LGS Event',
   };
+  const STATUS_LABELS = {
+    pending_review: 'Pending review',
+    approved: 'Live',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+    rejected: 'Rejected',
+  };
+  const pending = !event.status || event.status === 'pending_review';
   const location = [event.suburb, event.state].filter(Boolean).map(esc).join(', ') || '—';
   const startDate = event.start_date
     ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
     : '—';
-  const submittedBy = event.organizer_name
+  const organiser = event.organizer_name
     ? `${esc(event.organizer_name)}${event.organizer_email ? ` (${esc(event.organizer_email)})` : ''}`
     : (esc(event.organizer_email) || '—');
+  const title = esc(event.title) || 'Untitled';
 
-  const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
+  const intro = pending
+    ? `<p>${byAdmin ? 'An admin' : 'A community member'} has submitted a new event for review. It won't appear on the public calendar until it's approved.</p>`
+    : `<p>A new event has been added to CardPop${event.status === 'approved' ? ' and is already live on the events calendar' : ''}.</p>`;
+  const body = `${intro}
 ${summaryTable([
-  ['Event', esc(event.title) || 'Untitled'],
+  ['Event', title],
+  ['Status', STATUS_LABELS[event.status] || esc(event.status) || '—'],
   ['Type', EVENT_TYPE_LABELS[event.event_type] || esc(event.event_type) || '—'],
   ['Location', location],
   ['Start date', startDate],
-  ['Submitted by', submittedBy],
+  ['Organiser', organiser],
+  ['Added by', esc(addedBy) || '—'],
 ])}
-<p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
+<p>${pending ? 'Review it in Event Management to approve, edit, or reject the submission.' : 'You can check or edit it in Event Management.'}</p>`;
 
   return cpEmail(
-    `New event pending review: ${esc(event.title) || 'Untitled'}`,
-    'New Event Submission',
-    'A new event needs your review',
+    `${pending ? 'New event pending review' : 'New event added'}: ${title}`,
+    pending ? 'New Event Submission' : 'New Event Added',
+    pending ? 'A new event needs your review' : 'A new event is on CardPop',
     body,
     'https://cardpop.com.au/admin/events',
-    'Review in Admin',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+    pending ? 'Review in Admin' : 'Open Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 

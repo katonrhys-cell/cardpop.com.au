@@ -9,10 +9,12 @@ import { ticketPriceLines } from './eventTicketPrices.js';
 import { cleanGalleryAlbums, flattenGalleryAlbums } from './eventGallery.js';
 import { cleanEventVideos } from './eventVideos.js';
 
-// The only columns an organiser can ask to change. Must match
-// public.event_change_request_fields() in
-// supabase/migrations/20261109235618_event_organiser_review_flow.sql (a test
-// keeps the two equal).
+// The only fields an organiser can ask to change. Must match
+// public.event_change_request_fields() as last defined in
+// supabase/migrations/ (a test keeps the two equal). Every entry is an
+// `events` column except `ticket_offer`: the member ticket offer, which lives
+// in event_ticket_offers and is applied by apply_event_change_request() —
+// value { offer_text, discount_code, referral_url, is_active } or null.
 export const EVENT_CHANGE_FIELDS = [
   'title', 'short_description', 'description', 'accessibility_info', 'age_restrictions',
   'event_type', 'featured_card_games', 'image_url', 'gallery_images', 'gallery_albums', 'event_videos',
@@ -24,6 +26,7 @@ export const EVENT_CHANGE_FIELDS = [
   'facebook_video_url',
   'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'capacity', 'registration_required',
   'seo_title', 'seo_description', 'seo_keywords', 'tags',
+  'ticket_offer',
 ];
 
 export const EVENT_CHANGE_LABELS = {
@@ -72,6 +75,7 @@ export const EVENT_CHANGE_LABELS = {
   seo_description: 'Meta description',
   seo_keywords: 'SEO keywords',
   tags: 'Tags',
+  ticket_offer: 'Member ticket offer',
 };
 
 const TIME_FIELDS = new Set(['start_time', 'end_time']);
@@ -130,6 +134,36 @@ export function diffEventChanges(event, payload) {
   return changes;
 }
 
+// ── Member ticket offer ───────────────────────────────────────────────────
+
+const offerString = (v) => (typeof v === 'string' ? v.trim() : '');
+
+/**
+ * The offer as a change-request value: { offer_text, discount_code,
+ * referral_url, is_active } with blanks as null, or null when there's no
+ * offer at all. Accepts the offer form ('' for blanks) or a table row.
+ */
+export function ticketOfferValue(offer) {
+  if (!offer) return null;
+  const value = {
+    offer_text: offerString(offer.offer_text) || null,
+    discount_code: offerString(offer.discount_code) || null,
+    referral_url: offerString(offer.referral_url) || null,
+    is_active: offer.is_active !== false,
+  };
+  return value.offer_text || value.discount_code || value.referral_url ? value : null;
+}
+
+/**
+ * The `ticket_offer` change for a change request: undefined when the form
+ * matches the live offer, else the new value (null = remove the offer).
+ */
+export function ticketOfferChange(liveOffer, form) {
+  const before = ticketOfferValue(liveOffer);
+  const after = ticketOfferValue(form);
+  return same(before, after) ? undefined : after;
+}
+
 /** The live event with an open request's changes laid over it (to prefill the form). */
 export function withRequestedChanges(event, changeRequest) {
   if (!event || !changeRequest?.changes) return event;
@@ -151,6 +185,16 @@ export function describeEventValue(field, value) {
     return `${plural(v.length, 'album')}, ${plural(photos, 'photo')}`;
   }
   if (field === 'gallery_images' && Array.isArray(v)) return plural(v.length, 'photo');
+  if (field === 'ticket_offer' && typeof v === 'object' && !Array.isArray(v)) {
+    const offer = ticketOfferValue(v);
+    if (!offer) return '—';
+    return [
+      offer.offer_text && `Offer: ${offer.offer_text}`,
+      offer.discount_code && `Code: ${offer.discount_code}`,
+      offer.referral_url && `Link: ${offer.referral_url}`,
+      offer.is_active ? null : '(switched off)',
+    ].filter(Boolean).join('\n');
+  }
   if (field === 'event_videos' && Array.isArray(v)) {
     return v.map((x) => x?.title || x?.url).filter(Boolean).join('\n') || plural(v.length, 'video');
   }

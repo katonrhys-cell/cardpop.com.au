@@ -36,13 +36,6 @@ function makeApp() {
 }
 const app = makeApp();
 
-function makeBuilder(result = { data: null, error: null }) {
-  const b = {};
-  for (const m of ['select', 'eq']) b[m] = vi.fn(() => b);
-  b.maybeSingle = vi.fn(() => Promise.resolve(result));
-  return b;
-}
-
 const pendingEvent = {
   id: 'evt-1',
   title: 'Sydney Card Show',
@@ -70,17 +63,41 @@ beforeEach(() => {
 });
 
 describe('POST /events/notify-submission', () => {
-  it('emails every resolved admin notification address for the submitter\'s pending event', async () => {
-    builders.push(makeBuilder({ data: pendingEvent, error: null }));
+  // chain() is defined below (function declaration — hoisted).
+  it('emails every admin notification address about the submitter\'s new event, once', async () => {
+    const claim = chain({ data: [{ id: 'evt-1' }], error: null });
+    builders.push(
+      chain({ data: pendingEvent, error: null }),
+      claim,
+      chain({ data: { email: 'jane@example.com', display_name: 'Jane', is_admin: false }, error: null }),
+    );
 
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
+    expect(claim.calls).toContainEqual(['is', 'admins_notified_at', null]);
     expect(mockSendEventSubmitted).toHaveBeenCalledWith({
       to: ['notifications@cardpop.com.au'],
       event: pendingEvent,
+      addedBy: 'Jane',
+      byAdmin: false,
     });
+  });
+
+  it('emails the other admins about an admin\'s own live event, not the admin who added it', async () => {
+    mockGetAdminEmails.mockResolvedValue(['Rhys@cardpop.com.au', 'second@cardpop.com.au', 'notifications@cardpop.com.au']);
+    builders.push(
+      chain({ data: { ...pendingEvent, status: 'approved' }, error: null }),
+      chain({ data: [{ id: 'evt-1' }], error: null }),
+      chain({ data: { email: 'rhys@cardpop.com.au', display_name: 'Rhys', is_admin: true }, error: null }),
+    );
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.status).toBe(200);
+    expect(mockSendEventSubmitted).toHaveBeenCalledWith(expect.objectContaining({
+      to: ['second@cardpop.com.au', 'notifications@cardpop.com.au'],
+      byAdmin: true,
+    }));
   });
 
   it('requires an eventId', async () => {
@@ -90,24 +107,37 @@ describe('POST /events/notify-submission', () => {
   });
 
   it('404s when the event does not exist', async () => {
-    builders.push(makeBuilder({ data: null, error: null }));
+    builders.push(chain({ data: null, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'nope' });
     expect(res.status).toBe(404);
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 
-  it('forbids notifying for an event the caller did not submit', async () => {
-    builders.push(makeBuilder({ data: { ...pendingEvent, organiser_id: 'someone-else' }, error: null }));
+  it('forbids notifying for an event the caller did not add', async () => {
+    builders.push(chain({ data: { ...pendingEvent, organiser_id: 'someone-else' }, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
     expect(res.status).toBe(403);
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 
-  it('skips (no email) when the event is not pending review', async () => {
-    builders.push(makeBuilder({ data: { ...pendingEvent, status: 'approved' }, error: null }));
+  it('does not email twice for the same submission', async () => {
+    builders.push(chain({ data: { ...pendingEvent, admins_notified_at: '2026-11-10T00:00:00Z' }, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true, skipped: 'not_pending' });
+    expect(res.body).toEqual({ ok: true, skipped: 'already_sent' });
+    expect(mockSendEventSubmitted).not.toHaveBeenCalled();
+  });
+
+  it('loses the race quietly when another call claimed the send first', async () => {
+    builders.push(chain({ data: pendingEvent, error: null }), chain({ data: [], error: null }));
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.body).toEqual({ ok: true, skipped: 'already_sent' });
+    expect(mockSendEventSubmitted).not.toHaveBeenCalled();
+  });
+
+  it('leaves the nightly scanner\'s finds to their own queue', async () => {
+    builders.push(chain({ data: { ...pendingEvent, auto_discovered: true }, error: null }));
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.body).toEqual({ ok: true, skipped: 'auto_discovered' });
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 });

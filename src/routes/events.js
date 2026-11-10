@@ -12,19 +12,19 @@ const router = Router();
 /**
  * POST /events/notify-submission
  *
- * Fired by the user-facing event form immediately after a user inserts a
- * `pending_review` event, so a new community submission doesn't sit unnoticed
- * in the moderation queue. Emails every admin account, plus the dedicated
- * Notification Email set under Admin → Platform Settings (falls back to the
- * contact address, then a default alerts inbox) for backward compatibility.
- * A separate DB trigger (see supabase/migrations) also fans out an in-app
- * notification to every admin — this endpoint only handles the email leg.
+ * Fired by the event form right after anyone adds an event — a member's
+ * submission (pending review), an admin's own event (often live straight
+ * away), or a member's resubmission of a rejected event — so every admin
+ * hears about every event. Emails every admin account plus the Notification
+ * Email under Admin → Platform Settings (getAdminNotificationEmails), minus
+ * the person who added it. The bell to every admin comes from a DB trigger
+ * (notify_admins_on_event_submission); this endpoint is the email leg.
+ * The nightly scanner's finds (auto_discovered) have their own queue.
  *
- * Auth + ownership are checked so a user can only trigger a notice for their own
- * freshly-submitted, still-pending event — never email an arbitrary address or
- * re-notify on an already-approved one. Fail-safe: the submission itself already
- * succeeded client-side, so any error here is logged and surfaced without
- * affecting the user's saved event.
+ * Only the event's own creator can trigger it, and it sends once per
+ * submission: the send is claimed through events.admins_notified_at, which
+ * the DB clears again when a rejected event is resubmitted. Fail-safe: the
+ * event is already saved, so any error is logged and reported only.
  */
 router.post('/notify-submission', authMiddleware, async (req, res) => {
   const { eventId } = req.body || {};
@@ -33,25 +33,50 @@ router.post('/notify-submission', authMiddleware, async (req, res) => {
   try {
     const { data: event, error } = await supabase
       .from('events')
-      .select('id, title, event_type, status, suburb, state, start_date, organiser_id, organizer_name, organizer_email')
+      .select('id, title, slug, event_type, status, suburb, state, start_date, organiser_id, organizer_name, organizer_email, auto_discovered, admins_notified_at')
       .eq('id', eventId)
       .maybeSingle();
     if (error) throw error;
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    // Only the submitter can trigger the notice, and only while the event is
-    // actually awaiting review — closes the "email anyone / re-notify" hole.
+    // Only the person who added the event can trigger the notice — closes the
+    // "email the admins about anything, any time" hole.
     if (event.organiser_id !== req.user.id) {
       return res.status(403).json({ error: 'You can only notify for your own event' });
     }
-    if (event.status !== 'pending_review') {
-      return res.json({ ok: true, skipped: 'not_pending' });
-    }
+    if (event.auto_discovered) return res.json({ ok: true, skipped: 'auto_discovered' });
+    if (event.admins_notified_at) return res.json({ ok: true, skipped: 'already_sent' });
 
-    const recipients = await getAdminNotificationEmails();
-    await sendEventSubmitted({ to: recipients, event });
+    // Claim the send before making it, so a double call can't email twice.
+    const { data: claimed, error: claimError } = await supabase
+      .from('events')
+      .update({ admins_notified_at: new Date().toISOString() })
+      .eq('id', event.id)
+      .is('admins_notified_at', null)
+      .select('id');
+    if (claimError) throw claimError;
+    if (!claimed?.length) return res.json({ ok: true, skipped: 'already_sent' });
 
-    logger.info(`[EVENTS] Notified ${recipients.join(', ')} of pending event ${event.id}`);
+    const { data: creator } = await supabase
+      .from('profiles')
+      .select('email, display_name, username, is_admin')
+      .eq('id', req.user.id)
+      .maybeSingle();
+    const creatorEmail = creator?.email?.trim().toLowerCase() || null;
+    const all = await getAdminNotificationEmails();
+    // An admin doesn't need an email about the event they just added — unless
+    // they're the only recipient.
+    const others = creatorEmail ? all.filter((a) => a.trim().toLowerCase() !== creatorEmail) : all;
+    const recipients = others.length ? others : all;
+
+    await sendEventSubmitted({
+      to: recipients,
+      event,
+      addedBy: creator?.display_name || creator?.username || null,
+      byAdmin: Boolean(creator?.is_admin),
+    });
+
+    logger.info(`[EVENTS] Notified ${recipients.length} admin address(es) of new event ${event.id} (${event.status})`);
     res.json({ ok: true });
   } catch (err) {
     logger.error(`[EVENTS] notify-submission failed: ${err.message}`);

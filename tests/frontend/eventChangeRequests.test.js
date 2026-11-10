@@ -4,9 +4,21 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   EVENT_CHANGE_FIELDS, EVENT_CHANGE_LABELS, diffEventChanges, withRequestedChanges, describeEventValue, normaliseEventValue,
+  ticketOfferValue, ticketOfferChange,
 } from '../../utils/eventChangeRequests.js';
 
-const MIGRATION = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../supabase/migrations/20261109235618_event_organiser_review_flow.sql');
+const MIGRATIONS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../supabase/migrations');
+
+// public.event_change_request_fields() as last defined across the migrations.
+function latestSqlFields() {
+  let fields = null;
+  for (const file of fs.readdirSync(MIGRATIONS).sort()) {
+    const sql = fs.readFileSync(path.join(MIGRATIONS, file), 'utf8');
+    const body = sql.match(/function public\.event_change_request_fields\(\)[\s\S]*?select array\[([\s\S]*?)\]::text\[\]/);
+    if (body) fields = [...body[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  }
+  return fields;
+}
 
 // A live row as Supabase returns it.
 const live = {
@@ -51,12 +63,8 @@ const untouched = {
 };
 
 describe('EVENT_CHANGE_FIELDS', () => {
-  it('matches public.event_change_request_fields() in the migration', () => {
-    const sql = fs.readFileSync(MIGRATION, 'utf8');
-    const body = sql.match(/function public\.event_change_request_fields\(\)[\s\S]*?select array\[([\s\S]*?)\]::text\[\]/);
-    expect(body).not.toBeNull();
-    const sqlFields = [...body[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-    expect(sqlFields).toEqual(EVENT_CHANGE_FIELDS);
+  it('matches the latest public.event_change_request_fields() in the migrations', () => {
+    expect(latestSqlFields()).toEqual(EVENT_CHANGE_FIELDS);
   });
 
   it('never lets an organiser request status, featuring or ownership changes', () => {
@@ -127,5 +135,27 @@ describe('describeEventValue / normaliseEventValue', () => {
     expect(normaliseEventValue('tags', [])).toBeNull();
     expect(normaliseEventValue('start_time', '10:00:00')).toBe('10:00');
     expect(normaliseEventValue('capacity', '500')).toBe(500);
+  });
+});
+
+describe('ticket offer changes', () => {
+  const liveOffer = { offer_text: '10% off GA', discount_code: 'CARDPOP10', referral_url: 'https://tix.test/?ref=cp', is_active: true, ticket_clicks: 4 };
+  const form = { offer_text: '10% off GA ', discount_code: 'CARDPOP10', referral_url: 'https://tix.test/?ref=cp', is_active: true };
+
+  it('is unchanged when the form matches the live offer', () => {
+    expect(ticketOfferChange(liveOffer, form)).toBeUndefined();
+    expect(ticketOfferChange(null, { offer_text: '', discount_code: '', referral_url: '', is_active: true })).toBeUndefined();
+  });
+  it('returns the new offer when it changed', () => {
+    expect(ticketOfferChange(liveOffer, { ...form, discount_code: 'CARDPOP15' })).toEqual({
+      offer_text: '10% off GA', discount_code: 'CARDPOP15', referral_url: 'https://tix.test/?ref=cp', is_active: true,
+    });
+  });
+  it('returns null to remove an offer', () => {
+    expect(ticketOfferChange(liveOffer, { offer_text: '', discount_code: '', referral_url: '', is_active: true })).toBeNull();
+  });
+  it('describes an offer for the review dialog', () => {
+    expect(describeEventValue('ticket_offer', ticketOfferValue(form))).toBe('Offer: 10% off GA\nCode: CARDPOP10\nLink: https://tix.test/?ref=cp');
+    expect(describeEventValue('ticket_offer', null)).toBe('—');
   });
 });

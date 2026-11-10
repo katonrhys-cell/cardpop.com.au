@@ -27,7 +27,7 @@ import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
 import { findOrganiser } from '@/utils/eventOrganisers.js';
-import { diffEventChanges } from '@/utils/eventChangeRequests.js';
+import { diffEventChanges, ticketOfferChange } from '@/utils/eventChangeRequests.js';
 import { notifyEventDecision } from '@/lib/eventReviewApi.js';
 import { toast } from 'sonner';
 
@@ -367,18 +367,24 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
       setVideos(cleanEventVideos(event.event_videos, event.youtube_url).map(v => ({ title: v.title, url: v.url })));
       setActiveTab('details');
 
-      if (!isUserMode) {
-        loadAdminTicketOffer(event.id).then((row) => {
-          if (cancelled || !row) return;
-          setExistingOffer(row);
-          setOfferForm({
-            offer_text: row.offer_text || '',
-            discount_code: row.discount_code || '',
-            referral_url: row.referral_url || '',
-            is_active: row.is_active,
-          });
-        }).catch(() => toast.error("Couldn't load this event's member offer."));
-      }
+      // Member offer: admins and the event's own organiser can read it (RLS).
+      // An open change request's offer (laid over `event` as ticket_offer)
+      // prefills the form instead of the live one.
+      const requestedOffer = isUserMode && event && Object.prototype.hasOwnProperty.call(event, 'ticket_offer')
+        ? event.ticket_offer
+        : undefined;
+      const toOfferForm = (row) => ({
+        offer_text: row?.offer_text || '',
+        discount_code: row?.discount_code || '',
+        referral_url: row?.referral_url || '',
+        is_active: row ? row.is_active !== false : true,
+      });
+      if (requestedOffer !== undefined) setOfferForm(toOfferForm(requestedOffer));
+      loadAdminTicketOffer(event.id).then((row) => {
+        if (cancelled || !row) return;
+        setExistingOffer(row);
+        if (requestedOffer === undefined) setOfferForm(toOfferForm(row));
+      }).catch(() => toast.error("Couldn't load this event's member offer."));
 
     } else {
       setFormData(INITIAL_STATE);
@@ -498,7 +504,7 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
       return;
     }
 
-    const offerError = isUserMode ? null : validateOfferForm(offerForm);
+    const offerError = validateOfferForm(offerForm);
     if (offerError) {
       toast.error(offerError);
       setActiveTab('offer');
@@ -617,6 +623,9 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
         // Live event: record the difference as a change request; the event row
         // itself is untouched until an admin applies it.
         const changes = diffEventChanges(liveEvent, payload);
+        // The member offer lives in its own table; a change to it rides along.
+        const offerChange = ticketOfferChange(existingOffer, offerForm);
+        if (offerChange !== undefined) changes.ticket_offer = offerChange;
         if (Object.keys(changes).length === 0) {
           if (changeRequest?.id) {
             const { error } = await supabase.from('event_change_requests').delete().eq('id', changeRequest.id);
@@ -689,9 +698,9 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
           ? 'Event submitted! Our team will review it before it appears on the calendar.'
           : 'Event created successfully');
 
-        // Notify admins that a user submission is awaiting review. Fire-and-forget
-        // so a mail hiccup never blocks the (already-saved) submission.
-        if (isUserMode && inserted?.id) {
+        // Email every admin about the new event (the bell is a DB trigger).
+        // Fire-and-forget so a mail hiccup never blocks the saved event.
+        if (inserted?.id) {
           apiServerClient
             .fetch('/events/notify-submission', {
               method: 'POST',
@@ -703,8 +712,10 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
       }
 
       // Member offer — saved after the event so a new event has its id. The
-      // event is already saved, so a failure here is reported, not fatal.
-      if (!isUserMode && savedId) {
+      // event is already saved, so a failure here is reported, not fatal. An
+      // organiser can write it while the event is under review (RLS); on a
+      // live event it went into the change request above.
+      if (savedId && !isChangeRequest) {
         try {
           await saveAdminTicketOffer(savedId, offerForm, existingOffer);
         } catch (err) {
@@ -779,7 +790,7 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
                   { id: 'seo',       label: 'SEO' },
-                  ...(isUserMode ? [] : [{ id: 'offer', label: 'Member Offer' }]),
+                  { id: 'offer', label: 'Member Offer' },
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.id}
@@ -1199,18 +1210,17 @@ const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeReques
                 )}
               </TabsContent>
 
-              {/* ── TAB 5: MEMBER OFFER (admin) ── */}
-              {!isUserMode && (
-                <TabsContent value="offer" className="mt-0 animate-in fade-in">
-                  <EventTicketOfferPanel
-                    value={offerForm}
-                    onChange={setOfferForm}
-                    stats={existingOffer}
-                    ticketUrl={formData.ticket_url.trim()}
-                    disabled={loading}
-                  />
-                </TabsContent>
-              )}
+              {/* ── TAB 5: MEMBER OFFER ── */}
+              <TabsContent value="offer" className="mt-0 animate-in fade-in">
+                <EventTicketOfferPanel
+                  value={offerForm}
+                  onChange={setOfferForm}
+                  stats={existingOffer}
+                  ticketUrl={formData.ticket_url.trim()}
+                  disabled={loading}
+                  audience={isUserMode ? 'organiser' : 'admin'}
+                />
+              </TabsContent>
 
             </div>
           </Tabs>
