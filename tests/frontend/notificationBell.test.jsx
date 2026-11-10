@@ -4,7 +4,6 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { vi, describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
 
 const markRead = vi.fn();
 vi.mock('@/hooks/useNotifications.js', () => ({
@@ -40,7 +39,7 @@ describe('NotificationBell', () => {
   });
 
   it('is not hidden on phones in the header', () => {
-    const src = fs.readFileSync(path.resolve(__dirname, '../../components/Header.jsx'), 'utf8');
+    const src = fs.readFileSync('components/Header.jsx', 'utf8');
     const at = src.indexOf('<NotificationBell />');
     const before = src.slice(Math.max(0, at - 300), at);
     expect(before).not.toMatch(/hidden sm:/);
