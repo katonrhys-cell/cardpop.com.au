@@ -28,7 +28,8 @@ describe('EventFormModal — user/admin field parity', () => {
   it('still hides the admin-only Status and homepage-feature controls in user mode', () => {
     renderForm('user');
     expect(screen.queryByText('Status')).not.toBeInTheDocument();
-    expect(screen.queryByText('Feature on Homepage')).not.toBeInTheDocument();
+    expect(screen.queryByText('Featured on the calendar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Show on the homepage')).not.toBeInTheDocument();
   });
 
   it('shows every tab in both modes, Member Offer included (organisers set their own code)', () => {

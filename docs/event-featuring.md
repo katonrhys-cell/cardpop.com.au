@@ -13,7 +13,7 @@ One table, `utils/featuredPackages.js`, read by the dialog, the
 |---|---|---|
 | Calendar Spotlight | $49 | nothing |
 | Spotlight + Instagram | $99 | Instagram post + story before the show |
-| Full Feature | $149 | the above, a second story in show week, homepage spot |
+| Full Feature | $149 | the above and a second story in show week (the homepage spot is automatic) |
 
 **Early bird:** booked 28+ days before the event's first day (Sydney date),
 20% off every package (`EARLY_BIRD`). To change a price or a package, edit
@@ -52,5 +52,16 @@ their own rows, admins read all, the browser writes nothing. Test with
   the event form. The purchase row stays `paid`.
 - **Tax invoice**: Stripe's emailed receipt is the record; these payments are
   not `orders`, so they don't get an `INV-` invoice.
-- **Homepage spot** (Full Feature): the homepage has no events section yet.
-  It must exist before a Full Feature is sold, so it is the next change.
+
+## Homepage Featured events
+
+Full Feature also sets `events.homepage_featured`
+(`20261110124303_event_homepage_featured.sql`), which puts the event in the
+**Featured events** section of the homepage
+(`components/home/HomepageFeaturedEvents.jsx`, gold like the calendar cards):
+up to 3 approved events that haven't ended, soonest first, read through the
+edge-cached homepage bundle (`queryHomepageEvents` in
+`lib/homepageQueries.js`). The section hides itself when there are none.
+Admins can switch it either way in the event form ("Show on the homepage",
+next to "Featured on the calendar"); organisers can't write the column (a
+BEFORE trigger pins it, like `is_featured`).

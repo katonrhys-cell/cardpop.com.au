@@ -64,3 +64,39 @@ end $$;
 
 reset role;
 \echo 'event_feature_purchases: all checks passed'
+
+-- ── homepage_featured (20261110124303) ──────────────────────────────────────
+-- The guard keys on auth.uid() (event_caller_is_admin()), so each step sets
+-- the caller's JWT subject and writes as the table owner, letting the trigger
+-- (not RLS) decide.
+do $$
+declare v boolean;
+begin
+  -- Service role (no JWT) sets it, and the public view exposes it.
+  perform set_config('request.jwt.claim.sub', '', false);
+  update public.events set homepage_featured = true where id = '00000000-0000-0000-0000-0000000000e1';
+  assert (select homepage_featured from public.events_public where id = '00000000-0000-0000-0000-0000000000e1'),
+    'events_public exposes homepage_featured';
+
+  -- The organiser can't switch it off…
+  perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', false);
+  update public.events set homepage_featured = false, title = 'Show (edited)' where id = '00000000-0000-0000-0000-0000000000e1';
+  select homepage_featured into v from public.events where id = '00000000-0000-0000-0000-0000000000e1';
+  assert v, 'an organiser cannot switch homepage_featured off';
+  assert (select title from public.events where id = '00000000-0000-0000-0000-0000000000e1') = 'Show (edited)',
+    'the rest of the organiser edit still saves';
+
+  -- …or on, for a new event.
+  insert into public.events (id, organiser_id, title, status, start_date, homepage_featured)
+  values ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-0000000000b1', 'New', 'pending_review', '2026-12-30', true);
+  assert not (select homepage_featured from public.events where id = '00000000-0000-0000-0000-0000000000e2'),
+    'an organiser cannot create a homepage-featured event';
+
+  -- An admin can.
+  perform set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
+  update public.events set homepage_featured = true where id = '00000000-0000-0000-0000-0000000000e2';
+  assert (select homepage_featured from public.events where id = '00000000-0000-0000-0000-0000000000e2'),
+    'an admin can set homepage_featured';
+  perform set_config('request.jwt.claim.sub', '', false);
+end $$;
+\echo 'homepage_featured: all checks passed'

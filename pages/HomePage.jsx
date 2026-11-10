@@ -10,6 +10,7 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellersCarousel from '@/components/FeaturedSellersCarousel.jsx';
+import HomepageFeaturedEvents from '@/components/home/HomepageFeaturedEvents.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
@@ -693,6 +694,9 @@ const HomePage = () => {
           </div>
         </section>
       )}
+
+      {/* ── Featured events — the Full Feature package's homepage spot ──── */}
+      <HomepageFeaturedEvents />
 
       {/* ── Live activity — just listed / just sold, realtime ────────────── */}
       <LiveActivityTicker framed />

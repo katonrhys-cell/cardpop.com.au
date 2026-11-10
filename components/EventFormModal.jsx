@@ -69,6 +69,7 @@ const INITIAL_STATE = {
   status: 'approved',
   featured_card_games: [],
   is_featured: false,
+  homepage_featured: false,
   // Venue
   venue_name: '',
   address: '',
@@ -313,6 +314,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         status:              'approved',
         featured_card_games: scrapedData.featured_card_games || [],
         is_featured:         false,
+        homepage_featured:   false,
         venue_name:          scrapedData.venue_name || scrapedData.location || '',
         address:             scrapedData.address || '',
         suburb:              scrapedData.suburb || '',
@@ -365,6 +367,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         status:              event.status || 'approved',
         featured_card_games: event.featured_card_games || [],
         is_featured:         event.is_featured || false,
+        homepage_featured:   event.homepage_featured || false,
         venue_name:          event.venue_name || '',
         address:             event.address || '',
         suburb:              event.suburb || '',
@@ -650,6 +653,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         status:              isUserMode ? (isLiveEdit ? 'approved' : asDraft ? 'draft' : 'pending_review') : formData.status,
         featured_card_games: formData.featured_card_games.length ? formData.featured_card_games : null,
         is_featured:         isUserMode ? false : formData.is_featured,
+        // Only sent when an admin has it (or is switching it off), so saves
+        // keep working if the column's migration hasn't landed yet.
+        ...(!isUserMode && (formData.homepage_featured || event?.homepage_featured)
+          ? { homepage_featured: formData.homepage_featured } : {}),
         image_url,
         gallery_images,
         gallery_albums,
@@ -968,11 +975,20 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 </div>
 
                 {!isUserMode && (
-                  <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch id="is_featured" checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} aria-describedby="is_featured_hint" />
-                    <div>
-                      <Label htmlFor="is_featured" className="text-sm font-semibold cursor-pointer">Feature on Homepage</Label>
-                      <p id="is_featured_hint" className="text-xs text-muted-foreground">Appears in the featured events section</p>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
+                      <Switch id="is_featured" checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} aria-describedby="is_featured_hint" />
+                      <div>
+                        <Label htmlFor="is_featured" className="text-sm font-semibold cursor-pointer">Featured on the calendar</Label>
+                        <p id="is_featured_hint" className="text-xs text-muted-foreground">Gold card, top of the events calendar (every paid package)</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
+                      <Switch id="homepage_featured" checked={formData.homepage_featured} onCheckedChange={v => set('homepage_featured', v)} disabled={loading} aria-describedby="homepage_featured_hint" />
+                      <div>
+                        <Label htmlFor="homepage_featured" className="text-sm font-semibold cursor-pointer">Show on the homepage</Label>
+                        <p id="homepage_featured_hint" className="text-xs text-muted-foreground">Homepage Featured events section (Full Feature package)</p>
+                      </div>
                     </div>
                   </div>
                 )}
