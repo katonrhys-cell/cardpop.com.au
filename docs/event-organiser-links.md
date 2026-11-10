@@ -48,3 +48,18 @@ button.
    `sameAs` in `lib/eventSeo.js` if it is a profile, and the detail card.
 4. Tests: `tests/frontend/eventFormModal.test.jsx` (labels),
    `eventDetailSections.test.jsx` (buttons), `eventSeo.test.js` (`sameAs`).
+
+## Sold out + waitlist
+
+`events.tickets_sold_out` (boolean, default false) and `events.waitlist_url`
+(`20261110221128_event_sold_out_waitlist.sql`) are set on the Organiser tab,
+by an admin or by the event's own organiser (live edits are logged like any
+other field — `EVENT_LOGGED_FIELDS` and `event_logged_fields()` stay equal).
+
+- **Sold out** replaces **Get Tickets** with a disabled **Sold Out** button
+  (`EventDetailCard.jsx`); Event JSON-LD (`lib/eventSeo.js`) and the
+  prerender's offers advertise `schema.org/SoldOut`.
+- **Join the waitlist** appears under it when a waitlist URL is set. It is
+  only shown while the event is sold out and upcoming; the prerender emits the
+  same line (`ticketStatusHtml()`) for no-JS readers.
+- The waitlist is the organiser's own page — CardPop stores only the link.

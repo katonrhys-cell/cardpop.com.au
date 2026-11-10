@@ -31,6 +31,7 @@ export const EVENT_URL_FIELDS = {
   website_url: 'Event Website',
   ticket_url: 'Tickets / Registration URL',
   vendor_application_url: 'Trader / Vendor Applications URL',
+  waitlist_url: 'Waitlist URL',
   instagram_url: 'Instagram URL',
   facebook_url: 'Facebook URL',
   youtube_channel_url: 'YouTube Channel URL',

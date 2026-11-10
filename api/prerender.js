@@ -1468,7 +1468,7 @@ const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
   'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, organizer_logo_url, seo_title, seo_description, ' +
-  'instagram_url, facebook_url, youtube_channel_url, tiktok_url, x_url, discord_url, vendor_application_url, ' +
+  'instagram_url, facebook_url, youtube_channel_url, tiktok_url, x_url, discord_url, vendor_application_url, tickets_sold_out, waitlist_url, ' +
   'gallery_images, gallery_albums, event_videos, created_at, updated_at';
 
 // Organiser links from the event form's Organiser tab (migration
@@ -1490,6 +1490,14 @@ const organiserLinksHtml = (event) => {
     .filter(([url]) => /^https?:\/\//i.test(url));
   if (!links.length) return '';
   return `<section><h2>Follow the Organiser</h2><ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul></section>`;
+};
+
+// Sold-out status + waitlist link (events.tickets_sold_out / waitlist_url).
+// Only http(s) waitlist URLs are emitted; past events show neither.
+const ticketStatusHtml = (event, isPast) => {
+  if (!event.tickets_sold_out || isPast) return '';
+  const url = typeof event.waitlist_url === 'string' ? event.waitlist_url.trim() : '';
+  return `<p><strong>Tickets sold out.</strong>${/^https?:\/\//i.test(url) ? ` <a href="${esc(url)}" rel="nofollow noopener">Join the waitlist</a>` : ''}</p>`;
 };
 
 // Event photo albums (events.gallery_albums, utils/eventGallery.js). Bots
@@ -1608,7 +1616,7 @@ function buildEventOffers(event, canonical, startDate) {
     '@type': 'Offer',
     price,
     priceCurrency: 'AUD',
-    availability: 'https://schema.org/InStock',
+    availability: event.tickets_sold_out ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
     url: event.ticket_url || event.website_url || canonical,
     ...(event.created_at || startDate ? { validFrom: event.created_at || startDate } : {}),
     ...(name ? { name } : {}),
@@ -1920,6 +1928,7 @@ async function renderEvent(supabase, param) {
   ${eventGalleryHtml(event, name)}
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
+  ${ticketStatusHtml(event, isPast)}
   ${organiserLinksHtml(event)}
   ${region ? `<p><a href="${BASE_URL}${eventRegionPath(region)}">More card shows in ${esc(region.city)}</a></p>` : ''}
 </main>`;

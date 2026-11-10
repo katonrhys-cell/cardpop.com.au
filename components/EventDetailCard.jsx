@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
@@ -315,7 +315,20 @@ const EventDetailCard = ({ event, isPast = false }) => {
             {!isPast && (
             <div className="space-y-3 pt-4">
               <EventTicketOffer eventId={event.id} offer={ticketOffer} />
-              {ticketLink ? (
+              {event.tickets_sold_out ? (
+                <>
+                  <Button className="w-full h-12 text-base font-bold" variant="secondary" disabled>
+                    <Ticket className="w-5 h-5 mr-2" /> Sold Out
+                  </Button>
+                  {event.waitlist_url && (
+                    <Button className="w-full h-12 text-base font-bold shadow-lg shadow-primary/20" asChild>
+                      <a href={event.waitlist_url} target="_blank" rel="noopener noreferrer">
+                        <ListPlus className="w-5 h-5 mr-2" /> Join the waitlist
+                      </a>
+                    </Button>
+                  )}
+                </>
+              ) : ticketLink ? (
                 <Button className="w-full h-12 text-base font-bold shadow-lg shadow-primary/20" asChild>
                   <a
                     href={ticketLink}

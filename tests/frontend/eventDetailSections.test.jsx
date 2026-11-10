@@ -393,6 +393,29 @@ describe('EventDetailCard — organiser links', () => {
   });
 });
 
+describe('EventDetailCard — sold out + waitlist', () => {
+  const soldOut = { ...baseEvent, ticket_url: 'https://tickets.example.com/x', tickets_sold_out: true };
+
+  it('replaces Get Tickets with a disabled Sold Out button and links the waitlist', () => {
+    renderCard({ ...soldOut, waitlist_url: 'https://collectitcon.com.au/waitlist' });
+    expect(screen.queryByRole('link', { name: /Get Tickets/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Sold Out/ })).toBeDisabled();
+    expect(screen.getByRole('link', { name: /Join the waitlist/ })).toHaveAttribute('href', 'https://collectitcon.com.au/waitlist');
+  });
+
+  it('shows Sold Out without a waitlist button when no waitlist URL is set', () => {
+    renderCard(soldOut);
+    expect(screen.getByRole('button', { name: /Sold Out/ })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: /Join the waitlist/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps Get Tickets when the event is not sold out, even with a waitlist URL', () => {
+    renderCard({ ...soldOut, tickets_sold_out: false, waitlist_url: 'https://collectitcon.com.au/waitlist' });
+    expect(screen.getByRole('link', { name: /Get Tickets/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Join the waitlist/ })).not.toBeInTheDocument();
+  });
+});
+
 describe('EventDetailModal — ticket prices', () => {
   it('shows the entry fee and the extra ticket prices', () => {
     renderModal({

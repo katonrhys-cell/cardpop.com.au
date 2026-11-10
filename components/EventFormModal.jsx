@@ -96,6 +96,8 @@ const INITIAL_STATE = {
   discord_url: '',
   // Where traders book a table.
   vendor_application_url: '',
+  tickets_sold_out: false,
+  waitlist_url: '',
   facebook_video_url: '',
   entry_fee_aud: '',
   presale_fee_aud: '',
@@ -391,6 +393,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         x_url:               event.x_url || '',
         discord_url:         event.discord_url || '',
         vendor_application_url: event.vendor_application_url || '',
+        tickets_sold_out:    event.tickets_sold_out || false,
+        waitlist_url:        event.waitlist_url || '',
         facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
@@ -689,6 +693,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         x_url:               urls.x_url || null,
         discord_url:         urls.discord_url || null,
         vendor_application_url: urls.vendor_application_url || null,
+        tickets_sold_out:    formData.tickets_sold_out === true,
+        waitlist_url:        urls.waitlist_url || null,
         facebook_video_url:  urls.facebook_video_url || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
@@ -1193,6 +1199,20 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="ticket_url" className="font-bold">Tickets / Registration URL</Label>
                     <Input id="ticket_url" name="ticket_url" type="url" value={formData.ticket_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                  </div>
+                  <div className="sm:col-span-2 space-y-3 rounded-xl border border-border p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="tickets_sold_out" className="font-bold">Tickets sold out</Label>
+                        <p id="tickets_sold_out_hint" className="text-xs text-muted-foreground">Replaces "Get Tickets" on the event page with a "Sold Out" badge. Switch it off if more tickets are released.</p>
+                      </div>
+                      <Switch id="tickets_sold_out" checked={formData.tickets_sold_out === true} onCheckedChange={v => set('tickets_sold_out', v)} disabled={loading} aria-describedby="tickets_sold_out_hint" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="waitlist_url" className="font-bold">Join the waitlist URL</Label>
+                      <Input id="waitlist_url" name="waitlist_url" type="url" value={formData.waitlist_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                      <p className="text-xs text-muted-foreground">Where collectors can join the waitlist. Shown as "Join the waitlist" while the event is sold out.</p>
+                    </div>
                   </div>
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
