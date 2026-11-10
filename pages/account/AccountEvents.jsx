@@ -8,6 +8,7 @@ import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.j
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
 import { featureEligibility, todayInAustralia } from '@/utils/featuredPackages.js';
+import { MY_EVENT_BUCKETS, myEventBucket, countMyEventBuckets, normaliseBucket } from '@/utils/myEventStatus.js';
 import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,12 @@ const STATUS_BADGES = {
   rejected:       { label: 'Rejected',       cls: 'bg-destructive/10 text-destructive border-destructive/30' },
   cancelled:      { label: 'Cancelled',      cls: 'bg-muted text-muted-foreground border-border' },
   completed:      { label: 'Completed',      cls: 'bg-slate-500/10 text-slate-600 border-slate-300 dark:text-slate-400' },
+};
+
+// An approved event's badge follows the calendar: on today, or finished.
+const BUCKET_BADGES = {
+  now:  { label: 'Happening now', cls: 'bg-primary/10 text-primary border-primary/40' },
+  past: { label: 'Past',          cls: 'bg-slate-500/10 text-slate-600 border-slate-300 dark:text-slate-400' },
 };
 
 const AccountEvents = () => {
@@ -141,8 +148,22 @@ const AccountEvents = () => {
   const drafts = events.filter((ev) => ev.status === 'draft');
   const submitted = events.filter((ev) => ev.status !== 'draft');
 
+  // `?status=` picks a lifecycle tab (the dashboard's Active Events tile
+  // links to `?status=live`). Unknown values fall back to All.
+  const bucket = normaliseBucket(searchParams.get('status'));
+  const counts = countMyEventBuckets(events, today);
+  const bucketMeta = MY_EVENT_BUCKETS.find((b) => b.key === bucket);
+  const bucketEvents = bucket === 'all' ? events : events.filter((ev) => myEventBucket(ev, today) === bucket);
+  const selectBucket = (key) => {
+    const next = new URLSearchParams(searchParams);
+    if (key === 'all') next.delete('status'); else next.set('status', key);
+    setSearchParams(next, { replace: true });
+  };
+
   const renderEvent = (event) => {
-    const badge = STATUS_BADGES[event.status] || STATUS_BADGES.pending_review;
+    const eventBucket = myEventBucket(event, today);
+    const badge = (event.status === 'approved' && BUCKET_BADGES[eventBucket])
+      || STATUS_BADGES[event.status] || STATUS_BADGES.pending_review;
     return (
       <article key={event.id} aria-labelledby={`event-${event.id}-title`} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1 min-w-0">
@@ -267,6 +288,42 @@ const AccountEvents = () => {
           </Button>
         </div>
       ) : (
+        <div className="space-y-6">
+          <div role="group" aria-label="Filter your events by status" className="-mx-1 px-1 flex gap-2 overflow-x-auto pb-1">
+            {MY_EVENT_BUCKETS.filter((b) => b.key === 'all' || b.key === bucket || counts[b.key] > 0).map((b) => (
+              <button
+                key={b.key}
+                type="button"
+                onClick={() => selectBucket(b.key)}
+                aria-pressed={bucket === b.key}
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                  bucket === b.key
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-card text-foreground border-border hover:border-primary/40'
+                }`}
+              >
+                {b.label}
+                <span className={`tabular-nums text-xs ${bucket === b.key ? 'opacity-90' : 'text-muted-foreground'}`}>{counts[b.key]}</span>
+              </button>
+            ))}
+          </div>
+
+          {bucket !== 'all' ? (
+            <section aria-labelledby="bucket-heading" className="space-y-4">
+              <div>
+                <h2 id="bucket-heading" className="text-lg font-bold">
+                  {bucketMeta.label} <span className="text-sm font-semibold text-muted-foreground">({bucketEvents.length})</span>
+                </h2>
+                {bucketMeta.description && <p className="text-sm text-muted-foreground">{bucketMeta.description}</p>}
+              </div>
+              {bucketEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground bg-card border border-dashed border-border rounded-2xl p-6 text-center">
+                  Nothing here right now.{' '}
+                  <button type="button" onClick={() => selectBucket('all')} className="text-primary font-semibold hover:underline">Show all events</button>
+                </p>
+              ) : bucketEvents.map(renderEvent)}
+            </section>
+          ) : (
         <div className="space-y-8">
           {drafts.length > 0 && (
             <section aria-labelledby="drafts-heading" className="space-y-4">
@@ -287,6 +344,8 @@ const AccountEvents = () => {
               <h2 id="submitted-heading" className={drafts.length > 0 ? 'text-lg font-bold' : 'sr-only'}>Submitted &amp; live</h2>
               {submitted.map(renderEvent)}
             </section>
+          )}
+        </div>
           )}
         </div>
       )}
