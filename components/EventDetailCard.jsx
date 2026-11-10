@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { isFeaturedEvent } from '@/utils/eventFeatured.js';
+import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
 import { eventTypeStyle, facebookEmbedUrl, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
@@ -132,7 +132,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
             );
           })()}
           {isFeaturedEvent(event, toLocalDateStr(new Date())) && (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-md">
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${FEATURED_PILL_CLASS} text-sm font-bold shadow-md`}>
               <Star className="w-3.5 h-3.5 fill-current" /> Featured event
             </span>
           )}

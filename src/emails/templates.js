@@ -577,6 +577,38 @@ ${summaryTable([
   );
 }
 
+// ─── Paid Featured Placement (to every admin) ───────────────────────────────
+// An organiser paid for a featuring package. The calendar side is already on
+// (events.is_featured); this lists what the team still does by hand.
+export function eventFeaturePaidEmail({ event, packageName, amountAud, earlyBird = false, organiserName = null, extras = [] }) {
+  const title = esc(event?.title) || 'Untitled';
+  const startDate = event?.start_date
+    ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
+    : '—';
+  const amount = Number.isFinite(Number(amountAud)) ? `$${Number(amountAud).toFixed(2)}${earlyBird ? ' (early bird)' : ''}` : '—';
+  const todo = extras.length
+    ? `<p>Still to do by hand for this package:</p><ul>${extras.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>`
+    : '<p>Nothing else to do by hand. The calendar placement is already live.</p>';
+  const body = `<p>An organiser has paid for Featured Placement. The event is now featured on the events calendar.</p>
+${summaryTable([
+  ['Event', title],
+  ['Package', esc(packageName) || '—'],
+  ['Paid', amount],
+  ['Start date', startDate],
+  ['Organiser', esc(organiserName) || '—'],
+])}
+${todo}`;
+  return cpEmail(
+    `Featured Placement paid: ${title}`,
+    'Featured Placement Paid',
+    'An organiser has featured their event',
+    body,
+    'https://cardpop.com.au/admin/events',
+    'Open Event Management',
+    'You received this because you are a CardPop admin.',
+  );
+}
+
 // ─── Event review outcome (to the organiser) ─────────────────────────────────
 
 // Sent to the member who submitted an event once an admin approves or rejects

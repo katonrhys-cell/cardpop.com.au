@@ -16,7 +16,9 @@ ended**, it gets:
 
 The rule lives in `utils/eventFeatured.js` (`isFeaturedEvent`). Featuring
 lapses on its own once the event ends, so it never needs switching off
-afterwards. It's the paid tier on `/list-your-event`.
+afterwards. It's the paid tier on `/list-your-event`: organisers buy it
+themselves from My Events, and paying switches it on — see
+`docs/event-featuring.md`.
 
 ## City pages: `/card-shows/<city>`
 

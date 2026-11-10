@@ -469,9 +469,9 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
         ) : (
           <div className="space-y-14">
             {featuredEvents.length > 0 && (
-              <section aria-labelledby="featured-events-heading" className="rounded-3xl border border-primary/30 bg-primary/5 p-5 sm:p-6">
+              <section aria-labelledby="featured-events-heading" className="rounded-3xl border border-amber-400/60 bg-amber-50/60 dark:bg-amber-400/5 p-5 sm:p-6">
                 <div className="flex items-center gap-2 sm:gap-3 mb-6">
-                  <Star className="w-5 h-5 shrink-0 text-primary fill-current" />
+                  <Star className="w-5 h-5 shrink-0 text-amber-500 fill-current" />
                   <h2 id="featured-events-heading" className="text-xl sm:text-2xl font-bold whitespace-nowrap">Featured events</h2>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

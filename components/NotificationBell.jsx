@@ -41,6 +41,7 @@ const TYPE_CONFIG = {
   event_updated:            { icon: FilePen,       color: 'text-amber-500' },
   event_approved:           { icon: CalendarCheck, color: 'text-emerald-500' },
   event_rejected:           { icon: CalendarX,     color: 'text-red-500' },
+  event_featured:           { icon: Star,          color: 'text-amber-500' },
   order_placed:             { icon: ShoppingBag,   color: 'text-emerald-500' },
   verification_requested:   { icon: UserCheck,     color: 'text-blue-500' },
   // Admin review queues (src/services/adminReviewAlerts.js)

@@ -35,7 +35,7 @@ import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
 import { EVENT_REGIONS, eventRegionBySlug, eventRegionByState, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
 import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '../utils/eventNextEdition.js';
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
-import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH } from '../data/listYourEvent.js';
+import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE } from '../data/listYourEvent.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
@@ -2582,6 +2582,11 @@ const STATIC_CONTENT = {
         h2: `${t.name} (${t.price})`,
         paras: [t.summary],
         items: t.points.map((text) => ({ text })),
+      })),
+      ...LIST_EVENT_FEATURED_PACKAGES.map((p, i) => ({
+        h2: `Featured Placement: ${p.name} (${p.price})`,
+        paras: i === 0 ? [FEATURED_EARLY_BIRD_NOTE] : [],
+        items: p.points.map((text) => ({ text })),
       })),
       { h2: 'How it works', items: LIST_EVENT_STEPS.map(({ step, body }) => ({ text: `${step}: ${body}` })) },
     ],

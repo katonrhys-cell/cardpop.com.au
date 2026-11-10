@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
+import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
+import { featureEligibility, todayInAustralia } from '@/utils/featuredPackages.js';
 import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,8 @@ const AccountEvents = () => {
   const [isVerifiedOrganiser, setIsVerifiedOrganiser] = useState(false);
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
+  const [featureEvent, setFeatureEvent] = useState(null);
+  const today = todayInAustralia();
 
   // `silent`: refresh after a save without swapping the list for skeletons.
   const fetchMyEvents = useCallback(async ({ silent = false } = {}) => {
@@ -83,6 +87,35 @@ const AccountEvents = () => {
   // submit form straight away; the param is dropped so a refresh or closing
   // the form doesn't reopen it.
   const [searchParams, setSearchParams] = useSearchParams();
+  // Back from Stripe after paying for Featured Placement. The webhook switches
+  // featuring on; refetch shortly so the badge shows without a reload.
+  useEffect(() => {
+    if (searchParams.get('featured') !== 'success') return undefined;
+    toast.success('Payment received. Your event is now featured.');
+    const next = new URLSearchParams(searchParams);
+    next.delete('featured');
+    setSearchParams(next, { replace: true });
+    const t = setTimeout(() => fetchMyEvents({ silent: true }), 3000);
+    return () => clearTimeout(t);
+  }, [searchParams, setSearchParams, fetchMyEvents]);
+
+  // `?feature=1` ("Feature Now" on /list-your-event): open the package picker
+  // for the one event that can be featured, point at the buttons if there are
+  // several, or open the submit form when there's nothing to feature yet.
+  useEffect(() => {
+    if (isLoading || searchParams.get('feature') !== '1') return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('feature');
+    setSearchParams(next, { replace: true });
+    const featurable = events.filter((ev) => featureEligibility(ev, today).ok);
+    if (featurable.length === 1) setFeatureEvent(featurable[0]);
+    else if (featurable.length > 1) toast.info('Press "Feature" next to the event you want to promote.');
+    else {
+      toast.info('Submit your event first. You can feature it straight after.');
+      openSubmit();
+    }
+  }, [isLoading, events, searchParams, setSearchParams, today]);
+
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
     openSubmit();
@@ -116,6 +149,11 @@ const AccountEvents = () => {
           <div className="flex items-center gap-3 flex-wrap mb-1.5">
             <h3 id={`event-${event.id}-title`} className="text-lg font-bold text-foreground break-words min-w-0">{event.title}</h3>
             <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
+            {event.is_featured && (
+              <Badge variant="outline" className="font-semibold bg-amber-400/15 text-amber-800 border-amber-400 dark:text-amber-300 gap-1">
+                <Star className="w-3 h-3 fill-current" aria-hidden="true" /> Featured
+              </Badge>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
@@ -155,6 +193,11 @@ const AccountEvents = () => {
           {event.status === 'rejected' && (
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)} aria-label={`Edit & resubmit ${event.title}`}>
               <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Edit &amp; resubmit
+            </Button>
+          )}
+          {featureEligibility(event, today).ok && (
+            <Button size="sm" className="rounded-xl gap-1.5 font-bold" onClick={() => setFeatureEvent(event)} aria-label={`Feature ${event.title}`}>
+              <Star className="w-3.5 h-3.5" aria-hidden="true" /> Feature
             </Button>
           )}
           {event.status === 'approved' && (
@@ -252,6 +295,7 @@ const AccountEvents = () => {
 
       <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
       <EventBadgeDialog event={badgeEvent} onClose={() => setBadgeEvent(null)} />
+      <FeatureEventDialog event={featureEvent} onClose={() => setFeatureEvent(null)} />
 
       <EventFormModal
         isOpen={isModalOpen}

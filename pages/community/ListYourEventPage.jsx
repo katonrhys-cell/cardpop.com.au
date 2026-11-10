@@ -1,40 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   CalendarPlus, Ticket, Megaphone, ArrowRight, Check, ClipboardList,
-  BadgeCheck, Tag, BarChart3, Users, Search, CalendarDays,
+  BadgeCheck, Tag, BarChart3,
 } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
-import { getPlatformStats, getTrafficSummary } from '@/lib/homepageData.js';
-import { formatCount, publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
+import { OrganiserReachSection, useOrganiserStats } from '@/components/events/OrganiserReach.jsx';
 import {
   LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_PATH, LIST_EVENT_SEO,
   LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH,
+  LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE,
 } from '@/data/listYourEvent.js';
 
 const TIER_ICONS = { listing: CalendarPlus, offer: Ticket, featured: Megaphone };
 const STEP_ICONS = [ClipboardList, BadgeCheck, Tag, BarChart3];
-const STAT_ICONS = { visitors: Users, impressions: Search, clicks: Search, events: CalendarDays };
-
-/**
- * Live audience figures for organisers — the same nightly GA4 / Search
- * Console summary the home page reads, so each tile hides below its floor or
- * when the sync is stale (utils/siteTraffic.js). Nothing is typed in by hand.
- */
-export const buildOrganiserStats = (trafficSummary, platformStats) => {
-  const stats = [];
-  const visitors = publicTrafficStat(trafficSummary);
-  if (visitors) stats.push({ ...visitors, label: 'Visitors in the last 30 days' });
-  const [impressions] = publicSearchStats(trafficSummary);
-  if (impressions) stats.push({ ...impressions, label: 'Times CardPop showed in Google, last 30 days' });
-  const events = Number(platformStats?.events) || 0;
-  if (events > 0) stats.push({ key: 'events', value: events, label: 'Upcoming events on the calendar' });
-  return stats;
-};
-
 const CtaLink = ({ cta, className }) => (cta.external ? (
   <a href={cta.href} className={className}>
     {cta.label} <ArrowRight className="h-4 w-4" />
@@ -46,18 +28,7 @@ const CtaLink = ({ cta, className }) => (cta.external ? (
 ));
 
 const ListYourEventPage = () => {
-  const [stats, setStats] = useState([]);
-
-  useEffect(() => {
-    let alive = true;
-    Promise.all([
-      getTrafficSummary().catch(() => null),
-      getPlatformStats().catch(() => null),
-    ]).then(([traffic, platform]) => {
-      if (alive) setStats(buildOrganiserStats(traffic?.data, platform?.data));
-    });
-    return () => { alive = false; };
-  }, []);
+  const stats = useOrganiserStats();
 
   return (
     <div className="min-h-screen bg-background">
@@ -102,29 +73,7 @@ const ListYourEventPage = () => {
       <div className="container-default space-y-16 py-12">
 
         {/* Live audience — hidden until there is an honest number to show */}
-        {stats.length > 0 && (
-          <section aria-labelledby="audience-heading">
-            <h2 id="audience-heading" className="mb-6 text-center font-serif text-2xl font-bold sm:text-3xl">
-              Who you&rsquo;ll reach
-            </h2>
-            <div className={`grid gap-4 ${stats.length > 2 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-              {stats.map((s) => {
-                const Icon = STAT_ICONS[s.key] || Users;
-                return (
-                  <div key={s.key} className="rounded-3xl border border-border bg-card p-6 text-center">
-                    <Icon className="mx-auto mb-3 h-5 w-5 text-primary" />
-                    <div className="text-3xl font-bold tabular-nums">{formatCount(s.value)}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
-                    {s.sub && <div className="mt-1 text-xs text-muted-foreground/80">{s.sub}</div>}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-3 text-center text-xs text-muted-foreground">
-              From Google Analytics and Search Console, updated nightly.
-            </p>
-          </section>
-        )}
+        <OrganiserReachSection stats={stats} />
 
         {/* Options */}
         <section id="options" className="scroll-mt-8">
@@ -160,6 +109,42 @@ const ListYourEventPage = () => {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* Featured Placement packages — prices from utils/featuredPackages.js */}
+        <section id="featured-packages" aria-labelledby="featured-packages-heading" className="scroll-mt-8">
+          <h2 id="featured-packages-heading" className="mb-2 text-center font-serif text-2xl font-bold sm:text-3xl">
+            Featured Placement packages
+          </h2>
+          <p className="mx-auto mb-6 max-w-xl text-center text-sm text-muted-foreground">{FEATURED_EARLY_BIRD_NOTE}</p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {LIST_EVENT_FEATURED_PACKAGES.map((pkg) => (
+              <div
+                key={pkg.key}
+                className={`flex flex-col rounded-3xl border bg-card p-6 ${pkg.highlight ? 'border-primary shadow-md' : 'border-border'}`}
+              >
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h3 className="text-lg font-bold">{pkg.name}</h3>
+                  <span className="text-2xl font-bold tabular-nums">{pkg.price}</span>
+                </div>
+                {pkg.highlight && <span className="mb-3 self-start rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Most popular</span>}
+                <ul className="mb-6 space-y-2 text-sm">
+                  {pkg.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to={`${SUBMIT_EVENT_PATH}?feature=1`}
+                  className={`mt-auto inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-opacity hover:opacity-90 ${pkg.highlight ? 'bg-primary text-primary-foreground' : 'border border-border bg-background'}`}
+                >
+                  Feature Now <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            ))}
           </div>
         </section>
 
