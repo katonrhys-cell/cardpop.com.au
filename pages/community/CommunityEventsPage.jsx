@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
-import { CalendarDays, Search, MapPin, SlidersHorizontal, X, History, Star } from 'lucide-react';
+import { CalendarDays, Search, MapPin, SlidersHorizontal, X, History, Star, Sparkles, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -470,11 +470,16 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
           <div className="space-y-14">
             {featuredEvents.length > 0 && (
               <section aria-labelledby="featured-events-heading" className="rounded-3xl border border-primary/30 bg-primary/5 p-5 sm:p-6">
-                <div className="flex items-center gap-2 sm:gap-3 mb-6">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-3 sm:gap-x-3 mb-6">
                   <Star className="w-5 h-5 shrink-0 text-primary fill-current" />
                   <h2 id="featured-events-heading" className="text-xl sm:text-2xl font-bold whitespace-nowrap">Featured events</h2>
-                  <Link to="/list-your-event" className="ml-auto whitespace-nowrap text-xs font-semibold text-muted-foreground hover:text-primary">
+                  <Link
+                    to="/list-your-event"
+                    className="group/feature sm:ml-auto inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-background px-3 py-1.5 text-xs sm:text-sm font-bold tracking-tight text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" aria-hidden="true" />
                     Feature your event
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover/feature:translate-x-0.5" aria-hidden="true" />
                   </Link>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -483,6 +488,7 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
                       key={event.id}
                       event={event}
                       isAdmin={false}
+                      inFeaturedSection
                       rsvpData={rsvpDataById[event.id]}
                       onView={ev => { setSelectedEvent(ev); setIsDetailOpen(true); }}
                     />
