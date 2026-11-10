@@ -34,7 +34,7 @@ import supabase from '../utils/supabaseClient.js';
 import {
   describePropertyIdProblem, describeServiceAccountProblem, isGa4Configured, runGa4Report,
 } from '../utils/ga4Client.js';
-import { getSiteUrl, isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
+import { describeSiteUrlProblem, isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
 import logger from '../utils/logger.js';
 
 // Earliest day to ask GA4 for. GA4 returns nothing for days before the
@@ -261,9 +261,8 @@ export const syncSiteTraffic = async () => {
   const gsc = isSearchConsoleConfigured();
   if (!ga4 && !gsc) {
     const problems = [describeServiceAccountProblem(), describePropertyIdProblem()].filter(Boolean);
-    if (!getSiteUrl() && process.env.GSC_SITE_URL) {
-      problems.push('GSC_SITE_URL must be sc-domain:cardpop.com.au or https://cardpop.com.au/');
-    }
+    const siteProblem = describeSiteUrlProblem();
+    if (siteProblem) problems.push(siteProblem);
     throw new Ga4NotConfiguredError(problems.join('. ') || null);
   }
 

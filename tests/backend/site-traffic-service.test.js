@@ -16,7 +16,7 @@ const gsc = vi.hoisted(() => ({ configured: false, query: vi.fn() }));
 vi.mock('../../src/utils/searchConsoleClient.js', () => ({
   isSearchConsoleConfigured: () => gsc.configured,
   runSearchAnalytics: gsc.query,
-  getSiteUrl: () => null,
+  describeSiteUrlProblem: () => null,
 }));
 
 const db = vi.hoisted(() => ({ writes: [], stored: [], readError: null }));
