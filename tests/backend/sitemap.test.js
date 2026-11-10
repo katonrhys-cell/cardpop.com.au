@@ -109,6 +109,23 @@ describe('sitemap leaves thin pages out', () => {
     expect(body).toContain(loc('/contact'));
   });
 
+  it('lists a collection or a shop section only while it has something in it', async () => {
+    let { body } = await run();
+    expect(body).toContain(loc('/collections'));
+    expect(body).not.toContain(loc('/collections/golf'));
+    expect(body).not.toContain(loc('/collections/pokemon'));
+    expect(body).not.toContain(loc('/shop/sealed-boxes'));
+    expect(body).not.toContain(loc('/shop/singles'));
+
+    state.tables.listings = [{ id: 'l1', slug: 'x', seller_id: 's1', vault_item: { card_name: 'Charizard', collection: 'Pokémon' } }];
+    state.tables.shop_products = [{ id: 'p1', title: 'Booster Box', slug: 'booster-box', category: 'sealed', product_type: 'sealed' }];
+    ({ body } = await run());
+    expect(body).toContain(loc('/collections/pokemon'));
+    expect(body).not.toContain(loc('/collections/golf'));
+    expect(body).toContain(loc('/shop/sealed-boxes'));
+    expect(body).not.toContain(loc('/shop/singles'));
+  });
+
   it('lists the forum only once it has a discussion', async () => {
     let { body } = await run();
     expect(body).not.toContain(loc('/community/forum'));

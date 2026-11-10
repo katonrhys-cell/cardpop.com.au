@@ -129,6 +129,32 @@ const descriptionParagraphs = (text) => String(text || '')
 
 const isoDate = (d) => (d ? new Date(d).toISOString() : undefined);
 
+// Dates as a reader sees them ("14 November 2026"). A bare 2026-11-14 in the
+// visible copy reads as a database dump to a reviewer; machine-readable dates
+// stay ISO in the JSON-LD. Date-only strings are pinned to UTC so the day
+// can't shift with the server's timezone.
+const humanDate = (d) => {
+  if (!d) return '';
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(d)) ? `${d}T00:00:00Z` : d);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+};
+
+// "Pokémon" → "Pokémon cards", but "Golf Cards" stays "Golf Cards" — thirteen
+// collection names already end in the word.
+const cardsLabel = (name = '', suffix = 'cards') => (/\bcards\s*$/i.test(name) ? name : `${name} ${suffix}`);
+
+// Stored enums ("near_mint") as words ("Near mint").
+const humanEnum = (v = '') => {
+  const text = String(v).replace(/[_-]+/g, ' ').trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : '';
+};
+
+// A byline that is a desk, not a person, must not be typed Person in JSON-LD.
+const authorLd = (name) => (/\b(team|research|cardpop|staff|editorial)\b/i.test(name)
+  ? { '@type': 'Organization', name, url: `${BASE_URL}/about` }
+  : { '@type': 'Person', name, url: `${BASE_URL}/about` });
+
 // Decode a single path segment without throwing. A malformed %-escape (e.g.
 // a crawler hitting "/shop/%" or "/marketplace/%ZZ") makes decodeURIComponent
 // raise URIError; unguarded, that bubbles to the handler's catch and answers a
@@ -185,6 +211,49 @@ const schemaItemCondition = (c) => {
   return 'https://schema.org/UsedCondition';
 };
 
+// Every bot-facing page carries the site's navigation and identity, the way
+// the SPA wraps every route in Header and Footer. Without them a crawler that
+// lands on an article or an event sees a page with no way to the rest of the
+// site and no About / Contact / Privacy links — which an ad-network review
+// reads as an unfinished site.
+const SITE_NAV_LINKS = [
+  { text: 'Marketplace', href: '/marketplace' },
+  { text: 'Shop', href: '/shop' },
+  { text: 'Card Prices', href: '/prices' },
+  { text: 'Events', href: '/events' },
+  { text: 'Card Shops', href: '/card-shops' },
+  { text: 'Grading', href: '/grading' },
+  { text: 'Players', href: '/players' },
+  { text: 'The Parallel Report', href: '/blog' },
+];
+const SITE_FOOTER_LINKS = [
+  { text: 'About CardPop', href: '/about' },
+  { text: 'Contact', href: '/contact' },
+  { text: 'FAQ', href: '/faq' },
+  { text: 'Buyer Protection & Safety', href: '/trust-safety' },
+  { text: 'Safe Buying Guide', href: '/safe-buying' },
+  { text: 'Shipping', href: '/shipping' },
+  { text: 'Returns & Refunds', href: '/returns' },
+  { text: 'Pricing & Plans', href: '/pricing' },
+  { text: 'Collections', href: '/collections' },
+  { text: 'Community', href: '/community' },
+  { text: 'Accessibility', href: '/accessibility' },
+  { text: 'Privacy Policy', href: '/privacy-policy' },
+  { text: 'Terms of Service', href: '/terms' },
+];
+const navLinksHtml = (links) => links
+  .map((l) => `<a href="${BASE_URL}${esc(l.href)}">${esc(l.text)}</a>`)
+  .join(' · ');
+const SITE_HEADER_HTML = `<header>
+<p><a href="${BASE_URL}/"><strong>CardPop Australia™</strong></a> — the Australian trading card marketplace</p>
+<nav aria-label="Primary">${navLinksHtml(SITE_NAV_LINKS)}</nav>
+</header>`;
+const SITE_FOOTER_HTML = `<footer>
+<nav aria-label="Footer">${navLinksHtml(SITE_FOOTER_LINKS)}</nav>
+<p>CardPop Australia™ · PO Box 1024, Ascot Vale, Victoria 3032, Australia · <a href="mailto:support@cardpop.com.au">support@cardpop.com.au</a></p>
+<p>© ${new Date().getUTCFullYear()} CardPop Australia™. Prices are in Australian dollars and include GST.</p>
+</footer>`;
+
 function htmlDoc({ title, description, canonical, ogImage, ogImageAlt, robots, ogType = 'website', headExtra = '', jsonLdItems = [], bodyHtml = '' }) {
   const imageAlt = ogImageAlt || title;
   const ld = jsonLdItems.length
@@ -216,8 +285,9 @@ ${headExtra}
 ${ld}
 </head>
 <body>
+${SITE_HEADER_HTML}
 ${bodyHtml}
-<p><a href="${esc(canonical)}">View on CardPop</a></p>
+${SITE_FOOTER_HTML}
 </body>
 </html>`;
 }
@@ -473,14 +543,14 @@ async function renderBlogArticle(supabase, param) {
     : null;
   const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
   const readTime = Number(article.read_time_minutes);
-  const wordCount = toText(bodyContent).split(/\s+/).filter(Boolean).length;
+  const wordCount = toText(bodyContent, Infinity).split(/\s+/).filter(Boolean).length;
 
   const blogPosting = {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: article.title,
     ...(image ? { image } : {}),
-    author: { '@type': 'Person', name: author, url: `${BASE_URL}/about` },
+    author: authorLd(author),
     publisher: {
       '@type': 'Organization',
       name: 'CardPop',
@@ -569,7 +639,7 @@ async function renderBlogArticle(supabase, param) {
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(article.title)}</nav>
   <article>
     <h1>${esc(article.title)}</h1>
-    <p><em>By ${esc(author)}${published ? ` — ${esc(new Date(published).toISOString().split('T')[0])}` : ''}${article.read_time_minutes ? ` · ${esc(String(article.read_time_minutes))} min read` : ''}</em></p>
+    <p><em>By ${esc(author)}${published ? ` — ${esc(humanDate(published))}` : ''}${article.read_time_minutes ? ` · ${esc(String(article.read_time_minutes))} min read` : ''}</em></p>
     ${articleDisclosure(article) ? `<p><small>${esc(articleDisclosure(article))}</small></p>` : ''}
     ${article.excerpt ? `<p>${esc(article.excerpt)}</p>` : ''}
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
@@ -752,7 +822,7 @@ async function renderListing(supabase, id, slugParam) {
         : '')}
   ${setLine ? `<p>${esc(setLine)}</p>` : ''}
   <ul>
-    ${condition ? `<li>Condition: ${esc(condition)}</li>` : ''}
+    ${condition ? `<li>Condition: ${esc(humanEnum(condition))}</li>` : ''}
     ${grade ? `<li>Grade: ${esc(`${gradingCompany || ''} ${grade}`.trim())}</li>` : ''}
     <li>Seller: ${sellerHref ? `<a href="${sellerHref}">${esc(sellerName)}</a>` : esc(sellerName)}</li>
   </ul>
@@ -1433,7 +1503,12 @@ ${itemsHtml || '    <li>No items available right now.</li>'}
   </ul>
 </main>`;
 
-  return htmlDoc({ title: cfg.title, description: cfg.description, canonical, jsonLdItems: [collectionPage, itemList, breadcrumb], bodyHtml });
+  // A product-type section with nothing in it ("No items available right
+  // now.") is an empty page to a crawler — keep it out of the index until it
+  // has stock. The sitemap applies the same gate (api/sitemap.js). The /shop
+  // and /marketplace hubs are never gated: an empty read there is a fault.
+  const robots = cfg.productType && items.length === 0 ? 'noindex, follow' : undefined;
+  return htmlDoc({ title: cfg.title, description: cfg.description, canonical, robots, jsonLdItems: [collectionPage, itemList, breadcrumb], bodyHtml });
 }
 
 // Event category landing pages. `type` filters by the event_type enum using
@@ -1451,7 +1526,7 @@ const eventDateLine = (ev) => {
   const start = ev.start_date;
   const end = ev.end_date && ev.end_date !== ev.start_date ? ev.end_date : null;
   if (!start) return '';
-  return end ? `${start} – ${end}` : start;
+  return end ? `${humanDate(start)} – ${humanDate(end)}` : humanDate(start);
 };
 
 const eventLocationLine = (ev) =>
@@ -2303,20 +2378,25 @@ const STATIC_CONTENT = {
     description: "CardPop's privacy policy — how we collect, use and protect your personal information on our Australian trading card marketplace.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Privacy Policy', path: '/privacy-policy' }],
     h1: 'Privacy Policy',
-    intro: 'Your trust is our top priority. Learn how we handle your data with transparency, care, and industry-leading security. Effective 14 May 2026.',
+    intro: 'Your trust is our top priority. Learn how we handle your data with transparency, and care. Effective 14 May 2026; last updated 11 November 2026.',
     sections: [
       { h2: '1. Introduction', paras: ['CardPop respects your privacy and is committed to protecting personal data. This policy explains how we collect, use, disclose and safeguard information when you use the platform, digital vault, or trading marketplace.'] },
       { h2: '2. Information we collect', paras: ['Personal identification (name, email, address, phone), payment information (card details, billing address and transaction history via our payment partners), browsing data (IP, browser, device identifiers, pages visited), and communication data (records of support and member interactions).'] },
       { h2: '3. How we use your information', paras: ['To deliver the service (manage your account, process orders, facilitate trades and support), improve the platform, send marketing and updates only with consent, prevent fraud, and comply with legal obligations.'] },
-      { h2: '4. Data sharing and disclosure', paras: ['We do not sell personal data. We share it only with service providers (such as Stripe for payments and shipping carriers), where legally required, in a business transfer, or with your explicit consent.'] },
+      { h2: '4. Data sharing and disclosure', paras: ['We do not sell personal data. We share it only with service providers (such as Stripe for payments, shipping carriers, and Google for analytics and advertising), where legally required, in a business transfer, or with your explicit consent.'] },
       { h2: '5. Data security', paras: ['Sensitive data is encrypted in transit via TLS and protected with role-based access controls. No method of internet transmission or storage is 100% secure.'] },
-      { h2: '6. Your privacy rights', paras: ['You have rights to access and correct your data, request deletion (right to be forgotten), opt out of marketing, and request data portability. To exercise these rights, contact privacy@cardpop.com.'] },
-      { h2: '7. Cookies and tracking technologies', paras: ['We use essential cookies required for the site to function and analytical cookies to understand interactions. Your browser can refuse cookies, though some functionality may be unavailable if essential cookies are declined.'] },
+      { h2: '6. Your privacy rights', paras: ['You have rights to access and correct your data, request deletion (right to be forgotten), opt out of marketing, and request data portability. To exercise these rights, contact privacy@cardpop.com.au.'] },
+      { h2: '7. Cookies and tracking technologies', paras: [
+        'Essential cookies are required for the site to function, such as keeping you signed in. Analytical cookies: Google Analytics 4 records page views and shopping events so we can see what works and fix what does not; the data is aggregated and is not used for advertising unless you accept marketing cookies.',
+        'Marketing cookies are optional. With your consent we use Google Ads conversion tracking and the Meta (Facebook / Instagram) Pixel to measure which ads bring collectors to CardPop. They load only after you choose Accept all in the cookie bar; Essentials only keeps them off.',
+        'Advertising (Google AdSense): some content pages — articles, event pages and guides — may show advertising served by Google AdSense. Third-party vendors, including Google, use cookies to serve ads based on your prior visits to CardPop and other websites. You can opt out of personalised advertising at Google Ads Settings (https://adssettings.google.com), or opt out of other vendors’ cookies at https://www.aboutads.info/choices/. We never place ads on checkout, account, shop or marketplace pages.',
+        'Your browser can refuse cookies, though some functionality may be unavailable if essential cookies are declined.',
+      ] },
       { h2: '8. Third-party links and services', paras: ['The service may link to sites not operated by CardPop. We encourage you to review those sites’ privacy policies; we assume no responsibility for third-party content or practices.'] },
       { h2: "9. Children's privacy", paras: ['CardPop does not knowingly collect information from anyone under 18; the platform is intended for adult collectors and traders. Any minor data discovered is removed.'] },
       { h2: '10. International data transfers', paras: ['Your information may be transferred to and maintained on computers outside your jurisdiction. For EEA/UK users we ensure GDPR compliance using standard contractual clauses and compliant infrastructure partners.'] },
       { h2: '11. Data retention', paras: ['We retain personal data only as long as necessary for the stated purposes and to meet legal obligations. Account data is typically deleted within 30 days of a formal deletion request, barring disputes or legal holds.'] },
-      { h2: '12. Contact us', paras: ['Privacy: privacy@cardpop.com. Support: support@cardpop.com. We aim to respond within 48–72 business hours.'] },
+      { h2: '12. Contact us', paras: ['Privacy: privacy@cardpop.com.au. Support: support@cardpop.com.au. We aim to respond within 48–72 business hours.'] },
     ],
   },
 
@@ -3172,7 +3252,7 @@ async function renderBlogIndex(supabase) {
   ).join('\n');
 
   const articlesHtml = articles.map((a) => {
-    const date = (a.published_at || a.created_at || '').split('T')[0];
+    const date = humanDate(a.published_at || a.created_at);
     const author = a.author || 'CardPop Australia';
     return `    <li><a href="${BASE_URL}/blog/${esc(a.slug || a.id)}"><strong>${esc(a.title || 'Untitled')}</strong></a>`
       + `${a.excerpt ? ` — ${esc(toText(a.excerpt, 160))}` : ''} <em>(${esc(author)}${date ? `, ${esc(date)}` : ''})</em></li>`;
@@ -3246,7 +3326,7 @@ async function renderBlogCategory(supabase, slug) {
   };
 
   const articlesHtml = articles.map((a) => {
-    const date = (a.published_at || a.created_at || '').split('T')[0];
+    const date = humanDate(a.published_at || a.created_at);
     const author = a.author || 'CardPop Australia';
     return `    <li><a href="${BASE_URL}/blog/${esc(a.slug || a.id)}"><strong>${esc(a.title || 'Untitled')}</strong></a>`
       + `${a.excerpt ? ` — ${esc(toText(a.excerpt, 160))}` : ''} <em>(${esc(author)}${date ? `, ${esc(date)}` : ''})</em></li>`;
@@ -3388,14 +3468,14 @@ async function renderPriceCard(supabase, categorySlug, cardSlug) {
 
   const title = `${card.name} Price (AUD) — ${card.set_name || categoryLabel} | CardPop`;
   const description = latest?.raw_avg
-    ? `${fullName} is listing for around ${audPrice(latest.raw_avg)} raw and ${audPrice(latest.graded_avg)} graded in Australia (updated ${updatedOn}). Live AUD prices, history and where to buy.`
+    ? `${fullName} is listing for around ${audPrice(latest.raw_avg)} raw${latest.graded_avg ? ` and ${audPrice(latest.graded_avg)} graded` : ''} in Australia (updated ${updatedOn}). Live AUD prices, history and where to buy.`
     : `Live Australian-dollar market price for ${fullName}: raw and graded averages, price history, and where to buy and sell in Australia.`;
 
   const faqs = [
     {
       q: `How much is ${card.name} (${card.set_name || categoryLabel}) worth in Australia?`,
       a: latest?.raw_avg
-        ? `As at ${updatedOn}, ungraded copies list for around ${audPrice(latest.raw_avg)} (range ${audPrice(latest.raw_min)}–${audPrice(latest.raw_max)}), while graded copies average about ${audPrice(latest.graded_avg)}. Prices are in Australian dollars and refresh daily.`
+        ? `As at ${updatedOn}, ungraded copies list for around ${audPrice(latest.raw_avg)}${latest.raw_min !== latest.raw_max ? ` (range ${audPrice(latest.raw_min)}–${audPrice(latest.raw_max)})` : ''}${latest.graded_avg ? `, while graded copies average about ${audPrice(latest.graded_avg)}` : ''}. Prices are in Australian dollars and refresh daily.`
         : 'A current AUD price is being calculated from live listings — check back shortly for the latest figure.',
     },
     {
@@ -3447,9 +3527,9 @@ async function renderPriceCard(supabase, categorySlug, cardSlug) {
   ].filter(Boolean);
 
   const statsHtml = latest ? `<ul>
-<li>Raw average: ${esc(audPrice(latest.raw_avg) || '—')}${latest.raw_count ? ` (${latest.raw_count} listings)` : ''}</li>
+<li>Raw average: ${esc(audPrice(latest.raw_avg) || '—')}${latest.raw_count ? ` (${latest.raw_count} ${latest.raw_count === 1 ? 'listing' : 'listings'})` : ''}</li>
 <li>Raw range: ${latest.raw_avg !== null ? `${esc(audPrice(latest.raw_min))} – ${esc(audPrice(latest.raw_max))}` : '—'}</li>
-<li>Graded average: ${esc(audPrice(latest.graded_avg) || '—')}${latest.graded_count ? ` (${latest.graded_count} listings)` : ''}</li>
+<li>Graded average: ${esc(audPrice(latest.graded_avg) || '—')}${latest.graded_count ? ` (${latest.graded_count} ${latest.graded_count === 1 ? 'listing' : 'listings'})` : ''}</li>
 <li>Graded range: ${latest.graded_avg !== null ? `${esc(audPrice(latest.graded_min))} – ${esc(audPrice(latest.graded_max))}` : '—'}</li>
 </ul>` : '<p>The first price snapshot for this card is being collected.</p>';
 
@@ -3768,7 +3848,7 @@ async function renderCollection(supabase, rawSlug) {
   // match the collection name or one of its aliases. An empty result only
   // trims the list; the SEO copy above still renders.
   const categoryValues = [cfg.name, ...(cfg.aliases || [])];
-  const { data } = await supabase
+  const { data, error: listingsError } = await supabase
     .from('listings')
     .select('id, slug, price_aud, vault_item:vault_items!inner(card_name, collection)')
     .eq('status', 'active')
@@ -3829,7 +3909,7 @@ async function renderCollection(supabase, rawSlug) {
 
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/collections">Collections</a> / ${esc(cfg.name)}</nav>
-  <h1>${esc(cfg.name)} Cards in Australia</h1>
+  <h1>${esc(cardsLabel(cfg.name, 'Cards'))} in Australia</h1>
   <p>${esc(description)}</p>
   ${cfg.intro ? `<p>${esc(cfg.intro)}</p>` : ''}
   ${sportPlayers.length ? `<h2>${esc(cfg.name.replace(/\s+cards?\s*$/i, ''))} players</h2>
@@ -3843,7 +3923,11 @@ ${itemsHtml || '    <li>No active listings right now — check back soon or brow
   <p><a href="${BASE_URL}/marketplace">Browse the full marketplace</a></p>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, jsonLdItems, bodyHtml });
+  // No listings means the page is its marketing paragraph and "check back
+  // soon" — noindex until a collector lists a card in it (sitemap gate matches).
+  // A failed read is not an empty collection, so it never sets noindex.
+  const robots = listings.length === 0 && !listingsError ? 'noindex, follow' : undefined;
+  return htmlDoc({ title, description, canonical, robots, jsonLdItems, bodyHtml });
 }
 
 // ── Shop supply collection pages (/shop/:groupSlug) ──────────────────────────
@@ -4404,7 +4488,7 @@ async function renderHome(supabase) {
   const trustHtml = HOME_TRUST_SIGNALS.map((t) =>
     `    <li><strong>${esc(t.title)}</strong> — ${esc(t.body)}</li>`).join('\n');
   const categoriesHtml = Object.entries(COLLECTION_SEO).map(([slug, cfg]) =>
-    `    <li><a href="${BASE_URL}/collections/${esc(slug)}">${esc(cfg.name)} cards</a></li>`).join('\n');
+    `    <li><a href="${BASE_URL}/collections/${esc(slug)}">${esc(cardsLabel(cfg.name))}</a></li>`).join('\n');
   const listingsHtml = listings.map((l) => {
     const name = l.vault_item?.card_name || 'Trading Card';
     const collection = l.vault_item?.collection ? ` (${esc(l.vault_item.collection)})` : '';
@@ -4412,7 +4496,7 @@ async function renderHome(supabase) {
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>${collection}${price}</li>`;
   }).join('\n');
   const articlesHtml = articles.map((a) => {
-    const date = (a.published_at || a.created_at || '').split('T')[0];
+    const date = humanDate(a.published_at || a.created_at);
     const byline = [a.author || 'CardPop Australia', date].filter(Boolean).join(', ');
     return `    <li><a href="${BASE_URL}/blog/${esc(a.slug || a.id)}"><strong>${esc(a.title || 'Article')}</strong></a>`
       + `${a.excerpt ? ` — ${esc(toText(a.excerpt, 160))}` : ''} <em>(${esc(byline)})</em></li>`;

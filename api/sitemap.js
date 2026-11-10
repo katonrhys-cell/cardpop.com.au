@@ -101,8 +101,8 @@ const STATIC_PAGES = [
   // /search is intentionally excluded — internal search-results pages offer no
   // unique indexable content and are disallowed in robots.txt.
   { loc: '/shop',                  lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
-  { loc: '/shop/sealed-boxes',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/shop/singles',          lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
+  // /shop/sealed-boxes and /shop/singles are listed below only while they
+  // have a product — an empty section is noindex in the prerender.
   // Shop supply collection pages (Protection, Storage, Display, Shipping,
   // Grading) — config-driven, one per group in data/shopCollectionSeo.js.
   ...Object.keys(SHOP_COLLECTION_SEO).map((slug) => (
@@ -192,10 +192,15 @@ const STATIC_PAGES = [
   { loc: '/accessibility',         lastmod: '2026-05-31', freq: 'yearly',  pri: '0.3' },
   // Collection landing pages (config-driven, one per TCG/sport in
   // data/collectionSeo.js) — evergreen category pages worth indexing.
+  // Each /collections/<slug> is listed below only while it has an active
+  // listing — an empty collection is noindex in the prerender.
   { loc: '/collections',           lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
-  ...Object.keys(COLLECTION_SEO).map((slug) => (
-    { loc: `/collections/${slug}`, lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' }
-  )),
+];
+
+// Shop sections that are one product_type of the catalogue.
+const SHOP_TYPE_SECTIONS = [
+  { loc: '/shop/sealed-boxes', productType: 'sealed' },
+  { loc: '/shop/singles', productType: 'single' },
 ];
 
 
@@ -234,7 +239,7 @@ export default async function handler(req, res) {
       // seller_id also feeds the public-seller content gate below.
       fetchAll(() => supabase
         .from('listings')
-        .select('id, slug, seller_id, updated_at, created_at, vault_item:vault_items(card_name)')
+        .select('id, slug, seller_id, listing_type, updated_at, created_at, vault_item:vault_items(card_name, collection)')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
         .order('id'), MAX_ROWS.listings),
@@ -249,7 +254,7 @@ export default async function handler(req, res) {
         .order('id'), MAX_ROWS.dealers),
       fetchAll(() => supabase
         .from('shop_products')
-        .select('id, title, slug, category, colour, family_sku, updated_at, created_at')
+        .select('id, title, slug, category, colour, family_sku, product_type, updated_at, created_at')
         .in('status', PUBLIC_SHOP_STATUSES)
         .order('created_at', { ascending: false })
         .order('id'), MAX_ROWS.products),
@@ -361,6 +366,20 @@ export default async function handler(req, res) {
 
     for (const p of STATIC_PAGES) {
       parts.push(xmlUrl(`${BASE_URL}${p.loc}`, p.lastmod, p.freq, p.pri));
+    }
+
+    // Content gates shared with api/prerender.js: a shop section or a
+    // collection with nothing in it is noindex there and unlisted here.
+    for (const section of SHOP_TYPE_SECTIONS) {
+      if (products.some((p) => p.product_type === section.productType)) {
+        parts.push(xmlUrl(`${BASE_URL}${section.loc}`, SITE_UPDATED, 'daily', '0.8'));
+      }
+    }
+    const listedCollections = new Set(listings.map((l) => l.vault_item?.collection).filter(Boolean));
+    for (const [slug, cfg] of Object.entries(COLLECTION_SEO)) {
+      if ([cfg.name, ...(cfg.aliases || [])].some((name) => listedCollections.has(name))) {
+        parts.push(xmlUrl(`${BASE_URL}/collections/${slug}`, SITE_UPDATED, 'daily', '0.8'));
+      }
     }
 
     // The forum earns its sitemap entry once collectors have posted; until
