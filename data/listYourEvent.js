@@ -19,7 +19,7 @@
  * Search Console sync, shown only above their floors (utils/siteTraffic.js).
  */
 
-import { FEATURED_PACKAGES, EARLY_BIRD, formatAud } from '../utils/featuredPackages.js';
+import { FEATURED_PACKAGES, EARLY_BIRD, BUNDLE, bundleCents, formatAud } from '../utils/featuredPackages.js';
 
 export const LIST_EVENT_PATH = '/list-your-event';
 export const SUBMIT_EVENT_PATH = '/account/events';
@@ -39,9 +39,16 @@ export const LIST_EVENT_FEATURED_PACKAGES = FEATURED_PACKAGES.map((p) => ({
   key: p.key,
   name: p.name,
   price: formatAud(p.priceAud * 100),
+  packPrice: formatAud(bundleCents(p.key)),
   highlight: Boolean(p.highlight),
   points: p.points,
 }));
+
+/** The 3-event pack, in one sentence: "Spotlight $119, …" for three events. */
+export const FEATURED_BUNDLE_NOTE =
+  `Running ${BUNDLE.size} or more shows? Feature any ${BUNDLE.size} of them in one payment with the ${BUNDLE.size}-event pack: ${
+    FEATURED_PACKAGES.map((p) => `${p.name} ${formatAud(bundleCents(p.key))}`).join(', ')
+  } for all ${BUNDLE.size}, with early bird still taken off any show ${EARLY_BIRD.minDays / 7}+ weeks away.`;
 
 export const FEATURED_EARLY_BIRD_NOTE =
   `Book ${EARLY_BIRD.minDays / 7} or more weeks before your show and every package is ${EARLY_BIRD.pct}% off. Prices include GST and are per event.`;
@@ -113,11 +120,11 @@ export const LIST_EVENT_STEPS = [
 export const LIST_EVENT_FAQS = [
   {
     q: 'What does it cost to list an event?',
-    a: `Nothing. Listing a card show, tournament, trade night or store event on CardPop is free. So is adding a member ticket offer. Only Featured Placement is paid: ${LIST_EVENT_FEATURED_PACKAGES.map((p) => `${p.name} ${p.price}`).join(', ')} per event, including GST.`,
+    a: `Nothing. Listing a card show, tournament, trade night or store event on CardPop is free. So is adding a member ticket offer. Only Featured Placement is paid: ${LIST_EVENT_FEATURED_PACKAGES.map((p) => `${p.name} ${p.price}`).join(', ')} per event, including GST. Featuring ${BUNDLE.size} events at once costs less with the ${BUNDLE.size}-event pack.`,
   },
   {
     q: 'How do I feature my event?',
-    a: `Submit your event, then press "Feature" next to it in My Events, pick a package and pay by card. Featuring switches on as soon as the payment goes through and lasts until your show ends. Book ${EARLY_BIRD.minDays / 7} or more weeks before the show and it's ${EARLY_BIRD.pct}% off.`,
+    a: `Submit your event, then press "Feature" next to it in My Events, pick a package and pay by card. Featuring switches on as soon as the payment goes through and lasts until your show ends. Book ${EARLY_BIRD.minDays / 7} or more weeks before the show and it's ${EARLY_BIRD.pct}% off. With ${BUNDLE.size} or more events waiting, press "Choose ${BUNDLE.size} events" in My Events for the ${BUNDLE.size}-event pack.`,
   },
   {
     q: 'What kinds of events can I list?',

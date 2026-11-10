@@ -12,7 +12,7 @@ import { OrganiserReachSection, useOrganiserStats } from '@/components/events/Or
 import {
   LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_PATH, LIST_EVENT_SEO,
   LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH,
-  LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE,
+  LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE,
 } from '@/data/listYourEvent.js';
 
 const TIER_ICONS = { listing: CalendarPlus, offer: Ticket, featured: Megaphone };
@@ -128,6 +128,7 @@ const ListYourEventPage = () => {
                   <h3 className="text-lg font-bold">{pkg.name}</h3>
                   <span className="text-2xl font-bold tabular-nums">{pkg.price}</span>
                 </div>
+                <p className="mb-3 text-xs text-muted-foreground">or {pkg.packPrice} for 3 events</p>
                 {pkg.highlight && <span className="mb-3 self-start rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Most popular</span>}
                 <ul className="mb-6 space-y-2 text-sm">
                   {pkg.points.map((p) => (
@@ -146,6 +147,7 @@ const ListYourEventPage = () => {
               </div>
             ))}
           </div>
+          <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted-foreground">{FEATURED_BUNDLE_NOTE}</p>
         </section>
 
         {/* How it works */}

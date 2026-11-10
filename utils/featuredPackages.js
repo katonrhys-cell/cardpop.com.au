@@ -91,6 +91,59 @@ export const featuredQuote = (packageKey, startDate, today) => {
   return { pkg, baseCents, discountCents, priceCents: baseCents - discountCents, earlyBird };
 };
 
+/**
+ * The 3-event pack: one package for three of the organiser's events, paid in
+ * one checkout, at `priceAud` for the three instead of three times the
+ * single price. Early bird still applies per event on that event's share of
+ * the pack price, so a pack is never dearer than booking the events one by one.
+ */
+export const BUNDLE = {
+  size: 3,
+  priceAud: { spotlight: 119, spotlight_instagram: 239, full: 359 },
+};
+
+/** The pack price for a package in cents, or null. */
+export const bundleCents = (packageKey) => {
+  const aud = BUNDLE.priceAud[packageKey];
+  return aud == null ? null : Math.round(aud * 100);
+};
+
+/**
+ * The price of one package across BUNDLE.size events, in cents. `startDates`
+ * are the events' first days, in order. The pack price is split as evenly as
+ * whole cents allow (the remainder on the first events), then each event's
+ * early bird comes off its own share. Every event's line carries its single
+ * list price (`baseCents`) and what it actually costs (`priceCents`), so the
+ * purchase rows add up to the charge. null for an unknown package or the
+ * wrong number of events.
+ */
+export const featuredBundleQuote = (packageKey, startDates, today) => {
+  const pkg = featuredPackage(packageKey);
+  const packCents = bundleCents(packageKey);
+  if (!pkg || packCents == null || !Array.isArray(startDates) || startDates.length !== BUNDLE.size) return null;
+  const baseCents = Math.round(pkg.priceAud * 100);
+  const share = Math.floor(packCents / BUNDLE.size);
+  const remainder = packCents - share * BUNDLE.size;
+  const lines = startDates.map((startDate, i) => {
+    const shareCents = share + (i < remainder ? 1 : 0);
+    const earlyBird = isEarlyBird(startDate, today);
+    const earlyBirdCents = earlyBird ? Math.ceil((shareCents * EARLY_BIRD.pct) / 100) : 0;
+    const priceCents = shareCents - earlyBirdCents;
+    return { baseCents, shareCents, earlyBirdCents, priceCents, discountCents: baseCents - priceCents, earlyBird };
+  });
+  const listCents = baseCents * BUNDLE.size;
+  const priceCents = lines.reduce((sum, l) => sum + l.priceCents, 0);
+  return {
+    pkg,
+    lines,
+    listCents,
+    packCents,
+    priceCents,
+    savingCents: listCents - priceCents,
+    earlyBird: lines.some((l) => l.earlyBird),
+  };
+};
+
 /** "$49" / "$39.20" */
 export const formatAud = (cents) => {
   const dollars = cents / 100;

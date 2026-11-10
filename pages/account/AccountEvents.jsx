@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
 import { toast } from 'sonner';
@@ -8,7 +8,9 @@ import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.j
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
 import FeatureUpsellCard from '@/components/events/FeatureUpsellCard.jsx';
-import { featureEligibility, todayInAustralia } from '@/utils/featuredPackages.js';
+import {
+  BUNDLE, FEATURED_PACKAGES, bundleCents, featureEligibility, formatAud, todayInAustralia,
+} from '@/utils/featuredPackages.js';
 import { MY_EVENT_BUCKETS, myEventBucket, countMyEventBuckets, normaliseBucket } from '@/utils/myEventStatus.js';
 import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -44,7 +46,15 @@ const AccountEvents = () => {
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
   const [featureEvent, setFeatureEvent] = useState(null);
+  const [featurePack, setFeaturePack] = useState(false);
   const today = todayInAustralia();
+  // Soonest first: the pack picker ticks the next shows by default.
+  const featurableEvents = useMemo(
+    () => events
+      .filter((ev) => featureEligibility(ev, today).ok)
+      .sort((a, b) => String(a.start_date || '').localeCompare(String(b.start_date || ''))),
+    [events, today],
+  );
 
   // `silent`: refresh after a save without swapping the list for skeletons.
   const fetchMyEvents = useCallback(async ({ silent = false } = {}) => {
@@ -295,6 +305,26 @@ const AccountEvents = () => {
         );
       })()}
 
+      {!isLoading && !loadError && featurableEvents.length >= BUNDLE.size && (
+        <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-bold text-foreground flex items-center gap-2">
+              <Star className="w-4 h-4 text-primary fill-current" aria-hidden="true" /> Feature {BUNDLE.size} events, pay less
+            </p>
+            <p className="text-sm text-muted-foreground">
+              The {BUNDLE.size}-event pack features three of your shows in one payment, from {formatAud(bundleCents(FEATURED_PACKAGES[0].key))} instead of {formatAud(FEATURED_PACKAGES[0].priceAud * 100 * BUNDLE.size)}.
+            </p>
+          </div>
+          <Button
+            size="sm"
+            className="rounded-xl gap-1.5 font-bold shrink-0"
+            onClick={() => { setFeaturePack(true); setFeatureEvent(featurableEvents[0]); }}
+          >
+            <Star className="w-3.5 h-3.5" aria-hidden="true" /> Choose {BUNDLE.size} events
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-4" role="status" aria-label="Loading your events">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
@@ -386,7 +416,12 @@ const AccountEvents = () => {
 
       <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
       <EventBadgeDialog event={badgeEvent} onClose={() => setBadgeEvent(null)} />
-      <FeatureEventDialog event={featureEvent} onClose={() => setFeatureEvent(null)} />
+      <FeatureEventDialog
+        event={featureEvent}
+        featurable={featurableEvents}
+        startInPack={featurePack}
+        onClose={() => { setFeatureEvent(null); setFeaturePack(false); }}
+      />
 
       <EventFormModal
         isOpen={isModalOpen}
