@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { apiServerClient } from '@/lib/apiServerClient.js';
+import { OrganiserReachStrip, useOrganiserStats } from '@/components/events/OrganiserReach.jsx';
 import {
   FEATURED_PACKAGES, EARLY_BIRD, featuredQuote, formatAud, todayInAustralia,
 } from '@/utils/featuredPackages.js';
@@ -17,6 +18,7 @@ const FeatureEventDialog = ({ event, onClose }) => {
   const [selected, setSelected] = useState('spotlight_instagram');
   const [submitting, setSubmitting] = useState(false);
   const today = todayInAustralia();
+  const reach = useOrganiserStats();
 
   const quotes = useMemo(
     () => (event ? FEATURED_PACKAGES.map((p) => featuredQuote(p.key, event.start_date, today)) : []),
@@ -62,6 +64,8 @@ const FeatureEventDialog = ({ event, onClose }) => {
               : ` Book ${EARLY_BIRD.minDays / 7}+ weeks before a show for ${EARLY_BIRD.pct}% off.`}
           </DialogDescription>
         </DialogHeader>
+
+        <OrganiserReachStrip stats={reach} />
 
         <div role="radiogroup" aria-label="Featuring package" className="grid gap-3">
           {quotes.map((q) => {

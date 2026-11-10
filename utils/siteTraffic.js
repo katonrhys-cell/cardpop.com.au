@@ -85,6 +85,27 @@ export const publicTrafficStat = (summary, { now = Date.now() } = {}) => {
   };
 };
 
+// Page views join the visitors figure on the organiser pages (/list-your-event,
+// the Feature dialog) once they're worth quoting.
+export const MIN_PUBLIC_PAGEVIEWS_30D = 500;
+
+/**
+ * Page views in the last 30 days (GA4, same nightly sync and staleness rule
+ * as visitors), with the since-launch total underneath. null below the floor.
+ */
+export const publicPageviewStat = (summary, { now = Date.now() } = {}) => {
+  if (!summary) return null;
+  const views30d = int(summary.pageviews_30d);
+  if (views30d < MIN_PUBLIC_PAGEVIEWS_30D) return null;
+  if (ageInDays(summary.synced_at, now) > MAX_PUBLIC_SUMMARY_AGE_DAYS) return null;
+  return {
+    key: 'pageviews',
+    value: views30d,
+    label: 'Page views',
+    sub: sinceLine(summary.pageviews_all_time, views30d, summary.since_date),
+  };
+};
+
 const sinceLine = (allTime, last30, sinceDate) => {
   // All-time can't honestly be lower than the last 30 days; show the larger.
   const shown = Math.max(int(allTime), int(last30));

@@ -4,7 +4,7 @@ import {
   ORGANISER_EMAIL, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES,
 } from '@/data/listYourEvent.js';
 import { FEATURED_PACKAGES } from '@/utils/featuredPackages.js';
-import { buildOrganiserStats } from '@/pages/community/ListYourEventPage.jsx';
+import { buildOrganiserStats } from '@/components/events/OrganiserReach.jsx';
 
 const fresh = new Date().toISOString();
 
@@ -66,6 +66,23 @@ describe('buildOrganiserStats', () => {
     expect(stats.map((s) => [s.key, s.value])).toEqual([
       ['visitors', 5000], ['impressions', 40000], ['events', 42],
     ]);
+  });
+
+  it('adds page views and Google clicks once they clear their floors', () => {
+    const stats = buildOrganiserStats(
+      { visitors_30d: 1879, visitors_all_time: 7020, pageviews_30d: 5758, pageviews_all_time: 21000,
+        since_date: '2026-04-07', synced_at: fresh,
+        search_impressions_30d: 99962, search_clicks_30d: 1377, search_impressions_all_time: 257706,
+        search_clicks_all_time: 5118, search_since_date: '2026-05-31', search_synced_at: fresh },
+      { events: 12 },
+    );
+    expect(stats.map((s) => [s.key, s.value])).toEqual([
+      ['visitors', 1879], ['pageviews', 5758], ['impressions', 99962], ['clicks', 1377], ['events', 12],
+    ]);
+    expect(stats.find((s) => s.key === 'pageviews').sub).toBe('21k since Apr 2026');
+    // Page views below their floor stay hidden on their own.
+    const few = buildOrganiserStats({ visitors_30d: 200, pageviews_30d: 300, synced_at: fresh }, null);
+    expect(few.map((s) => s.key)).toEqual(['visitors']);
   });
 
   it('drops a stale sync', () => {
