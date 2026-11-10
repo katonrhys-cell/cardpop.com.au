@@ -1,19 +1,17 @@
-// Organiser change requests on live events (docs/event-submissions.md).
+// Organiser edits to live events (docs/event-submissions.md).
 //
-// An organiser can't edit a live event directly. Their edit becomes an
-// event_change_requests row holding only the fields that differ; an admin
-// applies it (apply_event_change_request) or dismisses it. Shared by the form,
-// the admin review dialog and the tests.
+// An organiser edits their own event directly. Once it's approved their save
+// goes live straight away, and the database records every field that changed
+// in public.event_change_log as { field: { from, to } } — which bells every
+// admin, is emailed to them (POST /events/:id/notify-changes) and is shown in
+// Admin → Event Management. This module labels and reads those entries; it is
+// shared by the admin dialog, the email and the tests.
 
 import { ticketPriceLines } from './eventTicketPrices.js';
-import { cleanGalleryAlbums, flattenGalleryAlbums } from './eventGallery.js';
-import { cleanEventVideos } from './eventVideos.js';
 
-// The only columns an organiser can ask to change. Must match
-// public.event_change_request_fields() in
-// supabase/migrations/20261109235618_event_organiser_review_flow.sql (a test
-// keeps the two equal).
-export const EVENT_CHANGE_FIELDS = [
+// The event columns that are logged. Must match public.event_logged_fields()
+// as last defined in supabase/migrations/ (a test keeps the two equal).
+export const EVENT_LOGGED_FIELDS = [
   'title', 'short_description', 'description', 'accessibility_info', 'age_restrictions',
   'event_type', 'featured_card_games', 'image_url', 'gallery_images', 'gallery_albums', 'event_videos',
   'venue_name', 'address', 'suburb', 'state', 'postcode',
@@ -23,8 +21,11 @@ export const EVENT_CHANGE_FIELDS = [
   'instagram_url', 'facebook_url', 'youtube_url', 'youtube_channel_url', 'tiktok_url', 'x_url', 'discord_url',
   'facebook_video_url',
   'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'capacity', 'registration_required',
-  'seo_title', 'seo_description', 'seo_keywords', 'tags',
+  'seo_title', 'seo_description', 'seo_keywords', 'tags', 'source_url',
 ];
+
+// The member ticket offer's fields, as log_organiser_offer_edit() names them.
+export const OFFER_LOGGED_FIELDS = ['offer_text', 'discount_code', 'referral_url', 'offer_is_active'];
 
 export const EVENT_CHANGE_LABELS = {
   title: 'Title',
@@ -72,14 +73,20 @@ export const EVENT_CHANGE_LABELS = {
   seo_description: 'Meta description',
   seo_keywords: 'SEO keywords',
   tags: 'Tags',
+  source_url: 'Scraped from',
+  offer_text: 'Member offer line',
+  discount_code: 'Member ticket code',
+  referral_url: 'Ticket referral link',
+  offer_is_active: 'Member offer switched on',
 };
+
+export const changeLabel = (field) => EVENT_CHANGE_LABELS[field] || field;
 
 const TIME_FIELDS = new Set(['start_time', 'end_time']);
 const NUMBER_FIELDS = new Set(['entry_fee_aud', 'presale_fee_aud', 'capacity']);
 
-// One canonical shape per value so a field the organiser didn't touch never
-// counts as a change: '' / [] / {} / undefined → null, "10:00:00" → "10:00",
-// "12.50" → 12.5.
+// One canonical shape per value: '' / [] / {} / undefined → null,
+// "10:00:00" → "10:00", "12.50" → 12.5.
 export function normaliseEventValue(field, value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'string') {
@@ -94,51 +101,9 @@ export function normaliseEventValue(field, value) {
   return value;
 }
 
-const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-
-// The live row as the form would save it untouched. The form rebuilds photo
-// albums and the video list from the legacy columns (gallery_images,
-// youtube_url) and saves a free event's fee as 0, so the row is read the same
-// way — otherwise a field nobody touched would show up as a change.
-function asFormWouldSave(event) {
-  const albums = cleanGalleryAlbums(event?.gallery_albums, event?.gallery_images)
-    .filter((a) => a.images.length > 0);
-  const videos = cleanEventVideos(event?.event_videos, event?.youtube_url).map((v) => ({ title: v.title, url: v.url }));
-  return {
-    ...event,
-    gallery_albums: albums,
-    gallery_images: flattenGalleryAlbums(albums),
-    event_videos: videos,
-    youtube_url: videos[0]?.url || null,
-    entry_fee_aud: event?.is_free !== false && event?.entry_fee_aud == null ? 0 : event?.entry_fee_aud,
-  };
-}
-
-/**
- * The requestable fields of `payload` (the form's save payload) that differ
- * from the live `event` row. Returns the payload's own values.
- */
-export function diffEventChanges(event, payload) {
-  const changes = {};
-  const live = asFormWouldSave(event);
-  for (const field of EVENT_CHANGE_FIELDS) {
-    if (!payload || !(field in payload)) continue;
-    const before = normaliseEventValue(field, live[field]);
-    const after = normaliseEventValue(field, payload[field]);
-    if (!same(before, after)) changes[field] = payload[field] ?? null;
-  }
-  return changes;
-}
-
-/** The live event with an open request's changes laid over it (to prefill the form). */
-export function withRequestedChanges(event, changeRequest) {
-  if (!event || !changeRequest?.changes) return event;
-  return { ...event, ...changeRequest.changes };
-}
-
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-/** A short, human reading of a field's value for the admin review dialog. */
+/** A short, human reading of a field's value. */
 export function describeEventValue(field, value) {
   const v = normaliseEventValue(field, value);
   if (v === null) return '—';
@@ -162,5 +127,37 @@ export function describeEventValue(field, value) {
   return String(v);
 }
 
-/** Whether a field holds an image URL the review dialog should preview. */
+/** Whether a field holds an image URL worth previewing. */
 export const isImageChangeField = (field) => field === 'image_url' || field === 'organizer_logo_url';
+
+/**
+ * Several log entries (oldest first or newest first — order is taken from
+ * created_at) merged into one { field: { from, to } }: each field's first
+ * "from" and last "to". A field that ends where it started is dropped.
+ */
+export function mergeChangeLog(entries) {
+  const sorted = [...(entries || [])].sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+  const merged = {};
+  for (const entry of sorted) {
+    for (const [field, change] of Object.entries(entry?.changes || {})) {
+      if (!merged[field]) merged[field] = { from: change?.from ?? null, to: change?.to ?? null };
+      else merged[field].to = change?.to ?? null;
+    }
+  }
+  for (const [field, change] of Object.entries(merged)) {
+    const same = JSON.stringify(normaliseEventValue(field, change.from)) === JSON.stringify(normaliseEventValue(field, change.to));
+    if (same) delete merged[field];
+  }
+  return merged;
+}
+
+/** [{ field, label, from, to }] for display, in form order. */
+export function changeRows(changes) {
+  const order = [...EVENT_LOGGED_FIELDS, ...OFFER_LOGGED_FIELDS];
+  return Object.entries(changes || {})
+    .sort(([a], [b]) => {
+      const ia = order.indexOf(a); const ib = order.indexOf(b);
+      return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+    })
+    .map(([field, change]) => ({ field, label: changeLabel(field), from: change?.from ?? null, to: change?.to ?? null }));
+}

@@ -159,7 +159,6 @@ describe('PATCH /admin/events/:id/organiser', () => {
         { data: { id: ORG_ID, username: 'collectors', display_name: null, is_admin: false }, error: null },
       ],
       events: [{ data: { id: EVENT_ID, organiser_id: ORG_ID }, error: null }],
-      event_change_requests: [{ data: null, error: null }],
       event_organiser_verifications: [{ data: null, error: null }],
     });
 
@@ -170,11 +169,6 @@ describe('PATCH /admin/events/:id/organiser', () => {
     expect(built('events')[0].calls).toContainEqual(['update', { organiser_id: ORG_ID }]);
     expect(built('events')[0].calls).toContainEqual(['eq', 'id', EVENT_ID]);
     expect(res.body.organiser).toMatchObject({ id: ORG_ID, verified: false });
-    // The previous owner's open change request is dropped.
-    const cleared = built('event_change_requests')[0].calls;
-    expect(cleared).toContainEqual(['delete']);
-    expect(cleared).toContainEqual(['eq', 'status', 'pending']);
-    expect(cleared).toContainEqual(['neq', 'organiser_id', ORG_ID]);
   });
 
   it('looks up by email (lower-cased, LIKE wildcards escaped) when given one', async () => {
@@ -184,7 +178,6 @@ describe('PATCH /admin/events/:id/organiser', () => {
         { data: { id: ORG_ID, username: null, display_name: null, is_admin: false }, error: null },
       ],
       events: [{ data: { id: EVENT_ID, organiser_id: ORG_ID }, error: null }],
-      event_change_requests: [{ data: null, error: null }],
       event_organiser_verifications: [{ data: null, error: null }],
     });
     const res = await request(app).patch(`/admin/events/${EVENT_ID}/organiser`).send({ identifier: 'Jo_Shows@Example.com' });

@@ -12,7 +12,7 @@ import {
   launchWelcomeEmail,
   eventSubmittedEmail,
   eventReviewOutcomeEmail,
-  eventChangeRequestedEmail,
+  eventChangesMadeEmail,
   identityReviewNeededEmail,
   soleTraderChangedEmail,
   orderAdminNoticeEmail,
@@ -273,34 +273,32 @@ export async function sendShopEnquiry({ to, productTitle, productSku, productId,
 // Admin heads-up when a user submits an event to the community calendar. Sent to
 // admin accounts (and the configurable admin contact address), not to a customer.
 // `to` may be a single address or an array of addresses.
-export async function sendEventSubmitted({ to, event }) {
+export async function sendEventSubmitted({ to, event, addedBy = null, byAdmin = false }) {
+  const pending = !event?.status || event.status === 'pending_review';
   return send({
     to,
-    subject: `New event pending review: ${event?.title || 'Untitled'}`,
-    html: eventSubmittedEmail({ event }),
+    subject: `${pending ? 'New event pending review' : 'New event added'}: ${event?.title || 'Untitled'}`,
+    html: eventSubmittedEmail({ event, addedBy, byAdmin }),
   });
 }
 
-// Organiser email when an admin approves or rejects their event submission
-// (kind 'submission') or applies / dismisses their changes to a live event
-// (kind 'changes').
-export async function sendEventReviewOutcome({ to, name, eventTitle, kind, approved, note, eventUrl }) {
-  const what = kind === 'changes' ? 'Your changes to' : 'Your event';
+// Organiser email when an admin approves or rejects their event submission.
+export async function sendEventReviewOutcome({ to, name, eventTitle, approved, note, eventUrl }) {
   return send({
     to,
     subject: approved
-      ? `${what} ${eventTitle || 'your event'} ${kind === 'changes' ? 'are' : 'is'} live`
-      : `${what} ${eventTitle || 'your event'} ${kind === 'changes' ? 'weren’t applied' : 'wasn’t approved'}`,
-    html: eventReviewOutcomeEmail({ name, eventTitle, kind, approved, note, eventUrl }),
+      ? `Your event ${eventTitle || ''} is live`.replace(/\s+/g, ' ')
+      : `Your event ${eventTitle || ''} wasn’t approved`.replace(/\s+/g, ' '),
+    html: eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl }),
   });
 }
 
-// Admin heads-up when the organiser of a live event asks to change it.
-export async function sendEventChangeRequested({ to, event, organiserName, fields }) {
+// Every admin: exactly what an organiser changed on their live event.
+export async function sendEventChangesMade({ to, event, editorName, rows }) {
   return send({
     to,
-    subject: `Event changes to review: ${event?.title || 'Untitled'}`,
-    html: eventChangeRequestedEmail({ event, organiserName, fields }),
+    subject: `Live event edited: ${event?.title || 'Untitled'}`,
+    html: eventChangesMadeEmail({ event, editorName, rows }),
   });
 }
 
