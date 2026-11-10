@@ -8,12 +8,15 @@ const ga4 = vi.hoisted(() => ({ configured: true, runReport: vi.fn() }));
 vi.mock('../../src/utils/ga4Client.js', () => ({
   isGa4Configured: () => ga4.configured,
   runGa4Report: ga4.runReport,
+  describeServiceAccountProblem: () => 'GA4_SERVICE_ACCOUNT_JSON is not set in this deployment',
+  describePropertyIdProblem: () => null,
 }));
 
 const gsc = vi.hoisted(() => ({ configured: false, query: vi.fn() }));
 vi.mock('../../src/utils/searchConsoleClient.js', () => ({
   isSearchConsoleConfigured: () => gsc.configured,
   runSearchAnalytics: gsc.query,
+  getSiteUrl: () => null,
 }));
 
 const db = vi.hoisted(() => ({ writes: [], stored: [], readError: null }));
@@ -115,6 +118,7 @@ describe('syncSiteTraffic', () => {
   it('throws Ga4NotConfiguredError without credentials and never calls GA4', async () => {
     ga4.configured = false;
     await expect(syncSiteTraffic()).rejects.toBeInstanceOf(Ga4NotConfiguredError);
+    await expect(syncSiteTraffic()).rejects.toThrow(/GA4_SERVICE_ACCOUNT_JSON is not set/);
     expect(ga4.runReport).not.toHaveBeenCalled();
     expect(db.writes).toHaveLength(0);
   });

@@ -6,7 +6,7 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 const {
-  parseServiceAccount, getPropertyId, isGa4Configured, buildAssertion, getAccessToken, runGa4Report, _resetTokenCache,
+  parseServiceAccount, describeServiceAccountProblem, describePropertyIdProblem, getPropertyId, isGa4Configured, buildAssertion, getAccessToken, runGa4Report, _resetTokenCache,
   SEARCH_CONSOLE_SCOPE,
 } = await import('../../src/utils/ga4Client.js');
 
@@ -38,6 +38,35 @@ describe('ga4Client configuration', () => {
     expect(parseServiceAccount(undefined)).toBeNull();
     expect(parseServiceAccount('not json')).toBeNull();
     expect(parseServiceAccount(JSON.stringify({ client_email: 'x' }))).toBeNull();
+  });
+
+  it('accepts the forms a pasted key commonly arrives in', () => {
+    const key = { type: 'service_account', client_email: 'ga@proj.iam.gserviceaccount.com', private_key: '-----BEGIN-----\nabc\n-----END-----\n' };
+    const raw = JSON.stringify(key, null, 2);
+    const email = { clientEmail: 'ga@proj.iam.gserviceaccount.com' };
+    expect(parseServiceAccount(`\uFEFF${raw}`)).toMatchObject(email);
+    expect(parseServiceAccount(`'${raw}'`)).toMatchObject(email);
+    expect(parseServiceAccount(JSON.stringify(raw))).toMatchObject(email); // JSON-encoded twice
+    const b64 = Buffer.from(raw).toString('base64');
+    expect(parseServiceAccount(b64.replace(/(.{60})/g, '$1\n'))).toMatchObject(email); // wrapped base64
+    // The \n escapes in private_key expanded into real line breaks.
+    const expanded = raw.replace(/\\n/g, '\n');
+    expect(() => JSON.parse(expanded)).toThrow();
+    expect(parseServiceAccount(expanded).privateKey).toBe('-----BEGIN-----\nabc\n-----END-----\n');
+  });
+
+  it('explains why a key or property id is unusable without echoing the value', () => {
+    expect(describeServiceAccountProblem(keyJson)).toBeNull();
+    expect(describeServiceAccountProblem('')).toMatch(/not set/);
+    const oauth = describeServiceAccountProblem(JSON.stringify({ web: { client_id: 'secret-ish' } }));
+    expect(oauth).toMatch(/OAuth client/);
+    expect(oauth).not.toMatch(/secret-ish/);
+    const cut = describeServiceAccountProblem('{"type":"service_account","private_key":"-----BEGIN');
+    expect(cut).toMatch(/isn't valid JSON/);
+    expect(cut).not.toMatch(/BEGIN/);
+    expect(describePropertyIdProblem('123456')).toBeNull();
+    expect(describePropertyIdProblem('G-NCZ6K9VFF8')).toMatch(/measurement id/);
+    expect(describePropertyIdProblem('')).toMatch(/not set/);
   });
 
   it('accepts a bare or prefixed property id and nothing else', () => {
