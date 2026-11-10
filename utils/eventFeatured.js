@@ -10,6 +10,13 @@ import { isPastEvent } from './eventPast.js';
 
 export const FEATURED_STRIP_LIMIT = 6;
 
+// Featured events wear gold, matching the rookie-card outline on listing
+// cards (lib/cardVariants.js ROOKIE): a 2px amber border with a soft glow and
+// a light gold fill. The pill is dark text on amber for contrast.
+export const FEATURED_CARD_CLASS =
+  'border-2 border-amber-400 bg-amber-50/70 dark:bg-amber-400/5 shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_4px_20px_rgba(251,191,36,0.25)]';
+export const FEATURED_PILL_CLASS = 'bg-amber-400 text-amber-950';
+
 /** `today` is the viewer's local `YYYY-MM-DD` (toLocalDateStr). */
 export const isFeaturedEvent = (event, today) =>
   Boolean(event?.is_featured) && event.status === 'approved' && !isPastEvent(event, today);

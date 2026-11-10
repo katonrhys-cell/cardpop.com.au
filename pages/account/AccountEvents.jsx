@@ -150,7 +150,7 @@ const AccountEvents = () => {
             <h3 id={`event-${event.id}-title`} className="text-lg font-bold text-foreground break-words min-w-0">{event.title}</h3>
             <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
             {event.is_featured && (
-              <Badge variant="outline" className="font-semibold bg-primary/10 text-primary border-primary/30 gap-1">
+              <Badge variant="outline" className="font-semibold bg-amber-400/15 text-amber-800 border-amber-400 dark:text-amber-300 gap-1">
                 <Star className="w-3 h-3 fill-current" aria-hidden="true" /> Featured
               </Badge>
             )}

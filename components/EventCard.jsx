@@ -9,18 +9,19 @@ import EventRsvp from '@/components/EventRsvp.jsx';
 import HalfStars from '@/components/reviews/HalfStars.jsx';
 import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import { isPastEvent } from '@/utils/eventPast.js';
-import { isFeaturedEvent } from '@/utils/eventFeatured.js';
+import { isFeaturedEvent, FEATURED_CARD_CLASS, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 
 // `reviewStats` ({ review_count, average_rating }) is the past grid's star
 // summary, batch-loaded by the page; an upcoming event never shows one.
 // `inFeaturedSection` is set by the events page's "Featured events" strip:
 // the section heading already says it, so the card drops its own Featured
-// pill and highlight border there and keeps one plain, crisp outline.
+// pill there but keeps the gold outline.
 const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewStats, inFeaturedSection = false }) => {
   const eventTitle = event.title || event.name;
   const today = toLocalDateStr(new Date());
   const past = isPastEvent(event, today);
-  const featured = !inFeaturedSection && isFeaturedEvent(event, today);
+  const featured = isFeaturedEvent(event, today);
+  const showFeaturedPill = featured && !inFeaturedSection;
   const reviewCount = Number(reviewStats?.review_count) || 0;
   const formattedDate = formatEventDate(event);
   const formattedTime = formatEventTime(event);
@@ -35,7 +36,7 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
   const imgError = !imgSrc;
 
   return (
-    <Card className={`flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group ${featured ? 'border-2 border-primary' : 'border-border'}`}>
+    <Card className={`flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group ${featured ? FEATURED_CARD_CLASS : 'border-border'}`}>
       <div className="relative h-48 w-full overflow-hidden bg-muted flex items-center justify-center">
         {rawImageUrl && !imgError ? (
           <>
@@ -79,8 +80,8 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
               <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
             );
           })()}
-          {featured && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">
+          {showFeaturedPill && (
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${FEATURED_PILL_CLASS} text-xs font-bold shadow-sm`}>
               <Star className="w-3 h-3 fill-current" /> Featured
             </span>
           )}
