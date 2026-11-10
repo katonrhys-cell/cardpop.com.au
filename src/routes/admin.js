@@ -742,6 +742,16 @@ router.patch('/events/:id/organiser', validateRequestParams(eventRsvpsSchema), v
     if (updateError) throw updateError;
     if (!updated) return res.status(404).json({ error: 'Event not found' });
 
+    // An open change request belongs to whoever owned the event before; the new
+    // owner can't see or edit it, so drop it rather than leave it orphaned.
+    const { error: requestError } = await supabase
+      .from('event_change_requests')
+      .delete()
+      .eq('event_id', req.params.id)
+      .eq('status', 'pending')
+      .neq('organiser_id', matches[0].id);
+    if (requestError) logger.warn(`[ADMIN] Could not clear old change requests on event ${req.params.id}: ${requestError.message}`);
+
     logger.info(`[ADMIN] ${req.user.id} linked organiser ${matches[0].id} to event ${req.params.id}`);
     res.json({ organiser: await loadEventOrganiser(updated.organiser_id) });
   } catch (err) {

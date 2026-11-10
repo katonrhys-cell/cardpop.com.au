@@ -11,6 +11,8 @@ import {
   welcomeOfferEmail,
   launchWelcomeEmail,
   eventSubmittedEmail,
+  eventReviewOutcomeEmail,
+  eventChangeRequestedEmail,
   identityReviewNeededEmail,
   soleTraderChangedEmail,
   orderAdminNoticeEmail,
@@ -276,6 +278,29 @@ export async function sendEventSubmitted({ to, event }) {
     to,
     subject: `New event pending review: ${event?.title || 'Untitled'}`,
     html: eventSubmittedEmail({ event }),
+  });
+}
+
+// Organiser email when an admin approves or rejects their event submission
+// (kind 'submission') or applies / dismisses their changes to a live event
+// (kind 'changes').
+export async function sendEventReviewOutcome({ to, name, eventTitle, kind, approved, note, eventUrl }) {
+  const what = kind === 'changes' ? 'Your changes to' : 'Your event';
+  return send({
+    to,
+    subject: approved
+      ? `${what} ${eventTitle || 'your event'} ${kind === 'changes' ? 'are' : 'is'} live`
+      : `${what} ${eventTitle || 'your event'} ${kind === 'changes' ? 'weren’t applied' : 'wasn’t approved'}`,
+    html: eventReviewOutcomeEmail({ name, eventTitle, kind, approved, note, eventUrl }),
+  });
+}
+
+// Admin heads-up when the organiser of a live event asks to change it.
+export async function sendEventChangeRequested({ to, event, organiserName, fields }) {
+  return send({
+    to,
+    subject: `Event changes to review: ${event?.title || 'Untitled'}`,
+    html: eventChangeRequestedEmail({ event, organiserName, fields }),
   });
 }
 

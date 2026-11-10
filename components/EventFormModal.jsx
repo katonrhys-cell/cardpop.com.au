@@ -27,6 +27,8 @@ import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
 import { findOrganiser } from '@/utils/eventOrganisers.js';
+import { diffEventChanges } from '@/utils/eventChangeRequests.js';
+import { notifyEventDecision } from '@/lib/eventReviewApi.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -103,6 +105,8 @@ const INITIAL_STATE = {
   seo_keywords: [],
   tags: [],
   source_url: '',
+  // Admin only: shown to the organiser when status is 'rejected'.
+  rejection_reason: '',
 };
 
 // Simple tag input — press Enter or comma to add
@@ -170,9 +174,18 @@ const CharCount = ({ value = '', max, warn = 0.85 }) => {
 
 // mode="admin" exposes status/featured/SEO controls; mode="user" locks
 // submissions to pending_review so they go through the admin approval queue.
-const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = 'admin' }) => {
+//
+// In user mode a live (approved) event isn't edited directly: the save becomes
+// a change request (utils/eventChangeRequests.js) that an admin applies, and
+// the live page is untouched until then. For that, `event` is the live row with
+// any open request's changes laid over it (to prefill), `baseEvent` the live
+// row itself (to diff against) and `changeRequest` the open request, if any.
+const EventFormModal = ({ isOpen, onClose, event, baseEvent = null, changeRequest = null, scrapedData, onSaved, mode = 'admin' }) => {
   const { currentUser } = useAuth();
   const isUserMode = mode === 'user';
+  const liveEvent = baseEvent || event;
+  const isChangeRequest = isUserMode && Boolean(liveEvent?.id) && liveEvent.status === 'approved';
+  const isResubmission = isUserMode && liveEvent?.status === 'rejected';
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
@@ -341,6 +354,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         seo_keywords:        event.seo_keywords || [],
         tags:                event.tags || [],
         source_url:          event.source_url || '',
+        rejection_reason:    event.rejection_reason || '',
       });
       setImagePreview(event.image_url || null);
       setLogoFile(null);
@@ -594,14 +608,71 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         tags:                formData.tags.length ? formData.tags : null,
         source_url:          formData.source_url.trim() || null,
       };
+      // Admin only, and only alongside a rejection — approving clears it in the DB.
+      if (!isUserMode && formData.status === 'rejected') {
+        payload.rejection_reason = formData.rejection_reason.trim() || null;
+      }
 
-      if (event?.id) {
+      if (isChangeRequest) {
+        // Live event: record the difference as a change request; the event row
+        // itself is untouched until an admin applies it.
+        const changes = diffEventChanges(liveEvent, payload);
+        if (Object.keys(changes).length === 0) {
+          if (changeRequest?.id) {
+            const { error } = await supabase.from('event_change_requests').delete().eq('id', changeRequest.id);
+            if (error) throw error;
+            toast.success('Your change request was withdrawn — nothing differs from the live event.');
+            if (onSaved) onSaved();
+            onClose();
+          } else {
+            toast.info('Nothing has changed yet — edit a field, then submit.');
+          }
+          return;
+        }
+        let requestId = changeRequest?.id ?? null;
+        if (requestId) {
+          const { error } = await supabase.from('event_change_requests').update({ changes }).eq('id', requestId);
+          if (error) throw error;
+        } else {
+          const { data: inserted, error } = await supabase
+            .from('event_change_requests')
+            .insert({ event_id: liveEvent.id, organiser_id: currentUser?.id, changes })
+            .select('id')
+            .single();
+          if (error) throw error;
+          requestId = inserted?.id ?? null;
+        }
+        toast.success('Changes sent for review. Your event stays live as it is until they’re approved.');
+        if (requestId) {
+          // Fire-and-forget email to the admins; the bell comes from a DB trigger.
+          apiServerClient
+            .fetch(`/events/change-requests/${requestId}/notify-admins`, { method: 'POST' })
+            .catch(() => {});
+        }
+      } else if (event?.id) {
         // NB: organiser_id is deliberately NOT in the update payload — editing
         // an event (incl. an admin fixing a user submission) must not reassign
         // its owner to the editor.
         const { error } = await supabase.from('events').update(payload).eq('id', event.id);
         if (error) throw error;
-        toast.success(isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
+        toast.success(isResubmission
+          ? 'Event resubmitted — our team will review it again before it goes live.'
+          : isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
+        if (isResubmission) {
+          // Same admin email a fresh submission gets.
+          apiServerClient
+            .fetch('/events/notify-submission', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ eventId: event.id }),
+            })
+            .catch(() => {});
+        }
+        if (!isUserMode && event.status === 'pending_review' && ['approved', 'rejected'].includes(payload.status)) {
+          // An admin just decided a submission: email its organiser (the bell
+          // is a DB trigger). Fire-and-forget — the decision is saved.
+          notifyEventDecision(event.id);
+        }
       } else {
         // Organiser FK — set only on create, to the submitting user.
         if (currentUser?.id) payload.organiser_id = currentUser.id;
@@ -680,7 +751,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         <DialogHeader className="px-6 py-5 border-b border-border bg-muted/20 shrink-0">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-2xl font-bold font-heading text-foreground">
-              {event?.id ? 'Edit Event' : 'Create New Event'}
+              {isChangeRequest ? 'Request Changes' : isResubmission ? 'Edit & Resubmit' : event?.id ? 'Edit Event' : 'Create New Event'}
             </DialogTitle>
             {scrapedData && (
               <Badge variant="secondary" className="bg-primary/10 text-primary border-none shadow-sm h-6 font-semibold px-3">
@@ -689,9 +760,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
             )}
           </div>
           <DialogDescription className="text-muted-foreground mt-1">
-            {isUserMode
-              ? 'Submit your card event to the CardPop calendar. Our team reviews every submission before it goes live.'
-              : event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
+            {isChangeRequest
+              ? 'Your event is live. Edit anything below and submit — our team reviews the changes, and the live page stays as it is until they’re approved.'
+              : isResubmission
+                ? 'Fix what the review asked for, then resubmit. Our team will review it again before it goes live.'
+                : isUserMode
+                  ? 'Submit your card event to the CardPop calendar. Our team reviews every submission before it goes live.'
+                  : event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -772,6 +847,25 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     </div>
                   )}
                 </div>
+
+                {!isUserMode && formData.status === 'rejected' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="rejection_reason" className="font-bold">
+                      Reason for the organiser <span className="text-muted-foreground font-normal text-xs">(shown in their My Events and emailed to them)</span>
+                    </Label>
+                    <Textarea
+                      id="rejection_reason"
+                      name="rejection_reason"
+                      value={formData.rejection_reason}
+                      onChange={handleChange}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="e.g. Please add the venue address and the event's start time."
+                      className="bg-background rounded-xl resize-y"
+                      disabled={loading}
+                    />
+                  </div>
+                )}
 
                 {/* Featured Card Games */}
                 <div className="space-y-2">
@@ -1134,7 +1228,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
+                {isChangeRequest ? 'Submit Changes for Review' : isResubmission ? 'Resubmit for Review' : event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
           </DialogFooter>
