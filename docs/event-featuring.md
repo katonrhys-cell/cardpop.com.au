@@ -19,6 +19,21 @@ One table, `utils/featuredPackages.js`, read by the dialog, the
 20% off every package (`EARLY_BIRD`). To change a price or a package, edit
 that file only (and the `package` check in a new migration if a key changes).
 
+**3-event pack** (`BUNDLE`): one package across three of the organiser's
+events, in one checkout:
+
+| Package | 3 singles | Pack (GST incl.) |
+|---|---|---|
+| Calendar Spotlight | $147 | $119 |
+| Spotlight + Instagram | $297 | $239 |
+| Full Feature | $447 | $359 |
+
+`featuredBundleQuote()` splits the pack price across the three events in whole
+cents (remainder on the first), then takes the early bird off the share of
+any event 28+ days away, so a pack is never dearer than three singles. Each
+event must pass `featureEligibility()` on its own. Change the pack prices in
+`BUNDLE.priceAud`.
+
 ## Flow
 
 1. `POST /hcgi/api/events/:id/feature-checkout` (`src/routes/events.js`,
@@ -36,13 +51,29 @@ that file only (and the `package` check in a new migration if a key changes).
 3. `checkout.session.expired` / `async_payment_failed` mark a pending row
    `expired`, so the organiser can try again.
 
+**Pack flow:** `POST /hcgi/api/events/feature-bundle-checkout`
+(`{ package, eventIds: [3 ids] }`, same auth) runs the same checks on each
+event, writes three `pending` rows sharing a `bundle_id`, and opens one
+session with a line per event and `metadata.bundleId`. The webhook finds the
+rows by `bundle_id` and features each event as above (each row claims its own
+transition, so a redelivery finishes only what's left); expiry expires all
+three. If an event was already featured by another payment in the meantime
+its row can't go `paid` (one paid row per event): the webhook logs an error
+naming the amount to refund in Stripe and carries on with the others.
+
+In the UI, the Feature dialog shows a **This event / 3-event pack** switch
+when the organiser has three or more featurable events, and My Events shows
+a **Choose 3 events** banner; `/list-your-event` lists the pack price under
+each package.
+
 The checkout success-page fallback in `GET /stripe/session/:id` skips this
 kind, so a feature payment can never become an order.
 
 ## Data
 
 `event_feature_purchases` (`20261110104532_event_feature_purchases.sql`):
-one row per session; at most one `paid` row per event; the organiser reads
+one row per event per session (a pack's three rows share `bundle_id` and the
+session, `20261110194228_event_feature_bundles.sql`); at most one `paid` row per event; the organiser reads
 their own rows, admins read all, the browser writes nothing. Test with
 `tests/db/run-event-feature-purchases-migration.sh`.
 

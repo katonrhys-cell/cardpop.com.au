@@ -100,3 +100,32 @@ begin
   perform set_config('request.jwt.claim.sub', '', false);
 end $$;
 \echo 'homepage_featured: all checks passed'
+
+-- ── 3-event pack (20261110194228) ──────────────────────────────────────────
+insert into public.events (id, organiser_id, title, status, start_date) values
+  ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b1', 'Show 2', 'approved', '2026-12-21'),
+  ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b1', 'Show 3', 'approved', '2026-12-22'),
+  ('00000000-0000-0000-0000-0000000000f4', '00000000-0000-0000-0000-0000000000b1', 'Show 4', 'approved', '2026-12-23');
+
+do $$ begin
+  perform set_config('request.jwt.claim.sub', '', false);
+  -- One session, three rows sharing a bundle.
+  insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status, stripe_session_id, bundle_id)
+  select e, '00000000-0000-0000-0000-0000000000b1', 'spotlight', 49, 39.67, 'paid', 'cs_pack', '00000000-0000-0000-0000-00000000bb01'
+  from unnest(array['00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000f4']::uuid[]) e;
+  assert (select count(*) from public.event_feature_purchases where bundle_id = '00000000-0000-0000-0000-00000000bb01') = 3,
+    'a pack writes three rows on one session';
+  begin
+    insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, stripe_session_id)
+    values ('00000000-0000-0000-0000-0000000000f2', '00000000-0000-0000-0000-0000000000b1', 'spotlight', 49, 39.67, 'cs_pack');
+    raise exception 'one session must not cover the same event twice';
+  exception when unique_violation then null;
+  end;
+  begin
+    insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status)
+    values ('00000000-0000-0000-0000-0000000000f3', '00000000-0000-0000-0000-0000000000b1', 'full', 149, 149, 'paid');
+    raise exception 'a pack event must not be paid for twice';
+  exception when unique_violation then null;
+  end;
+end $$;
+\echo 'event_feature_bundles: all checks passed'

@@ -1,6 +1,9 @@
 /**
  * Paid Featured Placement for events.
  *
+ * createFeatureBundleCheckout — the same for the 3-event pack (BUNDLE): one
+ *   package across three of the organiser's events, one session, three
+ *   `pending` rows sharing a bundle_id, each carrying its event's share.
  * createFeatureCheckout — the organiser picks a package in Account → My Events;
  *   the price comes from utils/featuredPackages.js (never the request), a
  *   `pending` event_feature_purchases row is written, and a Stripe Checkout
@@ -15,18 +18,22 @@
  * Every handler is idempotent: Stripe redelivers, and the status transition
  * is claimed with a conditional update.
  */
+import { randomUUID } from 'node:crypto';
 import stripe from '../utils/stripeClient.js';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import { sendEventFeaturePaid } from '../utils/emailService.js';
 import {
-  featuredQuote, featureEligibility, todayInAustralia, featuredPackage,
+  featuredQuote, featuredBundleQuote, featureEligibility, todayInAustralia, featuredPackage, BUNDLE,
 } from '../../utils/featuredPackages.js';
 
 export const EVENT_FEATURE_KIND = 'event_feature';
 
 const EVENT_COLS = 'id, title, slug, status, start_date, end_date, is_featured, organiser_id, organizer_name';
+const PURCHASE_COLS = 'id, event_id, organiser_id, package, amount_aud, early_bird, status';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const toAud = (cents) => Number((cents / 100).toFixed(2));
 
 /** What the team still does by hand for each package (the calendar is automatic). */
 export const MANUAL_EXTRAS = {
@@ -72,8 +79,6 @@ export async function createFeatureCheckout({ user, eventId, packageKey, success
   if (!eligibility.ok) throw new FeatureCheckoutError(409, eligibility.reason);
 
   const quote = featuredQuote(packageKey, event.start_date, today);
-  const toAud = (cents) => Number((cents / 100).toFixed(2));
-
   const { data: purchase, error: insertError } = await supabase
     .from('event_feature_purchases')
     .insert({
@@ -127,9 +132,105 @@ export async function createFeatureCheckout({ user, eventId, packageKey, success
   return { url: session.url, sessionId: session.id, quote };
 }
 
+export async function createFeatureBundleCheckout({ user, eventIds, packageKey, successUrl, cancelUrl, now = new Date() }) {
+  if (!featuredPackage(packageKey)) throw new FeatureCheckoutError(400, 'Choose a featuring package.');
+  const ids = Array.isArray(eventIds) ? [...new Set(eventIds.map(String))] : [];
+  if (ids.length !== BUNDLE.size || !ids.every((id) => UUID_RE.test(id))) {
+    throw new FeatureCheckoutError(400, `Choose ${BUNDLE.size} different events for the pack.`);
+  }
+
+  const { data: rows, error } = await supabase.from('events').select(EVENT_COLS).in('id', ids);
+  if (error) throw error;
+  const byId = new Map((rows || []).map((e) => [e.id, e]));
+  const events = ids.map((id) => byId.get(id));
+  if (events.some((e) => !e)) throw new FeatureCheckoutError(404, 'Event not found.');
+  if (events.some((e) => e.organiser_id !== user.id)) throw new FeatureCheckoutError(403, 'You can only feature your own events.');
+
+  const { data: paidRows, error: paidError } = await supabase
+    .from('event_feature_purchases')
+    .select('event_id')
+    .in('event_id', ids)
+    .eq('status', 'paid');
+  if (paidError) throw paidError;
+  const paid = new Set((paidRows || []).map((r) => r.event_id));
+
+  const today = todayInAustralia(now);
+  for (const event of events) {
+    const eligibility = featureEligibility(event, today, { paid: paid.has(event.id) });
+    if (!eligibility.ok) throw new FeatureCheckoutError(409, `${event.title}: ${eligibility.reason}`);
+  }
+
+  const quote = featuredBundleQuote(packageKey, events.map((e) => e.start_date), today);
+  const bundleId = randomUUID();
+
+  const { data: purchases, error: insertError } = await supabase
+    .from('event_feature_purchases')
+    .insert(events.map((event, i) => ({
+      event_id: event.id,
+      organiser_id: user.id,
+      package: quote.pkg.key,
+      base_aud: toAud(quote.lines[i].baseCents),
+      discount_aud: toAud(quote.lines[i].discountCents),
+      amount_aud: toAud(quote.lines[i].priceCents),
+      early_bird: quote.lines[i].earlyBird,
+      bundle_id: bundleId,
+      status: 'pending',
+    })))
+    .select('id');
+  if (insertError) throw insertError;
+
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ['card'],
+    mode: 'payment',
+    customer_email: user.email || undefined,
+    line_items: events.map((event, i) => ({
+      price_data: {
+        currency: 'aud',
+        product_data: {
+          name: `Featured Placement ${BUNDLE.size}-event pack: ${quote.pkg.name}`,
+          description: `${event.title}${quote.lines[i].earlyBird ? ' (early bird price)' : ''}`.slice(0, 500),
+        },
+        unit_amount: quote.lines[i].priceCents,
+      },
+      quantity: 1,
+    })),
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: {
+      kind: EVENT_FEATURE_KIND,
+      bundleId,
+      eventIds: ids.join(','),
+      userId: user.id,
+      package: quote.pkg.key,
+    },
+  });
+  if (!session?.url) throw new Error('Stripe returned a session without a URL');
+
+  const { error: stampError } = await supabase
+    .from('event_feature_purchases')
+    .update({ stripe_session_id: session.id, updated_at: new Date().toISOString() })
+    .eq('bundle_id', bundleId);
+  if (stampError) logger.error(`[EVENT FEATURE] Could not stamp session ${session.id} on bundle ${bundleId}: ${stampError.message}`);
+
+  logger.info(`[EVENT FEATURE] Pack checkout ${session.id} for events ${ids.join(', ')} (${quote.pkg.key}, ${quote.priceCents}c, ${purchases?.length || 0} rows)`);
+  return { url: session.url, sessionId: session.id, quote };
+}
+
+/** Every purchase row a session paid for: the pack's three, or the single one. */
+async function findPurchases(session) {
+  const bundleId = session.metadata?.bundleId;
+  if (bundleId) {
+    const { data, error } = await supabase.from('event_feature_purchases').select(PURCHASE_COLS).eq('bundle_id', bundleId);
+    if (error) throw new Error(`Feature bundle lookup failed for session ${session.id}: ${error.message}`);
+    return data || [];
+  }
+  const purchase = await findPurchase(session);
+  return purchase ? [purchase] : [];
+}
+
 async function findPurchase(session) {
   const purchaseId = session.metadata?.purchaseId;
-  let query = supabase.from('event_feature_purchases').select('id, event_id, organiser_id, package, amount_aud, early_bird, status');
+  let query = supabase.from('event_feature_purchases').select(PURCHASE_COLS);
   query = purchaseId ? query.eq('id', purchaseId) : query.eq('stripe_session_id', session.id);
   const { data, error } = await query.maybeSingle();
   if (error) throw new Error(`Feature purchase lookup failed for session ${session.id}: ${error.message}`);
@@ -141,11 +242,19 @@ export async function handleEventFeaturePaid(session) {
     logger.info(`[EVENT FEATURE] Session ${session.id} not paid yet (${session.payment_status}), deferring`);
     return;
   }
-  const purchase = await findPurchase(session);
-  if (!purchase) {
+  const purchases = await findPurchases(session);
+  if (!purchases.length) {
     logger.error(`[EVENT FEATURE] Paid session ${session.id} has no purchase row; featuring not switched on`);
     return;
   }
+  // A pack's rows are handled one by one: each claims its own transition, so a
+  // redelivery after a partial failure finishes only what's left.
+  for (const purchase of purchases) {
+    await featurePurchase(session, purchase, { bundled: Boolean(session.metadata?.bundleId) });
+  }
+}
+
+async function featurePurchase(session, purchase, { bundled = false } = {}) {
   if (purchase.status === 'paid') {
     logger.info(`[EVENT FEATURE] Purchase ${purchase.id} already paid, skipping`);
     return;
@@ -165,6 +274,13 @@ export async function handleEventFeaturePaid(session) {
     .eq('id', purchase.id)
     .neq('status', 'paid')
     .select('id');
+  if (claimError?.code === '23505') {
+    // Another payment already featured this event (two checkouts were open at
+    // once). The money is taken; retrying can never succeed, so flag it for a
+    // refund instead of failing the webhook forever.
+    logger.error(`[EVENT FEATURE] Purchase ${purchase.id}: event ${purchase.event_id} was already featured by another payment (session ${session.id}). Refund $${purchase.amount_aud} in Stripe.`);
+    return;
+  }
   if (claimError) throw new Error(`Feature purchase ${purchase.id} could not be marked paid: ${claimError.message}`);
   if (!claimed?.length) return;
 
@@ -179,6 +295,7 @@ export async function handleEventFeaturePaid(session) {
   if (featureError) throw new Error(`Event ${purchase.event_id} could not be featured: ${featureError.message}`);
 
   const pkg = featuredPackage(purchase.package);
+  const packageName = `${pkg?.name || purchase.package}${bundled ? ` (${BUNDLE.size}-event pack)` : ''}`;
   const extras = MANUAL_EXTRAS[purchase.package] || [];
   logger.info(`[EVENT FEATURE] Event ${purchase.event_id} featured (${purchase.package}, purchase ${purchase.id})`);
 
@@ -199,7 +316,7 @@ export async function handleEventFeaturePaid(session) {
         user_id: a.id,
         type: 'event_featured',
         title: 'Featured Placement paid',
-        body: `${title}: ${pkg?.name || purchase.package}.${extras.length ? ` To do: ${extras.join('; ')}.` : ''}`,
+        body: `${title}: ${packageName}.${extras.length ? ` To do: ${extras.join('; ')}.` : ''}`,
         related_id: purchase.event_id,
       });
     }
@@ -211,7 +328,7 @@ export async function handleEventFeaturePaid(session) {
     await sendEventFeaturePaid({
       to: await getAdminNotificationEmails(),
       event,
-      packageName: pkg?.name || purchase.package,
+      packageName,
       amountAud: purchase.amount_aud,
       earlyBird: purchase.early_bird,
       organiserName: event?.organizer_name || organiser?.display_name || organiser?.username || null,
@@ -223,13 +340,15 @@ export async function handleEventFeaturePaid(session) {
 }
 
 export async function handleEventFeatureExpired(session) {
-  const purchase = await findPurchase(session);
-  if (!purchase || purchase.status !== 'pending') return;
-  const { error } = await supabase
-    .from('event_feature_purchases')
-    .update({ status: 'expired', updated_at: new Date().toISOString() })
-    .eq('id', purchase.id)
-    .eq('status', 'pending');
-  if (error) throw new Error(`Feature purchase ${purchase.id} could not be expired: ${error.message}`);
-  logger.info(`[EVENT FEATURE] Purchase ${purchase.id} expired unpaid`);
+  const purchases = await findPurchases(session);
+  for (const purchase of purchases) {
+    if (purchase.status !== 'pending') continue;
+    const { error } = await supabase
+      .from('event_feature_purchases')
+      .update({ status: 'expired', updated_at: new Date().toISOString() })
+      .eq('id', purchase.id)
+      .eq('status', 'pending');
+    if (error) throw new Error(`Feature purchase ${purchase.id} could not be expired: ${error.message}`);
+    logger.info(`[EVENT FEATURE] Purchase ${purchase.id} expired unpaid`);
+  }
 }

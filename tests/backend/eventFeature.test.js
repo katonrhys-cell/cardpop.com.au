@@ -177,3 +177,118 @@ describe('Stripe webhook for featuring', () => {
     expect(expire.calls).toContainEqual(['update', expect.objectContaining({ status: 'expired' })]);
   });
 });
+
+describe('POST /events/feature-bundle-checkout', () => {
+  const ID2 = '22222222-2222-4222-8222-222222222222';
+  const ID3 = '33333333-3333-4333-8333-333333333333';
+  const three = () => [
+    event(),
+    event({ id: ID2, title: 'Melbourne Card Show', start_date: addDays(40) }),
+    event({ id: ID3, title: 'Brisbane Card Show', start_date: addDays(12) }),
+  ];
+  const packBody = { ...body, package: 'spotlight', eventIds: [EVENT_ID, ID2, ID3] };
+
+  it('prices the pack server-side, writes three rows and opens one session', async () => {
+    const insert = chain({ data: [{ id: 'p1' }, { id: 'p2' }, { id: 'p3' }], error: null });
+    const stamp = chain({ error: null });
+    builders.push(chain({ data: three(), error: null }), chain({ data: [], error: null }), insert, stamp);
+
+    const res = await request(app).post('/feature-bundle-checkout').send({ ...packBody, amount: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ url: 'https://checkout.stripe.com/c/cs_123', sessionId: 'cs_123' });
+    const rows = insert.calls.find((c) => c[0] === 'insert')[1];
+    expect(rows).toHaveLength(3);
+    const bundleId = rows[0].bundle_id;
+    expect(bundleId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(rows.every((r) => r.bundle_id === bundleId && r.package === 'spotlight' && r.base_aud === 49 && r.status === 'pending')).toBe(true);
+    // $119 split 39.67 / 39.67 / 39.66, early bird off the Melbourne share only.
+    expect(rows.map((r) => [r.event_id, r.amount_aud, r.early_bird])).toEqual([
+      [EVENT_ID, 39.67, false], [ID2, 31.73, true], [ID3, 39.66, false],
+    ]);
+    const session = mockStripe.checkout.sessions.create.mock.calls[0][0];
+    expect(session.line_items.map((l) => l.price_data.unit_amount)).toEqual([3967, 3173, 3966]);
+    expect(session.metadata).toMatchObject({ kind: EVENT_FEATURE_KIND, bundleId, package: 'spotlight', eventIds: `${EVENT_ID},${ID2},${ID3}` });
+    expect(stamp.calls).toContainEqual(['eq', 'bundle_id', bundleId]);
+  });
+
+  it('needs three different events', async () => {
+    const two = await request(app).post('/feature-bundle-checkout').send({ ...packBody, eventIds: [EVENT_ID, ID2] });
+    expect(two.status).toBe(400);
+    const dup = await request(app).post('/feature-bundle-checkout').send({ ...packBody, eventIds: [EVENT_ID, EVENT_ID, ID2] });
+    expect(dup.status).toBe(400);
+    const junk = await request(app).post('/feature-bundle-checkout').send({ ...packBody, eventIds: [EVENT_ID, ID2, 'x'] });
+    expect(junk.status).toBe(400);
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses someone else's event, a missing one, or one already featured", async () => {
+    builders.push(chain({ data: [three()[0], three()[1], event({ id: ID3, organiser_id: 'someone-else' })], error: null }));
+    expect((await request(app).post('/feature-bundle-checkout').send(packBody)).status).toBe(403);
+
+    builders.push(chain({ data: three().slice(0, 2), error: null }));
+    expect((await request(app).post('/feature-bundle-checkout').send(packBody)).status).toBe(404);
+
+    builders.push(chain({ data: three(), error: null }), chain({ data: [{ event_id: ID2 }], error: null }));
+    const res = await request(app).post('/feature-bundle-checkout').send(packBody);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/Melbourne Card Show/);
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unknown package', async () => {
+    expect((await request(app).post('/feature-bundle-checkout').send({ ...packBody, package: 'gold' })).status).toBe(400);
+  });
+});
+
+describe('Stripe webhook for a 3-event pack', () => {
+  const session = { id: 'cs_pack', payment_status: 'paid', payment_intent: 'pi_2', metadata: { kind: EVENT_FEATURE_KIND, bundleId: 'b-1' } };
+  const rows = ['e1', 'e2', 'e3'].map((e, i) => ({
+    id: `p${i + 1}`, event_id: e, organiser_id: 'org-1', package: 'spotlight', amount_aud: 39.67, early_bird: false, status: 'pending',
+  }));
+  const notifyBuilders = () => [
+    chain({ data: [], error: null }), // admins
+    chain({ error: null }), // bells
+    chain({ data: { display_name: 'Jane' }, error: null }), // organiser
+  ];
+
+  it('features all three events', async () => {
+    const lookup = chain({ data: rows, error: null });
+    const features = [];
+    builders.push(lookup);
+    for (const r of rows) {
+      const feature = chain({ data: event({ id: r.event_id, is_featured: true }), error: null });
+      features.push(feature);
+      builders.push(chain({ data: [{ id: r.id }], error: null }), feature, ...notifyBuilders());
+    }
+
+    await handleEventFeaturePaid(session);
+
+    expect(lookup.calls).toContainEqual(['eq', 'bundle_id', 'b-1']);
+    features.forEach((f, i) => {
+      expect(f.calls).toContainEqual(['update', { is_featured: true }]);
+      expect(f.calls).toContainEqual(['eq', 'id', rows[i].event_id]);
+    });
+    expect(mockSendFeaturePaid).toHaveBeenCalledTimes(3);
+    expect(mockSendFeaturePaid).toHaveBeenCalledWith(expect.objectContaining({ packageName: 'Calendar Spotlight (3-event pack)' }));
+  });
+
+  it('skips an event another payment already featured instead of failing the webhook', async () => {
+    builders.push(
+      chain({ data: rows, error: null }),
+      chain({ data: [{ id: 'p1' }], error: null }), chain({ data: event({ id: 'e1' }), error: null }), ...notifyBuilders(),
+      chain({ data: null, error: { code: '23505', message: 'duplicate key' } }),
+      chain({ data: [{ id: 'p3' }], error: null }), chain({ data: event({ id: 'e3' }), error: null }), ...notifyBuilders(),
+    );
+
+    await expect(handleEventFeaturePaid(session)).resolves.toBeUndefined();
+    expect(mockSendFeaturePaid).toHaveBeenCalledTimes(2);
+  });
+
+  it('expires every pending row of a lapsed pack', async () => {
+    const expires = rows.map(() => chain({ error: null }));
+    builders.push(chain({ data: rows, error: null }), ...expires);
+    await handleEventFeatureExpired(session);
+    expires.forEach((e, i) => expect(e.calls).toContainEqual(['eq', 'id', rows[i].id]));
+  });
+});

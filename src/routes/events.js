@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
 import { invalidReturnUrl } from '../utils/returnUrl.js';
-import { createFeatureCheckout, FeatureCheckoutError } from '../services/eventFeatureService.js';
+import { createFeatureCheckout, createFeatureBundleCheckout, FeatureCheckoutError } from '../services/eventFeatureService.js';
 import {
   FEATURED_PACKAGES, EARLY_BIRD, featureEligibility, featuredQuote, formatAud, todayInAustralia,
 } from '../../utils/featuredPackages.js';
@@ -314,6 +314,29 @@ router.post('/:id/notify-changes', authMiddleware, async (req, res) => {
   } catch (err) {
     logger.error(`[EVENTS] notify-changes failed for ${eventId}: ${err.message}`);
     res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
+/**
+ * POST /events/feature-bundle-checkout  { package, eventIds: [3 ids], successUrl, cancelUrl }
+ *
+ * The 3-event pack (BUNDLE in utils/featuredPackages.js): one package across
+ * three of the caller's own events in one Stripe Checkout Session, priced
+ * server-side. Same rules per event as a single featuring.
+ */
+router.post('/feature-bundle-checkout', authMiddleware, requireAal2, async (req, res) => {
+  const { package: packageKey, eventIds, successUrl, cancelUrl } = req.body || {};
+  if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+  const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
+  if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
+
+  try {
+    const result = await createFeatureBundleCheckout({ user: req.user, eventIds, packageKey, successUrl, cancelUrl });
+    res.json({ url: result.url, sessionId: result.sessionId });
+  } catch (err) {
+    if (err instanceof FeatureCheckoutError) return res.status(err.status).json({ error: err.message });
+    logger.error(`[EVENTS] feature-bundle-checkout failed: ${err.message}`);
+    res.status(500).json({ error: 'Could not start checkout. Please try again.' });
   }
 });
 
