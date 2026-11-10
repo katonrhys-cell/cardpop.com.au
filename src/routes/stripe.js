@@ -10,6 +10,7 @@ import { checkPurchaseVelocity } from '../utils/purchaseVelocity.js';
 import { handleDisputeCreated, handleDisputeClosed } from '../services/disputeService.js';
 import { calculateBreakdown, calculateProcessingFee, calculateGst } from '../services/commissionService.js';
 import { handleCheckoutSessionCompleted, handlePaymentFailed, handleCheckoutSessionExpired, getPlatformSetting } from '../services/stripeWebhookService.js';
+import { EVENT_FEATURE_KIND, handleEventFeaturePaid, handleEventFeatureExpired } from '../services/eventFeatureService.js';
 import { validateRequestBody, validateRequestQuery } from '../middleware/validateRequest.js';
 import { createCheckoutSchema, calculateBreakdownSchema, processRefundSchema } from '../schemas/stripeSchemas.js';
 import { createSingleItemCheckout, resolveOfferPrice } from '../services/checkoutService.js';
@@ -690,7 +691,8 @@ router.get('/session/:sessionId', optionalAuthMiddleware, async (req, res) => {
     // contributes nothing but the session id.
     const isSubscription = session.mode === 'subscription' || session.metadata?.kind === 'subscription';
     const isWalletTopup = session.metadata?.walletTopup === 'true';
-    if (session.payment_status === 'paid' && !isSubscription && !isWalletTopup) {
+    const isEventFeature = session.metadata?.kind === EVENT_FEATURE_KIND;
+    if (session.payment_status === 'paid' && !isSubscription && !isWalletTopup && !isEventFeature) {
       try {
         await handleCheckoutSessionCompleted(session, stripe);
       } catch (fulfilErr) {
@@ -866,6 +868,9 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
           }
         } else if (session.metadata?.walletTopup === 'true') {
           await handleWalletTopup(session, stripe);
+        } else if (session.metadata?.kind === EVENT_FEATURE_KIND) {
+          // Paid Featured Placement for an event — not an order.
+          await handleEventFeaturePaid(session);
         } else if (session.mode === 'subscription' || session.metadata?.kind === 'subscription') {
           // Membership signups are mirrored onto the profile by the
           // customer.subscription.* events below. Falling through to the order
@@ -883,11 +888,12 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       // Release the pending order the same way an expiry does, so it isn't left
       // hanging as 'pending'.
       case 'checkout.session.async_payment_failed':
-        await handleCheckoutSessionExpired(event.data.object);
-        break;
-
       case 'checkout.session.expired':
-        await handleCheckoutSessionExpired(event.data.object);
+        if (event.data.object?.metadata?.kind === EVENT_FEATURE_KIND) {
+          await handleEventFeatureExpired(event.data.object);
+        } else {
+          await handleCheckoutSessionExpired(event.data.object);
+        }
         break;
 
       case 'payment_intent.payment_failed':

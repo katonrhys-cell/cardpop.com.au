@@ -18,6 +18,7 @@ vi.mock('../../src/middleware/auth.js', () => ({
 }));
 vi.mock('../../src/middleware/requireAal2.js', () => ({
   requireAdmin: (_req, res, next) => (mockIsAdmin.value ? next() : res.status(403).json({ error: 'Admin access required' })),
+  requireAal2: (_req, _res, next) => next(),
 }));
 vi.mock('../../src/utils/emailService.js', () => ({
   sendEventSubmitted: mockSendEventSubmitted,

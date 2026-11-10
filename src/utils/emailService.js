@@ -13,6 +13,7 @@ import {
   eventSubmittedEmail,
   eventReviewOutcomeEmail,
   eventChangesMadeEmail,
+  eventFeaturePaidEmail,
   identityReviewNeededEmail,
   soleTraderChangedEmail,
   orderAdminNoticeEmail,
@@ -299,6 +300,15 @@ export async function sendEventChangesMade({ to, event, editorName, rows }) {
     to,
     subject: `Live event edited: ${event?.title || 'Untitled'}`,
     html: eventChangesMadeEmail({ event, editorName, rows }),
+  });
+}
+
+// Every admin: an organiser paid for Featured Placement on their event.
+export async function sendEventFeaturePaid({ to, event, packageName, amountAud, earlyBird, organiserName, extras }) {
+  return send({
+    to,
+    subject: `Featured Placement paid: ${event?.title || 'Untitled'}`,
+    html: eventFeaturePaidEmail({ event, packageName, amountAud, earlyBird, organiserName, extras }),
   });
 }
 

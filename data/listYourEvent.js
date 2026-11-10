@@ -12,10 +12,14 @@
  * events.is_featured (admin-set) — utils/eventFeatured.js puts the event in the
  * "Featured events" strip above the calendar, first in its month and with a
  * Featured badge on its card and page — plus Instagram promotion done by hand.
- * No newsletter mention until the newsletter runs. Never put a price or an audience figure in this file —
- * live numbers come from the nightly GA4 / Search Console sync, shown only
- * above their floors (utils/siteTraffic.js).
+ * No newsletter mention until the newsletter runs. The only prices here are
+ * the featuring packages, read from utils/featuredPackages.js (the same table
+ * the server charges from) — never type a price into this file. Never put an
+ * audience figure here either: live numbers come from the nightly GA4 /
+ * Search Console sync, shown only above their floors (utils/siteTraffic.js).
  */
+
+import { FEATURED_PACKAGES, EARLY_BIRD, formatAud } from '../utils/featuredPackages.js';
 
 export const LIST_EVENT_PATH = '/list-your-event';
 export const SUBMIT_EVENT_PATH = '/account/events';
@@ -26,6 +30,21 @@ const mailto = (subject) =>
 
 export const MEMBER_OFFER_MAILTO = mailto('Member ticket offer for my event');
 export const FEATURED_MAILTO = mailto('Featured placement for my event');
+
+const cheapestFeature = Math.min(...FEATURED_PACKAGES.map((p) => p.priceAud * 100));
+export const FEATURED_FROM_PRICE = `From ${formatAud(cheapestFeature)}`;
+
+/** The three featuring packages, for the /list-your-event packages section. */
+export const LIST_EVENT_FEATURED_PACKAGES = FEATURED_PACKAGES.map((p) => ({
+  key: p.key,
+  name: p.name,
+  price: formatAud(p.priceAud * 100),
+  highlight: Boolean(p.highlight),
+  points: p.points,
+}));
+
+export const FEATURED_EARLY_BIRD_NOTE =
+  `Book ${EARLY_BIRD.minDays / 7} or more weeks before your show and every package is ${EARLY_BIRD.pct}% off. Prices include GST and are per event.`;
 
 export const LIST_EVENT_SEO = {
   title: 'List Your Card Show Free | CardPop Australia™ for Event Organisers',
@@ -72,16 +91,15 @@ export const LIST_EVENT_TIERS = [
   {
     key: 'featured',
     name: 'Featured Placement',
-    price: 'Ask us',
-    summary: 'Your show goes to the top of the CardPop events calendar, and we promote it in the weeks before it runs.',
+    price: FEATURED_FROM_PRICE,
+    summary: 'Your show goes to the top of the CardPop events calendar, and we promote it in the weeks before it runs. Pay online in a minute.',
     points: [
       'A spot in the "Featured events" section at the top of the events calendar',
       'First in its month on the calendar, with a Featured badge',
-      'A Featured badge on your event\'s own page',
-      'A post and story on CardPop\'s Instagram',
-      'A clicks and reveals report after the show',
+      'Instagram promotion and a homepage spot on the bigger packages',
+      `${EARLY_BIRD.pct}% off when you book ${EARLY_BIRD.minDays / 7}+ weeks ahead`,
     ],
-    cta: { label: 'Feature Now', href: FEATURED_MAILTO, external: true },
+    cta: { label: 'Feature Now', href: `${SUBMIT_EVENT_PATH}?feature=1` },
   },
 ];
 
@@ -95,7 +113,11 @@ export const LIST_EVENT_STEPS = [
 export const LIST_EVENT_FAQS = [
   {
     q: 'What does it cost to list an event?',
-    a: 'Nothing. Listing a card show, tournament, trade night or store event on CardPop is free. So is adding a member ticket offer. Only featured placement is paid, and we quote it per event.',
+    a: `Nothing. Listing a card show, tournament, trade night or store event on CardPop is free. So is adding a member ticket offer. Only Featured Placement is paid: ${LIST_EVENT_FEATURED_PACKAGES.map((p) => `${p.name} ${p.price}`).join(', ')} per event, including GST.`,
+  },
+  {
+    q: 'How do I feature my event?',
+    a: `Submit your event, then press "Feature" next to it in My Events, pick a package and pay by card. Featuring switches on as soon as the payment goes through and lasts until your show ends. Book ${EARLY_BIRD.minDays / 7} or more weeks before the show and it's ${EARLY_BIRD.pct}% off.`,
   },
   {
     q: 'What kinds of events can I list?',

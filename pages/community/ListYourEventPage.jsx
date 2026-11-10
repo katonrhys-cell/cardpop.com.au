@@ -13,6 +13,7 @@ import { formatCount, publicSearchStats, publicTrafficStat } from '@/utils/siteT
 import {
   LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_PATH, LIST_EVENT_SEO,
   LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH,
+  LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE,
 } from '@/data/listYourEvent.js';
 
 const TIER_ICONS = { listing: CalendarPlus, offer: Ticket, featured: Megaphone };
@@ -160,6 +161,42 @@ const ListYourEventPage = () => {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* Featured Placement packages — prices from utils/featuredPackages.js */}
+        <section id="featured-packages" aria-labelledby="featured-packages-heading" className="scroll-mt-8">
+          <h2 id="featured-packages-heading" className="mb-2 text-center font-serif text-2xl font-bold sm:text-3xl">
+            Featured Placement packages
+          </h2>
+          <p className="mx-auto mb-6 max-w-xl text-center text-sm text-muted-foreground">{FEATURED_EARLY_BIRD_NOTE}</p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {LIST_EVENT_FEATURED_PACKAGES.map((pkg) => (
+              <div
+                key={pkg.key}
+                className={`flex flex-col rounded-3xl border bg-card p-6 ${pkg.highlight ? 'border-primary shadow-md' : 'border-border'}`}
+              >
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h3 className="text-lg font-bold">{pkg.name}</h3>
+                  <span className="text-2xl font-bold tabular-nums">{pkg.price}</span>
+                </div>
+                {pkg.highlight && <span className="mb-3 self-start rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Most popular</span>}
+                <ul className="mb-6 space-y-2 text-sm">
+                  {pkg.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  to={`${SUBMIT_EVENT_PATH}?feature=1`}
+                  className={`mt-auto inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-opacity hover:opacity-90 ${pkg.highlight ? 'bg-primary text-primary-foreground' : 'border border-border bg-background'}`}
+                >
+                  Feature Now <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            ))}
           </div>
         </section>
 

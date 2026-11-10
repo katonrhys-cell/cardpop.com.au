@@ -2,7 +2,9 @@ import { Router } from 'express';
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
-import { requireAdmin } from '../middleware/requireAal2.js';
+import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
+import { invalidReturnUrl } from '../utils/returnUrl.js';
+import { createFeatureCheckout, FeatureCheckoutError } from '../services/eventFeatureService.js';
 import { sendEventSubmitted, sendEventReviewOutcome, sendEventChangesMade } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import { mergeChangeLog, changeRows, describeEventValue } from '../../utils/eventChangeLog.js';
@@ -292,6 +294,33 @@ router.post('/:id/notify-changes', authMiddleware, async (req, res) => {
   } catch (err) {
     logger.error(`[EVENTS] notify-changes failed for ${eventId}: ${err.message}`);
     res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
+/**
+ * POST /events/:id/feature-checkout  { package, successUrl, cancelUrl }
+ *
+ * Opens a Stripe Checkout Session for paid Featured Placement on the caller's
+ * own event (Account → My Events → Feature). The price is set server-side from
+ * utils/featuredPackages.js, early bird included; the webhook switches the
+ * featuring on once paid (src/services/eventFeatureService.js). Money in, so
+ * MFA-enrolled organisers must be stepped up, like a wallet top-up.
+ */
+router.post('/:id/feature-checkout', authMiddleware, requireAal2, async (req, res) => {
+  const { id } = req.params;
+  const { package: packageKey, successUrl, cancelUrl } = req.body || {};
+  if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid event id' });
+  if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+  const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
+  if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
+
+  try {
+    const result = await createFeatureCheckout({ user: req.user, eventId: id, packageKey, successUrl, cancelUrl });
+    res.json({ url: result.url, sessionId: result.sessionId });
+  } catch (err) {
+    if (err instanceof FeatureCheckoutError) return res.status(err.status).json({ error: err.message });
+    logger.error(`[EVENTS] feature-checkout failed for ${id}: ${err.message}`);
+    res.status(500).json({ error: 'Could not start checkout. Please try again.' });
   }
 });
 

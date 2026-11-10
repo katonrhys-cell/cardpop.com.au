@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   LIST_EVENT_TIERS, LIST_EVENT_FAQS, LIST_EVENT_STEPS, MEMBER_OFFER_MAILTO, FEATURED_MAILTO,
-  ORGANISER_EMAIL, SUBMIT_EVENT_PATH,
+  ORGANISER_EMAIL, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES,
 } from '@/data/listYourEvent.js';
+import { FEATURED_PACKAGES } from '@/utils/featuredPackages.js';
 import { buildOrganiserStats } from '@/pages/community/ListYourEventPage.jsx';
 
 const fresh = new Date().toISOString();
@@ -24,10 +25,22 @@ describe('organiser landing copy', () => {
     }
   });
 
-  it('never claims an audience figure or a dollar price in the copy', () => {
+  it('never claims an audience figure, and only quotes the featuring prices', () => {
     const text = JSON.stringify([LIST_EVENT_TIERS, LIST_EVENT_FAQS, LIST_EVENT_STEPS]);
-    expect(text).not.toMatch(/\$\d/);
     expect(text).not.toMatch(/\d[\d,]{3,}\s*(visitors|collectors|members|pageviews|views)/i);
+    // Every dollar figure is one of the featuring package prices (utils/featuredPackages.js).
+    const allowed = new Set(FEATURED_PACKAGES.map((p) => `$${p.priceAud}`));
+    for (const price of text.match(/\$\d[\d.]*/g) || []) expect(allowed.has(price)).toBe(true);
+  });
+
+  it('lists every featuring package at the price the server charges', () => {
+    expect(LIST_EVENT_FEATURED_PACKAGES.map((p) => [p.key, p.price])).toEqual(
+      FEATURED_PACKAGES.map((p) => [p.key, `$${p.priceAud}`]),
+    );
+    const featured = LIST_EVENT_TIERS.find((t) => t.key === 'featured');
+    expect(featured.cta.label).toBe('Feature Now');
+    expect(featured.cta.href).toBe(`${SUBMIT_EVENT_PATH}?feature=1`);
+    expect(JSON.stringify(LIST_EVENT_TIERS)).not.toMatch(/newsletter/i);
   });
 });
 
