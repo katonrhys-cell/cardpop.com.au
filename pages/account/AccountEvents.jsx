@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, FilePen, RotateCcw } from 'lucide-react';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
@@ -84,6 +84,18 @@ const AccountEvents = () => {
   }, [currentUser?.id]);
 
   const openSubmit = () => { setEditingEvent(null); setIsModalOpen(true); };
+
+  // `?new=1` (the "List an event" option after email confirmation) opens the
+  // submit form straight away; the param is dropped so a refresh or closing
+  // the form doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    openSubmit();
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const openEdit = (event) => { setEditingEvent(event); setIsModalOpen(true); };
   const editingRequest = editingEvent?.status === 'approved' && requests.get(editingEvent.id)?.status === 'pending'
     ? requests.get(editingEvent.id)
