@@ -8,9 +8,11 @@
  * Every promise here is something the site already does: free listings are
  * submitted from Account → My Events and reviewed; the member ticket offer is
  * the event form's Member Offer tab (docs/event-ticket-offers.md), whose
- * clicks and reveals are counted per event; featured placement is promotion
- * CardPop does by hand (socials, newsletter) — the events calendar doesn't
- * surface events.is_featured, so don't promise a badge here. Never put a price or an audience figure in this file —
+ * clicks and reveals are counted per event; featured placement is
+ * events.is_featured (admin-set) — utils/eventFeatured.js puts the event in the
+ * "Featured events" strip above the calendar, first in its month and with a
+ * Featured badge on its card and page — plus Instagram promotion done by hand.
+ * No newsletter mention until the newsletter runs. Never put a price or an audience figure in this file —
  * live numbers come from the nightly GA4 / Search Console sync, shown only
  * above their floors (utils/siteTraffic.js).
  */
@@ -71,10 +73,12 @@ export const LIST_EVENT_TIERS = [
     key: 'featured',
     name: 'Featured Placement',
     price: 'Ask us',
-    summary: 'We promote your show to CardPop\'s audience in the weeks before it runs.',
+    summary: 'Your show goes to the top of the CardPop events calendar, and we promote it in the weeks before it runs.',
     points: [
+      'A spot in the "Featured events" section at the top of the events calendar',
+      'First in its month on the calendar, with a Featured badge',
+      'A Featured badge on your event\'s own page',
       'A post and story on CardPop\'s Instagram',
-      'A mention in the CardPop newsletter',
       'A clicks and reveals report after the show',
     ],
     cta: { label: 'Feature Now', href: FEATURED_MAILTO, external: true },
