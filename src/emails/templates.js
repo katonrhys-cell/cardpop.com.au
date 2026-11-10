@@ -557,6 +557,67 @@ ${summaryTable([
   );
 }
 
+// ─── Event review outcome (to the organiser) ─────────────────────────────────
+
+// Sent to the member who submitted an event (kind 'submission') or asked to
+// change a live one (kind 'changes') once an admin decides. `note` is the
+// admin's reason / message, shown as written. See docs/event-submissions.md.
+export function eventReviewOutcomeEmail({ name, eventTitle, kind = 'submission', approved, note, eventUrl }) {
+  const title = esc(eventTitle) || 'your event';
+  const greeting = `Hi ${esc(name) || 'there'},`;
+  const noteHtml = note
+    ? `<p style="margin:16px 0;padding:12px 16px;border-left:3px solid #CE1126;background:#f6f6f6;">${esc(note).replace(/\n/g, '<br>')}</p>`
+    : '';
+  let band;
+  let body;
+  if (kind === 'changes') {
+    band = approved ? 'Your Changes Are Live' : 'Changes Not Applied';
+    body = approved
+      ? `<p>The changes you asked for on <strong>${title}</strong> have been approved and are now on the event page.</p>${noteHtml}`
+      : `<p>We reviewed the changes you asked for on <strong>${title}</strong> and haven't applied them, so the event page is unchanged.</p>${noteHtml}
+<p>You can send a new request from <strong>Account → My Events</strong>.</p>`;
+  } else {
+    band = approved ? 'Your Event Is Live' : 'Event Not Approved';
+    body = approved
+      ? `<p><strong>${title}</strong> has been approved and is now on the CardPop events calendar.</p>${noteHtml}
+<p>Need to change something later? Use <strong>Request changes</strong> under Account → My Events — the live page stays as it is until we approve the update.</p>`
+      : `<p>We reviewed <strong>${title}</strong> and couldn't approve it as submitted.</p>${noteHtml}
+<p>You can edit it and resubmit from <strong>Account → My Events</strong>.</p>`;
+  }
+  const ctaUrl = approved && eventUrl ? eventUrl : 'https://cardpop.com.au/account/events';
+  const ctaText = approved && eventUrl ? 'View your event' : 'Go to My Events';
+  return cpEmail(
+    `${band}: ${title}`,
+    band,
+    greeting,
+    body,
+    ctaUrl,
+    ctaText,
+    'You received this because you submitted this event to CardPop. Turn these emails off under Account → Notification Settings.',
+  );
+}
+
+// ─── Organiser asked to change a live event (admin notification) ─────────────
+
+export function eventChangeRequestedEmail({ event, organiserName, fields }) {
+  const body = `<p>The organiser of a live event has asked to change it. The event page stays as it is until you apply the changes.</p>
+${summaryTable([
+  ['Event', esc(event?.title) || 'Untitled'],
+  ['Requested by', esc(organiserName) || '—'],
+  ['Fields', (fields || []).map(esc).join(', ') || '—'],
+])}
+<p>Review the changes in Event Management to apply or dismiss them.</p>`;
+  return cpEmail(
+    `Event changes to review: ${esc(event?.title) || 'Untitled'}`,
+    'Event Changes Requested',
+    'An organiser wants to update their event',
+    body,
+    'https://cardpop.com.au/admin/events?view=changes',
+    'Review changes',
+    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+  );
+}
+
 // ─── Identity verification needs manual review (admin notification) ──────────
 
 // Sent to admin accounts when a user's Stripe Identity document name doesn't

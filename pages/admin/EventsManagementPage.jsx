@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Helmet } from 'react-helmet-async';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent, Ban, FilePen } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -16,6 +16,9 @@ import EventScraperPanel from '@/components/EventScraperPanel.jsx';
 import EventScanPanel from '@/components/EventScanPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import EventRsvpListDialog from '@/components/admin/EventRsvpListDialog.jsx';
+import EventRejectDialog from '@/components/admin/EventRejectDialog.jsx';
+import EventChangeReviewDialog from '@/components/admin/EventChangeReviewDialog.jsx';
+import { loadPendingChangeRequests, notifyEventDecision } from '@/lib/eventReviewApi.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { toLocalDateStr } from '@/lib/eventSeo.js';
 import {
@@ -40,8 +43,9 @@ const STATUS_LABELS = {
 const fmtLocation = (ev) =>
   [ev.venue_name, ev.suburb, ev.state].filter(Boolean).join(', ') || 'Location TBA';
 
-// Two views over the same list: everything, or just what the nightly scan found
-// and hasn't been reviewed yet — which is the queue an admin actually works.
+// Views over the same list: everything, what the nightly scan found and hasn't
+// been reviewed yet, or live events whose organiser has asked for changes
+// (`changes`, filtered against the open change requests — see below).
 const FILTERS = {
   all: () => true,
   discovered: (ev) => ev.auto_discovered && ev.status === 'pending_review',
@@ -94,6 +98,10 @@ const EventsManagementPage = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [scrapedData, setScrapedData] = useState(null);
   const [rsvpEvent, setRsvpEvent] = useState(null);
+  // Open organiser change requests on live events, keyed by event id.
+  const [changeRequests, setChangeRequests] = useState(() => new Map());
+  const [reviewEventId, setReviewEventId] = useState(null);
+  const [rejectingEvent, setRejectingEvent] = useState(null);
   // Ids of rows published from the "Found by scan" view that are still shown
   // there (toggle on, fading) until their linger timer removes them.
   const [lingeringIds, setLingeringIds] = useState(() => new Set());
@@ -118,6 +126,11 @@ const EventsManagementPage = () => {
       return next;
     }, { replace: true });
   };
+  // The admin bell / email for a change request links to ?view=changes.
+  useEffect(() => {
+    if (searchParams.get('view') === 'changes') setFilter('changes');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on arrival
+  }, []);
   const searchTerm = param('q');
   const listFilters = { search: searchTerm, status: param('status'), type: param('type'), state: param('state'), source: param('source') };
   const sortKey = param('sort');
@@ -164,13 +177,15 @@ const EventsManagementPage = () => {
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const [{ data, error }, offers] = await Promise.all([
+      const [{ data, error }, offers, requests] = await Promise.all([
         supabase.from('events').select('*').order('start_date', { ascending: false }),
         // Member offer counts (lib/eventTicketOffers.js). Separate read so a
         // problem here never empties the list.
         loadOfferCounts(),
+        loadPendingChangeRequests().catch(() => new Map()),
       ]);
       if (error) throw error;
+      setChangeRequests(requests);
       const offerByEvent = new Map(offers.map((o) => [o.event_id, o]));
       setEvents((data ?? []).map((ev) => ({ ...ev, ticket_offer: offerByEvent.get(ev.id) ?? null })));
     } catch (err) {
@@ -226,6 +241,8 @@ const EventsManagementPage = () => {
       // In the scan queue the row would otherwise leave on this same render:
       // keep it for a beat so the admin sees the toggle go green first.
       if (filter === 'discovered' && newStatus === 'approved') lingerRow(event.id);
+      // Approving a member's submission: email them (the bell is a DB trigger).
+      if (event.status === 'pending_review' && newStatus === 'approved') notifyEventDecision(event.id);
       toast.success(`Event ${newStatus === 'approved' ? 'published' : 'unpublished'}.`);
     } catch (err) {
       toast.error('Failed to update event status.');
@@ -248,11 +265,20 @@ const EventsManagementPage = () => {
   };
 
   const discoveredCount = events.filter(FILTERS.discovered).length;
+  const changesCount = events.filter((ev) => changeRequests.has(ev.id)).length;
   const queueEvents = events.filter(
     filter === 'discovered'
       ? (ev) => FILTERS.discovered(ev) || lingeringIds.has(ev.id)
-      : FILTERS[filter]
+      : filter === 'changes'
+        ? (ev) => changeRequests.has(ev.id)
+        : FILTERS[filter]
   );
+  const reviewEvent = reviewEventId ? events.find((ev) => ev.id === reviewEventId) : null;
+  const dropChangeRequest = (eventId) => setChangeRequests((prev) => {
+    const next = new Map(prev);
+    next.delete(eventId);
+    return next;
+  });
   // Search, dropdown filters and sort apply on top of the queue view, and the
   // result is split into Current & upcoming / Past. `today` is the admin's
   // local date so the split matches the public calendar.
@@ -262,7 +288,7 @@ const EventsManagementPage = () => {
       return groupEventsByTiming(filterEvents(queueEvents, listFilters, { today }), sortKey, sortDir, { today });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- listFilters/sortKey/sortDir all derive from searchParams
-    [events, filter, lingeringIds, searchParams],
+    [events, filter, lingeringIds, searchParams, changeRequests],
   );
   const visibleCount = sections.reduce((n, s) => n + s.events.length, 0);
 
@@ -289,7 +315,7 @@ const EventsManagementPage = () => {
         </Button>
       </AdminPageHeader>
 
-      {discoveredCount > 0 && (
+      {(discoveredCount > 0 || changesCount > 0 || filter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={filter === 'all' ? 'default' : 'outline'}
@@ -306,6 +332,14 @@ const EventsManagementPage = () => {
             className="rounded-lg font-bold"
           >
             <Radar className="w-3.5 h-3.5 mr-1.5" /> Found by scan ({discoveredCount})
+          </Button>
+          <Button
+            variant={filter === 'changes' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('changes')}
+            className="rounded-lg font-bold"
+          >
+            <FilePen className="w-3.5 h-3.5 mr-1.5" /> Change requests ({changesCount})
           </Button>
         </div>
       )}
@@ -373,6 +407,8 @@ const EventsManagementPage = () => {
                   ? 'Nothing matches your search and filters.'
                   : filter === 'discovered'
                     ? 'The scan has nothing waiting for review.'
+                    : filter === 'changes'
+                      ? 'No organiser has asked for changes.'
                     : "You haven't created any events yet."}
               </p>
               {activeFilterCount > 0 ? (
@@ -506,6 +542,15 @@ const EventsManagementPage = () => {
                             {STATUS_LABELS[event.status] || event.status}
                           </Badge>
                         )}
+                        {changeRequests.has(event.id) && (
+                          <button
+                            type="button"
+                            onClick={() => setReviewEventId(event.id)}
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-700 whitespace-nowrap hover:bg-amber-500/20 dark:text-amber-400"
+                          >
+                            <FilePen className="w-3 h-3" aria-hidden="true" /> Changes requested
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
@@ -531,6 +576,18 @@ const EventsManagementPage = () => {
                             <ClipboardPen className="w-4 h-4" />
                           </Link>
                         </Button>
+                        {event.status === 'pending_review' && !event.auto_discovered && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRejectingEvent(event)}
+                            className="rounded-lg shadow-sm"
+                            title="Reject with a reason"
+                            aria-label={`Reject ${event.title}`}
+                          >
+                            <Ban className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleOpenModal(event)} className="rounded-lg shadow-sm">
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -566,6 +623,19 @@ const EventsManagementPage = () => {
       />
 
       <EventRsvpListDialog event={rsvpEvent} onClose={() => setRsvpEvent(null)} />
+
+      <EventRejectDialog
+        event={rejectingEvent}
+        onClose={() => setRejectingEvent(null)}
+        onRejected={(id, reason) => setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, status: 'rejected', rejection_reason: reason } : ev))}
+      />
+
+      <EventChangeReviewDialog
+        event={reviewEvent}
+        request={reviewEvent ? changeRequests.get(reviewEvent.id) : null}
+        onClose={() => setReviewEventId(null)}
+        onDecided={(eventId) => { dropChangeRequest(eventId); fetchEvents(); }}
+      />
 
       <EventScanPanel
         isOpen={isScanOpen}
