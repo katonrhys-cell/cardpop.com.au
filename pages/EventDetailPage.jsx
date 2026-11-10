@@ -6,6 +6,7 @@ import EventDetailCard from '@/components/EventDetailCard.jsx';
 import EventInfoBoard from '@/components/events/EventInfoBoard.jsx';
 import EventDiscussion from '@/components/events/EventDiscussion.jsx';
 import RelatedEvents from '@/components/RelatedEvents.jsx';
+import NextEditionBanner from '@/components/events/NextEditionBanner.jsx';
 import EventReviewTeaser from '@/components/reviews/EventReviewTeaser.jsx';
 import EventAttendeeReviews from '@/components/events/EventAttendeeReviews.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -135,6 +136,9 @@ const EventDetailPage = () => {
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Calendar
           </Link>
         </Button>
+
+        {/* A finished event hands its search traffic to the next edition */}
+        {isPast && <NextEditionBanner event={event} />}
 
         <EventDetailCard event={displayEvent} isPast={isPast} />
 

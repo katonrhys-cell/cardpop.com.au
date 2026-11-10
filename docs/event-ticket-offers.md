@@ -11,12 +11,20 @@ code, routes the click and counts both.
 
 ## Setting one up
 
-Admin → Events → edit the event → **Member Offer** tab:
+Either side can set it, on the event form's **Member Offer** tab:
+
+- **The organiser**, on their own event only (Account → My Events): saved
+  with the event. On a submission it's reviewed with it; on a **live** event
+  the change is immediate and every admin is alerted with the before → after
+  (`docs/event-submissions.md`).
+- **An admin**, on any event: Admin → Events → edit the event.
+
+Fields:
 
 | Field | Meaning |
 |---|---|
 | **Offer line** | Public teaser, e.g. "15% off GA tickets for CardPop members" (120 chars). |
-| **Ticket discount code** | The code the organiser gave you. Visible to signed-in members only. |
+| **Ticket discount code** | The organiser's code. Visible to signed-in members only. |
 | **Referral / tracking link** | The organiser's or ticket platform's link that credits CardPop (e.g. `…?ref=cardpop`). While set, "Get Tickets" opens this instead of the Tickets URL. Must start with `http(s)://`. |
 | **Offer live** | Switch off to hide everything without losing the code or the counts. |
 
@@ -55,7 +63,10 @@ referral report.
 - `supabase/migrations/20261025075600_event_ticket_offers.sql` —
   `event_ticket_offers` (1:1 with `events`). `events` is publicly readable,
   so the code lives in this table, which has **no public SELECT**; admins
-  manage it through RLS. The page reads it through security-definer functions:
+  manage it through RLS. An event's organiser can read and write their own
+  event's row (pending / rejected / approved —
+  `20261110002320_event_organiser_offers_and_admin_alerts.sql`); their changes
+  on a live event are logged to `event_change_log` and alert every admin. The page reads it through security-definer functions:
   `get_event_ticket_offer()` (teaser, anon + signed in — never the code),
   `reveal_event_ticket_code()` (signed in only, counts a reveal) and
   `record_event_ticket_click()`. A trigger stops a form save from resetting
@@ -63,5 +74,6 @@ referral report.
 - `lib/eventTicketOffers.js` — reads, admin save, and `ticketDestination()`
   (referral link → ticket URL → website).
 - `hooks/useEventTicketOffer.js`, `components/events/EventTicketOffer.jsx`
-  (member box), `components/admin/EventTicketOfferPanel.jsx` (admin tab).
+  (member box), `components/admin/EventTicketOfferPanel.jsx` (the form's tab, admin and
+  organiser wording via `audience`).
 - Event JSON-LD / prerender keep the organiser's own `ticket_url`.

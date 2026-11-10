@@ -1282,10 +1282,10 @@ export const MobileNavMenus = ({
 
         {isAdmin && (
           <div className="mb-8">
-            <h4 className="px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
+            <h2 className="px-4 text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
               <Shield className="w-3.5 h-3.5" />
               Admin Portal
-            </h4>
+            </h2>
             <nav className="flex flex-col gap-1">
               {ADMIN_LINKS.map((link) => (
                 <SheetClose key={link.label} asChild>

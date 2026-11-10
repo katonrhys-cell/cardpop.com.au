@@ -184,9 +184,9 @@ const ShopSinglesPage = () => {
         {/* Sidebar Filters */}
         <aside className="w-full lg:w-72 shrink-0">
           <div className="bg-card border border-border rounded-3xl p-6 shadow-sm sticky top-28">
-            <h3 className="font-bold text-lg mb-6 flex items-center gap-2 text-foreground">
+            <h2 className="font-bold text-lg mb-6 flex items-center gap-2 text-foreground">
               <SlidersHorizontal className="w-5 h-5" /> Filters
-            </h3>
+            </h2>
             
             {/* Price Range */}
             <div className="mb-8">
@@ -279,7 +279,7 @@ const ShopSinglesPage = () => {
           ) : (
             <div className="flex flex-col items-center justify-center py-24 bg-muted/30 rounded-3xl border border-border border-dashed">
               <PackageX className="w-16 h-16 text-muted-foreground mb-4 opacity-50" />
-              <h3 className="text-2xl font-bold mb-2 text-foreground">No singles found</h3>
+              <h2 className="text-2xl font-bold mb-2 text-foreground">No singles found</h2>
               <p className="text-muted-foreground max-w-md text-center mb-8 text-lg">
                 We couldn't find any items matching your current filters.
               </p>

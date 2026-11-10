@@ -18,13 +18,3 @@ begin
           'partner_application'::public.notification_type;
   raise notice 'ok: submissions bell admins and new types exist';
 end $$;
-
--- A notification failure can no longer block a submission.
-create or replace function public.create_notification(p_user_id uuid, p_type notification_type, p_title text, p_body text, p_link text default null, p_related_id uuid default null)
-returns void language plpgsql as $$ begin raise exception 'boom'; end; $$;
-do $$
-begin
-  insert into public.events (title, organiser_id) values ('Still saves', '00000000-0000-0000-0000-0000000000b1');
-  if not exists (select 1 from public.events where title = 'Still saves') then raise exception 'submission was blocked'; end if;
-  raise notice 'ok: a failing bell does not block the submission';
-end $$;

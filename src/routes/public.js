@@ -6,6 +6,7 @@ import { queryHomepageBundle, bundleHasErrors, queryTickerRows, queryShowcaseRow
 import { SHOP_FACET_COLUMNS } from '../../utils/shopColumns.js';
 import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
 import { loadPublicSettings } from './settings.js';
+import { priceWidgetSvg, priceWidgetFallbackSvg, PRICE_WIDGET_DAYS } from '../../utils/priceWidget.js';
 
 // Edge-cached public reads.
 //
@@ -165,6 +166,64 @@ router.get('/settings', async (req, res) => {
     if (!(error instanceof PartialResult)) logger.error(`[PUBLIC] settings failed: ${error.message}`);
     uncacheable(res);
     return res.json(error instanceof PartialResult ? error.payload : (await loadPublicSettings()).settings);
+  }
+});
+
+// ── Embeddable price widget ────────────────────────────────────────────────
+// GET /public/price-widget/:slug.svg — the live "price on CardPop" image that
+// other sites embed inside a link to the card's price page (utils/priceWidget.js,
+// "Embed" on /prices/:category/:slug). Snapshots refresh daily, so the edge
+// keeps it for an hour. It is loaded as an <img> from other origins, so it
+// opts out of Helmet's same-origin Cross-Origin-Resource-Policy.
+
+const PRICE_WIDGET_SLUG = /^[a-z0-9][a-z0-9-]{0,119}$/;
+export const PRICE_WIDGET_CACHE_CONTROL = 'public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400';
+// Its own cache so a crawl of many widgets can't evict the home page bundle.
+export const priceWidgetCache = createTtlCache({ ttlMs, maxEntries: 200 });
+
+const NOT_FOUND = Symbol('not found');
+
+async function loadPriceWidget(slug) {
+  const { data: card, error } = await supabaseAnon
+    .from('tracked_cards')
+    .select('id, slug, name, set_name, category')
+    .eq('slug', slug)
+    .eq('active', true)
+    .maybeSingle();
+  if (error) throw new Error(error.message || 'tracked_cards query failed');
+  if (!card) return NOT_FOUND;
+
+  const { data: rows, error: historyError } = await supabaseAnon
+    .from('card_price_snapshots')
+    .select('snapshot_date, raw_avg, graded_avg')
+    .eq('card_id', card.id)
+    .order('snapshot_date', { ascending: false })
+    .limit(PRICE_WIDGET_DAYS);
+  if (historyError) throw new Error(historyError.message || 'card_price_snapshots query failed');
+  return priceWidgetSvg(card, (rows || []).slice().reverse());
+}
+
+function sendSvg(res, status, svg, cacheControl) {
+  res.removeHeader('Pragma');
+  res.removeHeader('Expires');
+  res.setHeader('Cache-Control', cacheControl);
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  res.type('image/svg+xml');
+  return res.status(status).send(svg);
+}
+
+router.get('/price-widget/:slug.svg', async (req, res) => {
+  const slug = String(req.params.slug || '').toLowerCase();
+  if (!PRICE_WIDGET_SLUG.test(slug)) {
+    return sendSvg(res, 404, priceWidgetFallbackSvg(), EDGE_CACHE_CONTROL);
+  }
+  try {
+    const svg = await priceWidgetCache.get(`price-widget:${slug}`, () => loadPriceWidget(slug));
+    if (svg === NOT_FOUND) return sendSvg(res, 404, priceWidgetFallbackSvg(), EDGE_CACHE_CONTROL);
+    return sendSvg(res, 200, svg, PRICE_WIDGET_CACHE_CONTROL);
+  } catch (error) {
+    logger.error(`[PUBLIC] price widget ${slug} failed: ${error.message}`);
+    return sendSvg(res, 503, priceWidgetFallbackSvg(), 'no-store');
   }
 });
 

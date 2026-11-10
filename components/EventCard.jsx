@@ -13,11 +13,14 @@ import { isFeaturedEvent } from '@/utils/eventFeatured.js';
 
 // `reviewStats` ({ review_count, average_rating }) is the past grid's star
 // summary, batch-loaded by the page; an upcoming event never shows one.
-const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewStats }) => {
+// `inFeaturedSection` is set by the events page's "Featured events" strip:
+// the section heading already says it, so the card drops its own Featured
+// pill and highlight border there and keeps one plain, crisp outline.
+const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewStats, inFeaturedSection = false }) => {
   const eventTitle = event.title || event.name;
   const today = toLocalDateStr(new Date());
   const past = isPastEvent(event, today);
-  const featured = isFeaturedEvent(event, today);
+  const featured = !inFeaturedSection && isFeaturedEvent(event, today);
   const reviewCount = Number(reviewStats?.review_count) || 0;
   const formattedDate = formatEventDate(event);
   const formattedTime = formatEventTime(event);
@@ -32,16 +35,28 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
   const imgError = !imgSrc;
 
   return (
-    <Card className={`flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group ${featured ? 'border-primary ring-2 ring-primary/30' : 'border-border'}`}>
+    <Card className={`flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group ${featured ? 'border-2 border-primary' : 'border-border'}`}>
       <div className="relative h-48 w-full overflow-hidden bg-muted flex items-center justify-center">
         {rawImageUrl && !imgError ? (
-          <img
-            src={imgSrc}
-            alt={eventTitle}
-            className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-            onError={() => setImgSrc(imgSrc !== rawImageUrl ? rawImageUrl : null)}
-          />
+          <>
+            {/* The poster is shown whole (contain) so its text isn't cropped;
+                a blurred cover copy of the same image fills the letterbox so
+                the card never shows empty bands between poster and border. */}
+            <img
+              src={imgSrc}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-70"
+              loading="lazy"
+            />
+            <img
+              src={imgSrc}
+              alt={eventTitle}
+              className="relative object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+              onError={() => setImgSrc(imgSrc !== rawImageUrl ? rawImageUrl : null)}
+            />
+          </>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-muted to-muted/60">
             <ImageOff className="w-8 h-8 text-muted-foreground opacity-40" />

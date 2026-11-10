@@ -105,6 +105,13 @@ const CATEGORIES = [
     ],
   },
   {
+    label: 'Events you organise',
+    types: [
+      { key: 'event_approved', label: 'Your event or its changes were approved' },
+      { key: 'event_rejected', label: 'Your event or its changes weren’t approved' },
+    ],
+  },
+  {
     label: 'Social',
     types: [
       { key: 'message',         label: 'New message' },

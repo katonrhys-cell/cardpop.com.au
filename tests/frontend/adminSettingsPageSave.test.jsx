@@ -93,6 +93,7 @@ describe('AdminSettingsPage save', () => {
       'default_shipping_rate_aud', 'require_mfa_admins', 'email_verification_required',
       'enable_marketplace', 'enable_trading', 'enable_blog', 'banned_words',
       'marketplace_identity_threshold_aud',
+      'google_workspace_referral_enabled', 'google_workspace_referral_url',
     ];
     const user = userEvent.setup();
     render(<AdminSettingsPage />);

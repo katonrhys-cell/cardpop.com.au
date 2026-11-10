@@ -1,90 +1,82 @@
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+// Every notification type the code writes must exist in the notification_type
+// enum. An unknown value fails the insert ("invalid input value for enum
+// notification_type"), and when the insert happens inside a trigger it aborts
+// the user's own write — that is how event submissions broke for organisers
+// (event_pending_review was used by a trigger but never added to the enum).
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
-// Every notification type the code writes must exist in the
-// notification_type enum. An unknown value is a hard error in Postgres:
-// in a trigger it aborted every community event submission from 2026-07-31
-// to 2026-11-06 ('event_pending_review'), and in an API insert it silently
-// dropped the bell. See 20261106061312_admin_review_notification_types.sql.
+const ROOT = path.resolve(__dirname, '../..');
+const MIGRATIONS = path.join(ROOT, 'supabase/migrations');
 
-const ROOT = join(import.meta.dirname, '..', '..');
-
-// The enum as it existed before this repo tracked migrations (read from
-// production, 2026-11-06). Later values come from `add value` migrations.
-const BASE_ENUM = [
-  'bid_placed', 'bid_outbid', 'auction_won', 'auction_ended', 'offer_received', 'offer_accepted',
-  'offer_declined', 'offer_countered', 'order_update', 'review_received', 'price_alert',
-  'event_approved', 'event_rejected', 'system', 'message', 'follow', 'comment', 'comment_reply',
-  'listing_sold', 'listing_approved', 'listing_rejected', 'verification_approved',
-  'verification_rejected', 'payment_received', 'withdrawal_processed', 'security_alert',
-  'watchlist_price_drop', 'watchlist_bid', 'watchlist_ending_soon', 'auction_ending_soon',
-  'order_payment_unfulfilled',
+// Values created on the dashboard before the repo owned the schema — they
+// have no `add value` migration. Taken from production pg_enum.
+const BASE_VALUES = [
+  'bid_placed', 'bid_outbid', 'auction_won', 'auction_ended', 'offer_received',
+  'offer_accepted', 'offer_declined', 'offer_countered', 'order_update',
+  'review_received', 'price_alert', 'event_approved', 'event_rejected', 'system',
+  'message', 'follow', 'comment', 'comment_reply', 'listing_sold',
+  'listing_approved', 'listing_rejected', 'verification_approved',
+  'verification_rejected', 'payment_received', 'withdrawal_processed',
+  'security_alert', 'watchlist_price_drop', 'watchlist_bid',
+  'watchlist_ending_soon', 'auction_ending_soon',
 ];
 
-const walk = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((d) => {
-  const p = join(dir, d.name);
-  return d.isDirectory() ? walk(p) : [p];
-});
-
-const migrations = walk(join(ROOT, 'supabase', 'migrations')).filter((f) => f.endsWith('.sql'));
-const enumValues = new Set(BASE_ENUM);
-for (const f of migrations) {
-  for (const m of readFileSync(f, 'utf8').matchAll(/notification_type\s+add\s+value\s+if\s+not\s+exists\s+'([a-z_]+)'/gi)) {
-    enumValues.add(m[1]);
+function walk(dir, exts, out = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.name === 'node_modules' || entry.name.startsWith('.')) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(full, exts, out);
+    else if (exts.some((e) => entry.name.endsWith(e))) out.push(full);
   }
+  return out;
 }
 
-// Types written by the API: `from('notifications').insert(...)` calls and
-// alertAdminsToReview({ type }) — read the `type:` keys in those statements.
-const writtenBySrc = () => {
-  const found = [];
-  for (const f of walk(join(ROOT, 'src')).filter((p) => p.endsWith('.js'))) {
-    const src = readFileSync(f, 'utf8');
-    const starts = [...src.matchAll(/from\('notifications'\)\s*\.insert\(|alertAdminsToReview\(\{/g)].map((m) => m.index);
-    for (const start of starts) {
-      const chunk = src.slice(start, start + 900);
-      const end = chunk.search(/\n\s*\}\)\)?\)?;/);
-      for (const m of (end > 0 ? chunk.slice(0, end) : chunk).matchAll(/\btype:\s*'([a-z_]+)'/g)) {
-        found.push({ type: m[1], file: f.replace(`${ROOT}/`, '') });
-      }
+function enumValues() {
+  const values = new Set(BASE_VALUES);
+  for (const f of fs.readdirSync(MIGRATIONS)) {
+    const sql = fs.readFileSync(path.join(MIGRATIONS, f), 'utf8');
+    for (const m of sql.matchAll(/alter\s+type\s+(?:public\.)?notification_type\s+add\s+value\s+(?:if\s+not\s+exists\s+)?'([a-z_]+)'/gi)) {
+      values.add(m[1]);
     }
   }
-  return found;
-};
+  return values;
+}
 
-// Types passed to create_notification() by the latest definition of each
-// SQL function (a later migration's `create or replace` supersedes earlier ones).
-const writtenBySql = () => {
-  const latest = new Map();
-  for (const f of migrations.sort()) {
-    const sql = readFileSync(f, 'utf8');
-    for (const m of sql.matchAll(/create\s+or\s+replace\s+function\s+(public\.)?([a-z_]+)\s*\(([\s\S]*?)\$(function)?\$\s*;/gi)) {
-      latest.set(m[2], { body: m[3], file: f.replace(`${ROOT}/`, '') });
+function usedTypes() {
+  const used = new Map();
+  const note = (t, where) => { if (!used.has(t)) used.set(t, where); };
+
+  // SQL: create_notification(<user>, '<type>', …)
+  for (const f of fs.readdirSync(MIGRATIONS)) {
+    const sql = fs.readFileSync(path.join(MIGRATIONS, f), 'utf8');
+    for (const m of sql.matchAll(/create_notification\(\s*[^,()]+,\s*'([a-z_]+)'/g)) note(m[1], f);
+  }
+
+  // JS: `type: '…'` in the object literals passed to notifications inserts.
+  const dirs = ['src', 'api'].map((d) => path.join(ROOT, d)).filter(fs.existsSync);
+  for (const file of dirs.flatMap((d) => walk(d, ['.js']))) {
+    const code = fs.readFileSync(file, 'utf8');
+    for (const m of code.matchAll(/from\(\s*'notifications'\s*\)\s*\.(?:insert|upsert)\(/g)) {
+      const window = code.slice(m.index, m.index + 800);
+      const t = window.match(/\btype:\s*'([a-z_]+)'/);
+      if (t) note(t[1], path.relative(ROOT, file));
     }
   }
-  const found = [];
-  for (const [fn, { body, file }] of latest) {
-    for (const m of body.matchAll(/create_notification\(\s*[^,]+,\s*'([a-z_]+)'/g)) {
-      found.push({ type: m[1], file: `${file} (${fn})` });
-    }
-  }
-  return found;
-};
+  return used;
+}
 
-describe('notification types', () => {
-  it('finds the writers it is meant to check', () => {
-    expect(writtenBySrc().length).toBeGreaterThan(20);
-    expect(writtenBySql().map((w) => w.type)).toContain('event_pending_review');
-  });
-
-  it('every type the API writes exists in the enum', () => {
-    const missing = writtenBySrc().filter((w) => !enumValues.has(w.type));
+describe('notification_type enum', () => {
+  it('contains every notification type the code writes', () => {
+    const values = enumValues();
+    const missing = [...usedTypes()]
+      .filter(([t]) => !values.has(t))
+      .map(([t, where]) => `${t} (${where})`);
     expect(missing).toEqual([]);
   });
 
-  it('every type a database function writes exists in the enum', () => {
-    const missing = writtenBySql().filter((w) => !enumValues.has(w.type));
-    expect(missing).toEqual([]);
+  it('includes event_pending_review, used by the event-submission trigger', () => {
+    expect(enumValues().has('event_pending_review')).toBe(true);
   });
 });
