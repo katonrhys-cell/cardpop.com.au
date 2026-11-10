@@ -8,8 +8,11 @@
  *
  *   1. All days since GA4_START_DATE, by date, with a TOTAL aggregation.
  *      The rows refresh site_traffic_daily (GA4 finalises a day up to ~48h
- *      late, so re-pulling the whole history every night self-heals; it is
- *      a few hundred rows). The TOTAL row gives the all-time figures, and
+ *      late, so re-pulling the whole history every night self-heals), but
+ *      only days whose figures differ from the stored row are written: a
+ *      settled day is never rewritten, so a night's writes are the last few
+ *      days instead of every day since launch. The TOTAL row gives the
+ *      all-time figures, and
  *      GA4 de-duplicates activeUsers across the range — summing the daily
  *      rows would count a returning visitor once per day instead.
  *   2. The trailing 30 days (30daysAgo → yesterday), by date, with a TOTAL
@@ -28,8 +31,10 @@
  * Runbook: docs/site-traffic.md.
  */
 import supabase from '../utils/supabaseClient.js';
-import { isGa4Configured, runGa4Report } from '../utils/ga4Client.js';
-import { isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
+import {
+  describePropertyIdProblem, describeServiceAccountProblem, isGa4Configured, runGa4Report,
+} from '../utils/ga4Client.js';
+import { describeSiteUrlProblem, isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
 import logger from '../utils/logger.js';
 
 // Earliest day to ask GA4 for. GA4 returns nothing for days before the
@@ -45,8 +50,10 @@ const SEARCH_CONSOLE_RETENTION_DAYS = 480;
 const SEARCH_WINDOW_DAYS = 30;
 
 export class Ga4NotConfiguredError extends Error {
-  constructor() {
-    super('GA4 is not configured: set GA4_PROPERTY_ID and GA4_SERVICE_ACCOUNT_JSON (and GSC_SITE_URL for Search Console)');
+  constructor(detail) {
+    super(detail
+      ? `GA4 is not configured: ${detail}`
+      : 'GA4 is not configured: set GA4_PROPERTY_ID and GA4_SERVICE_ACCOUNT_JSON (and GSC_SITE_URL for Search Console)');
     this.name = 'Ga4NotConfiguredError';
   }
 }
@@ -108,7 +115,52 @@ const byDateReport = (dateRange) => runGa4Report({
   limit: 100000,
 });
 
-const upsertDaily = async (days, syncedAt) => {
+const READ_PAGE = 1000; // PostgREST's default row cap
+
+const GA4_COLUMNS = ['users', 'sessions', 'pageviews'];
+const SEARCH_COLUMNS = ['search_clicks', 'search_impressions'];
+
+/**
+ * The days whose figures differ from what is stored (or that aren't stored
+ * yet). Exported for tests.
+ */
+export const changedDays = (days, stored, columns) => days.filter((d) => {
+  const row = stored?.get(d.day);
+  return !row || columns.some((c) => Number(row[c]) !== d[c]);
+});
+
+/**
+ * The stored rows from `fromDay` on, keyed by day — or null when the read
+ * fails, in which case every day is written as before.
+ */
+const readStoredDays = async (fromDay, columns) => {
+  try {
+    const out = new Map();
+    for (let from = 0; ; from += READ_PAGE) {
+      const { data, error } = await supabase
+        .from('site_traffic_daily')
+        .select(['day', ...columns].join(', '))
+        .gte('day', fromDay)
+        .order('day')
+        .range(from, from + READ_PAGE - 1);
+      if (error) throw error;
+      for (const r of data || []) out.set(r.day, r);
+      if (!data || data.length < READ_PAGE) return out;
+    }
+  } catch (error) {
+    logger.warn(`[SITE_TRAFFIC] Could not read stored days, rewriting all: ${error.message}`);
+    return null;
+  }
+};
+
+const onlyChanged = async (days, columns) => {
+  if (!days.length) return days;
+  const stored = await readStoredDays(days[0].day, columns);
+  return changedDays(days, stored, columns);
+};
+
+const upsertDaily = async (allDays, syncedAt) => {
+  const days = await onlyChanged(allDays, GA4_COLUMNS);
   for (let i = 0; i < days.length; i += UPSERT_CHUNK) {
     const chunk = days.slice(i, i + UPSERT_CHUNK).map((d) => ({ ...d, source: 'ga4', synced_at: syncedAt }));
     const { error } = await supabase.from('site_traffic_daily').upsert(chunk, { onConflict: 'day' });
@@ -159,7 +211,8 @@ const searchStartDate = (today) => {
   return configured > earliest ? configured : earliest;
 };
 
-const upsertSearchDaily = async (days, syncedAt) => {
+const upsertSearchDaily = async (allDays, syncedAt) => {
+  const days = await onlyChanged(allDays, SEARCH_COLUMNS);
   for (let i = 0; i < days.length; i += UPSERT_CHUNK) {
     // Only the search columns: a day GA4 has already written keeps its
     // users / sessions / pageviews, a day it hasn't gets the column defaults.
@@ -206,7 +259,12 @@ const syncSearchConsole = async (syncedAt) => {
 export const syncSiteTraffic = async () => {
   const ga4 = isGa4Configured();
   const gsc = isSearchConsoleConfigured();
-  if (!ga4 && !gsc) throw new Ga4NotConfiguredError();
+  if (!ga4 && !gsc) {
+    const problems = [describeServiceAccountProblem(), describePropertyIdProblem()].filter(Boolean);
+    const siteProblem = describeSiteUrlProblem();
+    if (siteProblem) problems.push(siteProblem);
+    throw new Ga4NotConfiguredError(problems.join('. ') || null);
+  }
 
   const syncedAt = new Date().toISOString();
   const result = { synced_at: syncedAt };

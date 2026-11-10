@@ -19,7 +19,11 @@ const requireAuth = (req, res, next) => {
 // Cheap, fast model — generating prose from already-structured fields is an easy
 // task, so the small model is plenty and keeps the call well inside the
 // serverless time budget.
-const DESCRIPTION_MODEL = 'claude-haiku-4-5-20251001';
+// Claude Haiku 5.5 ($0.10 / $0.50 per MTok, from Haiku 4.5's $1 / $5). It
+// thinks by default; a two-sentence description from structured fields needs
+// none of that, so thinking is off (allowed at effort ≤ high) and the reply is
+// read by block type rather than `content[0]`.
+const DESCRIPTION_MODEL = 'claude-haiku-5-5';
 const DESCRIPTION_TIMEOUT = 15_000;
 
 // Human-readable labels for the structured card fields we feed the model.
@@ -93,6 +97,8 @@ router.post('/generate', integratedAiRateLimit, requireAuth, async (req, res) =>
 			body: JSON.stringify({
 				model: DESCRIPTION_MODEL,
 				max_tokens: 512,
+				thinking: { type: 'disabled' },
+				output_config: { effort: 'low' },
 				system: CardDescriptionPrompt,
 				messages: [{ role: 'user', content: [{ type: 'text', text: promptText }] }],
 			}),
@@ -117,8 +123,12 @@ router.post('/generate', integratedAiRateLimit, requireAuth, async (req, res) =>
 		}
 
 		const data = await apiRes.json();
+		const replyText = (Array.isArray(data.content) ? data.content : [])
+			.filter((block) => block?.type === 'text')
+			.map((block) => block.text ?? '')
+			.join('');
 		// Strip any stray surrounding quotes or whitespace the model may add.
-		const description = (data.content?.[0]?.text ?? '').trim().replace(/^["']|["']$/g, '').trim();
+		const description = replyText.trim().replace(/^["']|["']$/g, '').trim();
 
 		if (!description) {
 			return res.status(502).json({ error: 'The description came back empty. Please try again.' });

@@ -47,14 +47,14 @@ const EventReviewScorecard = ({ review, compact = false }) => {
         )}
       </div>
 
-      <div className={`px-5 py-4 grid gap-x-8 gap-y-3 ${compact ? '' : 'sm:grid-cols-2'}`}>
+      <div className={`px-5 py-4 grid gap-x-10 gap-y-4 ${compact ? '' : 'md:grid-cols-2'}`}>
         {SCORE_CATEGORIES.map((cat) => {
           const v = scores[cat.id];
           if (!isValidScore(v)) return null;
           return (
             <div key={cat.id} className="flex items-center justify-between gap-4 min-w-0">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-foreground truncate">{cat.label}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-foreground leading-snug break-words">{cat.label}</p>
                 <div className="mt-1 h-1.5 w-full max-w-[12rem] rounded-full bg-muted overflow-hidden">
                   <div className="h-full rounded-full bg-brand-red" style={{ width: `${(v / 5) * 100}%` }} />
                 </div>
@@ -71,7 +71,7 @@ const EventReviewScorecard = ({ review, compact = false }) => {
       {(goAgain || review.verdict) && (
         <div className="px-5 pb-5 pt-1 flex flex-col sm:flex-row sm:items-center gap-3 border-t border-border/60 mt-1">
           {goAgain && goStyle && (
-            <span className={`inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1 text-xs font-bold ${goStyle.className}`}>
+            <span className={`inline-flex shrink-0 items-center gap-1.5 self-start whitespace-nowrap rounded-full border px-3 py-1 text-xs font-bold ${goStyle.className}`}>
               <goStyle.icon className="w-3.5 h-3.5" aria-hidden="true" />
               Would we go again? {goAgain.label}
             </span>

@@ -11,14 +11,14 @@ export const COLLECTION_SEO = {
     name: "Pokémon",
     aliases: ["Pokemon","Pokémon TCG","pokemon"],
     title: "Pokémon Cards for Sale in Australia | CardPop",
-    description: "Buy, sell and trade Pokémon Trading Card Game singles and sealed products from verified Australian sellers. Browse vintage holos, PSA-graded slabs, and the latest Scarlet & Violet expansions — all priced in AUD.",
+    description: "Buy, sell and trade Pokémon TCG singles and sealed product from verified Australian sellers — vintage holos, PSA slabs and the latest sets, priced in AUD.",
     intro: "The Pokémon Trading Card Game has captivated collectors worldwide since 1999. From the iconic Base Set Charizard to the crown-jewels of modern Scarlet & Violet, Australian collectors have always been among the most passionate on the planet. CardPop is Australia's home for Pokémon cards — connecting buyers and sellers across every state with secure escrow trading, real-time market data, and a community of verified collectors who live and breathe the game. Whether you're hunting a PSA 10 Shadowless Blastoise or picking up the latest Paldea Evolved booster display, you'll find it here.",
   },
   "magic": {
     name: "Magic: The Gathering",
     aliases: ["Magic: The Gathering","Magic","MTG"],
     title: "Magic: The Gathering Cards Australia | CardPop",
-    description: "Buy and sell MTG singles, sealed product and Commander staples from verified Australian sellers. Browse Standard, Pioneer, Modern and Legacy formats — priced in AUD.",
+    description: "Buy and sell MTG singles, sealed product and Commander staples from verified Australian sellers. Standard, Pioneer, Modern and Legacy — priced in AUD.",
     intro: "Magic: The Gathering is the world's premier trading card game — a vast, ever-expanding multiverse spanning over 30 years of iconic cards. From the legendary Power Nine to the latest Bloomburrow and Duskmourn sets, Australian Magic players demand the best. CardPop connects you with verified local sellers for singles, sealed product, and rare foils across all formats and eras.",
   },
   "yugioh": {
@@ -67,7 +67,7 @@ export const COLLECTION_SEO = {
     name: "Riftbound",
     aliases: ["Riftbound"],
     title: "Riftbound Cards Australia | CardPop",
-    description: "Buy and sell Riftbound singles from verified Australian collectors.",
+    description: "Buy and sell Riftbound cards from verified Australian collectors — get in early on the new TCG and start your collection, priced in AUD.",
     intro: "Riftbound is one of the exciting new entries in the TCG space, bringing dimensional rift mechanics to competitive and casual play. Get in early and start building your collection.",
   },
   "tmnt": {

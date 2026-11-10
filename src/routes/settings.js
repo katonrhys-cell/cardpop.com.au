@@ -30,6 +30,12 @@ const PUBLIC_SETTINGS = {
   // checkout page (the server still prices it — src/services/cartService.js).
   free_shipping_threshold_aud: 100,
   default_shipping_rate_aud: 15,
+  // Google Workspace referral (Impact advocate link) shown to sole traders and
+  // event organisers in their account pages (components/WorkspaceReferralCard.jsx).
+  // Editable at Admin → Settings → Referrals so the link can change without a
+  // deploy; the browser only renders an https URL (utils/workspaceReferral.js).
+  google_workspace_referral_enabled: true,
+  google_workspace_referral_url: 'https://sharegoogleworkspace.advocate.impact.com/mQZonNp',
 };
 
 // platform_settings.value is jsonb: booleans store as real JSON booleans, but
@@ -45,11 +51,14 @@ function coerce(defaultValue, value) {
   return String(value);
 }
 
-// GET /settings/public — no auth. Returns the whitelist above, merged over any
-// stored overrides. Fails open to defaults so a settings-table outage can never
-// take the whole site down (or falsely trip maintenance mode).
-router.get('/public', async (_req, res) => {
-  const out = { ...PUBLIC_SETTINGS };
+/**
+ * The whitelist above, merged over any stored overrides. Never throws: a
+ * failed read returns the defaults with `ok: false`, so callers can serve the
+ * fail-open answer without caching it. Only the whitelisted keys are read, so
+ * using the service-role client here exposes nothing else.
+ */
+export async function loadPublicSettings() {
+  const settings = { ...PUBLIC_SETTINGS };
   try {
     const { data, error } = await supabase
       .from('platform_settings')
@@ -57,11 +66,21 @@ router.get('/public', async (_req, res) => {
       .in('key', Object.keys(PUBLIC_SETTINGS));
     if (error) throw error;
     for (const row of data || []) {
-      if (row.key in out) out[row.key] = coerce(PUBLIC_SETTINGS[row.key], row.value);
+      if (row.key in settings) settings[row.key] = coerce(PUBLIC_SETTINGS[row.key], row.value);
     }
+    return { settings, ok: true };
   } catch (err) {
     logger.error(`[SETTINGS] public read failed, serving defaults: ${err.message}`);
+    return { settings, ok: false };
   }
+}
+
+// GET /settings/public — no auth. The browser now reads the same answer from
+// the edge-cached /public/settings (src/routes/public.js); this path stays for
+// tabs still running an older build. Fails open to defaults so a settings-table
+// outage can never take the whole site down (or falsely trip maintenance mode).
+router.get('/public', async (_req, res) => {
+  const { settings: out } = await loadPublicSettings();
   // Identical for every visitor and fetched on every SPA boot — let the
   // Cloudflare edge absorb it (overrides the API-wide no-store default).
   // s-maxage 60 keeps a maintenance-mode flip visible within a minute.

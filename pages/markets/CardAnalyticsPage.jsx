@@ -18,7 +18,7 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import SoldBadge from '@/components/SoldBadge.jsx';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
-import { VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
+import { VAULT_ITEM_CARD_COLUMNS, VAULT_ITEM_LISTING_EMBED } from '@/lib/listingCardColumns.js';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -260,7 +260,7 @@ const CardAnalyticsPage = () => {
 
     Promise.all([
       supabase.from('shop_products').select(SHOP_CARD_COLUMNS).ilike('title', `%${term}%`).in('status', PURCHASABLE_SHOP_STATUSES).order('price_aud').limit(6).then(r => r.data ?? []),
-      supabase.from('vault_items').select(`*, ${VAULT_ITEM_LISTING_EMBED}`).ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
+      supabase.from('vault_items').select(`${VAULT_ITEM_CARD_COLUMNS}, ${VAULT_ITEM_LISTING_EMBED}`).ilike('card_name', `%${term}%`).eq('is_public', true).order('created_at', { ascending: false }).limit(6).then(r => r.data ?? []),
     ]).then(([shop, vault]) => {
       if (!cancelled) {
         setListings(shop.map(i => ({ ...i, _source: 'shop' })));

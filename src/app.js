@@ -109,7 +109,11 @@ app.use(cors({
 	maxAge: 86400,
 }));
 
-app.use(morgan('combined'));
+// In production only failed requests are logged: the platform already records
+// every invocation, and a line per request was most of the log volume.
+app.use(morgan('combined', {
+	skip: (_req, res) => process.env.NODE_ENV === 'production' && res.statusCode < 400,
+}));
 // Apply the global IP rate limit to everything except the payment webhooks —
 // a burst of retries from Stripe or PayPal (a handful of fixed egress IPs)
 // must never be throttled, or the provider backs off and eventually disables
@@ -127,6 +131,7 @@ logger.debug(`[MAIN] Configuring body parser with limit: ${BodyLimit} bytes`);
 // with stripe.webhooks.constructEvent() before processing the event.
 // endsWith handles both /stripe/webhook (dev) and /hcgi/api/stripe/webhook (the
 // frontend's proxied prefix, which Vercel rewrites to /api).
+const jsonParser = express.json({ limit: BodyLimit });
 app.use((req, res, next) => {
 	if (req.path.endsWith('/stripe/webhook')) return next();
 	// The admin event-scraper accepts a large pasted page body. Parsing it here —
@@ -135,7 +140,7 @@ app.use((req, res, next) => {
 	// router; it parses the body with LargeBodyLimit only AFTER authenticating
 	// and authorizing the caller (router-level gate in routes/event-scraper.js).
 	if (req.path.includes('/event-scraper')) return next();
-	express.json({ limit: BodyLimit })(req, res, next);
+	jsonParser(req, res, next);
 });
 app.use(express.urlencoded({ extended: true, limit: BodyLimit }));
 

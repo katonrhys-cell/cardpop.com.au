@@ -281,10 +281,12 @@ const AdminDashboard = () => {
           <ManagementBox title="Chargebacks" description="Review payment disputes and frozen payouts." icon={CreditCard} link="/admin/disputes" />
           <ManagementBox title="Revenue Breakdown" description="Every sale behind total revenue — dates, amounts, fees and GST." icon={DollarSign} link="/admin/revenue" />
           <ManagementBox title="Finance & Tax" description="Profit on shop sales, GST by BAS quarter, stock valuation and accountant exports." icon={DollarSign} link="/admin/finance" />
+          <ManagementBox title="Invoices" description="A tax invoice for every paid order and a credit note for every refund, with Xero exports and sync status." icon={FileText} link="/admin/invoices" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
           <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />
+          <ManagementBox title="Grading Partners" description="Australian stores that submit cards to PSA, Beckett, CGC, ACE, SGC and TAG — where every “Grade with…” link lands." icon={Handshake} link="/admin/grading-partners" />
           <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
           <ManagementBox title="Giveaways" description="Instagram giveaways: prizes, entries, comment verification and the recorded random draw." icon={Gift} link="/admin/giveaways" />
         </div>

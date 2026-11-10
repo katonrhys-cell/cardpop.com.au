@@ -14,7 +14,12 @@
 // Pinning an inactive type makes `sessions.create` throw, which takes down
 // checkout — hence the env override, so the list can be corrected in Vercel
 // without waiting for a deploy.
-const DEFAULT_TYPES = ['card', 'paypal'];
+//
+// The default is card only. It used to be card + PayPal, but PayPal is not
+// active on the account, so every checkout failed with "The payment method
+// type provided: paypal is invalid" (2026-11-05). Add it back through
+// STRIPE_PAYMENT_METHOD_TYPES=card,paypal once it is switched on in Stripe.
+const DEFAULT_TYPES = ['card'];
 
 /**
  * @returns {string[]|null} the types to pin, or null to let Stripe/the

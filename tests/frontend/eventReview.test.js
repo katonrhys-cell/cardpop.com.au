@@ -13,6 +13,11 @@ import {
   reviewPublishProblems,
   videoKind,
   cleanVideo,
+  cleanVideos,
+  cleanDeals,
+  dealSavingPct,
+  buildReviewVideoJsonLds,
+  MAX_REVIEW_VIDEOS,
   reviewVideoFileError,
   REVIEW_VIDEO_MAX_BYTES,
   hasScorecard,
@@ -128,6 +133,8 @@ describe('normalizeReview', () => {
       headline_pickup: null,
       gallery: [],
       video: null,
+      videos: [],
+      deals: [],
       pickups: [],
     });
     expect(row).not.toHaveProperty('extra');
@@ -158,6 +165,8 @@ describe('publishing rules', () => {
     expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', overall_rating: 4 } })).toEqual([]);
     expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', gallery: [photo] } })).toEqual([]);
     expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', video } })).toEqual([]);
+    expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', videos: [video] } })).toEqual([]);
+    expect(reviewPublishProblems({ ...base, review: { event_id: 'evt', deals: [{ title: '20% off singles' }] } })).toEqual([]);
     expect(reviewPublishProblems({ article: { title: 'T', content: body }, review: { event_id: 'evt' } })).toEqual([]);
   });
 
@@ -166,7 +175,7 @@ describe('publishing rules', () => {
     expect(problems).toHaveLength(3);
     expect(problems.join(' ')).toMatch(/title/);
     expect(problems.join(' ')).toMatch(/event/);
-    expect(problems.join(' ')).toMatch(/star rating, photos, a video or the written report/);
+    expect(problems.join(' ')).toMatch(/star rating, photos, videos, deals of the day or the written report/);
   });
 
   it('flags a report that was started but is too short to stand on its own', () => {
@@ -248,5 +257,69 @@ describe('buildEventReviewJsonLd', () => {
   it('still reviews the article title when the event is missing', () => {
     const ld = buildEventReviewJsonLd({ article, review: { overall_rating: 3 }, event: null });
     expect(ld.itemReviewed).toEqual({ '@type': 'Event', name: 'Vault Melbourne 2026' });
+  });
+});
+
+describe('several review videos', () => {
+  const yt = { url: 'https://youtu.be/dQw4w9WgXcQ', caption: 'Floor tour' };
+  const upload = { url: 'https://x.supabase.co/storage/v1/object/public/media/event-reviews/videos/1-abc-floor.mp4', poster_url: 'https://x.supabase.co/p.jpg' };
+
+  it('keeps order, drops junk and duplicates', () => {
+    const out = cleanVideos([yt, { url: 'https://example.com/x' }, yt, upload]);
+    expect(out.map((v) => v.url)).toEqual([yt.url, upload.url]);
+  });
+
+  it('falls back to the legacy single video only when the list is empty', () => {
+    expect(cleanVideos([], yt)).toHaveLength(1);
+    expect(cleanVideos(undefined, yt)).toHaveLength(1);
+    expect(cleanVideos([upload], yt).map((v) => v.url)).toEqual([upload.url]);
+  });
+
+  it('caps the list', () => {
+    const many = Array.from({ length: MAX_REVIEW_VIDEOS + 5 }, (_, i) => ({ url: `https://youtu.be/dQw4w9WgX${String(i).padStart(2, '0')}` }));
+    expect(cleanVideos(many)).toHaveLength(MAX_REVIEW_VIDEOS);
+  });
+
+  it('normalizeReview writes videos and mirrors the first into video', () => {
+    const row = normalizeReview({ videos: [yt, upload] });
+    expect(row.videos).toHaveLength(2);
+    expect(row.video).toEqual(row.videos[0]);
+    expect(normalizeReview({ video: yt }).videos).toHaveLength(1);
+  });
+
+  it('emits one VideoObject per video with a thumbnail', () => {
+    const article = { title: 'Vault', slug: 'vault', published_at: '2026-10-05T00:00:00Z', excerpt: 'x' };
+    const lds = buildReviewVideoJsonLds({ article, videos: [yt, upload] });
+    expect(lds).toHaveLength(2);
+    expect(lds[0].embedUrl).toMatch(/youtube-nocookie/);
+    expect(lds[0].thumbnailUrl[0]).toMatch(/ytimg/);
+    expect(lds[1].contentUrl).toBe(upload.url);
+    expect(lds[1].thumbnailUrl).toEqual([upload.poster_url]);
+    expect(buildReviewVideoJsonLds({ article: { title: 'x' }, videos: [yt] })).toEqual([]);
+    expect(buildReviewVideoJsonLds({ article, videos: [{ url: upload.url }] })).toEqual([]);
+  });
+});
+
+describe('deals of the day', () => {
+  it('needs a title, sanitises links and ignores a "usual" price that is not higher', () => {
+    const out = cleanDeals([
+      { title: ' Booster box ', vendor: 'Table 12', price_aud: '150', was_price_aud: '200', url: 'javascript:alert(1)', note: '' },
+      { title: 'No saving', price_aud: 10, was_price_aud: 10 },
+      { title: '', price_aud: 5 },
+    ]);
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual({ title: 'Booster box', vendor: 'Table 12', price_aud: 150, was_price_aud: 200, note: null, url: null, image_url: null });
+    expect(out[1].was_price_aud).toBeNull();
+  });
+
+  it('works out the saving', () => {
+    expect(dealSavingPct({ price_aud: 150, was_price_aud: 200 })).toBe(25);
+    expect(dealSavingPct({ price_aud: 150 })).toBeNull();
+    expect(dealSavingPct({ price_aud: 250, was_price_aud: 200 })).toBeNull();
+  });
+
+  it('normalizeReview carries deals', () => {
+    expect(normalizeReview({ deals: [{ title: 'Pack special' }] }).deals).toHaveLength(1);
+    expect(normalizeReview({}).deals).toEqual([]);
   });
 });

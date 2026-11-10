@@ -239,7 +239,7 @@ describe('POST /create-checkout', () => {
     await request(app).post('/create-checkout').send(VALID_CHECKOUT_BODY);
 
     const [[sessionArgs]] = mockStripe.checkout.sessions.create.mock.calls;
-    expect(sessionArgs.payment_method_types).toEqual(['card', 'paypal']);
+    expect(sessionArgs.payment_method_types).toEqual(['card']);
     expect(sessionArgs.payment_method_types).not.toContain('afterpay_clearpay');
   });
 

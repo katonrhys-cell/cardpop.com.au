@@ -27,13 +27,15 @@ beforeEach(() => {
 });
 
 describe('WelcomePage', () => {
-  it('offers a freshly confirmed user the browse / add-card / sell fork instead of forcing ID verification', async () => {
+  it('offers a freshly confirmed user the browse / add-card / sell / event / dashboard choices instead of forcing ID verification', async () => {
     h.auth = { isAuthenticated: true, isIdentityVerified: false, loading: false };
     renderAt();
     await waitFor(() => expect(screen.getByText(/welcome to CardPop/i)).toBeInTheDocument());
     expect(screen.getByText('Browse cards').closest('a')).toHaveAttribute('href', '/marketplace');
     expect(screen.getByText('Add your first card').closest('a')).toHaveAttribute('href', '/vault/add');
     expect(screen.getByText('Set up selling').closest('a')).toHaveAttribute('href', '/verify-identity?welcome=1');
+    expect(screen.getByText('List an event').closest('a')).toHaveAttribute('href', '/account/events?new=1');
+    expect(screen.getByText('Go to your dashboard').closest('a')).toHaveAttribute('href', '/account');
   });
 
   it('sends an already ID-verified user straight to their dashboard', async () => {

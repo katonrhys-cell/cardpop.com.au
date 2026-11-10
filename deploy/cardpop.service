@@ -1,0 +1,58 @@
+# systemd unit for the CardPop server — installed by deploy/setup-vps.sh to
+# /etc/systemd/system/cardpop.service. Runbook: docs/vultr-rollout.md.
+#
+# Node itself terminates TLS (Cloudflare Origin CA certificate from
+# /opt/cardpop/shared/certs) on :443 and 308s stray :80 traffic to https, so
+# the unit grants only CAP_NET_BIND_SERVICE. The rest of the environment comes
+# from /opt/cardpop/shared/.env, which server/index.js loads (dotenv) from the
+# working directory — the `current` release links to it. Values set here win
+# over the file.
+#
+# TRUST_PROXY_HOPS=0: nothing sits between Cloudflare and Node, so only
+# Cloudflare edge addresses are walked past in X-Forwarded-For. Leaving the
+# default of 1 here would let a request that reaches the box directly forge
+# its IP for every rate limit.
+
+[Unit]
+Description=CardPop — Node server (Vite build + Express API)
+Documentation=https://github.com/katonrhys-cell/cardpop.com.au/blob/main/docs/vultr-rollout.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=cardpop
+Group=cardpop
+WorkingDirectory=/opt/cardpop/current
+Environment=NODE_ENV=production
+Environment=HOST=0.0.0.0
+Environment=PORT=80
+Environment=HTTPS_PORT=443
+Environment=TRUST_PROXY_HOPS=0
+Environment=TLS_CERT_FILE=/opt/cardpop/shared/certs/origin.pem
+Environment=TLS_KEY_FILE=/opt/cardpop/shared/certs/origin.key
+Environment=DOTENV_CONFIG_QUIET=true
+ExecStart=/usr/bin/node server/index.js
+Restart=always
+RestartSec=2
+# server/index.js drains in-flight requests for SHUTDOWN_GRACE_MS (10 s) on SIGTERM.
+TimeoutStopSec=20
+KillSignal=SIGTERM
+LimitNOFILE=65536
+
+# Bind :80/:443 without root; nothing else.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+NoNewPrivileges=true
+# The server writes nothing to disk (logs go to the journal).
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+
+[Install]
+WantedBy=multi-user.target

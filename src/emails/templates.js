@@ -36,60 +36,140 @@ export function esc(v) {
 export const EMAIL_LOGO_URL = 'https://cardpop.com.au/images/email/cardpop-logo-v1.png';
 const EMAIL_LOGO_BG = '#0A0A0A';
 const EMAIL_LOGO_WIDTH = 220; // 440px source ÷ 2
+// The footer repeats the logo smaller. The footer band uses the same
+// near-black ground as the header, so the email opens and closes in black and
+// the PNG's edges stay invisible there too.
+const EMAIL_FOOTER_LOGO_WIDTH = 160;
 
+// Email palette — the brand palette from tailwind.config.js (`brand.*`) plus
+// the neutral greys the body copy uses. Everything below reads from here so a
+// colour change is one edit. The header and footer bands are the logo
+// artwork's own near-black ground (EMAIL_LOGO_BG), not a palette colour.
+const RED = '#CE1126';      // brand-red
+const CHARCOAL = '#1F2937'; // brand-charcoal
+const SILVER = '#C4CED4';   // brand-silver
+const INK = '#111827';
+const BODY = '#374151';
+const MUTED = '#6B7280';
+const FAINT = '#9CA3AF';
+const RULE = '#E5E7EB';
+const PANEL = '#F9FAFB';
+const CANVAS = '#F3F4F6';
+const FONT = "'Helvetica Neue',Helvetica,Arial,sans-serif";
+
+/**
+ * Shared layout. `titleBand` is rendered as a small red uppercase label
+ * ("CONTACT FORM", "NEW ORDER") above the `greeting`, which is the page
+ * heading — the eyebrow + heading pattern — instead of the former solid red
+ * band under the logo. Hero emails pass both as '' and draw their own
+ * headline. `footerNote` ("You received this because…") sits in the dark
+ * footer with the legal line, where readers expect it.
+ */
 export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaText, footerNote) {
+  const year = new Date().getFullYear();
+  // A bulletproof-enough button: the colour and radius are on the cell so
+  // Outlook paints it, the padding is on the link so the whole pill is tappable.
   const cta = ctaUrl
-    ? `<div style="text-align:center;margin:32px 0 0"><a href="${ctaUrl}" style="background:#E63946;color:#FFFFFF;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;display:inline-block;letter-spacing:-0.3px">${ctaText}</a></div>`
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:32px auto 0;"><tr>
+<td align="center" style="background:${RED};border-radius:6px;mso-padding-alt:14px 32px;"><a href="${ctaUrl}" style="display:inline-block;padding:14px 32px;font-family:${FONT};font-size:15px;font-weight:700;line-height:1.2;color:#FFFFFF;text-decoration:none;letter-spacing:-0.2px;">${ctaText}</a></td>
+</tr></table>`
     : '';
-  // The title band sits directly under the near-black logo header, so it is
-  // brand red (as the header used to be) rather than charcoal-on-black.
-  const titleRow = titleBand
-    ? `<tr><td style="background:#E63946;padding:20px 40px;"><p style="margin:0;font-size:18px;font-weight:700;color:#FFFFFF;line-height:1.3;">${titleBand}</p></td></tr>`
+  const eyebrow = titleBand
+    ? `<p style="margin:0 0 10px;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:${RED};">${titleBand}</p>`
     : '';
-  const greetingRow = greeting
-    ? `<p style="margin:0 0 20px;font-size:17px;font-weight:600;color:#111827;">${greeting}</p>`
+  const heading = greeting
+    ? `<h1 style="margin:0 0 20px;font-size:22px;line-height:1.3;font-weight:700;color:${INK};letter-spacing:-0.3px;">${greeting}</h1>`
     : '';
   const footerNoteRow = footerNote
-    ? `<p style="margin:8px 0 0;font-size:12px;color:#9CA3AF;">${footerNote}</p>`
+    ? `<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">${footerNote}</p>`
     : '';
+  // nowrap keeps a two-word label ("My Account") on one line when the
+  // footer row wraps on a phone; only the gaps between links can break.
+  const footerLink = (href, label, colour = SILVER) =>
+    `<a href="${href}" style="color:${colour};text-decoration:none;white-space:nowrap;">${label}</a>`;
+  const dot = '<span style="color:#4B5563;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>';
 
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CardPop</title></head>
-<body style="margin:0;padding:0;background:#F0F0F5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
-<div style="display:none;max-height:0;overflow:hidden;color:transparent;">${preheader}</div>
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F0F5;padding:40px 16px;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
-<tr><td style="background:${EMAIL_LOGO_BG};border-radius:12px 12px 0 0;padding:24px 40px;text-align:center;">
-<a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-size:26px;font-weight:900;color:#FFFFFF;letter-spacing:-1px;text-align:center;"></a>
-</td></tr>
-${titleRow}
-<tr><td style="background:#FFFFFF;padding:40px;">
-${greetingRow}
-<div style="font-size:15px;line-height:1.7;color:#374151;">${bodyHtml}</div>
+  return `<!DOCTYPE html>
+<html lang="en" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="color-scheme" content="light">
+<meta name="supported-color-schemes" content="light">
+<title>${titleBand || 'CardPop'}</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<style>
+  body { margin:0; padding:0; -webkit-text-size-adjust:100%; -ms-text-size-adjust:100%; }
+  table { border-collapse:collapse; mso-table-lspace:0; mso-table-rspace:0; }
+  img { border:0; line-height:100%; outline:none; text-decoration:none; -ms-interpolation-mode:bicubic; }
+  a { color:${RED}; }
+  @media only screen and (max-width:620px) {
+    .cp-wrap { padding:16px 8px !important; }
+    .cp-pad { padding-left:20px !important; padding-right:20px !important; }
+    .cp-body { padding:28px 20px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:${CANVAS};font-family:${FONT};">
+<div style="display:none;max-height:0;overflow:hidden;color:transparent;font-size:1px;line-height:1px;mso-hide:all;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${CANVAS};">
+<tr><td align="center" class="cp-wrap" style="padding:40px 16px;">
+<!--[if mso]><table role="presentation" width="600" align="center" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+<tr><td class="cp-pad" style="background:${EMAIL_LOGO_BG};border-radius:12px 12px 0 0;padding:28px 40px 24px;text-align:center;"><a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-family:${FONT};font-size:26px;font-weight:900;color:#FFFFFF;letter-spacing:-1px;text-align:center;"></a></td></tr>
+<tr><td style="background:${RED};height:4px;line-height:4px;font-size:4px;">&nbsp;</td></tr>
+<tr><td class="cp-body" style="background:#FFFFFF;padding:40px;">
+${eyebrow}${heading}
+<div style="font-size:15px;line-height:1.7;color:${BODY};">${bodyHtml}</div>
 ${cta}
-<div style="margin-top:32px;padding-top:24px;border-top:1px solid #E5E7EB;">
-<p style="margin:0;font-size:13px;color:#9CA3AF;line-height:1.6;">Questions? Reach us at <a href="mailto:support@cardpop.com.au" style="color:#E63946;text-decoration:none;">support@cardpop.com.au</a></p>
-${footerNoteRow}
-</div>
 </td></tr>
-<tr><td style="background:#1C1C1E;border-radius:0 0 12px 12px;padding:24px 40px;text-align:center;">
-<p style="margin:0 0 4px;font-size:14px;font-weight:700;color:#FFFFFF;">CardPop</p>
-<p style="margin:0 0 12px;font-size:12px;color:#9CA3AF;">Australia's Premium Trading Card Marketplace</p>
-<p style="margin:0;font-size:12px;"><a href="https://cardpop.com.au" style="color:#E63946;text-decoration:none;">cardpop.com.au</a> &nbsp;&middot;&nbsp; <a href="https://cardpop.com.au/account" style="color:#9CA3AF;text-decoration:none;">My Account</a> &nbsp;&middot;&nbsp; <a href="mailto:support@cardpop.com.au" style="color:#9CA3AF;text-decoration:none;">Support</a></p>
+<tr><td class="cp-pad" style="background:${PANEL};border-top:1px solid ${RULE};padding:20px 40px;">
+<p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};">Questions about this email? Our team is at <a href="mailto:support@cardpop.com.au" style="color:${RED};text-decoration:none;font-weight:600;">support@cardpop.com.au</a>.</p>
+</td></tr>
+<tr><td class="cp-pad" style="background:${EMAIL_LOGO_BG};border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
+<a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;margin:0 0 14px;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_FOOTER_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_FOOTER_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-family:${FONT};font-size:15px;font-weight:700;color:#FFFFFF;text-align:center;"></a>
+<p style="margin:0 0 16px;font-size:12px;color:${SILVER};">Australia's Premium Trading Card Marketplace</p>
+<p style="margin:0;font-size:12px;line-height:1.8;">${footerLink('https://cardpop.com.au', 'cardpop.com.au', '#FFFFFF')}${dot}${footerLink('https://cardpop.com.au/marketplace', 'Marketplace')}${dot}${footerLink('https://cardpop.com.au/account', 'My Account')}${dot}${footerLink('mailto:support@cardpop.com.au', 'Support')}</p>
+<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">&copy; ${year} CardPop Australia. All Rights Reserved.</p>
+${footerNoteRow}
 </td></tr>
 </table>
+<!--[if mso]></td></tr></table><![endif]-->
 </td></tr></table>
 </body></html>`;
 }
 
+/**
+ * Key/value details card: a muted label column and a value column, one row
+ * per fact, with `bold` rows (totals) emphasised and ruled off from the rest.
+ */
 function summaryTable(rows) {
+  const last = rows.length - 1;
   const rowsHtml = rows
-    .map(([label, value, bold]) =>
-      `<tr><td style="padding:6px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;${bold ? 'font-weight:700;font-size:15px;color:#111827;' : ''}"><strong>${label}:</strong> ${value}</td></tr>`)
+    .map(([label, value, bold], i) => {
+      const rule = i < last ? `border-bottom:1px solid ${RULE};` : '';
+      const top = bold && i > 0 ? `border-top:2px solid ${RULE};` : '';
+      return `<tr>
+<td valign="top" width="130" style="padding:10px 16px 10px 0;font-size:13px;line-height:1.5;color:${bold ? INK : MUTED};${bold ? 'font-weight:700;' : ''}${rule}${top}">${label}</td>
+<td valign="top" style="padding:10px 0;font-size:${bold ? '16px' : '14px'};line-height:1.5;color:${INK};${bold ? 'font-weight:700;' : ''}${rule}${top}">${value}</td>
+</tr>`;
+    })
     .join('');
-  return `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;">
-<table cellpadding="0" cellspacing="0" border="0" width="100%">${rowsHtml}</table>
-</div>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PANEL};border:1px solid ${RULE};border-radius:8px;margin:24px 0;"><tr><td style="padding:6px 20px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">${rowsHtml}</table>
+</td></tr></table>`;
+}
+
+/**
+ * A quoted block of free text somebody typed (a contact message, an offer
+ * note) under a small label. Escapes the text itself; line breaks are kept.
+ */
+function quoteBlock(label, text) {
+  return `<p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${MUTED};">${label}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 24px;"><tr>
+<td style="background:${PANEL};border-left:3px solid ${RED};border-radius:0 8px 8px 0;padding:16px 20px;font-size:15px;line-height:1.7;color:${BODY};white-space:pre-wrap;">${esc(text)}</td>
+</tr></table>`;
 }
 
 // ─── Hero badge + stat tiles (every customer-facing email) ───────────────────
@@ -102,9 +182,9 @@ function summaryTable(rows) {
 // Colours are the brand palette (red / charcoal / greys) plus one green for
 // good-news tiles — no blue.
 
-const linkStyle = 'color:#E63946;text-decoration:none;';
+const linkStyle = `color:${RED};text-decoration:none;`;
 const money = (n) => `$${Number(n || 0).toFixed(2)}`;
-const TILE = { red: '#E63946', green: '#16A34A', charcoal: '#1C1C1E', grey: '#6B7280' };
+const TILE = { red: RED, green: '#16A34A', charcoal: CHARCOAL, grey: MUTED };
 
 /** The big centred icon badge under the headline (a glyph in a coloured ring). */
 function heroBadge(glyph, colour = TILE.red) {
@@ -117,7 +197,7 @@ function heroBadge(glyph, colour = TILE.red) {
 
 /** Centred headline + optional sub-line (the product / card / search name). */
 function heroHeading(title, subtitle) {
-  return `<h1 style="margin:0 0 6px;font-size:28px;line-height:1.25;font-weight:400;color:#1C1C1E;text-align:center;letter-spacing:-0.3px;">${title}</h1>
+  return `<h1 style="margin:0 0 6px;font-size:28px;line-height:1.25;font-weight:400;color:#1F2937;text-align:center;letter-spacing:-0.3px;">${title}</h1>
 ${subtitle ? `<p style="margin:0 0 28px;font-size:16px;color:#4B5563;text-align:center;">${subtitle}</p>` : '<div style="height:20px;"></div>'}`;
 }
 
@@ -127,7 +207,7 @@ function statTile({ glyph, colour = TILE.red, value, caption, small = false }) {
 <table cellpadding="0" cellspacing="0" border="0" align="center"><tr>
 <td align="center" valign="middle" style="width:56px;height:56px;border-radius:28px;background:${colour};color:#FFFFFF;font-size:24px;font-weight:900;line-height:56px;">${glyph}</td>
 </tr></table>
-<p style="margin:12px 0 2px;font-size:${small ? '20px' : '30px'};font-weight:400;color:#1C1C1E;line-height:1.2;letter-spacing:-0.5px;word-break:break-word;">${value}</p>
+<p style="margin:12px 0 2px;font-size:${small ? '20px' : '30px'};font-weight:400;color:#1F2937;line-height:1.2;letter-spacing:-0.5px;word-break:break-word;">${value}</p>
 <p style="margin:0;font-size:13px;color:#6B7280;line-height:1.4;">${caption}</p>
 </td>`;
 }
@@ -142,7 +222,7 @@ function statRow(tiles) {
 /** A list of items (cart lines, matches) in the same bordered-card style. */
 function itemCard(rows) {
   const html = rows.map(([left, right]) =>
-    `<tr><td style="padding:10px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${left}</td><td align="right" style="padding:10px 0;font-size:14px;font-weight:700;color:#1C1C1E;border-bottom:1px solid #F3F4F6;white-space:nowrap;">${right}</td></tr>`).join('');
+    `<tr><td style="padding:10px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${left}</td><td align="right" style="padding:10px 0;font-size:14px;font-weight:700;color:#1F2937;border-bottom:1px solid #F3F4F6;white-space:nowrap;">${right}</td></tr>`).join('');
   return `<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid #E5E7EB;border-radius:12px;margin:0 0 24px;"><tr><td style="padding:8px 20px;"><table width="100%" cellpadding="0" cellspacing="0" border="0">${html}</table></td></tr></table>`;
 }
 
@@ -185,7 +265,7 @@ export function welcomeOfferEmail({ name, code, trialDays, discountPct, expiresA
   const expiryStr = new Date(expiresAt).toLocaleDateString('en-AU', {
     day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney',
   });
-  const codeBlock = `<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px;">
+  const codeBlock = `<div style="background:#F9FAFB;border:2px dashed #CE1126;border-radius:12px;padding:24px;text-align:center;margin:0 0 24px;">
 <p style="margin:0 0 8px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
 <p style="margin:0;font-size:28px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
 </div>`;
@@ -221,36 +301,48 @@ ${centred(`Your code expires on <strong>${esc(expiryStr)}</strong>, so don’t s
 
 // Itemised invoice block. GST is already included in the total (Australian
 // prices are GST-inclusive), so it's shown as an "includes GST" line rather
-// than added on top.
+// than added on top. Laid out like a printed invoice: a ruled header row,
+// one line per item with the amount right-aligned, then the totals with the
+// amount charged emphasised.
 function invoiceBlock(invoice, orderId) {
+  const cell = (extra = '') => `padding:10px 0;font-size:14px;line-height:1.5;color:${BODY};border-bottom:1px solid ${RULE};${extra}`;
   const rows = (invoice.items || [])
     .map(it => `<tr>
-<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;">${esc(it.name)}${it.quantity > 1 ? ` <span style="color:#9CA3AF;">× ${Number(it.quantity)}</span>` : ''}${it.preorderEta ? `<br><span style="font-size:12px;font-weight:700;color:#CE1126;">Pre-order &middot; ${esc(it.preorderEta)}</span>` : ''}</td>
-<td style="padding:8px 0;font-size:14px;color:#374151;border-bottom:1px solid #F3F4F6;text-align:right;white-space:nowrap;">${money(it.total)} AUD</td>
+<td style="${cell()}">${esc(it.name)}${it.quantity > 1 ? ` <span style="color:${FAINT};">&times; ${Number(it.quantity)}</span>` : ''}${it.preorderEta ? `<br><span style="font-size:12px;font-weight:700;color:${RED};">Pre-order &middot; ${esc(it.preorderEta)}</span>` : ''}</td>
+<td align="right" style="${cell('white-space:nowrap;color:' + INK + ';')}">${money(it.total)} AUD</td>
 </tr>`)
     .join('');
 
-  const totalsRow = (label, value, bold) => `<tr>
-<td style="padding:6px 0;font-size:${bold ? '15px' : '14px'};color:${bold ? '#111827' : '#6B7280'};${bold ? 'font-weight:700;border-top:2px solid #E5E7EB;padding-top:12px;' : ''}">${label}</td>
-<td style="padding:6px 0;font-size:${bold ? '15px' : '14px'};color:${bold ? '#111827' : '#6B7280'};text-align:right;white-space:nowrap;${bold ? 'font-weight:700;border-top:2px solid #E5E7EB;padding-top:12px;' : ''}">${value}</td>
-</tr>`;
+  const totalsRow = (label, value, bold) => (bold
+    ? `<tr>
+<td style="padding:14px 0 4px;font-size:16px;font-weight:700;color:${INK};border-top:2px solid ${CHARCOAL};">${label}</td>
+<td align="right" style="padding:14px 0 4px;font-size:16px;font-weight:700;color:${INK};border-top:2px solid ${CHARCOAL};white-space:nowrap;">${value}</td>
+</tr>`
+    : `<tr>
+<td style="padding:5px 0;font-size:13px;color:${MUTED};">${label}</td>
+<td align="right" style="padding:5px 0;font-size:13px;color:${BODY};white-space:nowrap;">${value}</td>
+</tr>`);
 
   // Mirrors the on-page checkout summary: Subtotal → Discount → Service fee → GST → Shipping → Total.
   // invoice.gst is GST *added* on top (marketplace listings); invoice.gstIncluded
   // is GST already *inside* GST-inclusive prices (CardPop Shop items + shipping),
   // shown as a note under the total rather than an added row so the lines still
   // sum to the amount charged.
-  const discountRow = invoice.discount > 0 ? totalsRow('Discount', `−${money(invoice.discount)} AUD`) : '';
+  const discountRow = invoice.discount > 0 ? totalsRow('Discount', `&minus;${money(invoice.discount)} AUD`) : '';
   const serviceFeeRow = invoice.serviceFee > 0 ? totalsRow('Service fee', `${money(invoice.serviceFee)} AUD`) : '';
   const gstRow = invoice.gst > 0 ? totalsRow('GST (10%)', `${money(invoice.gst)} AUD`) : '';
   const shippingRow = invoice.shipping > 0 ? totalsRow('Shipping', `${money(invoice.shipping)} AUD`) : '';
   const includedGstRow = invoice.gstIncluded > 0
-    ? `<tr><td colspan="2" style="padding:6px 0 0;font-size:12px;color:#9CA3AF;text-align:right;">Includes GST of ${money(invoice.gstIncluded)} AUD</td></tr>`
+    ? `<tr><td colspan="2" align="right" style="padding:2px 0 0;font-size:12px;color:${FAINT};">Includes GST of ${money(invoice.gstIncluded)} AUD</td></tr>`
     : '';
+  const ref = orderId ? `#${esc(String(orderId).slice(0, 8).toUpperCase())}` : '';
+  const head = `font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${MUTED};padding:0 0 8px;border-bottom:2px solid ${RULE};`;
 
-  return `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;">
-<table cellpadding="0" cellspacing="0" border="0" width="100%">
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PANEL};border:1px solid ${RULE};border-radius:8px;margin:24px 0;"><tr><td style="padding:20px 24px;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+<tr><td style="${head}">Item${ref ? ` <span style="font-weight:400;letter-spacing:0;text-transform:none;color:${FAINT};">&middot; Order ${ref}</span>` : ''}</td><td align="right" style="${head}">Amount</td></tr>
 ${rows}
+<tr><td colspan="2" style="padding:6px 0 0;"></td></tr>
 ${totalsRow('Subtotal', `${money(invoice.subtotal)} AUD`)}
 ${discountRow}
 ${serviceFeeRow}
@@ -259,16 +351,16 @@ ${shippingRow}
 ${totalsRow('Total (AUD)', `${money(invoice.total)} AUD`, true)}
 ${includedGstRow}
 </table>
-</div>`;
+</td></tr></table>`;
 }
 
 function businessBlock(invoice) {
   if (!invoice?.abn) return '';
-  return `<div style="background:#FFFFFF;border:1px solid #E5E7EB;border-radius:8px;padding:16px 20px;margin:0 0 24px;">
-<p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:1.5px;text-transform:uppercase;">Billed to</p>
-${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:#111827;">${esc(invoice.businessName)}</p>` : ''}
-<p style="margin:0;font-size:14px;color:#374151;">ABN: ${esc(invoice.abn)}</p>
-</div>`;
+  return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border:1px solid ${RULE};border-radius:8px;margin:0 0 16px;"><tr><td style="padding:16px 20px;">
+<p style="margin:0 0 6px;font-size:11px;font-weight:700;color:${MUTED};letter-spacing:1.5px;text-transform:uppercase;">Billed to</p>
+${invoice.businessName ? `<p style="margin:0 0 2px;font-size:15px;font-weight:700;color:${INK};">${esc(invoice.businessName)}</p>` : ''}
+<p style="margin:0;font-size:14px;color:${BODY};">ABN ${esc(invoice.abn)}</p>
+</td></tr></table>`;
 }
 
 // Shown when any invoice line is a pre-order: paid now, dispatched later.
@@ -395,7 +487,7 @@ ${statRow([
 ])}
 ${summaryTable(rows)}
 ${Number(gstAud) > 0 ? '<p style="font-size:13px;color:#6b7280;">Your listing price included GST. CardPop withholds the GST on your sale and postage and remits it to the ATO on your behalf.</p>' : ''}
-<p><strong>Next step:</strong> post the card within 7 days using a tracked service, then open <a href="https://cardpop.com.au/account/sales" style="color:#E63946;text-decoration:none;">Account → Sales</a> to see the buyer's delivery address and mark it as shipped with the tracking number — the buyer is emailed the tracking link and your Buyer Protection cover begins.</p>`;
+<p><strong>Next step:</strong> post the card within 7 days using a tracked service, then open <a href="https://cardpop.com.au/account/sales" style="color:#CE1126;text-decoration:none;">Account → Sales</a> to see the buyer's delivery address and mark it as shipped with the tracking number — the buyer is emailed the tracking link and your Buyer Protection cover begins.</p>`;
 
   return cpEmail(
     'You made a sale on CardPop — great work!',
@@ -435,39 +527,108 @@ ${centred(`The refund goes back to your original payment method within ${MARKETP
 // Sent to the admin notification recipient when a user submits an event to the
 // community calendar. It's an internal heads-up, not a customer email, so it
 // links straight to the moderation queue rather than a public page.
-export function eventSubmittedEmail({ event }) {
+export function eventSubmittedEmail({ event, addedBy = null, byAdmin = false }) {
   const EVENT_TYPE_LABELS = {
     card_show: 'Card Show',
     trade_event: 'Trade Event',
     community_event: 'Community Event',
     lgs_event: 'LGS Event',
   };
+  const STATUS_LABELS = {
+    pending_review: 'Pending review',
+    approved: 'Live',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+    rejected: 'Rejected',
+  };
+  const pending = !event.status || event.status === 'pending_review';
   const location = [event.suburb, event.state].filter(Boolean).map(esc).join(', ') || '—';
   const startDate = event.start_date
     ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
     : '—';
-  const submittedBy = event.organizer_name
+  const organiser = event.organizer_name
     ? `${esc(event.organizer_name)}${event.organizer_email ? ` (${esc(event.organizer_email)})` : ''}`
     : (esc(event.organizer_email) || '—');
+  const title = esc(event.title) || 'Untitled';
 
-  const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
+  const intro = pending
+    ? `<p>${byAdmin ? 'An admin' : 'A community member'} has submitted a new event for review. It won't appear on the public calendar until it's approved.</p>`
+    : `<p>A new event has been added to CardPop${event.status === 'approved' ? ' and is already live on the events calendar' : ''}.</p>`;
+  const body = `${intro}
 ${summaryTable([
-  ['Event', esc(event.title) || 'Untitled'],
+  ['Event', title],
+  ['Status', STATUS_LABELS[event.status] || esc(event.status) || '—'],
   ['Type', EVENT_TYPE_LABELS[event.event_type] || esc(event.event_type) || '—'],
   ['Location', location],
   ['Start date', startDate],
-  ['Submitted by', submittedBy],
+  ['Organiser', organiser],
+  ['Added by', esc(addedBy) || '—'],
 ])}
-<p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
+<p>${pending ? 'Review it in Event Management to approve, edit, or reject the submission.' : 'You can check or edit it in Event Management.'}</p>`;
 
   return cpEmail(
-    `New event pending review: ${esc(event.title) || 'Untitled'}`,
-    'New Event Submission',
-    'A new event needs your review',
+    `${pending ? 'New event pending review' : 'New event added'}: ${title}`,
+    pending ? 'New Event Submission' : 'New Event Added',
+    pending ? 'A new event needs your review' : 'A new event is on CardPop',
     body,
     'https://cardpop.com.au/admin/events',
-    'Review in Admin',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+    pending ? 'Review in Admin' : 'Open Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
+  );
+}
+
+// ─── Event review outcome (to the organiser) ─────────────────────────────────
+
+// Sent to the member who submitted an event once an admin approves or rejects
+// it. `note` is the admin's rejection reason, shown as written. See
+// docs/event-submissions.md.
+export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl }) {
+  const title = esc(eventTitle) || 'your event';
+  const greeting = `Hi ${esc(name) || 'there'},`;
+  const noteHtml = note
+    ? `<p style="margin:16px 0;padding:12px 16px;border-left:3px solid #CE1126;background:#f6f6f6;">${esc(note).replace(/\n/g, '<br>')}</p>`
+    : '';
+  const band = approved ? 'Your Event Is Live' : 'Event Not Approved';
+  const body = approved
+    ? `<p><strong>${title}</strong> has been approved and is now on the CardPop events calendar.</p>
+<p>Need to change something later? Edit it any time under <strong>Account → My Events</strong> — your changes go live straight away.</p>`
+    : `<p>We reviewed <strong>${title}</strong> and couldn't approve it as submitted.</p>${noteHtml}
+<p>You can edit it and resubmit from <strong>Account → My Events</strong>.</p>`;
+  const ctaUrl = approved && eventUrl ? eventUrl : 'https://cardpop.com.au/account/events';
+  const ctaText = approved && eventUrl ? 'View your event' : 'Go to My Events';
+  return cpEmail(
+    `${band}: ${title}`,
+    band,
+    greeting,
+    body,
+    ctaUrl,
+    ctaText,
+    'You received this because you submitted this event to CardPop. Turn these emails off under Account → Notification Settings.',
+  );
+}
+
+// ─── Organiser edited their live event (admin notification) ──────────────────
+
+// Every admin gets exactly what changed: one row per field, before → after.
+// The changes are already live; the button opens the event's edit history in
+// Event Management. `rows` values are already human-readable strings.
+export function eventChangesMadeEmail({ event, editorName, rows }) {
+  const cell = 'padding:8px 10px;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:14px;';
+  const table = `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:16px 0;">
+<tr><th align="left" style="${cell}font-weight:700;">Field</th><th align="left" style="${cell}font-weight:700;">Before</th><th align="left" style="${cell}font-weight:700;">Now</th></tr>
+${(rows || []).map((r) => `<tr><td style="${cell}font-weight:600;">${esc(r.label)}</td><td style="${cell}color:#777;text-decoration:line-through;">${esc(r.from).replace(/\n/g, '<br>')}</td><td style="${cell}">${esc(r.to).replace(/\n/g, '<br>')}</td></tr>`).join('\n')}
+</table>`;
+  const body = `<p>${esc(editorName) || 'The organiser'} edited <strong>${esc(event?.title) || 'their event'}</strong>. The changes are already live${event?.url ? ` on <a href="${esc(event.url)}">the event page</a>` : ''}.</p>
+${table}
+<p>Check them in Event Management, edit the event if anything needs undoing, and mark them reviewed.</p>`;
+  return cpEmail(
+    `Live event edited: ${esc(event?.title) || 'Untitled'}`,
+    'Live Event Edited',
+    'An organiser changed their live event',
+    body,
+    'https://cardpop.com.au/admin/events?view=edits',
+    'Review in Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 
@@ -526,23 +687,29 @@ ${summaryTable([
 
 // ─── Contact form message (admin/support) ─────────────────────────────────────
 
-export function contactMessageEmail({ name, email, subject, message }) {
-  const body = `<p>A visitor sent a message through the CardPop contact form.</p>
+export function contactMessageEmail({ name, email, subject, message, receivedAt = new Date() }) {
+  const received = new Date(receivedAt).toLocaleString('en-AU', {
+    day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit',
+    timeZone: 'Australia/Sydney', timeZoneName: 'short',
+  });
+  const body = `<p style="margin:0 0 8px;">A visitor sent the message below through the contact form on cardpop.com.au.</p>
 ${summaryTable([
-  ['From', `${esc(name)} (${esc(email)})`],
+  ['From', esc(name)],
+  ['Email', `<a href="mailto:${esc(email)}" style="color:${RED};text-decoration:none;">${esc(email)}</a>`],
   ['Subject', esc(subject)],
+  ['Received', esc(received)],
 ])}
-<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;white-space:pre-wrap;font-size:15px;line-height:1.7;color:#374151;">${esc(message)}</div>
-<p style="font-size:13px;color:#9CA3AF;">Reply directly to this email to respond to ${esc(name)}.</p>`;
+${quoteBlock('Message', message)}
+<p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};">Reply to this email to answer ${esc(name)} directly — the reply goes to ${esc(email)}, not to CardPop.</p>`;
 
   return cpEmail(
-    `New contact message: ${esc(subject)}`,
-    'New Contact Message',
-    'Someone wants to get in touch',
+    `${esc(name)}: ${esc(subject)}`,
+    'Contact form',
+    `New message from ${esc(name)}`,
     body,
     null,
     null,
-    'You received this because you are the CardPop support contact.',
+    'You received this because you are the CardPop support contact. Change the recipient under Admin → Platform Settings.',
   );
 }
 
@@ -560,9 +727,9 @@ ${summaryTable([
   ['From', `${esc(name)} (${esc(email)})`],
 ])}
 ${message
-    ? `<div style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:8px;padding:20px 24px;margin:24px 0;white-space:pre-wrap;font-size:15px;line-height:1.7;color:#374151;">${esc(message)}</div>`
-    : `<p style="color:#6B7280;">No message was included — they just want to know when it is ${comingSoon ? 'available' : 'back in stock'}.</p>`}
-<p style="font-size:13px;color:#9CA3AF;">Reply directly to this email to respond to ${esc(name)}.</p>`;
+    ? quoteBlock('Their message', message)
+    : `<p style="color:${MUTED};">No message was included — they just want to know when it is ${comingSoon ? 'available' : 'back in stock'}.</p>`}
+<p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};">Reply to this email to answer ${esc(name)} directly — the reply goes to ${esc(email)}.</p>`;
 
   return cpEmail(
     `${comingSoon ? 'Coming-soon' : 'Stock'} enquiry: ${esc(productTitle)}`,
@@ -617,10 +784,7 @@ export function offerReceivedEmail({ sellerName, buyerName, cardName, amountAud,
   ];
   if (expiresAt) rows.push(['Expires', esc(expiresAt)]);
 
-  const quoted = message
-    ? `<p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#111827;">Their message</p>
-<div style="background:#F9FAFB;border-left:3px solid #E63946;border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">${esc(message)}</div>`
-    : '';
+  const quoted = message ? quoteBlock('Their message', message) : '';
 
   const body = `<p>${isEOI
     ? 'Someone has expressed interest in a card you have listed for offers.'
@@ -659,7 +823,7 @@ export function offerPlacedEmail({ buyerName, cardName, amountAud, askingPriceAu
   const body = `<p>Your offer has been sent to the seller.</p>
 ${summaryTable(rows)}
 <p><strong>This offer is binding.</strong> If the seller accepts it within 48 hours, you have agreed to buy the card at this price and will be asked to complete payment. You can withdraw it any time <em>before</em> the seller accepts from My Offers. If the seller doesn't respond, it expires automatically after 48 hours and you are no longer bound by it.</p>
-${listingUrl ? `<p style="font-size:13px;color:#6B7280;">Listing: <a href="${esc(listingUrl)}" style="color:#E63946;">${esc(listingUrl)}</a></p>` : ''}`;
+${listingUrl ? `<p style="font-size:13px;color:#6B7280;">Listing: <a href="${esc(listingUrl)}" style="color:#CE1126;">${esc(listingUrl)}</a></p>` : ''}`;
 
   return cpEmail(
     `Your ${money(amountAud)} offer on ${esc(cardName || 'a listing')} is binding for 48 hours unless you withdraw it.`,
@@ -719,10 +883,7 @@ ${summaryTable(rows)}
     if (deadline) rows.push(['Respond by', esc(deadline)]);
     title = 'Counter Offer Received';
     preheader = `The seller countered with ${money(counterAmountAud)} on ${card}.`;
-    const quoted = counterMessage
-      ? `<p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#111827;">Their message</p>
-<div style="background:#F9FAFB;border-left:3px solid #E63946;border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">${esc(counterMessage)}</div>`
-      : '';
+    const quoted = counterMessage ? quoteBlock('Their message', counterMessage) : '';
     body = `<p>The seller has made you a counter offer.</p>
 ${summaryTable(rows)}
 ${quoted}
@@ -777,10 +938,7 @@ export function offerAdminNoticeEmail({ offerId, cardName, amountAud, askingPric
   rows.push(['Seller', [sellerName, sellerEmail].filter(Boolean).map(esc).join(' · ') || '—']);
   if (expiresAt) rows.push(['Expires', esc(expiresAt)]);
 
-  const quoted = message
-    ? `<p style="margin:0 0 4px;font-size:13px;font-weight:700;color:#111827;">Buyer's message</p>
-<div style="background:#F9FAFB;border-left:3px solid #E63946;border-radius:0 8px 8px 0;padding:14px 18px;margin:0 0 24px;font-size:14px;color:#374151;line-height:1.6;">${esc(message)}</div>`
-    : '';
+  const quoted = message ? quoteBlock('Buyer&#39;s message', message) : '';
 
   return cpEmail(
     `Offer of ${money(amountAud)} on ${esc(cardName || 'a listing')}`,
@@ -805,7 +963,7 @@ export function orderShippedEmail({ buyerName, orderRef, items = [], carrier, tr
   const url = trackingUrl(carrier, trackingNumber);
   const number = normalizeTrackingNumber(trackingNumber);
   const trackingCell = url
-    ? `<a href="${esc(url)}" style="color:#E63946;text-decoration:none;font-family:monospace;">${esc(number)}</a>`
+    ? `<a href="${esc(url)}" style="color:#CE1126;text-decoration:none;font-family:monospace;">${esc(number)}</a>`
     : `<span style="font-family:monospace;">${esc(number)}</span>`;
 
   const body = `${heroBadge('→')}
@@ -819,7 +977,7 @@ ${centred(url
     ? `Tracking can take up to 24 hours to show the first scan. Follow your parcel any time with the button below${carrier === 'auspost' ? ' or in the Australia Post app' : ''}.`
     : `Use the tracking number above on ${esc(carrierLabel(carrier))}'s website to follow your parcel.`)}${invitesReview
     ? `
-<p style="text-align:center;">Once it arrives, we'd love to hear what you think. You can review the products from your order in <a href="https://cardpop.com.au/account/orders" style="color:#E63946;text-decoration:none;">Account → Orders</a> — it helps other collectors choose.</p>`
+<p style="text-align:center;">Once it arrives, we'd love to hear what you think. You can review the products from your order in <a href="https://cardpop.com.au/account/orders" style="color:#CE1126;text-decoration:none;">Account → Orders</a> — it helps other collectors choose.</p>`
     : ''}`;
 
   return cpEmail(
@@ -861,7 +1019,7 @@ ${heroHeading('Your order was delivered', `Hi ${esc(buyerName || 'there')} — $
 ${statRow(tiles)}
 ${items.length ? itemCard(items.map((i) => [esc(i), ''])) : ''}
 ${marketplace
-    ? `<p><strong>Check the card today.</strong> If it isn’t as described, arrived damaged or hasn’t actually turned up, report it from <a href="https://cardpop.com.au/account/orders" style="color:#E63946;text-decoration:none;">Account → Orders</a> within <strong>${Number(claimDays)} days</strong> — CardPop Buyer Protection refunds you in full, fees included.</p>
+    ? `<p><strong>Check the card today.</strong> If it isn’t as described, arrived damaged or hasn’t actually turned up, report it from <a href="https://cardpop.com.au/account/orders" style="color:#CE1126;text-decoration:none;">Account → Orders</a> within <strong>${Number(claimDays)} days</strong> — CardPop Buyer Protection refunds you in full, fees included.</p>
 ${centred(`All good? A quick rating helps ${sellerName ? esc(sellerName) : 'your seller'} and tells other collectors who to trust.`)}`
     : centred('We hope you love it. If anything isn’t right you have 14 days from delivery to return it for any reason, and a product review from your order page helps other collectors choose.')}`;
 
@@ -998,7 +1156,7 @@ ${statRow([
   { glyph: '%', colour: TILE.red, value: `${Number(discountPct)}%`, caption: 'Off the cards in your first order' },
   { glyph: '⏱', colour: TILE.charcoal, value: String(daysLeft), caption: `${plural(daysLeft, 'Day', 'Days')} left · ${esc(expiryStr)}` },
 ])}
-<div style="background:#F9FAFB;border:2px dashed #E63946;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px;">
+<div style="background:#F9FAFB;border:2px dashed #CE1126;border-radius:12px;padding:20px;text-align:center;margin:0 0 24px;">
 <p style="margin:0 0 6px;font-size:11px;color:#9CA3AF;letter-spacing:2.5px;text-transform:uppercase;">Your welcome code</p>
 <p style="margin:0;font-size:26px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
 </div>

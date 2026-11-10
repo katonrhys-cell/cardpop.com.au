@@ -18,6 +18,7 @@ import { runSupplierPriceWatch } from '../services/supplierPriceWatchService.js'
 import { syncSiteTraffic, Ga4NotConfiguredError } from '../services/siteTrafficService.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
 import { grantAdminComplimentaryMembership, revokeAdminComplimentaryMembership } from '../services/subscriptionService.js';
+import adminInvoicesRouter from './admin-invoices.js';
 
 const router = Router();
 
@@ -39,6 +40,10 @@ router.use(async (req, res, next) => {
 // (stepped-up) token. Runs after the admin check so non-admins still get the
 // 403 above, and never blocks admins who haven't enabled MFA.
 router.use(requireAal2);
+
+// Order invoices (Admin → Invoices): list / export / Xero preview / sync record.
+// Lives in its own file; mounted here so it inherits the admin + MFA gates above.
+router.use('/invoices', adminInvoicesRouter);
 
 
 // ─── Look up user login emails (admin-only) ───────────────────────────────────
@@ -736,6 +741,7 @@ router.patch('/events/:id/organiser', validateRequestParams(eventRsvpsSchema), v
       .maybeSingle();
     if (updateError) throw updateError;
     if (!updated) return res.status(404).json({ error: 'Event not found' });
+
 
     logger.info(`[ADMIN] ${req.user.id} linked organiser ${matches[0].id} to event ${req.params.id}`);
     res.json({ organiser: await loadEventOrganiser(updated.organiser_id) });

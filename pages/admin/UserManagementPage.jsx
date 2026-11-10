@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { Search, MoreHorizontal, Shield, ChevronLeft, Users, X, ShieldAlert, Landmark } from 'lucide-react';
@@ -27,6 +27,10 @@ const UserManagementPage = () => {
   
   const [users, setUsers] = useState([]);
   const [userCounts, setUserCounts] = useState({}); // Cache for related data counts
+  // fetchUsers is memoised, so it can't see a fresh `userCounts` — the cache
+  // check reads this ref, and results are merged with a functional update.
+  const userCountsRef = useRef(userCounts);
+  userCountsRef.current = userCounts;
   const [loading, setLoading] = useState(true);
   // Profiles with a Stripe name mismatch, keyed by user id: identity = the ID
   // document name differs from the profile name (blocks the badge, needs
@@ -61,10 +65,10 @@ const UserManagementPage = () => {
   const [totalItems, setTotalItems] = useState(0);
 
   const fetchRelatedCounts = async (userList) => {
-    const newCounts = { ...userCounts };
+    const newCounts = {};
 
     await Promise.all(userList.map(async (u) => {
-      if (newCounts[u.id]) return; // Skip if already cached
+      if (userCountsRef.current[u.id]) return; // Skip if already cached
 
       try {
         // Using getList with limit 1 just to get totalItems efficiently
@@ -85,7 +89,7 @@ const UserManagementPage = () => {
       }
     }));
 
-    setUserCounts(newCounts);
+    if (Object.keys(newCounts).length > 0) setUserCounts((prev) => ({ ...prev, ...newCounts }));
   };
 
   const fetchUsers = useCallback(async () => {

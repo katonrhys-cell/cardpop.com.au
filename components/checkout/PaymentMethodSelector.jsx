@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ShieldCheck, Lock } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 
 /*
- * Payment step. Card and PayPal details are never entered on CardPop — the
+ * Payment step. Card details are never entered on CardPop — the
  * actual payment is completed on Stripe's PCI-compliant hosted checkout after
  * "Confirm & Pay". This panel sets that expectation clearly and shows exactly
  * which methods are accepted, with the trust signals a buyer expects before
@@ -37,23 +37,12 @@ export const PaymentBadge = ({ label, children }) => (
 const PaymentMethodSelector = () => {
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <ShieldCheck className="h-[18px] w-[18px]" />
-          </span>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold text-foreground">Secure payment</p>
-            <p className="text-xs text-muted-foreground">Powered by Stripe · you never leave this page</p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          {PAYMENT_MARKS.map(({ label, Mark }) => (
-            <PaymentBadge key={label} label={label}>
-              <Mark />
-            </PaymentBadge>
-          ))}
-        </div>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {PAYMENT_MARKS.map(({ label, Mark }) => (
+          <PaymentBadge key={label} label={label}>
+            <Mark />
+          </PaymentBadge>
+        ))}
       </div>
 
       <div className="flex items-center gap-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">

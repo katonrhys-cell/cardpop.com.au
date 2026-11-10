@@ -136,8 +136,13 @@
          still has a plain form on record — it can decline to print a decorative
          character, and if the line ever reverts to the domain, dropping the ™
          from these naming fields (only) is the first thing to try. -->
+    <!-- data-rh="true" hands these tags to react-helmet (components/SEOHead.jsx
+         emits every one of them on every route), so a page's own description
+         and social tags replace these defaults instead of sitting beside them.
+         Without it each SPA page carried two meta descriptions and crawlers read
+         the first — the homepage's. -->
     <title>CardPop Australia™ | Trading Card Marketplace</title>
-    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop Australia™ — Australia's trusted online trading card marketplace. Browse cards from verified Australian sellers, check live AUD prices, and shop sealed boxes." />
+    <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, Yu-Gi-Oh, and sports cards on CardPop Australia™ — Australia's trusted online trading card marketplace. Browse cards from verified Australian sellers, check live AUD prices, and shop sealed boxes." data-rh="true" />
     <meta name="keywords" content="trading cards Australia, Pokemon cards Australia, buy sell trade cards, MTG Australia, sports cards Australia, card marketplace" />
     <meta name="author" content="CardPop™" />
     <meta name="application-name" content="CardPop Australia™" />

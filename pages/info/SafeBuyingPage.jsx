@@ -10,7 +10,7 @@ import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '@/utils/buyerProt
 // protection". Bot-prerendered via the matching STATIC_CONTENT['/safe-buying']
 // entry in api/prerender.js (keep the two in sync — no cloaking), listed in the
 // sitemap, and reachable from the footer. Copy is accurate to the integrations
-// we run: Stripe order checkout (PCI-DSS, with PayPal/wallets as methods),
+// we run: Stripe order checkout (PCI-DSS, with card wallets as methods),
 // Stripe membership billing, and Stripe Identity ID verification.
 
 const FAQ = [
@@ -59,15 +59,15 @@ const SafeBuyingPage = () => {
       description="Australia's safest place to buy Pokémon, Magic and sports cards — secure Stripe payments, ID-verified sellers and buyer protection on every order."
     >
       <SEOHead
-        title="Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™"
-        description={`Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described or doesn't arrive.`}
+        title="Safe Buying — Buy Trading Cards Safely | CardPop™"
+        description={`Buy cards safely in Australia: Stripe payments, ID-verified sellers and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if not as described.`}
         structuredData={faqStructuredData}
       />
 
       <p>Buying trading cards online should never feel like a gamble. CardPop™ is built from the ground up to be <strong>Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards</strong> — every order is paid securely, backed by buyer protection, and handled by identity-verified members. Here’s exactly how you’re protected on every purchase.</p>
 
       <h2>Every payment is secure</h2>
-      <p>All purchases are processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Your card details are entered on Stripe’s encrypted checkout and <strong>never touch CardPop’s servers</strong>. You can pay with <strong>Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay</strong>, all in Australian dollars.</p>
+      <p>All purchases are processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Your card details are entered on Stripe’s encrypted checkout and <strong>never touch CardPop’s servers</strong>. You can pay with <strong>Visa, Mastercard, American Express, Apple Pay or Google Pay</strong>, all in Australian dollars.</p>
 
       <h2>Buyer protection on every order</h2>
       <p>{PROTECTION_COPY.marketplaceSummary}</p>

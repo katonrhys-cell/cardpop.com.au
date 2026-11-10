@@ -25,7 +25,15 @@ import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx'
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
+import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
+import { findOrganiser } from '@/utils/eventOrganisers.js';
+import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
+import { createStepRunner, reportStalledStep, UPLOAD_STEP_TIMEOUT_MS } from '@/utils/saveSteps.js';
 import { toast } from 'sonner';
+import {
+  validateEventForm, normalizeEventUrl, describeEventSaveError, eventImageFileError,
+  EVENT_IMAGE_ACCEPT, EVENT_URL_FIELDS,
+} from '@/utils/eventFormValidation.js';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 
@@ -39,6 +47,7 @@ const EVENT_TYPES = [
 const STATUS_OPTIONS = [
   { value: 'approved',       label: 'Approved (Live)' },
   { value: 'pending_review', label: 'Pending Review' },
+  { value: 'draft',          label: 'Draft (organiser hasn’t submitted it)' },
   { value: 'cancelled',      label: 'Cancelled' },
   { value: 'completed',      label: 'Completed (archived — stays under Past Events)' },
   { value: 'rejected',       label: 'Rejected' },
@@ -101,10 +110,12 @@ const INITIAL_STATE = {
   seo_keywords: [],
   tags: [],
   source_url: '',
+  // Admin only: shown to the organiser when status is 'rejected'.
+  rejection_reason: '',
 };
 
 // Simple tag input — press Enter or comma to add
-const TagInput = ({ value = [], onChange, placeholder }) => {
+const TagInput = ({ id, value = [], onChange, placeholder, disabled }) => {
   const [inputVal, setInputVal] = useState('');
   const handleKey = (e) => {
     if ((e.key === 'Enter' || e.key === ',') && inputVal.trim()) {
@@ -112,7 +123,15 @@ const TagInput = ({ value = [], onChange, placeholder }) => {
       const tag = inputVal.trim().replace(/,$/, '');
       if (tag && !value.includes(tag)) onChange([...value, tag]);
       setInputVal('');
+    } else if (e.key === 'Backspace' && !inputVal && value.length) {
+      onChange(value.slice(0, -1));
     }
+  };
+  // A typed tag that wasn't followed by Enter is kept, not silently dropped.
+  const commitPending = () => {
+    const tag = inputVal.trim().replace(/,$/, '');
+    if (tag && !value.includes(tag)) onChange([...value, tag]);
+    setInputVal('');
   };
   const remove = (tag) => onChange(value.filter(t => t !== tag));
   return (
@@ -120,15 +139,18 @@ const TagInput = ({ value = [], onChange, placeholder }) => {
       {value.map(tag => (
         <span key={tag} className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary rounded-full text-xs font-medium">
           {tag}
-          <button type="button" onClick={() => remove(tag)} className="hover:text-destructive"><X className="w-3 h-3" /></button>
+          <button type="button" onClick={() => remove(tag)} disabled={disabled} aria-label={`Remove ${tag}`} className="rounded-full hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="w-3 h-3" aria-hidden="true" /></button>
         </span>
       ))}
       <input
+        id={id}
         className="flex-1 min-w-[120px] bg-transparent text-sm outline-none placeholder:text-muted-foreground"
         placeholder={value.length ? '' : placeholder}
         value={inputVal}
         onChange={e => setInputVal(e.target.value)}
         onKeyDown={handleKey}
+        onBlur={commitPending}
+        disabled={disabled}
       />
     </div>
   );
@@ -166,12 +188,24 @@ const CharCount = ({ value = '', max, warn = 0.85 }) => {
   );
 };
 
-// mode="admin" exposes status/featured/SEO controls; mode="user" locks
-// submissions to pending_review so they go through the admin approval queue.
+// mode="admin" exposes status/featured/SEO controls; mode="user" is an
+// organiser on their OWN event (RLS refuses anyone else's): a new submission or
+// an edit of a pending / rejected one goes (back) to the review queue; an edit
+// of their live event goes live straight away, and the database logs exactly
+// what changed for the admins (event_change_log, utils/eventChangeLog.js).
 const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = 'admin' }) => {
   const { currentUser } = useAuth();
   const isUserMode = mode === 'user';
+  const isLiveEdit = isUserMode && Boolean(event?.id) && event.status === 'approved';
+  const isResubmission = isUserMode && event?.status === 'rejected';
+  const isDraft = isUserMode && event?.status === 'draft';
+  // Organisers can keep an event private as a draft until they submit it
+  // (docs/event-submissions.md). A live event can't go back to draft.
+  const canSaveDraft = isUserMode && !isLiveEdit;
   const [loading, setLoading] = useState(false);
+  // What the save is doing right now (shown on the button), so a slow step is visible.
+  const [saveStep, setSaveStep] = useState('');
+  const [savingDraft, setSavingDraft] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [formData, setFormData] = useState(INITIAL_STATE);
@@ -184,6 +218,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const [logoPreview, setLogoPreview] = useState(null);
   const [logoIsVideo, setLogoIsVideo] = useState(false);
   const [removeExistingLogo, setRemoveExistingLogo] = useState(false);
+  // A saved organiser's logo picked from the list (already uploaded — no file).
+  const [pickedLogoUrl, setPickedLogoUrl] = useState(null);
+  const [savingOrganiser, setSavingOrganiser] = useState(false);
+  const { organisers, saveOrganiser } = useEventOrganisers(isOpen);
   const logoInputRef = useRef(null);
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
   // { url } (saved) or { file, preview } (uploaded on save).
@@ -199,6 +237,30 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   // row is public). `existingOffer` also carries the click/reveal counts.
   const [offerForm, setOfferForm] = useState(EMPTY_OFFER_FORM);
   const [existingOffer, setExistingOffer] = useState(null);
+
+  // Anything typed or picked since the form opened — closing then asks first,
+  // so a stray click outside the dialog can't throw a long form away.
+  const dirtyRef = useRef(false);
+  const markDirty = () => { dirtyRef.current = true; };
+  const requestClose = () => {
+    if (loading) return;
+    if (dirtyRef.current && !window.confirm('Discard your unsaved changes to this event?')) return;
+    onClose();
+  };
+  const changeGallery = (v) => { markDirty(); setGallery(v); };
+  const changeVideos = (v) => { markDirty(); setVideos(v); };
+  const changeOffer = (v) => { markDirty(); setOfferForm(v); };
+
+  // Switch to the tab holding a field and put the cursor in it, so an error
+  // toast always lands the organiser on the thing to fix.
+  const focusField = (tab, fieldId) => {
+    setActiveTab(tab);
+    if (!fieldId) return;
+    setTimeout(() => {
+      const el = document.getElementById(fieldId);
+      if (el) { el.focus(); el.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); }
+    }, 50);
+  };
 
   const handleWatchLoaded = useCallback((watch) => {
     setExistingWatch(watch);
@@ -229,6 +291,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
   useEffect(() => {
     if (!isOpen) return;
+    dirtyRef.current = false;
     setRescanWeekly(true);
     setExistingWatch(null);
     setOfferForm(EMPTY_OFFER_FORM);
@@ -309,8 +372,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         postcode:            event.postcode || '',
         start_date:          event.start_date || '',
         end_date:            event.end_date || '',
-        start_time:          event.start_time || '',
-        end_time:            event.end_time || '',
+        start_time:          event.start_time ? String(event.start_time).slice(0, 5) : '',
+        end_time:            event.end_time ? String(event.end_time).slice(0, 5) : '',
         organizer_name:      event.organizer_name || '',
         organizer_email:     event.organizer_email || '',
         organizer_phone:     event.organizer_phone || '',
@@ -335,10 +398,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         seo_keywords:        event.seo_keywords || [],
         tags:                event.tags || [],
         source_url:          event.source_url || '',
+        rejection_reason:    event.rejection_reason || '',
       });
       setImagePreview(event.image_url || null);
       setLogoFile(null);
       setLogoPreview(event.organizer_logo_url || null);
+      setPickedLogoUrl(null);
       setLogoIsVideo(isVideoLogoUrl(event.organizer_logo_url));
       setRemoveExistingLogo(false);
       setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
@@ -346,23 +411,24 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       setVideos(cleanEventVideos(event.event_videos, event.youtube_url).map(v => ({ title: v.title, url: v.url })));
       setActiveTab('details');
 
-      if (!isUserMode) {
-        loadAdminTicketOffer(event.id).then((row) => {
-          if (cancelled || !row) return;
-          setExistingOffer(row);
-          setOfferForm({
-            offer_text: row.offer_text || '',
-            discount_code: row.discount_code || '',
-            referral_url: row.referral_url || '',
-            is_active: row.is_active,
-          });
-        }).catch(() => toast.error("Couldn't load this event's member offer."));
-      }
+      // Member offer: admins and the event's own organiser can read it (RLS).
+      const toOfferForm = (row) => ({
+        offer_text: row?.offer_text || '',
+        discount_code: row?.discount_code || '',
+        referral_url: row?.referral_url || '',
+        is_active: row ? row.is_active !== false : true,
+      });
+      loadAdminTicketOffer(event.id).then((row) => {
+        if (cancelled || !row) return;
+        setExistingOffer(row);
+        setOfferForm(toOfferForm(row));
+      }).catch(() => toast.error("Couldn't load this event's member offer."));
 
     } else {
       setFormData(INITIAL_STATE);
       setImagePreview(null);
       setLogoPreview(null);
+      setPickedLogoUrl(null);
       setLogoIsVideo(false);
       setActiveTab('details');
     }
@@ -380,75 +446,147 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const processLogoFile = (file) => {
     const problem = logoFileError(file);
     if (problem) { toast.error(problem); return; }
+    markDirty();
     setLogoFile(file);
+    setPickedLogoUrl(null);
     setLogoIsVideo(isVideoLogoFile(file));
     setLogoPreview(URL.createObjectURL(file));
     setRemoveExistingLogo(false);
   };
-  const clearLogo = () => {
+  // Choose a saved organiser: fills the name and brings its logo along.
+  const pickOrganiser = (id) => {
+    const org = organisers.find(o => o.id === id);
+    if (!org) return;
+    markDirty();
+    set('organizer_name', org.name);
     setLogoFile(null);
+    if (logoInputRef.current) logoInputRef.current.value = '';
+    setPickedLogoUrl(org.logo_url || null);
+    setLogoPreview(org.logo_url || null);
+    setLogoIsVideo(isVideoLogoUrl(org.logo_url));
+    setRemoveExistingLogo(!org.logo_url);
+  };
+
+  // Admin: add / update this organiser (name + current logo) in the saved list.
+  const handleSaveOrganiser = async () => {
+    setSavingOrganiser(true);
+    try {
+      let logoUrl = pickedLogoUrl || (!removeExistingLogo ? event?.organizer_logo_url : null) || null;
+      if (logoFile) logoUrl = await uploadEventOrganiserLogo(logoFile);
+      const { created } = await saveOrganiser({ name: formData.organizer_name, logoUrl });
+      // The logo is saved now — keep using that URL rather than uploading again.
+      setLogoFile(null);
+      if (logoInputRef.current) logoInputRef.current.value = '';
+      setPickedLogoUrl(logoUrl);
+      setRemoveExistingLogo(!logoUrl);
+      toast.success(created ? 'Organiser added to the list' : 'Organiser updated in the list');
+    } catch (err) {
+      toast.error(err?.message || 'Could not save the organiser');
+    } finally {
+      setSavingOrganiser(false);
+    }
+  };
+
+  const clearLogo = () => {
+    markDirty();
+    setLogoFile(null);
+    setPickedLogoUrl(null);
     setLogoPreview(null);
     setLogoIsVideo(false);
     setRemoveExistingLogo(true);
     if (logoInputRef.current) logoInputRef.current.value = '';
   };
 
-  const set = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+  const set = (field, value) => { markDirty(); setFormData(prev => ({ ...prev, [field]: value })); };
 
   const handleChange = (e) => set(e.target.name, e.target.value);
 
   const toggleCardGame = (game) => {
-    set('featured_card_games', formData.featured_card_games.includes(game)
-      ? formData.featured_card_games.filter(g => g !== game)
-      : [...formData.featured_card_games, game]);
+    markDirty();
+    setFormData(prev => ({
+      ...prev,
+      featured_card_games: prev.featured_card_games.includes(game)
+        ? prev.featured_card_games.filter(g => g !== game)
+        : [...prev.featured_card_games, game],
+    }));
   };
 
   const processFile = (file) => {
     if (!file) return;
-    if (file.size > 20971520) { toast.error('Image exceeds 20MB.'); return; }
-    if (!file.type.startsWith('image/')) { toast.error('Only images allowed.'); return; }
+    const problem = eventImageFileError(file);
+    if (problem) {
+      toast.error(problem);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+    markDirty();
     setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
     setRemoveExistingImage(false);
   };
 
   const clearImage = () => {
+    markDirty();
     setImageFile(null);
     setImagePreview(null);
     setRemoveExistingImage(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const clearForm = () => {
+    if (dirtyRef.current && !window.confirm('Clear everything you’ve entered on this form?')) return;
+    setFormData(INITIAL_STATE);
+    setImagePreview(null);
+    setImageFile(null);
+    setRemoveExistingImage(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    clearLogo();
+    setGallery([emptyAlbum()]);
+    setVideos([emptyVideo()]);
+    setOfferForm(EMPTY_OFFER_FORM);
+    setActiveTab('details');
+    dirtyRef.current = false;
+  };
 
-    if (!formData.title.trim()) {
-      toast.error('Event title is required.');
-      setActiveTab('details');
-      return;
-    }
+  // `asDraft` (the "Save Draft" button): keep the event private, unsubmitted.
+  const handleSubmit = async (e, { asDraft = false } = {}) => {
+    e?.preventDefault?.();
 
-    if (!formData.start_date) {
-      toast.error('Start date is required.');
-      setActiveTab('venue');
+    // The form validates itself (noValidate): the browser's own bubbles only
+    // fire for fields on the open tab, and refused links typed without https://.
+    const formError = validateEventForm(formData);
+    if (formError) {
+      toast.error(formError.message);
+      focusField(formError.tab, formError.field);
       return;
     }
 
     const ticketPriceError = formData.is_free ? null : ticketPricesFormError(formData.ticket_prices);
     if (ticketPriceError) {
       toast.error(ticketPriceError);
-      setActiveTab('organiser');
+      focusField('organiser');
       return;
     }
 
-    const offerError = isUserMode ? null : validateOfferForm(offerForm);
+    const offerError = validateOfferForm(offerForm);
     if (offerError) {
       toast.error(offerError);
-      setActiveTab('offer');
+      focusField('offer');
       return;
     }
 
+    // Links as typed ("instagram.com/show") → full https:// URLs, shown back
+    // in the form so what's saved is what the organiser sees.
+    const urls = Object.fromEntries(Object.keys(EVENT_URL_FIELDS).map(f => [f, normalizeEventUrl(formData[f])]));
+    setFormData(prev => ({ ...prev, ...urls }));
+
     setLoading(true);
+    // Every upload and write runs as a named step with a deadline, so a stalled
+    // one fails with a message saying which step, and is reported (utils/saveSteps.js).
+    const step = createStepRunner({
+      onStep: setSaveStep,
+      onTimeout: (err) => reportStalledStep(err, { form: isUserMode ? 'event-organiser' : 'event-admin', eventId: event?.id ?? null }),
+    });
     try {
       let savedId = event?.id ?? null;
       let image_url = event?.image_url ?? null;
@@ -456,30 +594,36 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       if (imageFile) {
         // Throws on failure — don't silently save the event without its cover
         // image. Also writes the 480 px thumb the event tiles load.
-        image_url = await uploadEventImage(imageFile, { folder: 'events', stem: `${Date.now()}`, upsert: true });
+        image_url = await step('Uploading cover image', () => uploadEventImage(imageFile, { folder: 'events', stem: `${Date.now()}`, upsert: true }), UPLOAD_STEP_TIMEOUT_MS);
       } else if (removeExistingImage) {
         image_url = null;
       }
 
       let organizer_logo_url = event?.organizer_logo_url ?? null;
       if (logoFile) {
-        organizer_logo_url = await uploadEventOrganiserLogo(logoFile); // throws — don't save without the logo the organiser picked
+        // Throws — don't save without the logo the organiser picked.
+        organizer_logo_url = await step('Uploading organiser logo', () => uploadEventOrganiserLogo(logoFile), UPLOAD_STEP_TIMEOUT_MS);
       } else if (removeExistingLogo) {
         organizer_logo_url = null;
+      } else if (pickedLogoUrl) {
+        organizer_logo_url = pickedLogoUrl;
       }
 
       // Gallery photos picked this session go up now, each under its own
       // immutable path; saved ones keep their URL. Album and photo order are
       // the editor's. Empty albums are dropped.
       const uploadedAlbums = [];
+      const newPhotos = gallery.reduce((n, album) => n + album.photos.filter(p => !p.url).length, 0);
+      let photoNo = 0;
       for (const [a, album] of gallery.entries()) {
         const images = [];
         for (const [i, photo] of album.photos.entries()) {
           if (photo.url) { images.push(photo.url); continue; }
-          images.push(await uploadEventImage(photo.file, {
+          photoNo += 1;
+          images.push(await step(`Uploading photo ${photoNo} of ${newPhotos}`, () => uploadEventImage(photo.file, {
             folder: 'events/gallery',
             stem: `${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}`,
-          }));
+          }), UPLOAD_STEP_TIMEOUT_MS));
         }
         uploadedAlbums.push({ title: album.title.trim(), images });
       }
@@ -501,8 +645,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         accessibility_info:  formData.accessibility_info.trim() || null,
         age_restrictions:    formData.age_restrictions.trim() || null,
         event_type:          formData.event_type,
-        // User submissions always enter the review queue — RLS enforces this too
-        status:              isUserMode ? 'pending_review' : formData.status,
+        // An organiser never picks the status: a live event stays live, anything
+        // else (re-)enters the review queue. The DB guard enforces this too.
+        status:              isUserMode ? (isLiveEdit ? 'approved' : asDraft ? 'draft' : 'pending_review') : formData.status,
         featured_card_games: formData.featured_card_games.length ? formData.featured_card_games : null,
         is_featured:         isUserMode ? false : formData.is_featured,
         image_url,
@@ -525,17 +670,17 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         organizer_logo_url,
         organizer_email:     formData.organizer_email.trim() || null,
         organizer_phone:     formData.organizer_phone.trim() || null,
-        website_url:         formData.website_url.trim() || null,
-        ticket_url:          formData.ticket_url.trim() || null,
-        instagram_url:       formData.instagram_url.trim() || null,
-        facebook_url:        formData.facebook_url.trim() || null,
+        website_url:         urls.website_url || null,
+        ticket_url:          urls.ticket_url || null,
+        instagram_url:       urls.instagram_url || null,
+        facebook_url:        urls.facebook_url || null,
         youtube_url:         event_videos[0]?.url || null,
-        youtube_channel_url: formData.youtube_channel_url.trim() || null,
-        tiktok_url:          formData.tiktok_url.trim() || null,
-        x_url:               formData.x_url.trim() || null,
-        discord_url:         formData.discord_url.trim() || null,
-        vendor_application_url: formData.vendor_application_url.trim() || null,
-        facebook_video_url:  formData.facebook_video_url.trim() || null,
+        youtube_channel_url: urls.youtube_channel_url || null,
+        tiktok_url:          urls.tiktok_url || null,
+        x_url:               urls.x_url || null,
+        discord_url:         urls.discord_url || null,
+        vendor_application_url: urls.vendor_application_url || null,
+        facebook_video_url:  urls.facebook_video_url || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
         ticket_prices:       formData.is_free ? [] : cleanTicketPrices(formData.ticket_prices),
@@ -549,33 +694,71 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         tags:                formData.tags.length ? formData.tags : null,
         source_url:          formData.source_url.trim() || null,
       };
+      // Admin only, and only alongside a rejection — approving clears it in the DB.
+      if (!isUserMode && formData.status === 'rejected') {
+        payload.rejection_reason = formData.rejection_reason.trim() || null;
+      }
 
       if (event?.id) {
         // NB: organiser_id is deliberately NOT in the update payload — editing
         // an event (incl. an admin fixing a user submission) must not reassign
         // its owner to the editor.
-        const { error } = await supabase.from('events').update(payload).eq('id', event.id);
+        const { data: updated, error } = await step('Saving the event', () => supabase.from('events').update(payload).eq('id', event.id).select('id'));
         if (error) throw error;
-        toast.success(isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
+        // RLS answers a refused update with zero rows and no error — e.g. the
+        // team cancelled or archived the event while the form was open. Don't
+        // report that as saved.
+        if (Array.isArray(updated) && updated.length === 0) {
+          throw Object.assign(new Error('row-level security: no rows updated'), { code: '42501' });
+        }
+        // Submitted just now (a draft or a rejected event going to review).
+        const justSubmitted = isUserMode && payload.status === 'pending_review' && event.status !== 'pending_review';
+        toast.success(isLiveEdit
+          ? 'Changes saved and live. The CardPop team has been notified of what changed.'
+          : asDraft
+            ? 'Draft saved. Only you can see it — submit it for review when it’s ready.'
+            : isResubmission
+              ? 'Event resubmitted — our team will review it again before it goes live.'
+              : justSubmitted
+                ? 'Event submitted! Our team will review it before it appears on the calendar.'
+                : isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
+        if (justSubmitted) {
+          // Same admin email a fresh submission gets.
+          apiServerClient
+            .fetch('/events/notify-submission', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ eventId: event.id }),
+            })
+            .catch(() => {});
+        }
+        if (!isUserMode && event.status === 'pending_review' && ['approved', 'rejected'].includes(payload.status)) {
+          // An admin just decided a submission: email its organiser (the bell
+          // is a DB trigger). Fire-and-forget — the decision is saved.
+          notifyEventDecision(event.id);
+        }
       } else {
         // Organiser FK — set only on create, to the submitting user.
         if (currentUser?.id) payload.organiser_id = currentUser.id;
         // SEO-friendly slug for the event detail URL; suffix on collision
         payload.slug = `${slugify(formData.title)}-${formData.start_date}`;
-        let { data: inserted, error } = await supabase.from('events').insert(payload).select('id').single();
+        let { data: inserted, error } = await step('Saving the event', () => supabase.from('events').insert(payload).select('id').single());
         if (error?.code === '23505') {
           payload.slug = `${payload.slug}-${Math.random().toString(36).slice(2, 6)}`;
-          ({ data: inserted, error } = await supabase.from('events').insert(payload).select('id').single());
+          ({ data: inserted, error } = await step('Saving the event', () => supabase.from('events').insert(payload).select('id').single()));
         }
         if (error) throw error;
         savedId = inserted?.id ?? null;
-        toast.success(isUserMode
-          ? 'Event submitted! Our team will review it before it appears on the calendar.'
-          : 'Event created successfully');
+        toast.success(asDraft
+          ? 'Draft saved. Only you can see it — submit it for review when it’s ready.'
+          : isUserMode
+            ? 'Event submitted! Our team will review it before it appears on the calendar.'
+            : 'Event created successfully');
 
-        // Notify admins that a user submission is awaiting review. Fire-and-forget
-        // so a mail hiccup never blocks the (already-saved) submission.
-        if (isUserMode && inserted?.id) {
+        // Email every admin about the new event (the bell is a DB trigger).
+        // Fire-and-forget so a mail hiccup never blocks the saved event. A
+        // draft isn't announced until it's submitted.
+        if (inserted?.id && !asDraft) {
           apiServerClient
             .fetch('/events/notify-submission', {
               method: 'POST',
@@ -587,14 +770,19 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       }
 
       // Member offer — saved after the event so a new event has its id. The
-      // event is already saved, so a failure here is reported, not fatal.
-      if (!isUserMode && savedId) {
+      // event is already saved, so a failure here is reported, not fatal. An
+      // organiser can write the offer on their own event (RLS).
+      if (savedId) {
         try {
-          await saveAdminTicketOffer(savedId, offerForm, existingOffer);
+          await step('Saving the member offer', () => saveAdminTicketOffer(savedId, offerForm, existingOffer));
         } catch (err) {
           toast.error(err.message || 'Event saved, but the member offer failed to save.');
         }
       }
+
+      // An organiser's edit to their live event: email every admin exactly what
+      // changed (event and offer together; the bells are DB triggers).
+      if (isLiveEdit && savedId) notifyEventChanges(savedId);
 
       // Weekly re-scan of the website to scrape. The event is already saved, so
       // a problem here is reported but doesn't fail the save.
@@ -621,8 +809,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       onClose();
     } catch (err) {
       console.error('Event save error:', err);
-      toast.error(err.message || 'Failed to save event');
+      toast.error(describeEventSaveError(err), err?.name === 'SaveStepTimeoutError' && /Saving the event/.test(err.step || '')
+        ? { description: 'It may still have saved — check your events list before trying again.', duration: 12000 }
+        : undefined);
     } finally {
+      setSaveStep('');
       setLoading(false);
     }
   };
@@ -630,12 +821,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const inputCls = 'bg-background rounded-xl h-11';
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !loading && !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) requestClose(); }}>
       <DialogContent className="sm:max-w-[860px] w-[95vw] h-[92vh] sm:h-auto max-h-[92vh] flex flex-col p-0 overflow-hidden bg-card border-border shadow-xl">
         <DialogHeader className="px-6 py-5 border-b border-border bg-muted/20 shrink-0">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-2xl font-bold font-heading text-foreground">
-              {event?.id ? 'Edit Event' : 'Create New Event'}
+              {isLiveEdit ? 'Edit Live Event' : isResubmission ? 'Edit & Resubmit' : isDraft ? 'Edit Draft' : event?.id ? 'Edit Event' : 'Create New Event'}
             </DialogTitle>
             {scrapedData && (
               <Badge variant="secondary" className="bg-primary/10 text-primary border-none shadow-sm h-6 font-semibold px-3">
@@ -644,27 +835,34 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
             )}
           </div>
           <DialogDescription className="text-muted-foreground mt-1">
-            {isUserMode
-              ? 'Submit your card event to the CardPop calendar. Our team reviews every submission before it goes live.'
-              : event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
+            {isLiveEdit
+              ? 'Your event is live. Changes you save go live straight away, and the CardPop team is notified of exactly what changed.'
+              : isResubmission
+                ? 'Fix what the review asked for, then resubmit. Our team will review it again before it goes live.'
+                : isUserMode
+                  ? 'Submit your card event to the CardPop calendar — our team reviews every submission before it goes live. Not ready yet? Save it as a draft: only you can see it until you submit.'
+                  : event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
+        {/* The fields scroll; the footer (Save / Submit) stays pinned so it's
+            always reachable, however long the open tab is. */}
+        <form onSubmit={handleSubmit} noValidate aria-busy={loading} className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="px-6 border-b border-border sticky top-0 bg-card z-10 pt-2">
-              <TabsList className="w-full justify-start h-12 bg-transparent p-0 gap-0">
+              <TabsList aria-label="Event form sections" className="w-full justify-start h-12 bg-transparent p-0 gap-0 overflow-x-auto overflow-y-hidden">
                 {[
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
                   { id: 'seo',       label: 'SEO' },
-                  ...(isUserMode ? [] : [{ id: 'offer', label: 'Member Offer' }]),
+                  { id: 'offer', label: 'Member Offer' },
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 font-bold text-sm h-full"
+                    className="shrink-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-3 sm:px-4 font-bold text-sm h-full"
                   >
                     {tab.label}
                   </TabsTrigger>
@@ -678,8 +876,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               <TabsContent value="details" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div className="sm:col-span-2 space-y-2">
-                    <Label htmlFor="title" className="font-bold">Event Title <span className="text-destructive">*</span></Label>
-                    <Input id="title" name="title" value={formData.title} onChange={handleChange} className={inputCls} disabled={loading} required />
+                    <Label htmlFor="title" className="font-bold">Event Title <span className="text-destructive" aria-hidden="true">*</span></Label>
+                    <Input id="title" name="title" value={formData.title} onChange={handleChange} className={inputCls} disabled={loading} required aria-required="true" maxLength={200} />
                   </div>
 
                   <div className="sm:col-span-2 space-y-2">
@@ -706,9 +904,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="font-bold">Event Type</Label>
+                    <Label htmlFor="event_type" className="font-bold">Event Type</Label>
                     <Select value={formData.event_type} onValueChange={v => set('event_type', v)} disabled={loading}>
-                      <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                      <SelectTrigger id="event_type" className={inputCls}><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {EVENT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                       </SelectContent>
@@ -717,9 +915,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
                   {!isUserMode && (
                     <div className="space-y-2">
-                      <Label className="font-bold">Status</Label>
+                      <Label htmlFor="event_status" className="font-bold">Status</Label>
                       <Select value={formData.status} onValueChange={v => set('status', v)} disabled={loading}>
-                        <SelectTrigger className={inputCls}><SelectValue /></SelectTrigger>
+                        <SelectTrigger id="event_status" className={inputCls}><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {STATUS_OPTIONS.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}
                         </SelectContent>
@@ -728,14 +926,35 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   )}
                 </div>
 
+                {!isUserMode && formData.status === 'rejected' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="rejection_reason" className="font-bold">
+                      Reason for the organiser <span className="text-muted-foreground font-normal text-xs">(shown in their My Events and emailed to them)</span>
+                    </Label>
+                    <Textarea
+                      id="rejection_reason"
+                      name="rejection_reason"
+                      value={formData.rejection_reason}
+                      onChange={handleChange}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="e.g. Please add the venue address and the event's start time."
+                      className="bg-background rounded-xl resize-y"
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+
                 {/* Featured Card Games */}
-                <div className="space-y-2">
-                  <Label className="font-bold">Featured Card Games</Label>
+                <div className="space-y-2" role="group" aria-labelledby="featured_card_games_label">
+                  <p id="featured_card_games_label" className="text-sm font-bold leading-none">Featured Card Games</p>
                   <div className="flex flex-wrap gap-2">
                     {CARD_GAMES.map(game => (
                       <button
                         key={game} type="button"
                         onClick={() => toggleCardGame(game)}
+                        aria-pressed={formData.featured_card_games.includes(game)}
+                        disabled={loading}
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                           formData.featured_card_games.includes(game)
                             ? 'bg-primary text-primary-foreground border-primary'
@@ -750,29 +969,29 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
                 {!isUserMode && (
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} />
+                    <Switch id="is_featured" checked={formData.is_featured} onCheckedChange={v => set('is_featured', v)} disabled={loading} aria-describedby="is_featured_hint" />
                     <div>
-                      <p className="text-sm font-semibold">Feature on Homepage</p>
-                      <p className="text-xs text-muted-foreground">Appears in the featured events section</p>
+                      <Label htmlFor="is_featured" className="text-sm font-semibold cursor-pointer">Feature on Homepage</Label>
+                      <p id="is_featured_hint" className="text-xs text-muted-foreground">Appears in the featured events section</p>
                     </div>
                   </div>
                 )}
 
                 {/* Image upload */}
                 <div className="space-y-2">
-                  <Label className="font-bold">Cover Image</Label>
+                  <p id="cover_image_label" className="text-sm font-bold leading-none">Cover Image</p>
                   <div
                     className={`border-2 border-dashed rounded-2xl transition-all ${isDragging ? 'border-primary bg-primary/5' : 'border-border bg-muted/20 hover:bg-muted/40'}`}
                     onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
                     onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
-                    onDrop={e => { e.preventDefault(); setIsDragging(false); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }}
+                    onDrop={e => { e.preventDefault(); setIsDragging(false); if (!loading && e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); }}
                   >
                     {imagePreview ? (
                       <div className="relative p-2">
                         <div className="relative aspect-[21/9] rounded-xl overflow-hidden bg-black/5">
-                          <img src={imagePreview} alt="Preview" className="w-full h-full object-contain" />
-                          <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow" onClick={clearImage}>
-                            <X className="w-4 h-4" />
+                          <img src={imagePreview} alt="Cover image preview" className="w-full h-full object-contain" />
+                          <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 h-8 w-8 rounded-full shadow" onClick={clearImage} disabled={loading} aria-label="Remove cover image">
+                            <X className="w-4 h-4" aria-hidden="true" />
                           </Button>
                         </div>
                       </div>
@@ -780,7 +999,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                       <div
                         role="button"
                         tabIndex={0}
-                        aria-label="Upload image — click or press Enter to choose a file"
+                        aria-label="Upload cover image — click or press Enter to choose a file"
                         className="flex flex-col items-center justify-center py-8 cursor-pointer rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         onClick={() => fileInputRef.current?.click()}
                         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
@@ -790,13 +1009,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                         <p className="text-xs text-muted-foreground">Max 20MB — JPG, PNG, WEBP</p>
                       </div>
                     )}
-                    <input type="file" ref={fileInputRef} className="hidden" accept="image/jpeg,image/png,image/webp,image/gif" onChange={e => e.target.files[0] && processFile(e.target.files[0])} disabled={loading} />
+                    <input type="file" ref={fileInputRef} className="hidden" accept={EVENT_IMAGE_ACCEPT} aria-labelledby="cover_image_label" tabIndex={-1} onChange={e => e.target.files[0] && processFile(e.target.files[0])} disabled={loading} />
                   </div>
                 </div>
 
-                <EventGalleryEditor value={gallery} onChange={setGallery} disabled={loading} />
+                <EventGalleryEditor value={gallery} onChange={changeGallery} disabled={loading} />
 
-                <EventVideosEditor value={videos} onChange={setVideos} disabled={loading} />
+                <EventVideosEditor value={videos} onChange={changeVideos} disabled={loading} />
               </TabsContent>
 
               {/* ── TAB 2: VENUE & DATES ── */}
@@ -815,9 +1034,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                     <Input id="suburb" name="suburb" value={formData.suburb} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="space-y-2">
-                    <Label className="font-bold">State</Label>
+                    <Label htmlFor="state" className="font-bold">State</Label>
                     <Select value={formData.state} onValueChange={v => set('state', v)} disabled={loading}>
-                      <SelectTrigger className={inputCls}><SelectValue placeholder="Select state" /></SelectTrigger>
+                      <SelectTrigger id="state" className={inputCls}><SelectValue placeholder="Select state" /></SelectTrigger>
                       <SelectContent>
                         {AUS_STATES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
@@ -825,7 +1044,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="postcode" className="font-bold">Postcode</Label>
-                    <Input id="postcode" name="postcode" value={formData.postcode} onChange={handleChange} className={inputCls} maxLength={4} disabled={loading} />
+                    <Input id="postcode" name="postcode" value={formData.postcode} onChange={handleChange} className={inputCls} maxLength={4} inputMode="numeric" autoComplete="postal-code" disabled={loading} />
                   </div>
                 </div>
 
@@ -833,12 +1052,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Dates & Times</p>
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-2">
-                      <Label htmlFor="start_date" className="font-bold">Start Date</Label>
-                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Label htmlFor="start_date" className="font-bold">Start Date <span className="text-destructive" aria-hidden="true">*</span></Label>
+                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={inputCls} aria-required="true" disabled={loading} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="end_date" className="font-bold">End Date</Label>
-                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} min={formData.start_date || undefined} onChange={handleChange} className={inputCls} disabled={loading} />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="start_time" className="font-bold">Start Time</Label>
@@ -855,12 +1074,27 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               {/* ── TAB 3: ORGANISER ── */}
               <TabsContent value="organiser" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {organisers.length > 0 && (
+                    <div className="sm:col-span-2 space-y-2">
+                      <Label htmlFor="saved_organiser" className="font-bold">Saved Organiser <span className="text-muted-foreground font-normal text-xs">(pick one to fill the name and logo)</span></Label>
+                      <Select
+                        value={findOrganiser(organisers, formData.organizer_name)?.id ?? ''}
+                        onValueChange={pickOrganiser}
+                        disabled={loading}
+                      >
+                        <SelectTrigger id="saved_organiser" className={inputCls}><SelectValue placeholder="Choose from saved organisers…" /></SelectTrigger>
+                        <SelectContent>
+                          {organisers.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="organizer_name" className="font-bold">Organizer Name</Label>
                     <Input id="organizer_name" name="organizer_name" value={formData.organizer_name} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
-                    <Label className="font-bold">Organiser Logo <span className="text-muted-foreground font-normal text-xs">(optional — shown beside the event title, above Event Details)</span></Label>
+                    <p className="text-sm font-bold leading-none">Organiser Logo <span className="text-muted-foreground font-normal text-xs">(optional — shown beside the event title, above Event Details)</span></p>
                     <div className="border-2 border-dashed rounded-2xl border-border bg-muted/20 hover:bg-muted/40 transition-all">
                       {logoPreview ? (
                         <div className="relative p-3 flex items-center justify-center min-h-[7rem]">
@@ -887,16 +1121,25 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                           <p className="text-xs text-muted-foreground">PNG, JPG, WebP or GIF — or a short MP4 / WebM loop for a moving logo. Max {LOGO_MAX_LABEL}</p>
                         </div>
                       )}
-                      <input type="file" ref={logoInputRef} className="hidden" accept={LOGO_ACCEPT} onChange={e => e.target.files[0] && processLogoFile(e.target.files[0])} disabled={loading} />
+                      <input type="file" ref={logoInputRef} className="hidden" tabIndex={-1} aria-label="Organiser logo file" accept={LOGO_ACCEPT} onChange={e => e.target.files[0] && processLogoFile(e.target.files[0])} disabled={loading} />
                     </div>
+                    {!isUserMode && (
+                      <div className="flex flex-wrap items-center gap-3 pt-1">
+                        <Button type="button" variant="outline" size="sm" onClick={handleSaveOrganiser} disabled={loading || savingOrganiser || !formData.organizer_name.trim()}>
+                          {savingOrganiser && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
+                          {findOrganiser(organisers, formData.organizer_name) ? 'Update in organiser list' : 'Save to organiser list'}
+                        </Button>
+                        <span className="text-xs text-muted-foreground">Saves this name and logo so you can pick it on any event.</span>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="organizer_email" className="font-bold">Contact Email</Label>
-                    <Input id="organizer_email" name="organizer_email" type="email" value={formData.organizer_email} onChange={handleChange} className={inputCls} disabled={loading} />
+                    <Input id="organizer_email" name="organizer_email" type="email" autoComplete="email" value={formData.organizer_email} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="organizer_phone" className="font-bold">Contact Phone</Label>
-                    <Input id="organizer_phone" name="organizer_phone" value={formData.organizer_phone} onChange={handleChange} className={inputCls} disabled={loading} />
+                    <Input id="organizer_phone" name="organizer_phone" type="tel" autoComplete="tel" value={formData.organizer_phone} onChange={handleChange} className={inputCls} disabled={loading} />
                   </div>
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="website_url" className="font-bold">Event Website</Label>
@@ -960,21 +1203,21 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 <div className="pt-2 border-t border-border space-y-5">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Entry & Capacity</p>
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} />
+                    <Switch id="is_free" checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} aria-describedby="is_free_hint" />
                     <div>
-                      <p className="text-sm font-semibold">Free Entry</p>
-                      <p className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
+                      <Label htmlFor="is_free" className="text-sm font-semibold cursor-pointer">Free Entry</Label>
+                      <p id="is_free_hint" className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
                     </div>
                   </div>
                   {!formData.is_free && (
                     <div className="grid grid-cols-2 gap-5">
                       <div className="space-y-2">
                         <Label htmlFor="entry_fee_aud" className="font-bold">Entry Fee (AUD)</Label>
-                        <Input id="entry_fee_aud" name="entry_fee_aud" type="number" min="0" step="0.01" value={formData.entry_fee_aud} onChange={handleChange} className={inputCls} placeholder="0.00" disabled={loading} />
+                        <Input id="entry_fee_aud" name="entry_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.entry_fee_aud} onChange={handleChange} className={inputCls} placeholder="0.00" disabled={loading} />
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="presale_fee_aud" className="font-bold">Presale / Early Bird (AUD)</Label>
-                        <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
+                        <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
                       </div>
                     </div>
                   )}
@@ -984,11 +1227,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   <div className="grid grid-cols-2 gap-5">
                     <div className="space-y-2">
                       <Label htmlFor="capacity" className="font-bold">Max Capacity</Label>
-                      <Input id="capacity" name="capacity" type="number" min="1" value={formData.capacity} onChange={handleChange} className={inputCls} placeholder="e.g. 500" disabled={loading} />
+                      <Input id="capacity" name="capacity" type="number" min="1" step="1" inputMode="numeric" value={formData.capacity} onChange={handleChange} className={inputCls} placeholder="e.g. 500" disabled={loading} />
                     </div>
                     <div className="flex items-center gap-3 pt-8">
-                      <Switch checked={formData.registration_required} onCheckedChange={v => set('registration_required', v)} disabled={loading} />
-                      <Label className="font-semibold text-sm cursor-pointer">Registration Required</Label>
+                      <Switch id="registration_required" checked={formData.registration_required} onCheckedChange={v => set('registration_required', v)} disabled={loading} />
+                      <Label htmlFor="registration_required" className="font-semibold text-sm cursor-pointer">Registration Required</Label>
                     </div>
                   </div>
                 </div>
@@ -1019,13 +1262,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="font-bold">SEO Keywords <span className="text-muted-foreground font-normal text-xs">(press Enter to add)</span></Label>
-                  <TagInput value={formData.seo_keywords} onChange={v => set('seo_keywords', v)} placeholder="Add keywords and press Enter..." />
+                  <Label htmlFor="seo_keywords" className="font-bold">SEO Keywords <span className="text-muted-foreground font-normal text-xs">(press Enter to add)</span></Label>
+                  <TagInput id="seo_keywords" value={formData.seo_keywords} onChange={v => set('seo_keywords', v)} placeholder="Add keywords and press Enter..." disabled={loading} />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="font-bold">Event Tags <span className="text-muted-foreground font-normal text-xs">(for search & filtering)</span></Label>
-                  <TagInput value={formData.tags} onChange={v => set('tags', v)} placeholder="Add tags and press Enter..." />
+                  <Label htmlFor="event_tags" className="font-bold">Event Tags <span className="text-muted-foreground font-normal text-xs">(for search & filtering)</span></Label>
+                  <TagInput id="event_tags" value={formData.tags} onChange={v => set('tags', v)} placeholder="Add tags and press Enter..." disabled={loading} />
                 </div>
 
                 {isUserMode && formData.source_url && (
@@ -1036,38 +1279,62 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                 )}
               </TabsContent>
 
-              {/* ── TAB 5: MEMBER OFFER (admin) ── */}
-              {!isUserMode && (
-                <TabsContent value="offer" className="mt-0 animate-in fade-in">
-                  <EventTicketOfferPanel
-                    value={offerForm}
-                    onChange={setOfferForm}
-                    stats={existingOffer}
-                    ticketUrl={formData.ticket_url.trim()}
-                    disabled={loading}
-                  />
-                </TabsContent>
-              )}
+              {/* ── TAB 5: MEMBER OFFER ── */}
+              <TabsContent value="offer" className="mt-0 animate-in fade-in">
+                <EventTicketOfferPanel
+                  value={offerForm}
+                  onChange={changeOffer}
+                  stats={existingOffer}
+                  ticketUrl={formData.ticket_url.trim()}
+                  disabled={loading}
+                  audience={isUserMode ? 'organiser' : 'admin'}
+                />
+              </TabsContent>
 
             </div>
           </Tabs>
+          </div>
 
-          <DialogFooter className="px-6 py-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row gap-3 sm:justify-between shrink-0">
-            <Button
-              type="button" variant="outline"
-              onClick={() => { setFormData(INITIAL_STATE); setImagePreview(null); setImageFile(null); setRemoveExistingImage(true); clearLogo(); }}
-              disabled={loading}
-              className="rounded-xl font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-transparent hover:border-destructive/20"
-            >
-              <Trash2 className="w-4 h-4 mr-2" /> Clear Form
-            </Button>
-            <div className="flex gap-3 sm:justify-end">
-              <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
+          <DialogFooter className="px-4 sm:px-6 py-4 border-t border-border bg-muted/20 flex flex-col sm:flex-row gap-3 sm:justify-between shrink-0 sm:space-x-0">
+            {/* Clearing only makes sense on a blank new event — on a saved one
+                it would wipe the organiser's work, so it isn't offered there. */}
+            {!event?.id ? (
+              <Button
+                type="button" variant="outline"
+                onClick={clearForm}
+                disabled={loading}
+                className="order-last sm:order-first rounded-xl font-bold text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-transparent hover:border-destructive/20"
+              >
+                <Trash2 className="w-4 h-4 mr-2" aria-hidden="true" /> Clear Form
+              </Button>
+            ) : <span className="hidden sm:block" />}
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+              <Button type="button" variant="ghost" onClick={requestClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
+              {canSaveDraft && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={(e) => { setSavingDraft(true); handleSubmit(e, { asDraft: true }).finally(() => setSavingDraft(false)); }}
+                  className="rounded-xl font-bold"
+                >
+                  {loading && savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
+                  {loading && savingDraft && saveStep ? `${saveStep}…` : 'Save Draft'}
+                </Button>
+              )}
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
+                {loading && !savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
+                {loading && !savingDraft && saveStep
+                  ? `${saveStep}…`
+                  : isLiveEdit ? 'Save & Publish Changes'
+                    : isResubmission ? 'Resubmit for Review'
+                      : isDraft ? 'Submit for Review'
+                        : event?.id ? 'Save Changes'
+                          : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
+            {/* Announces the slow steps ("Uploading photo 2 of 5") to screen readers. */}
+            <p className="sr-only" role="status" aria-live="polite">{loading ? (saveStep || 'Saving…') : ''}</p>
           </DialogFooter>
         </form>
       </DialogContent>

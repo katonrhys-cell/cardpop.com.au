@@ -118,7 +118,7 @@ const HOW_IT_WORKS = [
   {
     step: '02', icon: ShieldCheck,
     title: 'Pay Securely',
-    desc: 'Checkout in AUD through Stripe — card, PayPal, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
+    desc: 'Checkout in AUD through Stripe — card, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
   },
   {
     step: '03', icon: Package,

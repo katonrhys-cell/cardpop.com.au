@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
-import { CalendarDays, Search, MapPin, SlidersHorizontal, X, History } from 'lucide-react';
+import { CalendarDays, Search, MapPin, SlidersHorizontal, X, History, Star, Sparkles, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { fetchRsvpCounts, fetchMyRsvps, emptyCounts } from '@/lib/eventRsvp.js';
 import EventCard from '@/components/EventCard.jsx';
+import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import EventDetailModal from '@/components/EventDetailModal.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { fetchReviewStatsMap } from '@/lib/eventAttendeeReviews.js';
+import { featuredFirst, featuredStrip } from '@/utils/eventFeatured.js';
+import { EVENT_REGIONS, eventRegionPath, eventRegionSeo } from '@/data/eventRegions.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SITE_URL, EVENT_TYPE_LABELS, buildEventListJsonLd, parseDate, toLocalDateStr } from '@/lib/eventSeo.js';
 
@@ -28,19 +31,9 @@ const nextYearStr = toLocalDateStr(new Date(Date.now() + 365 * DAY_MS));
 const yesterdayStr = toLocalDateStr(new Date(Date.now() - DAY_MS));
 const twoYearsAgoStr = toLocalDateStr(new Date(Date.now() - 2 * 365 * DAY_MS));
 
-// Everything the card, the detail modal and the JSON-LD read from an event —
-// the public view minus its SEO-only columns.
-export const EVENT_CARD_COLUMNS = [
-  'id', 'slug', 'event_type', 'status', 'title', 'description', 'short_description', 'image_url',
-  'venue_name', 'address', 'suburb', 'state', 'postcode',
-  'start_date', 'end_date', 'start_time', 'end_time',
-  'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'website_url', 'ticket_url',
-  'is_cardpop_verified', 'is_featured', 'registration_required', 'capacity',
-  'tags', 'featured_card_games', 'organizer_name',
-  'instagram_url', 'facebook_url', 'youtube_url', 'event_videos', 'facebook_video_url',
-  'youtube_channel_url', 'tiktok_url', 'x_url', 'discord_url', 'vendor_application_url',
-  'accessibility_info', 'age_restrictions', 'created_at', 'updated_at',
-].join(',');
+// Card projection lives in lib/eventColumns.js (shared with the organiser page);
+// re-exported here for existing importers.
+export { EVENT_CARD_COLUMNS };
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_EVENTS = 500;
@@ -111,12 +104,15 @@ const TYPE_SEO = {
 const ALL_SEO = {
   path: '/events',
   title: 'Trading Card Shows & TCG Events in Australia 2026 | CardPop',
-  description: "Australia's trading card event calendar — card shows, TCG expos, fairs and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth. Dates, venues and tickets.",
+  description: "Australia's trading card event calendar — card shows, TCG expos and collector meets in Sydney, Melbourne, Brisbane, Adelaide and Perth, with dates and venues.",
   heading: 'Trading Card Events Across Australia',
   subheading: 'Your go-to directory for TCG tournaments, card fairs, and collector shows happening nationwide. Find events near you — from major expos to local meetups.',
 };
 
-const CommunityEventsPage = ({ defaultType = 'all' }) => {
+// `region` (data/eventRegions.js) turns the calendar into a city landing page
+// — /card-shows/<city> — filtered to that state, with its own SEO copy.
+const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
+  const defaultState = region?.state || 'all';
   const { currentUser, isAuthenticated } = useAuth();
   const [events, setEvents] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -136,7 +132,7 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   const defaultEnd = showPast ? yesterdayStr : nextYearStr;
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterState, setFilterState] = useState('all');
+  const [filterState, setFilterState] = useState(defaultState);
   const [filterType, setFilterType] = useState(defaultType);
   const [startDate, setStartDate] = useState(defaultStart);
   const [endDate, setEndDate] = useState(defaultEnd);
@@ -162,6 +158,9 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   useEffect(() => {
     setFilterType(defaultType);
   }, [defaultType]);
+  useEffect(() => {
+    setFilterState(defaultState);
+  }, [defaultState]);
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -267,15 +266,23 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
       if (!groups[key]) groups[key] = [];
       groups[key].push(event);
     });
+    // Featured (paid) events lead their month; the rest keep date order.
+    for (const key of Object.keys(groups)) groups[key] = featuredFirst(groups[key], todayStr);
     return groups;
   }, [filteredEvents]);
 
-  const hasActiveFilters = searchTerm || filterState !== 'all' || filterType !== defaultType ||
+  // "Featured events" strip above the calendar — upcoming view only.
+  const featuredEvents = useMemo(
+    () => (showPast ? [] : featuredStrip(filteredEvents, todayStr)),
+    [filteredEvents, showPast],
+  );
+
+  const hasActiveFilters = searchTerm || filterState !== defaultState || filterType !== defaultType ||
     startDate !== defaultStart || endDate !== defaultEnd;
 
   const clearFilters = () => {
     setSearchTerm('');
-    setFilterState('all');
+    setFilterState(defaultState);
     setFilterType(defaultType);
     setStartDate(defaultStart);
     setEndDate(defaultEnd);
@@ -286,13 +293,14 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
   const structuredData = useMemo(() => {
     if (showPast) return null;
     const upcoming = events
+      .filter(e => !region || e.state === region.state)
       .filter(e => e.start_date && new Date(e.start_date) >= new Date(todayStr))
       .slice(0, 25);
     if (upcoming.length === 0) return null;
     return buildEventListJsonLd(upcoming);
-  }, [events, showPast]);
+  }, [events, showPast, region]);
 
-  const seo = TYPE_SEO[defaultType] || ALL_SEO;
+  const seo = region ? eventRegionSeo(region) : (TYPE_SEO[defaultType] || ALL_SEO);
 
   return (
     <div className="flex flex-col bg-background font-sans min-h-screen">
@@ -312,6 +320,12 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
             Event Calendar
           </Badge>
           <p className="text-lg text-muted-foreground max-w-2xl mx-auto">{seo.subheading}</p>
+          {region && (
+            <p className="text-sm text-muted-foreground max-w-2xl mx-auto mt-4 leading-relaxed">
+              {region.intro}
+              {region.nearby.length > 0 && <> Includes events in {region.nearby.join(', ')}.</>}
+            </p>
+          )}
         </div>
       </section>
 
@@ -454,6 +468,37 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
           </div>
         ) : (
           <div className="space-y-14">
+            {featuredEvents.length > 0 && (
+              <section aria-labelledby="featured-events-heading" className="rounded-3xl border border-primary/30 bg-primary/5 p-5 sm:p-6">
+                <div className="flex items-center gap-2 sm:gap-3 mb-6">
+                  <Star className="w-5 h-5 shrink-0 text-primary fill-current" />
+                  <h2 id="featured-events-heading" className="text-xl sm:text-2xl font-bold whitespace-nowrap">Featured events</h2>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {featuredEvents.map(event => (
+                    <EventCard
+                      key={event.id}
+                      event={event}
+                      isAdmin={false}
+                      inFeaturedSection
+                      rsvpData={rsvpDataById[event.id]}
+                      onView={ev => { setSelectedEvent(ev); setIsDetailOpen(true); }}
+                    />
+                  ))}
+                </div>
+                {/* The call to action closes the strip, after the featured cards. */}
+                <div className="mt-6 flex justify-center">
+                  <Link
+                    to="/list-your-event"
+                    className="group/feature inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-background px-3 py-1.5 text-xs sm:text-sm font-bold tracking-tight text-primary shadow-sm transition-all duration-200 hover:bg-primary hover:text-primary-foreground hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-current" aria-hidden="true" />
+                    Feature your event
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-200 group-hover/feature:translate-x-0.5" aria-hidden="true" />
+                  </Link>
+                </div>
+              </section>
+            )}
             {Object.entries(groupedEvents).map(([monthYear, monthEvents]) => (
               <section key={monthYear}>
                 <div className="flex items-center gap-4 mb-6">
@@ -496,13 +541,31 @@ const CommunityEventsPage = ({ defaultType = 'all' }) => {
               organiser before travelling.
             </p>
           </div>
+          <nav aria-labelledby="card-shows-by-city" className="md:col-span-2 order-last">
+            <h2 id="card-shows-by-city" className="text-lg font-bold mb-3">Card shows by city</h2>
+            <ul className="flex flex-wrap gap-2">
+              {EVENT_REGIONS.map(r => (
+                <li key={r.slug}>
+                  <Link
+                    to={eventRegionPath(r)}
+                    aria-current={region?.slug === r.slug ? 'page' : undefined}
+                    className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${region?.slug === r.slug ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary hover:text-primary'}`}
+                  >
+                    Card shows in {r.city}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
           <div>
             <h2 className="text-2xl font-bold mb-4">Running a Card Event?</h2>
             <p className="text-muted-foreground leading-relaxed">
               Organising a card show, tournament or trade night in Australia? List it on CardPop for
               free and reach collectors across Australia. Sign in and submit your event
               from <Link to="/account/events" className="text-primary font-semibold hover:underline">My Events</Link> in
-              your account — every submission is reviewed before it appears on the calendar. Between
+              your account — every submission is reviewed before it appears on the calendar. You can
+              also give CardPop members a ticket discount: see{' '}
+              <Link to="/list-your-event" className="text-primary font-semibold hover:underline">List your event</Link>. Between
               shows, explore the <Link to="/marketplace" className="text-primary font-semibold hover:underline">CardPop marketplace</Link> to
               buy and sell.
             </p>

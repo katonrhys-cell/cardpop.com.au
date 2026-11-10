@@ -145,6 +145,58 @@ export async function getCachedVerification({ gradingNumber, company = 'psa' }) 
   };
 }
 
+// The full PSA cert record (GetByCertNumber) plus its images
+// (GetImagesByCertNumber), as shown in the Certification panel on a graded
+// card's page. Every view used to make both PSA calls; the record is cached
+// on the same grading_verifications row the verification check uses, with the
+// images beside it. The grade on a cert never changes, but its population
+// counts do, so the details are refreshed after CERT_DETAILS_MAX_AGE_DAYS.
+const CERT_DETAILS_MAX_AGE_DAYS = 30;
+
+/**
+ * A cached PSA cert record and its images, or null when there is none younger
+ * than CERT_DETAILS_MAX_AGE_DAYS (or the read failed — callers then go live).
+ */
+export async function getCachedPsaCertDetails(gradingNumber) {
+  try {
+    const { data, error } = await supabase
+      .from('grading_verifications')
+      .select('verified, details, images, verified_at')
+      .eq('grading_number', gradingNumber)
+      .eq('company', 'psa')
+      .maybeSingle();
+    if (error) throw error;
+    if (!data?.verified || !data.details || !Array.isArray(data.images)) return null;
+    const age = Date.now() - new Date(data.verified_at).getTime();
+    if (!(age >= 0 && age < CERT_DETAILS_MAX_AGE_DAYS * DAY_MS)) return null;
+    return { details: data.details, images: data.images };
+  } catch (error) {
+    logger.warn(`[GRADING_VERIFICATION] Cert details cache read failed: ${error.message}`);
+    return null;
+  }
+}
+
+/** Store a live PSA cert record and its images. Best-effort; never throws. */
+export async function savePsaCertDetails(gradingNumber, details, images) {
+  try {
+    const now = Date.now();
+    const { error } = await supabase
+      .from('grading_verifications')
+      .upsert({
+        grading_number: gradingNumber,
+        company: 'psa',
+        verified: true,
+        details,
+        images: Array.isArray(images) ? images : [],
+        verified_at: new Date(now).toISOString(),
+        expires_at: new Date(now + POSITIVE_CACHE_DAYS * DAY_MS).toISOString(),
+      }, { onConflict: 'grading_number,company' });
+    if (error) throw error;
+  } catch (error) {
+    logger.warn(`[GRADING_VERIFICATION] Cert details cache save failed: ${error.message}`);
+  }
+}
+
 async function getFromCache(gradingNumber, company) {
   try {
     const { data, error } = await supabase

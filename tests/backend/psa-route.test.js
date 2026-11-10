@@ -7,12 +7,18 @@ import request from 'supertest';
 const mockLookupCard = vi.hoisted(() => vi.fn());
 const mockLookupImages = vi.hoisted(() => vi.fn());
 const mockScraper = vi.hoisted(() => vi.fn());
+const mockCachedDetails = vi.hoisted(() => vi.fn());
+const mockSaveDetails = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/psaApiClient.js', () => ({
   psaApiClient: { lookupCard: mockLookupCard, lookupImages: mockLookupImages },
 }));
 vi.mock('../../src/utils/psaScraper.js', () => ({
   fetchPSACertification: mockScraper,
+}));
+vi.mock('../../src/services/gradingVerificationService.js', () => ({
+  getCachedPsaCertDetails: mockCachedDetails,
+  savePsaCertDetails: mockSaveDetails,
 }));
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -30,6 +36,8 @@ const app = makeApp();
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockCachedDetails.mockResolvedValue(null);
+  mockSaveDetails.mockResolvedValue(undefined);
   process.env.PSA_API_TOKEN = 'test_token';
 });
 
@@ -115,5 +123,37 @@ describe('GET /psa/cert/:certNumber', () => {
 
     const res = await request(app).get('/psa/cert/138138870');
     expect(res.status).toBe(404);
+  });
+
+  it('answers from the cached record without calling PSA', async () => {
+    mockCachedDetails.mockResolvedValue({
+      details: PSA_CERT,
+      images: [{ IsFrontImage: true, ImageURL: 'https://img/front.jpg' }],
+    });
+    const res = await request(app).get('/psa/cert/%20138138870%20');
+    expect(res.status).toBe(200);
+    expect(res.body.cardTitle).toContain('Charizard');
+    expect(res.body.frontImage).toBe('https://img/front.jpg');
+    expect(mockCachedDetails).toHaveBeenCalledWith('138138870');
+    expect(mockLookupCard).not.toHaveBeenCalled();
+    expect(mockLookupImages).not.toHaveBeenCalled();
+  });
+
+  it('stores a live lookup for the next view', async () => {
+    mockLookupCard.mockResolvedValue(PSA_CERT);
+    const images = [{ IsFrontImage: false, ImageURL: 'https://img/back.jpg' }];
+    mockLookupImages.mockResolvedValue(images);
+    const res = await request(app).get('/psa/cert/138138870');
+    expect(res.status).toBe(200);
+    expect(mockSaveDetails).toHaveBeenCalledWith('138138870', PSA_CERT, images);
+  });
+
+  it('does not cache a scraper result or a miss', async () => {
+    mockLookupCard.mockResolvedValue(null);
+    mockLookupImages.mockResolvedValue([]);
+    mockScraper.mockResolvedValue(null);
+    const res = await request(app).get('/psa/cert/999');
+    expect(res.status).toBe(404);
+    expect(mockSaveDetails).not.toHaveBeenCalled();
   });
 });

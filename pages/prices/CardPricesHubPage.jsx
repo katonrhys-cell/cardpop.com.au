@@ -66,7 +66,7 @@ const CardPricesHubPage = () => {
     : 'Trading Card Prices in AUD | CardPop';
   const description = activeCategory
     ? `Live Australian-dollar market prices for ${activeCategory.label} cards — raw and graded averages updated daily from live listings. ${activeCategory.blurb}`
-    : 'Live Australian-dollar market prices for Pokémon, NBA, One Piece, AFL and NRL trading cards. Raw and graded averages updated daily — no USD conversion guesswork.';
+    : 'Live Australian-dollar prices for Pokémon, NBA, One Piece, AFL and NRL cards. Raw and graded averages updated daily — no USD conversion guesswork.';
 
   const sections = category ? [category] : CATEGORY_ORDER;
 

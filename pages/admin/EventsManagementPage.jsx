@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Helmet } from 'react-helmet-async';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent, Ban, FilePen, History } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -16,6 +16,9 @@ import EventScraperPanel from '@/components/EventScraperPanel.jsx';
 import EventScanPanel from '@/components/EventScanPanel.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import EventRsvpListDialog from '@/components/admin/EventRsvpListDialog.jsx';
+import EventRejectDialog from '@/components/admin/EventRejectDialog.jsx';
+import EventChangeLogDialog from '@/components/admin/EventChangeLogDialog.jsx';
+import { loadUnreviewedChanges, notifyEventDecision } from '@/lib/eventReviewApi.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { toLocalDateStr } from '@/lib/eventSeo.js';
 import {
@@ -25,6 +28,7 @@ import {
 
 const STATUS_STYLES = {
   pending_review: 'bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-400',
+  draft:          'bg-muted text-muted-foreground border-dashed border-border',
   cancelled:      'bg-muted text-muted-foreground border-border',
   completed:      'bg-blue-500/10 text-blue-700 border-blue-200 dark:text-blue-400',
   rejected:       'bg-destructive/10 text-destructive border-destructive/20',
@@ -32,6 +36,7 @@ const STATUS_STYLES = {
 
 const STATUS_LABELS = {
   pending_review: 'Pending',
+  draft:          'Organiser draft',
   cancelled:      'Cancelled',
   completed:      'Completed',
   rejected:       'Rejected',
@@ -40,8 +45,9 @@ const STATUS_LABELS = {
 const fmtLocation = (ev) =>
   [ev.venue_name, ev.suburb, ev.state].filter(Boolean).join(', ') || 'Location TBA';
 
-// Two views over the same list: everything, or just what the nightly scan found
-// and hasn't been reviewed yet — which is the queue an admin actually works.
+// Views over the same list: everything, what the nightly scan found and hasn't
+// been reviewed yet, or live events whose organiser has asked for changes
+// (`edits`: live events with organiser edits nobody has reviewed yet).
 const FILTERS = {
   all: () => true,
   discovered: (ev) => ev.auto_discovered && ev.status === 'pending_review',
@@ -94,6 +100,10 @@ const EventsManagementPage = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [scrapedData, setScrapedData] = useState(null);
   const [rsvpEvent, setRsvpEvent] = useState(null);
+  // Organiser edits to live events an admin hasn't reviewed, keyed by event id.
+  const [unreviewedEdits, setUnreviewedEdits] = useState(() => new Map());
+  const [editsEventId, setEditsEventId] = useState(null);
+  const [rejectingEvent, setRejectingEvent] = useState(null);
   // Ids of rows published from the "Found by scan" view that are still shown
   // there (toggle on, fading) until their linger timer removes them.
   const [lingeringIds, setLingeringIds] = useState(() => new Set());
@@ -118,6 +128,11 @@ const EventsManagementPage = () => {
       return next;
     }, { replace: true });
   };
+  // The admin bell / email for an organiser's edit links to ?view=edits.
+  useEffect(() => {
+    if (searchParams.get('view') === 'edits') setFilter('edits');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on arrival
+  }, []);
   const searchTerm = param('q');
   const listFilters = { search: searchTerm, status: param('status'), type: param('type'), state: param('state'), source: param('source') };
   const sortKey = param('sort');
@@ -164,13 +179,15 @@ const EventsManagementPage = () => {
   const fetchEvents = async () => {
     setIsLoading(true);
     try {
-      const [{ data, error }, offers] = await Promise.all([
+      const [{ data, error }, offers, requests] = await Promise.all([
         supabase.from('events').select('*').order('start_date', { ascending: false }),
         // Member offer counts (lib/eventTicketOffers.js). Separate read so a
         // problem here never empties the list.
         loadOfferCounts(),
+        loadUnreviewedChanges().catch(() => new Map()),
       ]);
       if (error) throw error;
+      setUnreviewedEdits(requests);
       const offerByEvent = new Map(offers.map((o) => [o.event_id, o]));
       setEvents((data ?? []).map((ev) => ({ ...ev, ticket_offer: offerByEvent.get(ev.id) ?? null })));
     } catch (err) {
@@ -226,6 +243,8 @@ const EventsManagementPage = () => {
       // In the scan queue the row would otherwise leave on this same render:
       // keep it for a beat so the admin sees the toggle go green first.
       if (filter === 'discovered' && newStatus === 'approved') lingerRow(event.id);
+      // Approving a member's submission: email them (the bell is a DB trigger).
+      if (event.status === 'pending_review' && newStatus === 'approved') notifyEventDecision(event.id);
       toast.success(`Event ${newStatus === 'approved' ? 'published' : 'unpublished'}.`);
     } catch (err) {
       toast.error('Failed to update event status.');
@@ -248,11 +267,20 @@ const EventsManagementPage = () => {
   };
 
   const discoveredCount = events.filter(FILTERS.discovered).length;
+  const editsCount = events.filter((ev) => unreviewedEdits.has(ev.id)).length;
   const queueEvents = events.filter(
     filter === 'discovered'
       ? (ev) => FILTERS.discovered(ev) || lingeringIds.has(ev.id)
-      : FILTERS[filter]
+      : filter === 'edits'
+        ? (ev) => unreviewedEdits.has(ev.id)
+        : FILTERS[filter]
   );
+  const editsEvent = editsEventId ? events.find((ev) => ev.id === editsEventId) : null;
+  const dropReviewedEdits = (eventId) => setUnreviewedEdits((prev) => {
+    const next = new Map(prev);
+    next.delete(eventId);
+    return next;
+  });
   // Search, dropdown filters and sort apply on top of the queue view, and the
   // result is split into Current & upcoming / Past. `today` is the admin's
   // local date so the split matches the public calendar.
@@ -262,7 +290,7 @@ const EventsManagementPage = () => {
       return groupEventsByTiming(filterEvents(queueEvents, listFilters, { today }), sortKey, sortDir, { today });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- listFilters/sortKey/sortDir all derive from searchParams
-    [events, filter, lingeringIds, searchParams],
+    [events, filter, lingeringIds, searchParams, unreviewedEdits],
   );
   const visibleCount = sections.reduce((n, s) => n + s.events.length, 0);
 
@@ -289,7 +317,7 @@ const EventsManagementPage = () => {
         </Button>
       </AdminPageHeader>
 
-      {discoveredCount > 0 && (
+      {(discoveredCount > 0 || editsCount > 0 || filter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
           <Button
             variant={filter === 'all' ? 'default' : 'outline'}
@@ -306,6 +334,14 @@ const EventsManagementPage = () => {
             className="rounded-lg font-bold"
           >
             <Radar className="w-3.5 h-3.5 mr-1.5" /> Found by scan ({discoveredCount})
+          </Button>
+          <Button
+            variant={filter === 'edits' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('edits')}
+            className="rounded-lg font-bold"
+          >
+            <FilePen className="w-3.5 h-3.5 mr-1.5" /> Organiser edits ({editsCount})
           </Button>
         </div>
       )}
@@ -373,6 +409,8 @@ const EventsManagementPage = () => {
                   ? 'Nothing matches your search and filters.'
                   : filter === 'discovered'
                     ? 'The scan has nothing waiting for review.'
+                    : filter === 'edits'
+                      ? 'No organiser edits waiting to be reviewed.'
                     : "You haven't created any events yet."}
               </p>
               {activeFilterCount > 0 ? (
@@ -496,7 +534,8 @@ const EventsManagementPage = () => {
                         <Switch
                           checked={event.status === 'approved'}
                           onCheckedChange={() => handleQuickTogglePublished(event)}
-                          disabled={event.status === 'completed' || event.status === 'rejected'}
+                          disabled={event.status === 'completed' || event.status === 'rejected' || event.status === 'draft'}
+                          title={event.status === 'draft' ? "The organiser hasn't submitted this draft yet" : undefined}
                         />
                         {event.status !== 'approved' && (
                           <Badge
@@ -505,6 +544,16 @@ const EventsManagementPage = () => {
                           >
                             {STATUS_LABELS[event.status] || event.status}
                           </Badge>
+                        )}
+                        {unreviewedEdits.has(event.id) && (
+                          <button
+                            type="button"
+                            onClick={() => setEditsEventId(event.id)}
+                            title="The organiser changed this live event — see exactly what changed"
+                            className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-500/10 px-2 py-0.5 text-xs font-bold text-amber-700 whitespace-nowrap hover:bg-amber-500/20 dark:text-amber-400"
+                          >
+                            <FilePen className="w-3 h-3" aria-hidden="true" /> Edited by organiser ({unreviewedEdits.get(event.id).length})
+                          </button>
                         )}
                       </div>
                     </td>
@@ -531,6 +580,30 @@ const EventsManagementPage = () => {
                             <ClipboardPen className="w-4 h-4" />
                           </Link>
                         </Button>
+                        {event.status === 'approved' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditsEventId(event.id)}
+                            className="rounded-lg shadow-sm"
+                            title="Organiser edit history"
+                            aria-label={`Organiser edit history for ${event.title}`}
+                          >
+                            <History className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {event.status === 'pending_review' && !event.auto_discovered && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setRejectingEvent(event)}
+                            className="rounded-lg shadow-sm"
+                            title="Reject with a reason"
+                            aria-label={`Reject ${event.title}`}
+                          >
+                            <Ban className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleOpenModal(event)} className="rounded-lg shadow-sm">
                           <Pencil className="w-4 h-4" />
                         </Button>
@@ -566,6 +639,18 @@ const EventsManagementPage = () => {
       />
 
       <EventRsvpListDialog event={rsvpEvent} onClose={() => setRsvpEvent(null)} />
+
+      <EventRejectDialog
+        event={rejectingEvent}
+        onClose={() => setRejectingEvent(null)}
+        onRejected={(id, reason) => setEvents(prev => prev.map(ev => ev.id === id ? { ...ev, status: 'rejected', rejection_reason: reason } : ev))}
+      />
+
+      <EventChangeLogDialog
+        event={editsEvent}
+        onClose={() => setEditsEventId(null)}
+        onReviewed={dropReviewedEdits}
+      />
 
       <EventScanPanel
         isOpen={isScanOpen}

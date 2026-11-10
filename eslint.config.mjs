@@ -13,8 +13,6 @@ export default [
 			'vitest.config.js',
 			'pb_hooks/**',
 			'pb_migrations/**',
-			// CollectionsDropdown has dynamic imports that trigger ESLint false positives
-			'components/CollectionsDropdown.jsx',
 		],
 	},
 	{
@@ -63,5 +61,5 @@ export default [
 		},
 	},
 	{ files: ['tools/**/*.js', 'tailwind.config.js'], languageOptions: { globals: globals.node } },
-	{ files: ['src/**/*.js', 'api/**/*.js', 'tests/backend/**/*.js'], languageOptions: { globals: globals.node } },
+	{ files: ['src/**/*.js', 'api/**/*.js', 'server/**/*.js', 'tests/backend/**/*.js'], languageOptions: { globals: globals.node } },
 ];

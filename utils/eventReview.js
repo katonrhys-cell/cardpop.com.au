@@ -3,7 +3,7 @@
 //
 // A review is a blog article (category `event-reviews`) plus an `event_reviews`
 // row holding the structured parts: the star scorecard, the quick-facts panel,
-// the photo gallery, the video and the pickups list. This module is the single source of
+// the photo gallery, the videos, the deals of the day and the pickups list. This module is the single source of
 // truth for the scorecard categories, the quick-fact vocabularies, the
 // overall-score arithmetic, the shape a row must have before it is saved, and
 // the Review JSON-LD — so the admin editor, the article page, the event page
@@ -168,6 +168,59 @@ export const cleanVideo = (video) => {
   };
 };
 
+// Several videos per review (event_reviews.videos, in display order). The
+// legacy single `video` column stays as the first one so older readers keep
+// working; normalizeReview writes both.
+export const MAX_REVIEW_VIDEOS = 12;
+
+export const cleanVideos = (videos, legacyVideo = null) => {
+  const list = Array.isArray(videos) ? videos : [];
+  const seen = new Set();
+  const out = [];
+  for (const raw of [...list, ...(list.length ? [] : [legacyVideo])]) {
+    const v = cleanVideo(raw);
+    if (!v || seen.has(v.url)) continue;
+    seen.add(v.url);
+    out.push(v);
+    if (out.length >= MAX_REVIEW_VIDEOS) break;
+  }
+  return out;
+};
+
+// Deals of the day: the bargains the vendors were running on the floor — a
+// table's "everything 20% off" sign, a card marked down to clear. Name is the
+// only required field; prices are optional and `was_price_aud` (the usual
+// price) only counts when it is above the deal price.
+export const MAX_REVIEW_DEALS = 30;
+
+export const cleanDeals = (deals) => {
+  if (!Array.isArray(deals)) return [];
+  return deals
+    .map((d) => {
+      const price = numberOrNull(d?.price_aud);
+      const was = numberOrNull(d?.was_price_aud);
+      return {
+        title: trimOrNull(d?.title),
+        vendor: trimOrNull(d?.vendor),
+        price_aud: price,
+        was_price_aud: was != null && price != null && was > price ? was : null,
+        note: trimOrNull(d?.note),
+        url: safeLink(d?.url),
+        image_url: safeLink(d?.image_url),
+      };
+    })
+    .filter((d) => d.title)
+    .slice(0, MAX_REVIEW_DEALS);
+};
+
+// Whole-number percentage off, or null when there is no usable "was" price.
+export const dealSavingPct = (deal) => {
+  const price = Number(deal?.price_aud);
+  const was = Number(deal?.was_price_aud);
+  if (!Number.isFinite(price) || !Number.isFinite(was) || was <= price || was <= 0) return null;
+  return Math.round(((was - price) / was) * 100);
+};
+
 // Plain text of the report body, for "has the admin written anything?".
 const reportText = (html) => String(html || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 export const REPORT_MIN_CHARS = 40;
@@ -187,6 +240,8 @@ export const emptyReview = () => ({
   headline_pickup: '',
   gallery: [],
   video: null,
+  videos: [],
+  deals: [],
   pickups: [],
 });
 
@@ -195,6 +250,7 @@ export const emptyReview = () => ({
 // overall falls back to the average of the sub-scores when not set by hand.
 export const normalizeReview = (input = {}) => {
   const scores = cleanScores(input.scores);
+  const videos = cleanVideos(input.videos, input.video);
   const overall = isValidScore(input.overall_rating)
     ? Number(input.overall_rating)
     : computeOverall(scores);
@@ -210,7 +266,9 @@ export const normalizeReview = (input = {}) => {
     crowd_level: CROWD_LEVEL_MAP[input.crowd_level] ? input.crowd_level : null,
     headline_pickup: trimOrNull(input.headline_pickup),
     gallery: cleanGallery(input.gallery),
-    video: cleanVideo(input.video),
+    video: videos[0] || null,
+    videos,
+    deals: cleanDeals(input.deals),
     pickups: cleanPickups(input.pickups),
   };
 };
@@ -218,7 +276,7 @@ export const normalizeReview = (input = {}) => {
 // What must be true before a review can be published. Drafts may be saved with
 // anything. The star rating, the photos, the video and the written report are
 // each optional on their own — a review can be just a rating, just a gallery,
-// just a video or just the report — but it has to carry at least one of them.
+// just videos, just the deals or just the report — but it has to carry at least one of them.
 export const reviewPublishProblems = ({ article = {}, review = {} } = {}) => {
   const problems = [];
   if (!trimOrNull(article.title)) problems.push('Give the review a title.');
@@ -230,9 +288,10 @@ export const reviewPublishProblems = ({ article = {}, review = {} } = {}) => {
   const hasSomething =
     isValidScore(review.overall_rating) ||
     cleanGallery(review.gallery).length > 0 ||
-    Boolean(cleanVideo(review.video)) ||
+    cleanVideos(review.videos, review.video).length > 0 ||
+    cleanDeals(review.deals).length > 0 ||
     text.length >= REPORT_MIN_CHARS;
-  if (!hasSomething) problems.push('Add at least one of: a star rating, photos, a video or the written report.');
+  if (!hasSomething) problems.push('Add at least one of: a star rating, photos, videos, deals of the day or the written report.');
   return problems;
 };
 
@@ -308,4 +367,31 @@ export const buildEventReviewJsonLd = ({ article, review, event, siteUrl = 'http
       ...(location ? { location } : {}),
     },
   };
+};
+
+// One schema.org VideoObject per review video — video rich results. Google
+// requires a thumbnail and an upload date: a YouTube video supplies its own
+// still, an upload its poster frame, anything else falls back to the article's
+// cover, and a video with none of those is skipped rather than emitted invalid.
+export const buildReviewVideoJsonLds = ({ article, videos, event, siteUrl = 'https://cardpop.com.au' } = {}) => {
+  if (!article) return [];
+  const list = cleanVideos(videos);
+  const eventName = event?.title || article.title;
+  const uploadDate = article.published_at || article.created_at;
+  if (!uploadDate) return [];
+  return list.map((v, i) => {
+    const embed = videoKind(v.url) === 'embed' ? parseVideoUrl(v.url) : null;
+    const thumb = embed?.thumbnailUrl || v.poster_url || article.featured_image_url || null;
+    if (!thumb) return null;
+    return {
+      '@context': 'https://schema.org',
+      '@type': 'VideoObject',
+      name: v.caption || `${eventName} — video${list.length > 1 ? ` ${i + 1}` : ''}`,
+      description: v.caption || article.excerpt || `Video from ${eventName}, reviewed by CardPop.`,
+      thumbnailUrl: [thumb],
+      uploadDate,
+      ...(embed ? { embedUrl: embed.embedUrl } : { contentUrl: v.url }),
+      url: `${siteUrl}/blog/${article.slug || article.id}`,
+    };
+  }).filter(Boolean);
 };

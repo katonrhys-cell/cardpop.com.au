@@ -80,9 +80,14 @@ jobs:
             exit 1
           fi
 
-          # Install a current rclone (the distro package lags). The official
-          # installer is the documented, maintained method.
-          curl -fsSL https://rclone.org/install.sh | sudo bash
+          # rclone from Ubuntu's signed package repository, not the old
+          # `curl https://rclone.org/install.sh | sudo bash`: that ran whatever
+          # the script was on the day, as root, with the Drive token in reach.
+          # The distro version lags upstream, but this job only uses `copy`
+          # and `delete --min-age`, which it has had for years.
+          sudo apt-get install -y --no-install-recommends rclone >/dev/null \
+            || { sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends rclone; }
+          rclone version | head -1
 
           # Materialise the rclone config from the secret. base64 keeps the
           # multi-line token JSON intact through the secrets pipeline.

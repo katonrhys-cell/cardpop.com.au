@@ -194,6 +194,9 @@ const BlogCategoryPage = lazy(() => import('@/pages/blog/BlogCategoryPage.jsx'))
 const CommunityPage = lazy(() => import('@/pages/community/CommunityPage.jsx'));
 const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEventsPage.jsx'));
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
+const EventOrganiserPage = lazy(() => import('@/pages/community/EventOrganiserPage.jsx'));
+const ListYourEventPage = lazy(() => import('@/pages/community/ListYourEventPage.jsx'));
+const EventRegionPage = lazy(() => import('@/pages/community/EventRegionPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
 const CommunityDiscussionNewPage = lazy(() => import('@/pages/community/CommunityDiscussionNewPage.jsx'));
 const WhatnotShowsPage = lazy(() => import('@/pages/community/WhatnotShowsPage.jsx'));
@@ -226,6 +229,7 @@ const AdminVerificationDashboard = lazy(() => import('@/pages/admin/AdminVerific
 const ReportsModerationPage = lazy(() => import('@/pages/admin/ReportsModerationPage.jsx'));
 const DisputesAdminPage = lazy(() => import('@/pages/admin/DisputesAdminPage.jsx'));
 const OffersAdminPage = lazy(() => import('@/pages/admin/OffersAdminPage.jsx'));
+const InvoicesAdminPage = lazy(() => import('@/pages/admin/InvoicesAdminPage.jsx'));
 const CommissionSettingsPage = lazy(() => import('@/pages/admin/CommissionSettingsPage.jsx'));
 const CategoryManagementPage = lazy(() => import('@/pages/admin/CategoryManagementPage.jsx'));
 const SubcategoryManagementPage = lazy(() => import('@/pages/admin/SubcategoryManagementPage.jsx'));
@@ -240,6 +244,7 @@ const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/Business
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
 const PromoCodesAdminPage = lazy(() => import('@/pages/admin/PromoCodesAdminPage.jsx'));
 const PlayersAdminPage = lazy(() => import('@/pages/admin/PlayersAdminPage.jsx'));
+const GradingPartnersAdminPage = lazy(() => import('@/pages/admin/GradingPartnersAdminPage.jsx'));
 const ProductReviewsAdminPage = lazy(() => import('@/pages/admin/ProductReviewsAdminPage.jsx'));
 const EventReviewsAdminPage = lazy(() => import('@/pages/admin/EventReviewsAdminPage.jsx'));
 const EventReviewEditorPage = lazy(() => import('@/pages/admin/EventReviewEditorPage.jsx'));
@@ -259,7 +264,6 @@ const ScanPage = lazy(() => import('@/pages/ScanPage.jsx'));
 // Info & Misc Pages
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage.jsx'));
 const DiagnosticsPage = lazy(() => import('@/pages/DiagnosticsPage.jsx'));
-const InsiderTradingPage = lazy(() => import('@/pages/InsiderTradingPage.jsx'));
 const SitemapPage = lazy(() => import('@/pages/SitemapPage.jsx'));
 
 // Corporate Info Pages
@@ -501,6 +505,9 @@ const App = () => {
                         <Route path="/events/trade-events" element={<CommunityEventsPage defaultType="trade_event" />} />
                         <Route path="/events/community-events" element={<CommunityEventsPage defaultType="community_event" />} />
                         <Route path="/events/store-events" element={<CommunityEventsPage defaultType="lgs_event" />} />
+                        <Route path="/events/organisers/:slug" element={<EventOrganiserPage />} />
+                        <Route path="/list-your-event" element={<ListYourEventPage />} />
+                        <Route path="/card-shows/:city" element={<EventRegionPage />} />
                         <Route path="/events/:eventId" element={<EventDetailPage />} />
                         <Route path="/community/events" element={<Navigate to="/events" replace />} />
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />
@@ -513,7 +520,6 @@ const App = () => {
                         {/* Search & Misc */}
                         <Route path="/search" element={<SearchResultsPage />} />
                         <Route path="/diagnostics" element={<DiagnosticsPage />} />
-                        <Route path="/insider-trading" element={<InsiderTradingPage />} />
                         <Route path="/sitemap" element={<SitemapPage />} />
                         
                         {/* Info Pages */}
@@ -562,6 +568,7 @@ const App = () => {
                           <Route path="reports" element={<ReportsModerationPage />} />
                           <Route path="disputes" element={<DisputesAdminPage />} />
                           <Route path="offers" element={<OffersAdminPage />} />
+                          <Route path="invoices" element={<InvoicesAdminPage />} />
                           <Route path="commissions" element={<CommissionSettingsPage />} />
                           <Route path="product-lines" element={<ProductLinesManagementPage />} />
                           <Route path="collections" element={<CollectionsManagementPage />} />
@@ -574,6 +581,7 @@ const App = () => {
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
                           <Route path="players" element={<PlayersAdminPage />} />
+                          <Route path="grading-partners" element={<GradingPartnersAdminPage />} />
                           <Route path="product-reviews" element={<ProductReviewsAdminPage />} />
                           <Route path="event-reviews" element={<EventReviewsAdminPage />} />
                           <Route path="event-reviews/new" element={<EventReviewEditorPage />} />

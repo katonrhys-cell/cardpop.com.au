@@ -5,6 +5,7 @@ import { authMiddleware, optionalAuthMiddleware, isAdminUser } from '../middlewa
 import { requireAdmin } from '../middleware/requireAal2.js';
 import { validateRequestBody, validateRequestParams } from '../middleware/validateRequest.js';
 import { getSellerRatingsSchema, createRatingSchema, updatePerformanceSchema, updatePerformanceBodySchema } from '../schemas/sellerRatingSchemas.js';
+import { publicCache, CACHE_SHORT } from '../middleware/publicCache.js';
 
 const router = Router();
 
@@ -36,7 +37,7 @@ router.get('/mine/given', authMiddleware, async (req, res) => {
 });
 
 // Get seller ratings and stats
-router.get('/:sellerId', validateRequestParams(getSellerRatingsSchema), async (req, res) => {
+router.get('/:sellerId', publicCache(CACHE_SHORT), validateRequestParams(getSellerRatingsSchema), async (req, res) => {
   try {
     const { sellerId } = req.params;
 

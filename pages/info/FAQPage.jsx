@@ -55,12 +55,15 @@ const FAQPage = () => {
     >
       <SEOHead
         title="FAQ | CardPop Australia™ — Trading Card Marketplace"
-        description="Answers to common questions about buying, selling and trading on CardPop™ — Australia's trusted trading card marketplace. Learn about fees, the Vault, trades, and payments."
+        description="Answers to common questions about buying, selling and trading on CardPop™, Australia's trading card marketplace — fees, the Vault, trades and payments."
         canonicalUrl="https://cardpop.com.au/faq"
         structuredData={faqSchema}
       />
       
       <div className="mt-8">
+        {/* Outline only: each accordion question is an <h3> (Radix's header),
+            so it needs an <h2> above it rather than following the page <h1>. */}
+        <h2 className="sr-only">Questions and answers</h2>
         <Accordion type="single" collapsible className="w-full">
           {FAQ_ITEMS.map((item, i) => (
             <AccordionItem key={i} value={`item-${i + 1}`}>

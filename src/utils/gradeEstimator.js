@@ -14,7 +14,21 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 // Grading needs to see corner whitening and surface scratches, so this is the
 // stronger model rather than the cheap one the OCR pass starts with.
-export const GRADE_MODEL = 'claude-sonnet-4-6';
+// Claude Sonnet 5.5 ($2 / $10 per MTok) replaces Sonnet 4.6 ($3 / $15). It runs
+// adaptive thinking by default; `between_tools` is its lowest thinking setting
+// (`disabled` is a 400 on this model) and keeps the call shaped as before — the
+// grade is written straight from the photos, inside the same time budget.
+export const GRADE_MODEL = 'claude-sonnet-5-5';
+const GRADE_THINKING = { type: 'between_tools' };
+const GRADE_MAX_TOKENS = 4500;
+
+/** Joins a Messages API reply's text blocks; thinking blocks are skipped. */
+function textFromContent(content) {
+	return (Array.isArray(content) ? content : [])
+		.filter((block) => block?.type === 'text')
+		.map((block) => block.text ?? '')
+		.join('');
+}
 
 /** Pulls the JSON object out of a model reply. Returns null when unreadable. */
 export function parseGradeJson(content) {
@@ -82,9 +96,11 @@ export async function requestGradeEstimate({ apiKey, imageBlocks }) {
 		},
 		body: JSON.stringify({
 			model: GRADE_MODEL,
-			// Six grader blocks with notes plus four assessments: a truncated
-			// reply reads as unparseable JSON, so leave headroom.
-			max_tokens: 3000,
+			// Six grader blocks with notes, four assessments and up to eight
+			// located findings: a truncated reply reads as unparseable JSON,
+			// so leave headroom.
+			max_tokens: GRADE_MAX_TOKENS,
+			thinking: GRADE_THINKING,
 			system: GradeEstimatorPrompt,
 			messages: [{
 				role: 'user',
@@ -103,7 +119,10 @@ export async function requestGradeEstimate({ apiKey, imageBlocks }) {
 	}
 
 	const data = await res.json();
-	return data.content?.[0]?.text ?? '';
+	if (data.stop_reason === 'refusal') {
+		throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
+	}
+	return textFromContent(data.content);
 }
 
 /** Throws when the reply doesn't carry the grades object the page renders. */
@@ -176,8 +195,9 @@ export async function streamGradeEstimate({ apiKey, imageBlocks, onText }) {
 		},
 		body: JSON.stringify({
 			model: GRADE_MODEL,
-			max_tokens: 3000,
+			max_tokens: GRADE_MAX_TOKENS,
 			stream: true,
+			thinking: GRADE_THINKING,
 			system: GradeEstimatorPrompt,
 			messages: [{
 				role: 'user',

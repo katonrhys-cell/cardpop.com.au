@@ -1,8 +1,39 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
+import { cachedQuery } from '@/lib/queryCache.js';
+import { fetchPublicJson, PUBLIC_SHOP_FACETS_URL } from '@/lib/publicApi.js';
 import { PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { FACET_SELECT, DEFAULT_FACET_KEYS, buildFacetOptions, readSelection } from '@/utils/shopFacets.js';
+
+// The unscoped facet rows (every public product) are the same for every
+// visitor, so they come from the server's edge-cached endpoint
+// (lib/publicApi.js) and Cloudflare answers repeats without touching
+// Supabase. Scoped grids (a category page narrows the base query) still read
+// Supabase directly; any failure of the endpoint falls back to that too.
+const FACETS_TTL_MS = 60 * 1000;
+const PUBLIC_FACETS_KEY = 'shop_facets_public';
+
+export const loadPublicFacetRows = () => cachedQuery(PUBLIC_FACETS_KEY, async () => {
+  const body = await fetchPublicJson(PUBLIC_SHOP_FACETS_URL);
+  if (!Array.isArray(body?.data)) throw new Error('public/shop/facets: unexpected shape');
+  return body.data;
+}, FACETS_TTL_MS);
+
+async function loadFacetRows(scope) {
+  if (!scope) {
+    try {
+      const rows = await loadPublicFacetRows();
+      if (Array.isArray(rows)) return rows;
+    } catch {
+      // fall through to the direct query
+    }
+  }
+  let query = supabase.from('shop_products').select(FACET_SELECT).in('status', PUBLIC_SHOP_STATUSES);
+  if (scope) query = scope(query);
+  const { data, error } = await query;
+  return error ? [] : (data || []);
+}
 
 /**
  * Loads the facet rows for a shop grid and keeps the filter selection in the
@@ -27,10 +58,8 @@ export function useShopFacets({ scope, scopeKey, enabled = true, keys = DEFAULT_
     setLoaded(false);
     (async () => {
       try {
-        let query = supabase.from('shop_products').select(FACET_SELECT).in('status', PUBLIC_SHOP_STATUSES);
-        if (scope) query = scope(query);
-        const { data, error } = await query;
-        if (!cancelled) setRows(error ? [] : (data || []));
+        const rows = await loadFacetRows(scope);
+        if (!cancelled) setRows(rows);
       } catch {
         if (!cancelled) setRows([]);
       } finally {
@@ -39,6 +68,7 @@ export function useShopFacets({ scope, scopeKey, enabled = true, keys = DEFAULT_
     })();
     return () => { cancelled = true; };
     // `scope` is a fresh closure each render; scopeKey tracks it by value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- scope is deliberately tracked via scopeKey
   }, [scopeKey, enabled]);
 
   const options = useMemo(() => buildFacetOptions(rows, keysKey.split(',')), [rows, keysKey]);

@@ -28,13 +28,23 @@ function enqueue(table, ...results) {
   queues.set(table, [...(queues.get(table) || []), ...results]);
 }
 
+// A head-only count (`select(..., { head: true })`) reads from its own
+// `<table>:count` queue and defaults to zero rows, so the unreviewed-drafts
+// check doesn't consume results queued for the rest of the run.
 mockSupabase.from.mockImplementation((table) => {
+  let countQuery = false;
   const take = () => {
-    const queue = queues.get(table) || [];
-    return queue.length > 0 ? queue.shift() : { data: null, error: null };
+    const key = countQuery ? `${table}:count` : table;
+    const queue = queues.get(key) || [];
+    if (queue.length > 0) return queue.shift();
+    return countQuery ? { count: 0, error: null } : { data: null, error: null };
   };
   const b = {};
-  for (const method of ['select', 'eq', 'in', 'order', 'limit']) b[method] = vi.fn(() => b);
+  for (const method of ['eq', 'in', 'order', 'limit']) b[method] = vi.fn(() => b);
+  b.select = vi.fn((_columns, options) => {
+    if (options?.head) countQuery = true;
+    return b;
+  });
   b.update = vi.fn((patch) => {
     writes.push({ table, op: 'update', patch });
     return b;
@@ -122,6 +132,56 @@ beforeEach(() => {
 afterEach(() => {
   delete process.env.BLOG_AUTOPUBLISH;
   delete process.env.ANTHROPIC_API_KEY;
+});
+
+describe('runScheduledGeneration — unreviewed-draft cap', () => {
+  afterEach(() => { delete process.env.BLOG_MAX_UNREVIEWED_DRAFTS; });
+
+  it('skips the run without calling the model when the cap is reached', async () => {
+    enqueue('blog_articles:count', { count: 3, error: null });
+
+    const result = await runScheduledGeneration();
+
+    expect(result).toMatchObject({ generated: false, unreviewed: 3 });
+    expect(result.reason).toMatch(/3 unreviewed draft/);
+    expect(mockStream).not.toHaveBeenCalled();
+    // The queue isn't touched either: no topic is claimed and left 'generating'.
+    expect(writes.filter((w) => w.table === 'blog_article_topics')).toEqual([]);
+  });
+
+  it('generates when the backlog is under the cap', async () => {
+    enqueue('blog_articles:count', { count: 2, error: null });
+    enqueue('blog_article_topics', { data: [topic()], error: null }, { data: topic({ status: 'generating', attempts: 1 }), error: null });
+    enqueue('blog_articles', { data: null, error: null }, { data: { id: 'article-1', slug: 'psa-grading-costs-australia' }, error: null });
+    respondWith(draft());
+
+    const result = await runScheduledGeneration();
+    expect(result.generated).toBe(true);
+  });
+
+  it('honours BLOG_MAX_UNREVIEWED_DRAFTS, with 0 turning the cap off', async () => {
+    process.env.BLOG_MAX_UNREVIEWED_DRAFTS = '1';
+    enqueue('blog_articles:count', { count: 1, error: null });
+    expect((await runScheduledGeneration()).generated).toBe(false);
+
+    process.env.BLOG_MAX_UNREVIEWED_DRAFTS = '0';
+    enqueue('blog_articles:count', { count: 50, error: null });
+    enqueue('blog_article_topics', { data: [], error: null });
+    expect(await runScheduledGeneration()).toEqual({ generated: false, reason: 'No topic ready in the queue.' });
+  });
+
+  it('ignores the cap under BLOG_AUTOPUBLISH, where nothing waits for review', async () => {
+    process.env.BLOG_AUTOPUBLISH = 'true';
+    enqueue('blog_articles:count', { count: 50, error: null });
+    enqueue('blog_article_topics', { data: [], error: null });
+    expect(await runScheduledGeneration()).toEqual({ generated: false, reason: 'No topic ready in the queue.' });
+  });
+
+  it('generates anyway when the backlog count fails', async () => {
+    enqueue('blog_articles:count', { count: null, error: { message: 'timeout' } });
+    enqueue('blog_article_topics', { data: [], error: null });
+    expect(await runScheduledGeneration()).toEqual({ generated: false, reason: 'No topic ready in the queue.' });
+  });
 });
 
 describe('runScheduledGeneration', () => {

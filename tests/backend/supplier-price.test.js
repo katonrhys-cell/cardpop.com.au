@@ -108,8 +108,13 @@ describe('readSupplierPrice', () => {
     const result = await readSupplierPrice('<p>Was AU$8.26 now AU$7.68</p>', 'https://www.temu.com/au/x.html');
     expect(result).toEqual({ price: 7.68, currency: 'AUD', reason: null, source: 'model' });
     const request = mockCreate.mock.calls[0][0];
+    expect(request.model).toBe('claude-haiku-5-5');
+    expect(request.output_config).toEqual({ effort: 'low', format: { type: 'json_schema', schema: expect.any(Object) } });
     expect(request.output_config.format.type).toBe('json_schema');
     expect(request.messages[0].content).toContain('untrusted');
+    // Haiku 5.5 has no server-side refusal fallback: sending one is a 400.
+    expect(request).not.toHaveProperty('fallbacks');
+    expect(request).not.toHaveProperty('betas');
   });
 
   it('passes on the model saying it found no price', async () => {

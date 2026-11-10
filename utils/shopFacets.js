@@ -18,12 +18,11 @@
  */
 import { sortFamily } from '@/utils/shopFamily.js';
 import { isSoldOut, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
-import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
+import { SHOP_CARD_COLUMNS, SHOP_FACET_COLUMNS } from '@/utils/shopColumns.js';
 import { binderCapacity } from '@/utils/binderCapacity.js';
 
-/** Columns needed to build, filter and sort by the facets. */
-export const FACET_SELECT =
-  'id, sku, title, brand, category, family_sku, colour, colour_hex, price_aud, retail_price_aud, stock_quantity, status, created_at';
+/** Columns needed to build, filter and sort by the facets (utils/shopColumns.js). */
+export const FACET_SELECT = SHOP_FACET_COLUMNS;
 
 const norm = (s) => String(s || '').trim().toLowerCase();
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

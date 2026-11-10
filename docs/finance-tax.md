@@ -58,3 +58,6 @@ accountant — in particular the seller-GST remittance position.
   at retail.
 
 Both are plain CSV for Excel/Xero/MYOB import.
+
+Per-document exports (the invoice register and Xero's sales-invoice import
+file) live on Admin → Invoices — see `docs/order-invoices.md`.

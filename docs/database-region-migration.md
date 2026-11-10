@@ -60,7 +60,6 @@ The old ref is **hardcoded** in several files. Search-and-replace `odoglvswwymyj
 - [ ] `api/prerender.js` — SSR/OG client URL + anon key
 - [ ] `api/sitemap.js`
 - [ ] `src/utils/supabaseClient.js` — backend client fallback
-- [ ] `src/routes/integrated-ai.js` — allowed image-host list
 - [ ] `components/Header.jsx` — `sb-<ref>-auth-token` localStorage key
 - [ ] `public/sw.js` — service-worker storage-URL cache matcher
 - [ ] `public/auth.md` + `public/.well-known/oauth-protected-resource` — published auth metadata (URL + anon key)
@@ -72,7 +71,7 @@ The old ref is **hardcoded** in several files. Search-and-replace `odoglvswwymyj
 - [ ] `.github/workflows/supabase-migrations.yml`, `migration-drift.yml` — `supabase link --project-ref`
 - [ ] `.github/workflows/image-maintenance.yml` — `SUPABASE_URL`
 - [ ] `scripts/backup-supabase.sh`, `scripts/security-smoke.mjs`, `scripts/ops-dashboard/Code.gs`, `tools/backfill-images.mjs`
-- [ ] tests: `tests/frontend/imageUrl.test.js`, `tests/backend/imageProxyWorker.test.js`, `tests/backend/integrated-ai.test.js`, `tests/backend/setup.js` (anon key)
+- [ ] tests: `tests/frontend/imageUrl.test.js`, `tests/backend/imageProxyWorker.test.js`, `tests/backend/setup.js` (anon key)
 - [ ] docs that state the live URL: `CLAUDE.md`, `docs/oauth-login.md`, `docs/backup-and-restore.md`, `docs/image-cdn.md`, `docs/ddos-protection.md`, `docs/email-inboxes.md`
 - [ ] `SECURITY_AUDIT_*.md` is a point-in-time record — leave it alone
 

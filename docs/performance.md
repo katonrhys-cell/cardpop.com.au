@@ -2,7 +2,9 @@
 
 How the site is built to load fast, and the reasoning behind the parts that
 look odd. Measured with Lighthouse / PageSpeed Insights on `https://cardpop.com.au/`;
-the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
+`lighthouserc.cjs` holds the budgets for a local `npx @lhci/cli autorun` (the
+CI workflow for it was removed in November 2026; it had been disabled since
+`@lhci/cli` left the dependencies).
 
 ## How a page paints
 
@@ -181,8 +183,10 @@ Rules that keep it from growing:
 
 ## Edge caching (vercel.json `headers`)
 
-Two rules of Vercel's header matching shape the `headers` array, and
-`tests/backend/vercelHeaders.test.js` pins both:
+`vercel.json` is the routing manifest on Vercel and on the parked VPS stack
+alike: `server/vercelRoutes.js` applies its `headers` rules with Vercel's
+semantics before the file or function answers (`docs/vultr-rollout.md`). Two rules of that matching shape
+the `headers` array, and `tests/backend/vercelHeaders.test.js` pins both:
 
 - **Every matching rule applies, in order, and for a repeated key the last
   match wins.** The catch-all `/(.*)` (which sets `Cache-Control: public,
@@ -207,6 +211,61 @@ What is cached how:
 | `manifest.json`, `robots.txt`, `llms.txt`, `openapi.json`, `ads.txt` | 1 hour + 1 day stale-while-revalidate | Unhashed, read by every crawler and install prompt |
 | `/sw.js`, `/app.html`, everything else | `max-age=0, must-revalidate` | A cached shell references deleted chunk hashes after a deploy |
 | `/api/*` | `no-store` | Per-user |
+| `/hcgi/api/public/*` | `max-age=30, s-maxage=60, stale-while-revalidate=300` | The edge-cached public reads below — identical for every visitor |
+| Public GETs behind `publicCache()` (`src/middleware/publicCache.js`) | 1 min–1 h browser, 2 min–1 day edge | Search suggestions, leaderboard, categories, seller ratings, and catalogue / eBay / CardSight lookups: the same for every visitor, and the lookups spend a paid quota. Set by the function, so it overrides the `/api/*` rule; errors and degraded fallbacks stay `no-store` |
 
-Cloudflare honours these in front of Vercel, so a positive `max-age` here also
-keeps the request off Vercel's origin for repeat visitors and bots.
+Cloudflare honours these in front of the origin, so a positive `max-age` here
+also keeps the request off the origin for repeat visitors and bots.
+
+## Edge-cached public reads (`/hcgi/api/public/*`)
+
+The browser talks to Supabase directly for user data, and until this layer
+existed it did so for the public pages too: the home page ran eight PostgREST
+queries per anonymous visitor, every shop grid loaded its facet rows, and none
+of it passed through Cloudflare, so **database compute was the one cost that
+grew linearly with traffic**. `src/routes/public.js` fixes that for the reads
+that are identical for everyone:
+
+| Endpoint | Replaces | Used by |
+|---|---|---|
+| `GET /public/home` | the four homepage queries (featured cards, featured sellers, stats, traffic) | `lib/homepageData.js` |
+| `GET /public/shop/facets` | the unscoped `shop_products` facet rows | `hooks/useShopFacets.js` (grids with no `scope`) |
+
+How it works, and the rules for adding an endpoint:
+
+- **Anon key, never service role.** The queries are the browser's own
+  (`lib/homepageQueries.js`, `SHOP_FACET_COLUMNS`), run through
+  `src/utils/supabaseAnonClient.js`, so RLS still decides what is visible and a
+  cached response can never hold a row an anonymous visitor couldn't fetch.
+  That also means the result is the anon view for signed-in users too, which is
+  what a public page should show.
+- **Two caches.** The Node process keeps a micro-cache
+  (`PUBLIC_READ_CACHE_TTL_MS`, default 60 s, with in-flight de-duplication, so a
+  burst is one Supabase round trip), and the response carries
+  `Cache-Control: public, max-age=30, s-maxage=60, stale-while-revalidate=300`
+  so Cloudflare serves repeats from the edge without reaching the box at all.
+- **Failures are never cached.** A failed query answers `no-store` (a partial
+  home bundle still returns the parts that worked), and the browser falls back
+  to its direct Supabase query for that part (`lib/publicApi.js` →
+  `fetchPublicJson`, per-part fallback in `lib/homepageData.js`). The page is
+  never worse off than before the endpoint existed.
+- **No credentials on the request** (`credentials: 'omit'`, no bearer): a
+  cookie or Authorization header would make the response uncacheable and
+  would be wrong for data that is the same for everyone. Don't route these
+  through `lib/apiServerClient.js`, which attaches the user's token.
+- **Bounded results only.** These are cached blobs, not paginated APIs; a
+  filtered or paged view (the marketplace grid with its filters) has too many
+  cache keys to be worth it and stays a direct query.
+
+**Cloudflare setup (one-time, free plan).** Cloudflare does not cache JSON by
+default, so the headers alone do nothing at the edge. Dashboard → Caching →
+**Cache Rules** → Create rule: *URI Path starts with* `/hcgi/api/public/` →
+Cache eligibility **Eligible for cache**; Edge TTL **Use cache-control header
+if present, bypass cache if not**; Browser TTL **Respect origin**. Verify with
+`curl -sI https://cardpop.com.au/hcgi/api/public/home | grep -i cf-cache-status`
+— the second request shows `HIT`. The micro-cache on the box still protects
+Supabase if the rule is missing; the rule is what makes repeats free.
+
+`tests/backend/publicRoutes.test.js` covers the headers, the micro-cache and
+the no-store-on-failure rule; `tests/frontend/homepageDataApi.test.js` covers
+the browser's fallback.

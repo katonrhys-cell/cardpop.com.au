@@ -18,6 +18,13 @@ updates:
         update-types:
           - "minor"
           - "patch"
+      # Security updates ignore the group above and used to arrive as one PR
+      # per package (17 open at once in Nov 2026, each re-running CI). Group
+      # them too: one PR per run, one CI run.
+      security:
+        applies-to: security-updates
+        patterns:
+          - "*"
     ignore:
       # crypto-js is kept intentionally for legacy decrypt compatibility —
       # do not auto-upgrade until the migration to Node.js crypto is complete.

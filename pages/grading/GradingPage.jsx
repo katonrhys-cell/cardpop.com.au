@@ -152,7 +152,7 @@ const GradingPage = () => (
   <div className="min-h-screen bg-background">
     <SEOHead
       title="Grading Hub | CardPop — Australia's Card Grading Resource"
-      description="Australia's go-to trading card grading resource. Compare PSA, BGS, CGC and ACE Grading, understand condition scales, and learn how to maximise the value of your collection."
+      description="Australia's trading card grading resource. Compare PSA, BGS, CGC and ACE Grading, understand condition scales and learn how grading adds value to a collection."
       keywords="card grading australia, PSA grading, ACE grading australia, pokemon grading, BGS grading, CGC cards, trading card grading guide, slab cards australia"
     />
 

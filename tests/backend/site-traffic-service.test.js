@@ -8,24 +8,39 @@ const ga4 = vi.hoisted(() => ({ configured: true, runReport: vi.fn() }));
 vi.mock('../../src/utils/ga4Client.js', () => ({
   isGa4Configured: () => ga4.configured,
   runGa4Report: ga4.runReport,
+  describeServiceAccountProblem: () => 'GA4_SERVICE_ACCOUNT_JSON is not set in this deployment',
+  describePropertyIdProblem: () => null,
 }));
 
 const gsc = vi.hoisted(() => ({ configured: false, query: vi.fn() }));
 vi.mock('../../src/utils/searchConsoleClient.js', () => ({
   isSearchConsoleConfigured: () => gsc.configured,
   runSearchAnalytics: gsc.query,
+  describeSiteUrlProblem: () => null,
 }));
 
-const db = vi.hoisted(() => ({ writes: [] }));
+const db = vi.hoisted(() => ({ writes: [], stored: [], readError: null }));
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   default: {
-    from: (table) => ({
-      upsert: (rows, opts) => { db.writes.push({ table, rows, opts }); return Promise.resolve({ error: null }); },
-    }),
+    from: (table) => {
+      // select(...).gte(...).order(...).range(from, to) → the stored rows
+      const read = {
+        select: () => read,
+        gte: () => read,
+        order: () => read,
+        range: (from, to) => Promise.resolve(db.readError
+          ? { data: null, error: db.readError }
+          : { data: db.stored.slice(from, to + 1), error: null }),
+      };
+      return {
+        ...read,
+        upsert: (rows, opts) => { db.writes.push({ table, rows, opts }); return Promise.resolve({ error: null }); },
+      };
+    },
   },
 }));
 
-const { syncSiteTraffic, parseDailyReport, parseSearchReport, Ga4NotConfiguredError } = await import('../../src/services/siteTrafficService.js');
+const { syncSiteTraffic, parseDailyReport, parseSearchReport, changedDays, Ga4NotConfiguredError } = await import('../../src/services/siteTrafficService.js');
 
 const searchRow = (date, clicks, impressions) => ({ keys: [date], clicks, impressions, ctr: 0, position: 0 });
 
@@ -91,6 +106,8 @@ describe('syncSiteTraffic', () => {
     gsc.configured = false;
     gsc.query.mockReset();
     db.writes.length = 0;
+    db.stored = [];
+    db.readError = null;
     process.env.GA4_START_DATE = '2026-06-01';
   });
   afterEach(() => {
@@ -101,6 +118,7 @@ describe('syncSiteTraffic', () => {
   it('throws Ga4NotConfiguredError without credentials and never calls GA4', async () => {
     ga4.configured = false;
     await expect(syncSiteTraffic()).rejects.toBeInstanceOf(Ga4NotConfiguredError);
+    await expect(syncSiteTraffic()).rejects.toThrow(/GA4_SERVICE_ACCOUNT_JSON is not set/);
     expect(ga4.runReport).not.toHaveBeenCalled();
     expect(db.writes).toHaveLength(0);
   });
@@ -159,6 +177,28 @@ describe('syncSiteTraffic', () => {
     expect(db.writes.find((w) => w.table === 'site_traffic_summary').rows).toMatchObject({ visitors_30d: 50 });
   });
 
+  it('rewrites only the days whose figures changed', async () => {
+    const allTime = () => report([row('20260601', 0, 0, 0), row('20260602', 4, 5, 9), row('20260603', 12, 15, 40)], [14, 20, 49]);
+    ga4.runReport.mockImplementation(async () => allTime());
+    // Stored: the 1st matches, the 2nd has GA4's earlier (unfinalised) figures, the 3rd is new.
+    db.stored = [
+      { day: '2026-06-01', users: 0, sessions: 0, pageviews: 0 },
+      { day: '2026-06-02', users: 3, sessions: 5, pageviews: 9 },
+    ];
+    await syncSiteTraffic();
+    const daily = db.writes.filter((w) => w.table === 'site_traffic_daily').flatMap((w) => w.rows);
+    expect(daily.map((d) => d.day)).toEqual(['2026-06-02', '2026-06-03']);
+  });
+
+  it('writes every day when the stored rows cannot be read', async () => {
+    ga4.runReport.mockResolvedValue(report([row('20260601', 1, 1, 1), row('20260602', 2, 2, 2)], [3, 3, 3]));
+    db.stored = [{ day: '2026-06-01', users: 1, sessions: 1, pageviews: 1 }];
+    db.readError = { message: 'timeout' };
+    await syncSiteTraffic();
+    const daily = db.writes.filter((w) => w.table === 'site_traffic_daily').flatMap((w) => w.rows);
+    expect(daily).toHaveLength(2);
+  });
+
   it('writes the daily rows and a single summary row from the two reports', async () => {
     ga4.runReport.mockImplementation(async (req) => {
       const range = req.dateRanges[0];
@@ -208,5 +248,24 @@ describe('syncSiteTraffic', () => {
     await syncSiteTraffic();
     const allTimeCall = ga4.runReport.mock.calls.find((c) => c[0].dateRanges[0].startDate !== '30daysAgo');
     expect(allTimeCall[0].dateRanges[0].startDate).toBe('2025-01-01');
+  });
+});
+
+describe('changedDays', () => {
+  const cols = ['search_clicks', 'search_impressions'];
+  it('keeps new days and days with a different figure, and drops settled ones', () => {
+    const stored = new Map([
+      ['2026-10-01', { day: '2026-10-01', search_clicks: 2, search_impressions: 60 }],
+      ['2026-10-02', { day: '2026-10-02', search_clicks: 1, search_impressions: 30 }],
+    ]);
+    const days = [
+      { day: '2026-10-01', search_clicks: 2, search_impressions: 60 },
+      { day: '2026-10-02', search_clicks: 1, search_impressions: 35 },
+      { day: '2026-10-03', search_clicks: 0, search_impressions: 0 },
+    ];
+    expect(changedDays(days, stored, cols).map((d) => d.day)).toEqual(['2026-10-02', '2026-10-03']);
+  });
+  it('keeps everything when nothing could be read', () => {
+    expect(changedDays([{ day: '2026-10-01', search_clicks: 0, search_impressions: 0 }], null, cols)).toHaveLength(1);
   });
 });

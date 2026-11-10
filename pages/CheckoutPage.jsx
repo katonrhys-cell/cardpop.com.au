@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { useCart } from '@/hooks/useCart.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -25,6 +25,7 @@ import OrderReviewSection from '@/components/checkout/OrderReviewSection.jsx';
 import EmbeddedStripeCheckout from '@/components/checkout/EmbeddedStripeCheckout.jsx';
 import MarketplacePurchaseGate from '@/components/checkout/MarketplacePurchaseGate.jsx';
 import CheckoutReassurance from '@/components/checkout/CheckoutReassurance.jsx';
+import StripeMark, { StripeWordmark } from '@/components/checkout/StripeMark.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
 import { ADDRESS_AUTOCOMPLETE_ENABLED } from '@/lib/addressAutocomplete.js';
@@ -40,7 +41,6 @@ import {
   parseCheckoutLinkParams, normaliseSku, shopRowToCartLine, listingRowToCartLine,
   CHECKOUT_LINK_ID_PARAM, CHECKOUT_LINK_QUANTITY_PARAM,
 } from '@/utils/checkoutLink.js';
-import { Link } from 'react-router-dom';
 
 // The typed-in details survive a reload or a detour through sign-in. Per-tab
 // (sessionStorage), cleared once the order is paid (CheckoutSuccessPage).
@@ -788,8 +788,15 @@ const CheckoutPage = () => {
 
         <header className="mb-8">
           <h1 className="font-heading text-2xl font-bold text-foreground sm:text-3xl">Secure Checkout</h1>
-          <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" /> Encrypted &amp; processed by Stripe — you never leave this page.
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
+            <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Encrypted &amp; Processed by</span>
+            <span className="inline-flex items-center gap-1">
+              <StripeMark className="h-4 w-4" />
+              <StripeWordmark className="h-[1.05rem] w-auto" />
+              <span className="sr-only">Stripe</span>
+            </span>
+            <span>— you’ll never leave this page.</span>
           </p>
         </header>
 
@@ -832,7 +839,7 @@ const CheckoutPage = () => {
                   paymentBody) — a disabled fieldset disables every input,
                   checkbox and select trigger inside it. */}
               <fieldset disabled={readyToPay} className="m-0 min-w-0 space-y-6 border-0 p-0" data-testid="checkout-details">
-              <Section step={1} icon={MapPin} title="Contact & shipping">
+              <Section step={1} icon={MapPin} title="Contact & Shipping">
                 {savedAddresses.length > 0 && (
                   <div className="space-y-1">
                     <Label>Saved addresses</Label>
@@ -923,7 +930,7 @@ const CheckoutPage = () => {
                           <Pencil className="mr-2 h-4 w-4" /> Edit details
                         </Button>
                       </div>
-                      <EmbeddedStripeCheckout requestBody={paymentBody} />
+                      <EmbeddedStripeCheckout requestBody={paymentBody} billingAddress={sameAsShipping ? shippingData : billingData} />
                     </div>
                   ) : (
                     <div className="space-y-3">

@@ -17,7 +17,8 @@ import EventReviewQuickFacts from '@/components/reviews/EventReviewQuickFacts.js
 import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
 import EventReviewPickups from '@/components/reviews/EventReviewPickups.jsx';
 import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
-import { buildEventReviewJsonLd, hasScorecard, hasQuickFacts, cleanVideo } from '@/utils/eventReview.js';
+import EventReviewDeals from '@/components/reviews/EventReviewDeals.jsx';
+import { buildEventReviewJsonLd, buildReviewVideoJsonLds, hasScorecard, hasQuickFacts, cleanVideos, cleanDeals } from '@/utils/eventReview.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -315,7 +316,7 @@ const BlogArticlePage = () => {
 
   if (loading) {
     return (
-      <div className="container-default max-w-[90rem] mx-auto py-24 space-y-8 min-h-[100dvh]">
+      <div className="container-default py-24 space-y-8 min-h-[100dvh]">
         <Skeleton className="h-12 w-3/4 rounded-lg" />
         <Skeleton className="h-6 w-1/4 rounded-md" />
         <Skeleton className="aspect-[21/9] w-full rounded-2xl" />
@@ -422,7 +423,9 @@ const BlogArticlePage = () => {
   // Review rich-result markup for event reviews (null when there's no rating).
   const eventReviewStructuredData = buildEventReviewJsonLd({ article, review: eventReview, event: reviewedEvent });
 
-  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, videoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
+  const reviewVideoStructuredData = eventReview ? buildReviewVideoJsonLds({ article, videos: cleanVideos(eventReview.videos, eventReview.video), event: reviewedEvent }) : [];
+
+  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, videoStructuredData, ...reviewVideoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -437,7 +440,7 @@ const BlogArticlePage = () => {
 
       {/* Parallel Report masthead — charcoal hero, CardPop Red accents */}
       <div className="bg-brand-charcoal text-white">
-        <div className="container-default max-w-4xl mx-auto pt-8 pb-6">
+        <div className="container-default pt-8 pb-6">
 
           {/* Back link */}
           <Link to="/blog" className="inline-flex items-center text-xs font-medium text-white/50 hover:text-white/90 transition-colors group mb-8">
@@ -483,7 +486,7 @@ const BlogArticlePage = () => {
 
           {/* Excerpt */}
           {article.excerpt && (
-            <p className="text-base text-white/65 leading-relaxed mb-7 max-w-2xl">
+            <p className="text-base md:text-lg text-white/65 leading-relaxed mb-7 max-w-4xl">
               {article.excerpt}
             </p>
           )}
@@ -515,7 +518,7 @@ const BlogArticlePage = () => {
       </div>
 
       {videoInfo ? (
-        <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
+        <div className="container-default mt-4 mb-4">
           <div className="rounded-2xl overflow-hidden bg-black shadow-lg aspect-video">
             <iframe
               src={videoInfo.embedUrl}
@@ -529,7 +532,7 @@ const BlogArticlePage = () => {
           </div>
         </div>
       ) : imageUrl && (
-        <div className="container-default max-w-4xl mx-auto mt-4 mb-4">
+        <div className="container-default mt-4 mb-4">
           <div className="rounded-2xl overflow-hidden bg-muted shadow-lg aspect-video">
              <img
                src={imageUrl}
@@ -544,7 +547,7 @@ const BlogArticlePage = () => {
       )}
 
       {eventReview && (hasScorecard(eventReview) || hasQuickFacts(eventReview) || reviewedEvent) && (
-        <div className="container-default max-w-4xl mx-auto mt-8 grid gap-5 lg:grid-cols-[3fr_2fr] items-start">
+        <div className="container-default mt-8 grid gap-5 lg:grid-cols-[3fr_2fr] items-start">
           <EventReviewScorecard review={eventReview} />
           <EventReviewQuickFacts review={eventReview} event={reviewedEvent} />
         </div>
@@ -591,16 +594,17 @@ const BlogArticlePage = () => {
         ) : eventReview ? null : (
           // An event review may be published without a written report (just
           // the rating, photos or video), so it never shows this placeholder.
-          <div className="container-default max-w-[90rem] mx-auto">
+          <div className="container-default">
             <p className="text-muted-foreground italic">No content available for this article.</p>
           </div>
         )}
       </div>
 
-      {eventReview && (cleanVideo(eventReview.video) || eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
-        <div className="container-default max-w-4xl mx-auto -mt-10 mb-16 space-y-12">
-          <EventReviewVideo video={eventReview.video} />
+      {eventReview && (cleanVideos(eventReview.videos, eventReview.video).length > 0 || cleanDeals(eventReview.deals).length > 0 || eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
+        <div className="container-default -mt-10 mb-16 space-y-12">
+          <EventReviewVideo videos={eventReview.videos} video={eventReview.video} />
           <EventReviewGallery gallery={eventReview.gallery} />
+          <EventReviewDeals deals={eventReview.deals} />
           <EventReviewPickups pickups={eventReview.pickups} />
         </div>
       )}
@@ -624,7 +628,7 @@ const BlogArticlePage = () => {
 
       {faqData && faqData.length > 0 && (
         <section className="border-t border-border py-14">
-          <div className="container-default max-w-4xl mx-auto">
+          <div className="container-default">
             <h2 className="font-heading font-extrabold text-2xl mb-6">Frequently Asked Questions</h2>
             <div className="space-y-6">
               {faqData.map((faq, i) => (
@@ -640,7 +644,7 @@ const BlogArticlePage = () => {
 
       {marketplaceCards.length > 0 && (
         <section className="border-t border-border py-14">
-          <div className="container-default max-w-4xl mx-auto">
+          <div className="container-default">
             <div className="flex items-center gap-3 mb-6">
               <div className="border border-white/20 rounded px-2.5 py-1 flex items-center gap-1.5 bg-brand-charcoal shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-red inline-block" />
@@ -649,7 +653,7 @@ const BlogArticlePage = () => {
             </div>
             <h2 className="font-heading font-extrabold text-xl mb-1">Shop Cards From This Article</h2>
             <p className="text-sm text-muted-foreground mb-6">Live listings from The CardPop Marketplace — updated in real time.</p>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {marketplaceCards.map((listing) => {
                 const card = listing.vault_items;
                 const cardImageUrl = resolveCardImage(card?.card_image);

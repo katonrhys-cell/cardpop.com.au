@@ -5,7 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import SEOHead from '@/components/SEOHead.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
-import { geocodeLocation, STATE_CENTROIDS } from '@/lib/geocode.js';
+import { geocodeBatch } from '@/lib/geocode.js';
 import { fetchStores, DIRECTORY_CITIES } from '@/lib/storeDirectory.js';
 import { toLocalDateStr } from '@/lib/eventSeo.js';
 import logger from '@/src/utils/logger.js';
@@ -256,7 +256,7 @@ const LocalMapPage = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Geocode progressively — most precise address first ─────────────────────
+  // ── Place every pin (shared geocode cache) ──────────────────────────────────
 
   useEffect(() => {
     if (rawItems.length === 0) return;
@@ -266,24 +266,13 @@ const LocalMapPage = () => {
     setGeocodedCount(0);
     setMarkers([]);
 
-    let done = 0;
-    const resolved = [];
-
+    // One request for every pin: the server answers from the shared geocode
+    // cache (lib/geocode.js); anything not resolved yet sits on its state.
     async function geocodeAll() {
-      for (const item of rawItems) {
-        if (cancelled) break;
-        const coords = await geocodeLocation(item.geocodeParams);
-        done++;
-        if (!cancelled) {
-          setGeocodedCount(done);
-          // Fall back to state centroid only if exact geocoding failed
-          const fallback = item.geocodeParams.state
-            ? STATE_CENTROIDS[item.geocodeParams.state.toUpperCase()] || null
-            : null;
-          resolved.push({ ...item, coords: coords || fallback });
-          setMarkers([...resolved]);
-        }
-      }
+      const coords = await geocodeBatch(rawItems.map((item) => item.geocodeParams));
+      if (cancelled) return;
+      setMarkers(rawItems.map((item, i) => ({ ...item, coords: coords[i] })));
+      setGeocodedCount(rawItems.length);
     }
     geocodeAll();
     return () => { cancelled = true; };
