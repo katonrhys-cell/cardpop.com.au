@@ -823,6 +823,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   };
 
   const inputCls = 'bg-background rounded-xl h-11';
+  // iOS Safari gives date/time inputs an intrinsic min-width wider than half a
+  // phone screen, so in a two-column grid they overflow and touch. min-w-0 +
+  // appearance-none let them shrink to their column; the value sits left like
+  // every other field (same fix as CommunityEventsPage's dateInputClass).
+  const dateTimeCls = `${inputCls} w-full min-w-0 appearance-none text-left [&::-webkit-date-and-time-value]:text-left`;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) requestClose(); }}>
@@ -1057,22 +1062,22 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
                 <div className="pt-2 border-t border-border">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Dates & Times</p>
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:gap-x-5">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="start_date" className="font-bold">Start Date <span className="text-destructive" aria-hidden="true">*</span></Label>
-                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={inputCls} aria-required="true" disabled={loading} />
+                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={dateTimeCls} aria-required="true" disabled={loading} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="end_date" className="font-bold">End Date</Label>
-                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} min={formData.start_date || undefined} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} min={formData.start_date || undefined} onChange={handleChange} className={dateTimeCls} disabled={loading} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="start_time" className="font-bold">Start Time</Label>
-                      <Input id="start_time" name="start_time" type="time" value={formData.start_time} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="start_time" name="start_time" type="time" value={formData.start_time} onChange={handleChange} className={dateTimeCls} disabled={loading} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="end_time" className="font-bold">End Time</Label>
-                      <Input id="end_time" name="end_time" type="time" value={formData.end_time} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="end_time" name="end_time" type="time" value={formData.end_time} onChange={handleChange} className={dateTimeCls} disabled={loading} />
                     </div>
                   </div>
                 </div>
