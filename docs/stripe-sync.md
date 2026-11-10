@@ -32,7 +32,12 @@ The integration schedules a pg_cron job, `stripe-sync-worker`, to drain its
 queue into the `stripe.*` tables. It ships at **every minute** — 1,440 wake-ups
 a day, the most frequent recurring query on the database by count — for a
 mirror nothing in the app reads. `20261010022330_stripe_sync_worker_cadence.sql`
-sets it to **every 5 minutes**, which is fresh enough for reporting. That
+set it to **every 5 minutes**, and `20261105070414_efficiency_housekeeping.sql`
+moved it to **hourly** (minute 7): still fresh enough for an ad-hoc report,
+and each wake-up is an Edge Function call plus a `cron.job_run_details` row
+(which that migration now prunes to 7 days). If no report ever needs the
+mirror, switch the integration off in the dashboard; the migration is a no-op
+without the job. That
 migration touches only the job's schedule, never the schema (which stays the
 integration's); it is a no-op on a project without pg_cron or without the job.
 If the integration is re-enabled or upgraded and recreates the job at one

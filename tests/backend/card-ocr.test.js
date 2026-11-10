@@ -230,7 +230,7 @@ describe('POST /scan — model escalation', () => {
     await request(app).post('/scan');
 
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(mockFetch.mock.calls[0][1].body).model).toBe('claude-haiku-4-5-20251001');
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body).model).toBe('claude-haiku-5-5');
   });
 
   it('escalates to the stronger model on low confidence and returns its result', async () => {
@@ -242,8 +242,47 @@ describe('POST /scan — model escalation', () => {
     const res = await request(app).post('/scan');
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
-    expect(JSON.parse(mockFetch.mock.calls[1][1].body).model).toBe('claude-sonnet-4-6');
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body).model).toBe('claude-sonnet-5-5');
     expect(res.text).toContain('Jungle');
+  });
+
+  it('turns thinking off on the fast model and to between_tools on the strong one, at low effort', async () => {
+    mockFiles = oneFile();
+    mockFetch
+      .mockResolvedValueOnce(anthropicOk(completeRead({ confidence: 'low' })))
+      .mockResolvedValueOnce(anthropicOk(completeRead()));
+
+    await request(app).post('/scan');
+
+    const fast = JSON.parse(mockFetch.mock.calls[0][1].body);
+    const strong = JSON.parse(mockFetch.mock.calls[1][1].body);
+    expect(fast.thinking).toEqual({ type: 'disabled' });
+    expect(strong.thinking).toEqual({ type: 'between_tools' });
+    expect(fast.output_config).toEqual({ effort: 'low' });
+    expect(strong.output_config).toEqual({ effort: 'low' });
+    for (const body of [fast, strong]) {
+      expect(body).not.toHaveProperty('temperature');
+      expect(body).not.toHaveProperty('tool_choice');
+    }
+  });
+
+  it('reads the JSON from the text block when the reply leads with a thinking block', async () => {
+    mockFiles = oneFile();
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        stop_reason: 'end_turn',
+        content: [
+          { type: 'thinking', thinking: '', signature: 'sig' },
+          { type: 'text', text: completeRead({ cardName: 'Blastoise' }) },
+        ],
+      }),
+    });
+
+    const res = await request(app).post('/scan');
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(res.text).toContain('Blastoise');
   });
 
   it('escalates when the fast model returns no card name', async () => {

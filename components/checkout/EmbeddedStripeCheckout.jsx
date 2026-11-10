@@ -8,7 +8,7 @@ import StripeElementsPayment from '@/components/checkout/StripeElementsPayment.j
 import { useCart } from '@/hooks/useCart.jsx';
 
 /*
- * Inline Stripe payment. Renders Stripe's Embedded Checkout (card / PayPal /
+ * Inline Stripe payment. Renders Stripe's Embedded Checkout (card /
  * wallets) directly on our page — the buyer never leaves
  * cardpop.com.au. Card data is entered inside Stripe's own secure iframe, so it
  * never touches our servers (PCI scope stays with Stripe).
@@ -28,7 +28,7 @@ import { useCart } from '@/hooks/useCart.jsx';
  */
 const UI_MODE = import.meta.env.VITE_CHECKOUT_UI === 'embedded' ? 'embedded' : 'elements';
 
-const EmbeddedStripeCheckout = ({ requestBody }) => {
+const EmbeddedStripeCheckout = ({ requestBody, billingAddress }) => {
   const [clientSecret, setClientSecret] = useState(null);
   const [error, setError] = useState(null);
   // A listing that sold while the buyer was typing — the server names it so
@@ -131,7 +131,7 @@ const EmbeddedStripeCheckout = ({ requestBody }) => {
   }
 
   if (UI_MODE === 'elements') {
-    return <StripeElementsPayment clientSecret={clientSecret} />;
+    return <StripeElementsPayment clientSecret={clientSecret} billingAddress={billingAddress} />;
   }
 
   return (

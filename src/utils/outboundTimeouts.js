@@ -37,6 +37,8 @@ export const OUTBOUND_TIMEOUT_MS = Object.freeze({
   anthropicGrade: 150_000, // grade estimator vision stream (two photos), api/grade-estimate.js's 300 s function
   anthropicScan: 180_000, // event scan / page extraction, 300 s function
   anthropicDraft: 240_000, // blog draft stream, 300 s function
+  // OpenStreetMap Nominatim, for the Local Map's shared geocode cache.
+  nominatim: 4_000,
   // Stripe SDK (`new Stripe(key, { timeout })`); Stripe's default is 80 s.
   stripe: 20_000,
 });

@@ -127,6 +127,7 @@ const CardShowcase = ({
       window.removeEventListener('deviceorientation', onOrient);
       if (raf) window.cancelAnimationFrame(raf);
       setTilting(false);
+      // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally the card that is current at cleanup (null-guarded)
       const card = cardRef.current;
       if (card) {
         card.style.removeProperty('--cs-rx');

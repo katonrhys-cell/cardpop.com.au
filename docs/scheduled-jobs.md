@@ -76,7 +76,7 @@ From the repository root, with a Cloudflare account that owns the
 npx wrangler login                                                        # opens the browser once
 npx wrangler deploy --config cloudflare/scheduler/wrangler.toml            # creates the Worker + the four triggers
 npx wrangler secret put CRON_SECRET --config cloudflare/scheduler/wrangler.toml
-#   paste exactly the CRON_SECRET value from the server's .env on the VPS (docs/vultr-rollout.md)
+#   paste exactly the CRON_SECRET value the server has (Vercel dashboard today; the VPS .env once cut over)
 ```
 
 That is enough for every schedule to run. Two optional extras:
@@ -181,7 +181,7 @@ skip rule matching it (or the `/api/…`/`/cron/…` paths with an
 `docs/ddos-protection.md`.
 
 **A job reports "No response within Ns".** The function exceeded its budget,
-or the site was unreachable. Check the server logs (`journalctl -u cardpop` on the VPS) for that path.
+or the site was unreachable. Check the server logs (Vercel → Logs today; `journalctl -u cardpop` on the VPS once cut over) for that path.
 
 **The run threw "No schedule for cron …".** A trigger on the Worker doesn't
 match `SCHEDULES` — see above; make `wrangler.toml` and `worker.js` agree and

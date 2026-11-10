@@ -2,7 +2,9 @@
 
 How the site is built to load fast, and the reasoning behind the parts that
 look odd. Measured with Lighthouse / PageSpeed Insights on `https://cardpop.com.au/`;
-the CI lane is `.github/workflows/lighthouse.yml` (`lighthouserc.cjs`).
+`lighthouserc.cjs` holds the budgets for a local `npx @lhci/cli autorun` (the
+CI workflow for it was removed in November 2026; it had been disabled since
+`@lhci/cli` left the dependencies).
 
 ## How a page paints
 
@@ -181,9 +183,9 @@ Rules that keep it from growing:
 
 ## Edge caching (vercel.json `headers`)
 
-`vercel.json` is still the routing manifest on the VPS: `server/vercelRoutes.js`
-applies its `headers` rules with Vercel's semantics before the file or
-function answers (`docs/vultr-rollout.md`). Two rules of that matching shape
+`vercel.json` is the routing manifest on Vercel and on the parked VPS stack
+alike: `server/vercelRoutes.js` applies its `headers` rules with Vercel's
+semantics before the file or function answers (`docs/vultr-rollout.md`). Two rules of that matching shape
 the `headers` array, and `tests/backend/vercelHeaders.test.js` pins both:
 
 - **Every matching rule applies, in order, and for a repeated key the last
@@ -210,9 +212,10 @@ What is cached how:
 | `/sw.js`, `/app.html`, everything else | `max-age=0, must-revalidate` | A cached shell references deleted chunk hashes after a deploy |
 | `/api/*` | `no-store` | Per-user |
 | `/hcgi/api/public/*` | `max-age=30, s-maxage=60, stale-while-revalidate=300` | The edge-cached public reads below — identical for every visitor |
+| Public GETs behind `publicCache()` (`src/middleware/publicCache.js`) | 1 min–1 h browser, 2 min–1 day edge | Search suggestions, leaderboard, categories, seller ratings, and catalogue / eBay / CardSight lookups: the same for every visitor, and the lookups spend a paid quota. Set by the function, so it overrides the `/api/*` rule; errors and degraded fallbacks stay `no-store` |
 
 Cloudflare honours these in front of the origin, so a positive `max-age` here
-also keeps the request off the VPS for repeat visitors and bots.
+also keeps the request off the origin for repeat visitors and bots.
 
 ## Edge-cached public reads (`/hcgi/api/public/*`)
 

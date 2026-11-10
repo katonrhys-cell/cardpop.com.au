@@ -1,21 +1,20 @@
 # Self-hosted CI runner
 
-The PR gate (`ci.yml`: lint + tests + build, ~4 minutes) and the Playwright
-run (`e2e.yml`, ~10 minutes) are where the GitHub Actions minutes go. A private
+The PR gate (`ci.yml` → `verify`: lint, tests, build and, on ready-for-review
+PRs, the Playwright E2E) is where the GitHub Actions minutes go. A private
 repository bills every run a whole metered minute, the allowance is 2,000 a
 month, and it ran out once on 2026-10-31 — which stopped *every* workflow,
 including the Supabase migration push. Jobs on a **self-hosted runner** bill
-nothing, so those two workflows run on a small Vultr box of our own, and the
+nothing, so that job runs on a small Vultr box of our own, and the
 hosted minutes are kept for the tiny jobs that must not depend on it.
 
 | Workflow | Runs on | Why |
 |---|---|---|
-| `ci.yml` (verify) | self-hosted when `CI_RUNS_ON` is set | the big spender; every PR |
-| `e2e.yml` | self-hosted when `CI_RUNS_ON` is set | the biggest spender; non-draft PRs |
-| `deploy.yml`, `supabase-migrations.yml`, `migration-drift.yml`, `git-backup.yml`, `merchant-listings-check.yml`, `snyk-security.yml` | GitHub-hosted | seconds each, ~90 min/month in total; production deploys and the schema safety net must keep working when the CI box is down |
+| `ci.yml` (verify, incl. E2E) | self-hosted when `CI_RUNS_ON` is set | the big spender; every PR |
+| `deploy.yml`, `supabase-migrations.yml`, `migration-drift.yml`, `git-backup.yml`, `merchant-listings-check.yml` | GitHub-hosted | seconds each, ~90 min/month in total; production deploys and the schema safety net must keep working when the CI box is down |
 
-**The switch is one repository variable, not a code change.** Both heavy
-workflows declare
+**The switch is one repository variable, not a code change.** The `verify`
+job declares
 
 ```yaml
 runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '["ubuntu-latest"]') }}
@@ -99,9 +98,9 @@ after 24 hours), delete the variable, merge what you need, and set it again.
 ## What the workflows assume about the box
 
 - Chromium's **system libraries are pre-installed** (`playwright install-deps`
-  at setup), so `e2e.yml` installs only the browser binary there; on hosted
-  runners it still runs `--with-deps`. The two steps are selected with
-  `runner.environment`.
+  at setup), so `ci.yml` installs only the browser binary there; on hosted
+  runners it still runs `--with-deps` (and the sudo apt cleanup). The steps
+  are selected with `runner.environment`.
 - **No sudo** is granted to the `runner` user. A workflow step that needs root
   on the box is a setup-script change, not a workflow change.
 - `aws` is on the path for the failure-report upload; the OIDC role is the

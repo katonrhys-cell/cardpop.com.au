@@ -162,7 +162,6 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
     res.status(404).type('text/plain').send('Not found');
   });
 
-  // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     console.error(`[SERVER] ${req.method} ${req.originalUrl} → ${err?.stack || err}`);
     if (res.headersSent) return res.end();

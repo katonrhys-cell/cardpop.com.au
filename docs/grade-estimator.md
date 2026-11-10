@@ -24,7 +24,8 @@ carries the disclaimer and the prompt is told to be conservative.
    guard) and bundles sharp like `api/index.js` does.
 4. The route compresses the buffers again server-side and sends them **inline as base64
    image blocks** straight to the Anthropic Messages API as a **stream**
-   (`streamGradeEstimate()` in `src/utils/gradeEstimator.js`, `claude-sonnet-4-6`, 150 s
+   (`streamGradeEstimate()` in `src/utils/gradeEstimator.js`, `claude-sonnet-5-5` with
+   `thinking: between_tools` so it answers straight from the photos, 150 s
    budget `OUTBOUND_TIMEOUT_MS.anthropicGrade` covering the whole stream). The photos are
    never stored. The response headers are flushed at once with an SSE comment, and each
    text delta is forwarded as a `content` event as the model writes it — Cloudflare drops
@@ -34,6 +35,31 @@ carries the disclaimer and the prompt is told to be conservative.
    concatenates and parses into the JSON the page renders: four condition rows (centering,
    corners, edges, surface), strengths/issues, then one card per grader with the estimate,
    range, label, confidence and notes (BGS also carries sub-grades).
+
+## Results page: the photo, marked up
+
+The results open with the card's details, then **Grades at a Glance**, a table with one
+row per company showing the estimate, its label word, the range and the confidence. Each
+company links down to its full slab-label card. Next is **Condition Inspection**, which
+shows the member's own upload again (the `File` the page still holds, via a `blob:` URL,
+never stored) with the estimate drawn on it:
+
+- The prompt asks for three located fields, all **in percent of the photo as supplied**
+  (not of the card, since the photo may include a desk, sleeve or slab):
+  `cardLocation.{front,back}` (box around the card), `centeringMeasured.{front,back}`
+  (`"55/45"` ratios) and `findings[]` (0–8 spots: `factor`, `side`, `x/y/w/h`,
+  `severity`, short `description`). `max_tokens` went to 4500 to make room.
+- `utils/gradeFindings.js` → `normaliseGradeGeometry()` is the one cleaner. It clamps
+  every box onto the photo, scales 0–1 fractions up, drops unknown factors and sides,
+  drops back-side data when no back was uploaded, and numbers findings front-first in
+  reading order. An older reply without these fields still renders: the photo shows
+  without markers.
+- `components/grading/GradeInspectionPhoto.jsx` draws the overlay: card outline,
+  centering centre lines with the L/R and T/B ratios, corner brackets / edge bands /
+  surface tint for a factor with no pinpointed spot (coloured by its score), and a
+  numbered, tappable box for each finding (amber minor, orange moderate, brand red
+  major). The factor tabs filter the overlay and list that factor's spots. Tapping a
+  spot echoes it under the photo, because on a phone the list is below the fold.
 
 ## Configuration
 
@@ -57,5 +83,45 @@ way `describeOcrFailure()` does for card scans, and the full error goes to the l
 ## Adding a grading company
 
 Add it to the scale reference and the JSON schema in `GradeEstimatorPrompt`
-(`src/constants/prompts.js`) and to `GRADERS` in `GradeEstimatorPage.jsx`; the results
-grid renders whatever keys the prompt returns that `GRADERS` lists.
+(`src/constants/prompts.js`) and to `GRADING_COMPANIES` in `data/gradingCompanies.js`; the
+results grid renders whatever keys the prompt returns that the list carries.
+
+## Company branding (logos and colours)
+
+Every grader card, and the "Grading Services Covered" strip, is themed from
+`data/gradingCompanies.js` — one entry per company with its `brand.primary` hex (the tint,
+border and fallback wordmark are derived from it via `graderStyle()`), an optional
+`brand.onDark` ink for dark mode, and the path of the company's **official logo file** in
+`public/images/grading/` (`logo`, plus `logoDark` where the company publishes a
+light-on-dark version). `components/grading/GraderLogo.jsx` shows that file and falls back
+to a plain wordmark in the brand colour if it is missing or fails to load — it never redraws
+a mark, so a missing file can't ship as a near-miss logo. The folder's README lists where
+each official file comes from; drop the file in, sample its primary fill into
+`brand.primary`, and set `verified: true`. Marks are the companies' trademarks: keep them
+unmodified and use them only to identify the service (PSA publishes logo-use guidelines at
+psacard.com/logo).
+
+**The estimate is drawn as that company's slab label.** `components/grading/SlabLabel.jsx`
+renders the grade box the way the top of the slab looks — PSA's red-framed white label
+with the grade word above the number and the blue/red mark along the bottom, Beckett's silver label (gold from 9.5, the Black Label with the
+grade in gold for a 10 with four 10 sub-grades) with the laurel crest and the four
+sub-grades in a row, ACE's navy label with the angled grade panel (light stock, gold for a
+Gem Mint 10), CGC's black label, SGC's black strip with the mark over a white panel and the grade word
+as a badge, TAG's black label with its white inset frame and the mark
+centred on the frame's top edge — with the
+mark on the left and the grade, its word beneath it, on the right. Which stock a company
+prints for a grade is `label.tiers` on its entry, resolved by `slabLabelTier()`, and the
+stock colours are `SLAB_LABEL_LOOKS`; both in `data/gradingCompanies.js`. Label stock is
+fixed colour (a black label stays black in light mode), so the logo is pinned with
+`GraderLogo`'s `tone` / `ink` props rather than following the theme. Every look but CGC's follows
+reference artwork supplied on 2026-11-04; CGC's black label is still an approximation —
+check it against a real slab.
+
+## "Grade with …" links
+
+Each grader card (and each tile in "Grading Services Covered") ends with a **Grade
+with PSA / BGS / …** button → `gradingPartnersPath(key)` from `utils/gradingPartners.js`,
+i.e. `/grading/submission-partners?company=psa`: the Submission Partners page opens on
+the Australian stores and services that submit to that company, under the company's
+own direct-submission note. The lists are the admin-maintained
+`grading_submission_partners` table — see `docs/grading-partners.md`.

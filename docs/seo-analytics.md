@@ -7,10 +7,9 @@ Three independent, complementary systems run in production:
 | System | What it measures | Where |
 |---|---|---|
 | **Google Analytics 4** (`G-NCZ6K9VFF8`) | Visitors, page views, traffic sources, audience | `lib/analytics.js`, loaded lazily from `main.jsx` |
-| **Vercel Analytics + Speed Insights** | Page views + Core Web Vitals per deployment | `main.jsx` (`@vercel/analytics`, `@vercel/speed-insights`) |
 | **Cloudflare Web Analytics** *(optional)* | Privacy-friendly RUM at the edge | Beacon loaded in `main.jsx` when `VITE_CF_BEACON_TOKEN` is set |
 
-Sentry (errors + performance traces) also runs but isn't visitor analytics.
+Sentry (errors + performance traces) also runs but isn't visitor analytics. (Vercel Analytics and Speed Insights were removed in November 2026: they loaded on every page and duplicated GA4, the Cloudflare beacon and Sentry.)
 
 GA4's visitor counts are also pulled **into the app** nightly (home page
 "Visitors" tile, Admin → Dashboard → Visitors card) — see `docs/site-traffic.md`.
@@ -61,6 +60,7 @@ only* leaves them off; *Cookie settings* in the footer shows the bar again.
 |---|---|---|
 | Google Ads conversion tracking | `VITE_GOOGLE_ADS_ID` (`AW-…`), `VITE_GOOGLE_ADS_PURCHASE_LABEL` | `config` on consent, a `conversion` event per purchase with value + `transaction_id` |
 | Meta Pixel (`lib/metaPixel.js`) | `VITE_META_PIXEL_ID` | `PageView` per route, `ViewContent`, `AddToCart`, `InitiateCheckout`, `AddPaymentInfo`, `Purchase` (with `eventID` = session id for dedup against a future Conversions API) |
+| Impact affiliate tag (`lib/impactTag.js`) | — (tag id in the file) | `transformLinks` + `trackImpression`; never started on `/checkout`, `/login`, `/signup`, `/admin`, `/account`, `/welcome`, `/reset-password` |
 
 GA4 itself runs regardless, with Google Consent Mode v2 defaults
 (`analytics_storage: granted`, `ad_storage` / `ad_user_data` /
@@ -119,6 +119,20 @@ tracking must be off, or every navigation counts twice:
   issue on failure, and is the first thing to run after a Search Console
   email about Merchant listings. Admin → Products warns when a non-`CP-` SKU
   is saved with the Brand blank.
+- **Merchant listings shipping & returns**: every product-page `Offer` carries
+  `shippingDetails` built by `utils/productShippingLd.js` — shop products quote
+  the live flat rate / free-shipping threshold (Admin → Settings; the bot
+  prerender reads them through the anon-callable `shop_shipping_terms()` RPC,
+  `20261105090739_shop_shipping_terms_rpc.sql`, falling back to the checkout
+  defaults), marketplace listings quote the seller's `shipping_cost_aud`.
+  Shop offers also carry `hasMerchantReturnPolicy` (`utils/shopReturnPolicy.js`).
+  Marketplace offers deliberately carry **no** return policy: schema.org can't
+  express "no change of mind, full refund when not as described", so a
+  "Missing field hasMerchantReturnPolicy" warning on marketplace URLs is
+  expected and does not make the item invalid. Delivery times are the
+  Shipping page's (`SHOP_DELIVERY_TIMES`, which that page reads). A product
+  that can't be bought (coming soon, unpriced) gets no `Offer`, and a Product
+  with no offer/review/rating is dropped (`isEligibleProductLd`).
 - **Prerendering for bots**: `api/prerender.js` serves real per-route HTML
   meta to crawlers (see `docs/` and `tests/backend/prerender.test.js`).
 - **Sitemap**: generated live at `https://cardpop.com.au/sitemap.xml`

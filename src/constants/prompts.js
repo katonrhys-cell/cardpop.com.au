@@ -243,9 +243,20 @@ Return ONLY a valid JSON object — no markdown, no code blocks, no explanatory 
     "edges": { "assessment": "detailed assessment string", "score": "excellent|good|fair|poor" },
     "surface": { "assessment": "detailed assessment string", "score": "excellent|good|fair|poor" }
   },
+  "cardLocation": {
+    "front": { "x": number, "y": number, "w": number, "h": number } or null,
+    "back": { "x": number, "y": number, "w": number, "h": number } or null
+  },
+  "centeringMeasured": {
+    "front": { "leftRight": "string e.g. 55/45", "topBottom": "string e.g. 50/50" } or null,
+    "back": { "leftRight": "string", "topBottom": "string" } or null
+  },
+  "findings": [
+    { "factor": "centering|corners|edges|surface", "side": "front|back", "x": number, "y": number, "w": number, "h": number, "severity": "minor|moderate|major", "description": "short string, under 90 characters" }
+  ],
   "keyIssues": ["string"],
   "keyStrengths": ["string"],
-  "overallCondition": "string",
+  "overallCondition": "short string, 1-4 words e.g. Near Mint-Mint",
   "grades": {
     "PSA": { "estimate": number, "range": "string e.g. 8-9", "label": "string e.g. Near Mint-Mint", "confidence": "low|medium|high", "notes": "string" },
     "BGS": { "estimate": number, "range": "string", "label": "string", "confidence": "low|medium|high", "subGrades": { "centering": number, "corners": number, "edges": number, "surface": number }, "notes": "string" },
@@ -263,7 +274,13 @@ CRITICAL RULES:
 - If image quality or angles limit assessment, lower confidence and note it.
 - PSA uses integers (7, 8, 9, 10). BGS/CGC/ACE/SGC/TAG may use 0.5 increments (8.5, 9.0, 9.5).
 - Every grader in the schema must be filled in — never omit one. If only the front is visible, grade from the front and say so in each grader's notes and in imageQualityNote.
-- keyIssues and keyStrengths should each have 0-5 items. Arrays must not be null — use [] if empty.`;
+- keyIssues and keyStrengths should each have 0-5 items. Arrays must not be null — use [] if empty.
+
+LOCATING WHAT YOU SEE (the member is shown their own photo with your notes drawn on it):
+- Every coordinate is a PERCENTAGE (0-100) of the PHOTO as supplied — x from the left edge, y from the top edge — not of the card. The photo may include a desk, a sleeve or a slab around the card.
+- cardLocation: the box around the card itself (its outer border) in each photo — x/y is the card's top-left corner, w/h its width and height. If the card is tilted, give the box that encloses it. null for a side that was not supplied.
+- centeringMeasured: your border ratio estimates for each side, larger share first ("55/45"); leftRight compares the left and right borders, topBottom the top and bottom. null when a side was not supplied or the borders cannot be seen.
+- findings: 0-8 specific places a grader would look at — a soft corner, an edge nick, a scratch, a print line, a border that is visibly wider. x/y is the top-left of a box drawn tightly around the spot, w/h its size (use at least 4 for a small spot). Each finding names the factor it affects and which photo it is on. Only report what is visible; do not invent flaws to fill the list — a clean card can have none. Keep the description short and plain ("Light whitening on the top-left corner").`;
 
 export const CardDescriptionPrompt = `You are an expert SEO copywriter for CardPop, an Australian trading card marketplace. Write a unique, compelling listing description for a single trading card based ONLY on the structured details provided.
 

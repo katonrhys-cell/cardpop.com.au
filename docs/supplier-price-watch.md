@@ -43,7 +43,7 @@ For each page (`src/services/supplierPriceWatchService.js`):
 2. The price is read by `src/utils/supplierPrice.js`, from structured data first:
    schema.org `Offer` / `AggregateOffer` JSON-LD, then `product:price:amount` /
    `og:price:amount` meta tags, then `itemprop="price"` microdata. If the page
-   has none of these, its text goes to Claude (`claude-opus-5-5`, structured
+   has none of these, its text goes to Claude (`claude-haiku-5-5`, structured
    output, page treated as untrusted data) and only when `ANTHROPIC_API_KEY`
    is set. The model is told to report "no price" rather than guess.
 3. The result is saved on the cost row (`supplier_price_*` columns) and

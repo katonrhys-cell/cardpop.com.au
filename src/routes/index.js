@@ -10,7 +10,6 @@ import authRouter from './auth/index.js';
 import stripeRouter from './stripe.js';
 import subscriptionRouter from './subscription.js';
 import verificationRouter from './verification.js';
-import integratedAiRouter from './integrated-ai.js';
 import cardOcrRouter from './card-ocr.js';
 import cardScansRouter from './card-scans.js';
 import cardDescriptionRouter from './card-description.js';
@@ -28,17 +27,15 @@ import shopReviewsRouter from './shop-reviews.js';
 import listingStatsRouter from './listing-stats.js';
 import pushRouter from './push.js';
 import pointsRouter from './points.js';
+import geocodeRouter from './geocode.js';
 import buyerProtectionRouter from './buyer-protection.js';
 import wishlistRouter from './wishlist.js';
 import offersRouter from './offers.js';
-import recommendationsRouter from './recommendations.js';
-import priceHistoryRouter from './price-history.js';
 import newsletterRouter from './newsletter.js';
 import contactRouter from './contact.js';
 import shopEnquiryRouter from './shop-enquiry.js';
 import giveawaysRouter from './giveaways.js';
 import dataDeletionRouter from './data-deletion.js';
-import marketDataRouter from './market-data.js';
 import pricesRouter from './prices.js';
 import shopSupplierWatchRouter from './shop-supplier-watch.js';
 import ordersRouter from './orders.js';
@@ -90,9 +87,6 @@ export default () => {
     // Google verification endpoint - no rate limiting, no auth required
     router.use('/', verificationRouter);
     
-    // Integrated AI routes with rate limiting
-    router.use('/integrated-ai', integratedAiRouter);
-
     // Card OCR routes with rate limiting
     router.use('/card-ocr', cardOcrRouter);
     router.use('/card-scans', cardScansRouter);
@@ -184,6 +178,10 @@ export default () => {
     router.use('/push', apiLimiter);
     router.use('/push', pushRouter);
 
+    // Local Map coordinates from the shared geocode cache
+    router.use('/geocode', apiLimiter);
+    router.use('/geocode', geocodeRouter);
+
     router.use('/points', apiLimiter);
     router.use('/points', pointsRouter);
 
@@ -194,15 +192,6 @@ export default () => {
     // the seller (the in-app notification comes from a database trigger).
     router.use('/offers', apiLimiter);
     router.use('/offers', offersRouter);
-
-    router.use('/recommendations', apiLimiter);
-    router.use('/recommendations', recommendationsRouter);
-
-    router.use('/market-data', apiLimiter);
-    router.use('/market-data', marketDataRouter);
-
-    router.use('/price-history', apiLimiter);
-    router.use('/price-history', priceHistoryRouter);
 
     // Public card price pages: snapshot refresh (cron + on-demand)
     router.use('/prices', apiLimiter);

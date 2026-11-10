@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { verifyGradingNumber } from '@/lib/gradingVerification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
+import GraderLogo from '@/components/grading/GraderLogo.jsx';
+import { findGradingCompany } from '@/data/gradingCompanies.js';
 
 // Pull a numeric grade out of values like "PSA 10", "9", or "GEM MT 10" so the
 // listed grade can be compared against the grade PSA has on record.
@@ -121,6 +123,9 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
       : listedGrade != null && psaGrade != null && listedGrade === psaGrade);
 
   const companyLabel = company.toUpperCase();
+  // The company's own mark (public/images/grading/) beside its name; a company we
+  // have no entry for keeps the plain text.
+  const grader = findGradingCompany(company);
 
   return (
     <div className="mt-8 p-6 bg-card rounded-2xl border border-border shadow-sm">
@@ -141,9 +146,13 @@ const CertificationVerificationSection = ({ certNumber, gradingCompany = 'psa', 
 
       {/* Summary rows */}
       <div className="space-y-2 text-sm mb-4">
-        <div className="flex justify-between">
+        <div className="flex justify-between items-center">
           <span className="text-muted-foreground">Company</span>
-          <span className="font-medium uppercase">{company}</span>
+          {grader ? (
+            <GraderLogo grader={grader} height={22} />
+          ) : (
+            <span className="font-medium uppercase">{company}</span>
+          )}
         </div>
 
         <div className="flex justify-between">

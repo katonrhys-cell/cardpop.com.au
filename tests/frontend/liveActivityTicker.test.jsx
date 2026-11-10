@@ -68,3 +68,13 @@ describe('LiveActivityTicker', () => {
     expect(events[0].at.getTime()).toBeGreaterThanOrEqual(events[events.length - 1].at.getTime());
   });
 });
+
+describe('timeAgo', () => {
+  it('formats a past moment the way the strip shows it', async () => {
+    const { timeAgo } = await import('@/components/LiveActivityTicker.jsx');
+    const now = Date.parse('2026-11-05T10:00:00Z');
+    expect(timeAgo(new Date(now - 5 * 60 * 1000), now)).toBe('5 minutes ago');
+    expect(timeAgo(new Date(now - 60 * 60 * 1000), now)).toBe('1 hour ago');
+    expect(timeAgo(new Date(now - 3 * 86400 * 1000), now)).toBe('3 days ago');
+  });
+});

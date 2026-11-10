@@ -1,0 +1,219 @@
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import {
+  CalendarPlus, Ticket, Megaphone, ArrowRight, Check, ClipboardList,
+  BadgeCheck, Tag, BarChart3, Users, Search, CalendarDays,
+} from 'lucide-react';
+import SEOHead from '@/components/SEOHead.jsx';
+import {
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
+} from '@/components/ui/accordion';
+import { getPlatformStats, getTrafficSummary } from '@/lib/homepageData.js';
+import { formatCount, publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
+import {
+  LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_PATH, LIST_EVENT_SEO,
+  LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH,
+} from '@/data/listYourEvent.js';
+
+const TIER_ICONS = { listing: CalendarPlus, offer: Ticket, featured: Megaphone };
+const STEP_ICONS = [ClipboardList, BadgeCheck, Tag, BarChart3];
+const STAT_ICONS = { visitors: Users, impressions: Search, clicks: Search, events: CalendarDays };
+
+/**
+ * Live audience figures for organisers — the same nightly GA4 / Search
+ * Console summary the home page reads, so each tile hides below its floor or
+ * when the sync is stale (utils/siteTraffic.js). Nothing is typed in by hand.
+ */
+export const buildOrganiserStats = (trafficSummary, platformStats) => {
+  const stats = [];
+  const visitors = publicTrafficStat(trafficSummary);
+  if (visitors) stats.push({ ...visitors, label: 'Visitors in the last 30 days' });
+  const [impressions] = publicSearchStats(trafficSummary);
+  if (impressions) stats.push({ ...impressions, label: 'Times CardPop showed in Google, last 30 days' });
+  const events = Number(platformStats?.events) || 0;
+  if (events > 0) stats.push({ key: 'events', value: events, label: 'Upcoming events on the calendar' });
+  return stats;
+};
+
+const CtaLink = ({ cta, className }) => (cta.external ? (
+  <a href={cta.href} className={className}>
+    {cta.label} <ArrowRight className="h-4 w-4" />
+  </a>
+) : (
+  <Link to={cta.href} className={className}>
+    {cta.label} <ArrowRight className="h-4 w-4" />
+  </Link>
+));
+
+const ListYourEventPage = () => {
+  const [stats, setStats] = useState([]);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([
+      getTrafficSummary().catch(() => null),
+      getPlatformStats().catch(() => null),
+    ]).then(([traffic, platform]) => {
+      if (alive) setStats(buildOrganiserStats(traffic?.data, platform?.data));
+    });
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <SEOHead
+        title={LIST_EVENT_SEO.title}
+        description={LIST_EVENT_SEO.description}
+        canonicalUrl={LIST_EVENT_PATH}
+      />
+
+      {/* Hero */}
+      <section className="relative overflow-hidden border-b border-border bg-gradient-to-b from-primary/10 via-card to-background py-20 sm:py-24">
+        <div className="container-default relative text-center">
+          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/15">
+            <CalendarPlus className="h-8 w-8 text-primary" />
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+            {LIST_EVENT_HERO.eyebrow}
+          </div>
+          <h1 className="mx-auto mt-5 max-w-2xl font-serif text-4xl font-bold leading-tight sm:text-5xl">
+            {LIST_EVENT_HERO.h1}
+          </h1>
+          <p className="mx-auto mt-4 max-w-xl leading-relaxed text-muted-foreground">
+            {LIST_EVENT_HERO.intro}
+          </p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <Link
+              to={SUBMIT_EVENT_PATH}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-8 py-3.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
+            >
+              Submit your event <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="#options"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-8 py-3.5 text-sm font-bold transition-colors hover:border-primary/50 sm:w-auto"
+            >
+              See the options
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <div className="container-default space-y-16 py-12">
+
+        {/* Live audience — hidden until there is an honest number to show */}
+        {stats.length > 0 && (
+          <section aria-labelledby="audience-heading">
+            <h2 id="audience-heading" className="mb-6 text-center font-serif text-2xl font-bold sm:text-3xl">
+              Who you&rsquo;ll reach
+            </h2>
+            <div className={`grid gap-4 ${stats.length > 2 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              {stats.map((s) => {
+                const Icon = STAT_ICONS[s.key] || Users;
+                return (
+                  <div key={s.key} className="rounded-3xl border border-border bg-card p-6 text-center">
+                    <Icon className="mx-auto mb-3 h-5 w-5 text-primary" />
+                    <div className="text-3xl font-bold tabular-nums">{formatCount(s.value)}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">{s.label}</div>
+                    {s.sub && <div className="mt-1 text-xs text-muted-foreground/80">{s.sub}</div>}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              From Google Analytics and Search Console, updated nightly.
+            </p>
+          </section>
+        )}
+
+        {/* Options */}
+        <section id="options" className="scroll-mt-8">
+          <h2 className="mb-6 text-center font-serif text-2xl font-bold sm:text-3xl">Three ways to promote your show</h2>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {LIST_EVENT_TIERS.map((tier) => {
+              const Icon = TIER_ICONS[tier.key] || CalendarPlus;
+              return (
+                <div
+                  key={tier.key}
+                  className={`flex flex-col rounded-3xl border bg-card p-6 ${tier.highlight ? 'border-primary shadow-md' : 'border-border'}`}
+                >
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10">
+                      <Icon className="h-5 w-5 text-primary" />
+                    </div>
+                    <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold">{tier.price}</span>
+                  </div>
+                  <h3 className="mb-1 text-lg font-bold">{tier.name}</h3>
+                  <p className="mb-4 text-sm leading-relaxed text-muted-foreground">{tier.summary}</p>
+                  <ul className="mb-6 space-y-2 text-sm">
+                    {tier.points.map((p) => (
+                      <li key={p} className="flex gap-2">
+                        <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                        <span>{p}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <CtaLink
+                    cta={tier.cta}
+                    className={`mt-auto inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-opacity hover:opacity-90 ${tier.highlight ? 'bg-primary text-primary-foreground' : 'border border-border bg-background'}`}
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* How it works */}
+        <section>
+          <h2 className="mb-6 text-center font-serif text-2xl font-bold sm:text-3xl">How it works</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {LIST_EVENT_STEPS.map(({ step, body }, i) => {
+              const Icon = STEP_ICONS[i] || ClipboardList;
+              return (
+                <div key={step} className="flex gap-4 rounded-3xl border border-border bg-card p-6">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="mb-1 font-bold">{step}</h3>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{body}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* FAQ */}
+        <section>
+          <h2 className="mb-6 font-serif text-2xl font-bold">Questions from organisers</h2>
+          <Accordion type="single" collapsible className="w-full overflow-hidden rounded-3xl border border-border bg-card px-2 sm:px-4">
+            {LIST_EVENT_FAQS.map(({ q, a }, i) => (
+              <AccordionItem key={q} value={`faq-${i}`} className="px-3 last:border-b-0">
+                <AccordionTrigger className="text-left font-bold">{q}</AccordionTrigger>
+                <AccordionContent className="text-sm leading-relaxed text-muted-foreground">{a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </section>
+
+        {/* Final CTA */}
+        <section className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 p-10 text-center">
+          <h2 className="mb-3 font-serif text-2xl font-bold">Got a show coming up?</h2>
+          <p className="mx-auto mb-7 max-w-md leading-relaxed text-muted-foreground">
+            List it free today. See what&rsquo;s already on the{' '}
+            <Link to="/events" className="font-semibold text-primary hover:underline">events calendar</Link>.
+          </p>
+          <Link
+            to={SUBMIT_EVENT_PATH}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary px-10 py-3.5 text-sm font-bold text-primary-foreground transition-opacity hover:opacity-90 sm:w-auto"
+          >
+            Submit your event <ArrowRight className="h-4 w-4" />
+          </Link>
+        </section>
+      </div>
+    </div>
+  );
+};
+
+export default ListYourEventPage;

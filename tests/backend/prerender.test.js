@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // The prerender function builds its own Supabase client from @supabase/supabase-js,
 // so we mock that module and feed per-table results through a chainable builder.
-const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, listResultByTable: null, publicUrl: 'https://cdn.test/img.jpg' }));
+const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, listResultByTable: null, rpcResult: null, publicUrl: 'https://cdn.test/img.jpg' }));
 
 vi.mock('@supabase/supabase-js', () => {
   const builder = (table) => {
@@ -31,6 +31,8 @@ vi.mock('@supabase/supabase-js', () => {
   return {
     createClient: vi.fn(() => ({
       from: vi.fn((table) => builder(table)),
+      // shop_shipping_terms() — the shop's flat rate + free-shipping threshold.
+      rpc: vi.fn(() => Promise.resolve(state.rpcResult ?? { data: null, error: { message: 'not stubbed' } })),
       storage: { from: vi.fn(() => ({ getPublicUrl: () => ({ data: { publicUrl: state.publicUrl } }) })) },
     })),
   };
@@ -56,7 +58,7 @@ function run(path, query = {}) {
 
 const UUID = '11111111-2222-3333-4444-555555555555';
 
-beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; });
+beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; state.rpcResult = null; });
 
 describe('prerender blog articles', () => {
   it('renders an article with its title, description and featured image', async () => {
@@ -160,6 +162,17 @@ describe('prerender marketplace listings', () => {
     expect(body).toContain('<h1>Charizard</h1>');
     expect(body).toContain('Base Set · 1999');
     expect(body).toContain('Grade: PSA 9');
+  });
+
+  it("quotes the seller's postage as the Offer's shippingDetails", async () => {
+    state.result = { data: {
+      id: UUID, slug: 'charizard-base-set', price_aud: 1499.95, shipping_cost_aud: 9.5, status: 'active',
+      vault_item: { card_name: 'Charizard' },
+      seller: { username: 'ash' },
+    } };
+    const { body } = await run('/marketplace/' + UUID + '/charizard-base-set');
+    expect(body).toContain('"shippingDetails":{"@type":"OfferShippingDetails","shippingRate":{"@type":"MonetaryAmount","value":9.5,"currency":"AUD"}');
+    expect(body).toContain('"addressCountry":"AU"');
   });
 
   it('gives the card a brand and MPN so Merchant listings has a global identifier', async () => {
@@ -271,6 +284,37 @@ describe('prerender shop products', () => {
     expect(body).toContain('schema.org/InStock');
     // canonical uses the slugified title, not the URL slug param
     expect(body).toContain('/product/shop/' + UUID + '/pokemon-scarlet-violet-booster-box');
+  });
+
+  // Runs before the next test: a successful settings read is cached per
+  // instance (a failed one never is), so order matters within this file.
+  it('quotes the default shipping when the settings read fails', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Booster Box', price_aud: 40, stock_quantity: 5, product_type: 'sealed', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/booster-box');
+    expect(body).toContain('"shippingRate":{"@type":"MonetaryAmount","value":15,"currency":"AUD"}');
+  });
+
+  it('carries shipping (from the live settings) and the shop return policy on the Offer', async () => {
+    state.rpcResult = { data: { default_shipping_rate_aud: 12, free_shipping_threshold_aud: 150 }, error: null };
+    state.result = { data: {
+      id: UUID, title: 'Booster Box', price_aud: 140, stock_quantity: 5, product_type: 'sealed', status: 'active',
+    } };
+    const { body } = await run('/product/shop/' + UUID + '/booster-box');
+    expect(body).toContain('"shippingRate":{"@type":"MonetaryAmount","value":12,"currency":"AUD"}');
+    expect(body).toContain('"hasMerchantReturnPolicy":{"@type":"MerchantReturnPolicy"');
+  });
+
+  it('gives a priced coming-soon product no Offer (and so no Product node)', async () => {
+    state.result = { data: {
+      id: UUID, title: 'Next Set Booster Box', price_aud: 220, stock_quantity: 0, product_type: 'sealed', status: 'coming_soon',
+    } };
+    const { status, body } = await run('/product/shop/' + UUID + '/next-set-booster-box');
+    expect(status).toBe(200);
+    expect(body).not.toContain('"@type":"Product"');
+    expect(body).not.toContain('schema.org/InStock');
+    expect(body).toContain('Coming soon');
   });
 
   it('emits brand, sku, mpn and gtin so Merchant listings has a global identifier', async () => {
@@ -518,7 +562,7 @@ describe('prerender landing pages', () => {
       { id: UUID, slug: 'charizard', title: 'Charizard', price_aud: 1000, vault_item: { card_name: 'Charizard' } },
     ] };
     const { body } = await run('/marketplace');
-    expect(body).toContain('Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop</title>');
     expect(body).toContain('/marketplace/' + UUID + '/charizard');
     expect(body).toContain('"@type":"ItemList"');
   });
@@ -526,7 +570,7 @@ describe('prerender landing pages', () => {
   it('renders an empty but valid landing when there are no items', async () => {
     state.listResult = { data: [] };
     const { body } = await run('/marketplace');
-    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace</title>');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop</title>');
     expect(body).toContain('No items available right now.');
     expect(body).not.toContain('noindex');
   });
@@ -595,6 +639,55 @@ describe('prerender events', () => {
     expect(body).toContain('"addressRegion":"VIC"');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/melbourne-card-expo" />');
     expect(body).not.toContain('noindex');
+  });
+
+  it('links a finished event to its next edition, and every event to its city page', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'hobby-hangout-xl-sydney-2025', title: 'Hobby Hangout XL Sydney 2025', status: 'approved',
+      start_date: '2025-11-01', state: 'NSW', organizer_name: 'The Hobby Hangout',
+    } };
+    state.listResult = { data: [
+      { id: 'n1', slug: 'tcxpo-2099', title: 'TCXPO', status: 'approved', organizer_name: 'TCXPO', state: 'NSW', start_date: '2099-01-01' },
+      { id: 'n2', slug: 'hobby-hangout-xl-melbourne-2099', title: 'Hobby Hangout XL Melbourne 2099', status: 'approved', organizer_name: 'The Hobby Hangout', state: 'VIC', start_date: '2099-04-24', venue_name: 'Royal Exhibition Building' },
+    ] };
+    let { body } = await run('/events/hobby-hangout-xl-sydney-2025');
+    expect(body).toContain('Next edition: <a href="https://cardpop.com.au/events/hobby-hangout-xl-melbourne-2099">Hobby Hangout XL Melbourne 2099</a>');
+    expect(body).not.toContain('/events/tcxpo-2099');
+    expect(body).toContain('<a href="https://cardpop.com.au/card-shows/sydney">More card shows in Sydney</a>');
+
+    // No next edition: point at the city page instead.
+    state.listResult = { data: [] };
+    ({ body } = await run('/events/hobby-hangout-xl-sydney-2025'));
+    expect(body).not.toContain('Next edition');
+    expect(body).toContain('See <a href="https://cardpop.com.au/card-shows/sydney">upcoming card shows in Sydney</a>.');
+
+    // An upcoming event says nothing about having finished.
+    state.result = { data: { id: UUID, slug: 'future', title: 'Future Show', status: 'approved', start_date: '2099-01-01', state: 'VIC' } };
+    ({ body } = await run('/events/future'));
+    expect(body).not.toContain('This event has finished');
+  });
+
+  it('renders a card-shop city page with the store count, upcoming events, the card-shows link and an FAQ', async () => {
+    const stores = ['A', 'B', 'C', 'D'].map((n) => ({ slug: `shop-${n}`, name: `Shop ${n}`, suburb: 'Carlton', state: 'VIC', city: 'melbourne' }));
+    state.listResultByTable = {
+      local_game_stores: { data: stores },
+      events: { data: [{ id: 'e1', slug: 'vic-show', title: 'VIC Card Show', start_date: '2099-01-10', venue_name: 'Town Hall', suburb: 'Malvern', state: 'VIC' }] },
+    };
+    const { status, body } = await run('/card-shops/melbourne');
+    expect(status).toBe(200);
+    expect(body).toMatch(/<title>4 Card Shops in Melbourne \([A-Z][a-z]{2} \d{4}\) — Pokémon, TCG &amp; Sports Cards<\/title>/);
+    expect(body).toContain('4 trading card shops in Melbourne, VIC');
+    expect(body).toContain('<a href="https://cardpop.com.au/events/vic-show">VIC Card Show</a>');
+    expect(body).toContain('<a href="https://cardpop.com.au/card-shows/melbourne">Card shows in Melbourne &amp; Victoria</a>');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('<h3>Where can I buy Pokémon or sports cards in Melbourne?</h3>');
+  });
+
+  it('keeps the plain card-shop title when a city lists only a couple of stores', async () => {
+    state.listResultByTable = { local_game_stores: { data: [{ slug: 's', name: 'Only Shop', state: 'NT', city: 'darwin' }] }, events: { data: [] } };
+    const { body } = await run('/card-shops/darwin');
+    expect(body).toContain('<title>Card Shops in Darwin — Pokémon, TCG &amp; Sports Card Stores | CardPop</title>');
+    expect(body).not.toContain('Upcoming card events in');
   });
 
   it('shows an image organiser logo to bots and puts it on the Organization, but never a video loop', async () => {
@@ -787,12 +880,109 @@ describe('prerender static content pages', () => {
     expect(body).toContain('"@type":"Question"');
   });
 
+  it('renders a city card-show page with its events and city links', async () => {
+    state.listResult = { data: [{
+      id: UUID, slug: 'melbourne-card-show', title: 'Melbourne Card Show', status: 'approved',
+      state: 'VIC', suburb: 'Docklands', venue_name: 'Marvel Stadium', start_date: '2099-03-01',
+    }] };
+    const { status, body } = await run('/card-shows/melbourne');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Card Shows in Melbourne</h1>');
+    expect(body).toContain('Melbourne Card Show');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/card-shows/melbourne" />');
+    expect(body).toContain('href="https://cardpop.com.au/card-shows/sydney"');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('noindexes a city with no upcoming events and 404s an unknown city', async () => {
+    const empty = await run('/card-shows/darwin');
+    expect(empty.status).toBe(200);
+    expect(empty.body).toContain('noindex, follow');
+    const unknown = await run('/card-shows/atlantis');
+    expect(unknown.status).toBe(404);
+  });
+
+  it('links the events landing to every city page', async () => {
+    const { body } = await run('/events');
+    expect(body).toContain('href="https://cardpop.com.au/card-shows/brisbane"');
+    expect(body).toContain('href="https://cardpop.com.au/list-your-event"');
+  });
+
+  it('renders the organiser landing page from the shared copy', async () => {
+    const { status, body } = await run('/list-your-event');
+    expect(status).toBe(200);
+    expect(body).toContain('Put your card show in front of Australian collectors.');
+    expect(body).toContain('Member ticket offer (Free)');
+    expect(body).toContain('Who sees my discount code?');
+    expect(body).toContain('href="https://cardpop.com.au/account/events"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/list-your-event" />');
+  });
+
   it('renders the analytics page', async () => {
     const { status, body } = await run('/analytics');
     expect(status).toBe(200);
     expect(body).toContain('<h1>Card Market Analytics</h1>');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/analytics" />');
     expect(body).not.toContain('noindex');
+  });
+
+  it('renders each company grading scale from the shared data', async () => {
+    const { status, body } = await run('/grading/scales/psa');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>PSA Grading Scale — Professional Sports Authenticator</h1>');
+    expect(body).toContain('PSA 10 — Gem Mint (GEM-MT)');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/grading/scales/psa" />');
+    expect(body).toContain('href="https://cardpop.com.au/grading/scales/bgs"');
+    expect(body).not.toContain('noindex');
+    for (const scale of ['bgs', 'cgc', 'ace']) {
+      expect((await run(`/grading/scales/${scale}`)).status, scale).toBe(200);
+    }
+  });
+
+  it('renders the conviction rating and card scanner pages', async () => {
+    let { status, body } = await run('/conviction-rating');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>The CardPop Conviction Rating</h1>');
+    expect(body).toContain('5 — Highest');
+    expect(body).toContain('Buy Conviction');
+    ({ status, body } = await run('/scan'));
+    expect(status).toBe(200);
+    expect(body).toContain('How the card scanner works');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/scan" />');
+  });
+});
+
+describe('prerender event organiser pages', () => {
+  it('lists the organiser and every event that names them', async () => {
+    state.result = { data: { id: 'o1', name: 'Sports Addicts Australia', slug: 'sports-addicts-australia', logo_url: 'https://cdn.test/logo.png' } };
+    state.listResult = { data: [
+      { id: 'e1', slug: 'future-show', title: 'Future Show', status: 'approved', start_date: '2999-01-01', organizer_name: 'Fast Break & Sports Addicts Australia' },
+      { id: 'e2', slug: 'old-show', title: 'Old Show', status: 'completed', start_date: '2026-01-01', organizer_name: 'Sports Addicts Australia' },
+      // ilike is a substring match — a longer different name is filtered out.
+      { id: 'e3', slug: 'other', title: 'Other Show', status: 'approved', start_date: '2999-02-01', organizer_name: 'Sports Addicts Australiana' },
+    ] };
+    const { status, body } = await run('/events/organisers/sports-addicts-australia');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Sports Addicts Australia</h1>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/organisers/sports-addicts-australia" />');
+    expect(body).toContain('Upcoming events (1)');
+    expect(body).toContain('Past events (1)');
+    expect(body).toContain('href="https://cardpop.com.au/events/future-show"');
+    expect(body).not.toContain('Other Show');
+    expect(body).toContain('"@type":"Organization"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('marks an organiser with no events noindex and 404s an unknown slug', async () => {
+    state.result = { data: { id: 'o2', name: 'Quiet Org', slug: 'quiet-org', logo_url: null } };
+    let { status, body } = await run('/events/organisers/quiet-org');
+    expect(status).toBe(200);
+    expect(body).toContain('noindex, follow');
+
+    state.result = { data: null };
+    ({ status } = await run('/events/organisers/nobody'));
+    expect(status).toBe(404);
   });
 });
 

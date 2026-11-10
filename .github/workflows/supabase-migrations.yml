@@ -23,13 +23,12 @@ on:
     paths:
       - 'supabase/migrations/**'
       - 'supabase/config.toml'
-  # Duplicate-version check on PRs: two branches picking the same version
-  # prefix (e.g. both choosing <date>000001) has now broken db push twice —
-  # the version is the PRIMARY KEY of schema_migrations, so the second file
-  # can never be applied. Catch it before merge instead of at deploy time.
-  pull_request:
-    paths:
-      - 'supabase/migrations/**'
+      # A change to how migrations are pushed is itself worth a push: it is
+      # the only way a fix to this file gets proven on main.
+      - '.github/workflows/supabase-migrations.yml'
+  # The duplicate-version check also runs on every PR, as a step of CI's
+  # verify job (.github/workflows/ci.yml), so PRs no longer bill a separate
+  # one-minute job here.
   # Allow a manual re-run from the Actions tab if a push ever fails.
   workflow_dispatch:
 
@@ -59,18 +58,24 @@ jobs:
           echo "All migration versions unique."
 
   db-push:
-    # Deploy only on pushes to main; PRs run the version check alone.
-    if: github.event_name != 'pull_request'
     needs: check-versions
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Pinned, never `latest`: Supabase CLI 3.0.0 (2026-11) changed three
+      # things under the same workflow at once — [inbucket] became [local_smtp]
+      # in config.toml (#1127), `db push` / `migration list` started targeting
+      # the LOCAL stack unless given --remote, and a non-interactive push now
+      # refuses without --yes. `latest` picked all of that up silently and the
+      # production push failed on every merge. Bump this deliberately, after
+      # trying the new version against a throwaway database (docs in CLAUDE.md
+      # → Supabase → Migrations).
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.0.0
 
       - name: Push migrations to production
         env:
@@ -83,6 +88,9 @@ jobs:
         # CLI refuses to apply local migrations whose version is lower than the
         # newest remote one. All repo migrations are idempotent, so applying
         # stragglers out of order is safe.
+        # --remote: CLI 3.x targets the local stack by default; this is the
+        # linked production project. --yes: a merge to main IS the approval,
+        # and without it a non-interactive push refuses and changes nothing.
         run: |
           supabase link --project-ref vrfsaazuqjxotnieqlkd
-          supabase db push --include-all
+          supabase db push --include-all --remote --yes

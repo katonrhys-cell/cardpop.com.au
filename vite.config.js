@@ -541,14 +541,6 @@ export default defineConfig({
 	},
 	build: {
 		rollupOptions: {
-			external: [
-				'@babel/parser',
-				'@babel/traverse',
-				'@babel/generator',
-				'@babel/types',
-				'onnxruntime-web',
-				'onnxruntime-web/webgpu',
-			],
 			output: {
 				manualChunks(id) {
 					if (!id.includes('node_modules')) return;

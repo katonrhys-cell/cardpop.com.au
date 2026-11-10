@@ -24,6 +24,36 @@ const MAX_ATTEMPTS = 2;
 // satisfied. Only ever produces one article — the window is for skipping past
 // topics that aren't ready yet, not for generating several.
 const CANDIDATE_WINDOW = 5;
+// Drafts land unpublished for a person to review. Once this many machine
+// drafts are waiting, a new one is an Opus call nobody reads yet, so the run
+// skips until the queue is reviewed. BLOG_MAX_UNREVIEWED_DRAFTS overrides it;
+// 0 turns the cap off. Ignored under BLOG_AUTOPUBLISH, which has no queue.
+const DEFAULT_MAX_UNREVIEWED_DRAFTS = 3;
+
+/** The backlog cap in force, from BLOG_MAX_UNREVIEWED_DRAFTS (0 = no cap). */
+export function maxUnreviewedDrafts(env = process.env) {
+  const raw = env.BLOG_MAX_UNREVIEWED_DRAFTS;
+  if (raw === undefined || String(raw).trim() === '') return DEFAULT_MAX_UNREVIEWED_DRAFTS;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : DEFAULT_MAX_UNREVIEWED_DRAFTS;
+}
+
+/**
+ * How many machine drafts are waiting for review. Returns null when the count
+ * can't be read, so a database hiccup never stops generation on its own.
+ */
+async function countUnreviewedDrafts() {
+  const { count, error } = await supabase
+    .from('blog_articles')
+    .select('id', { count: 'exact', head: true })
+    .eq('auto_generated', true)
+    .eq('is_published', false);
+  if (error) {
+    logger.warn(`[BLOG_GEN] Could not count unreviewed drafts, generating anyway: ${error.message}`);
+    return null;
+  }
+  return typeof count === 'number' ? count : null;
+}
 
 let cachedClient = null;
 // The SDK is imported here, on first use, rather than at module load: this
@@ -340,6 +370,19 @@ async function claimNextTopic(skipIds = []) {
  * and a single well-checked article beats a batch nobody reviews.
  */
 export async function runScheduledGeneration() {
+  const cap = maxUnreviewedDrafts();
+  if (cap > 0 && process.env.BLOG_AUTOPUBLISH !== 'true') {
+    const waiting = await countUnreviewedDrafts();
+    if (waiting !== null && waiting >= cap) {
+      logger.info(`[BLOG_GEN] ${waiting} unreviewed draft(s) waiting (cap ${cap}); skipping this run.`);
+      return {
+        generated: false,
+        reason: `${waiting} unreviewed draft(s) are waiting in Admin → Blog; review or publish them to resume (cap ${cap}).`,
+        unreviewed: waiting,
+      };
+    }
+  }
+
   const deferred = [];
 
   // A topic whose price history isn't deep enough yet goes back in the queue

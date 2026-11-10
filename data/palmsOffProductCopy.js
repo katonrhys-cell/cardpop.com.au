@@ -19,6 +19,10 @@
  * source keeps to title-level facts. No invented dimensions, capacities, pack
  * counts or materials.
  *
+ * `seoName` is a shorter name for the page <title> (utils/seoTitle.js), set only
+ * where the full product name alone runs past the ~60 characters a search
+ * result shows. The page heading and everything else keep the full name.
+ *
  * `details` is the long-form "About" section (product page + bot prerender)
  * and `specs` adds verified rows to palmsOffSpecs(). Where a product's distinguishing
  * feature is a number already in its name — a point rating, a size, a pack
@@ -61,6 +65,7 @@ export const PALMS_OFF_PRODUCT_COPY = {
   // Source: https://www.kmart.com.au/product/palms-off-gaming-blackout-deck-sleeves-100pk-standard-size-black-110128728/
   // Source: https://otakumart.co.nz/products/blackout-deck-sleeves-standard-pink-palms-off
   "BODS-ST-M": {
+    seoName: "Palms Off Gaming Blackout Deck Sleeves — Standard Matte",
     metaDescription: "Palms Off Gaming Blackout Deck Sleeves, standard size, matte: opaque-backed, low-glare sleeves for Pokémon, Magic and One Piece decks in Australia.",
     intro: "This is the matte cut of Palms Off Gaming's Blackout Deck Sleeves in standard size. The opaque back is the same as the regular Blackout sleeve, but the finish is matte, so overhead lights do not bounce off the card face and the sleeves have a touch more grip in the hand. It is the version to choose for long tournament days, streamed matches or any deck you plan to photograph.",
     details: [
@@ -105,6 +110,7 @@ export const PALMS_OFF_PRODUCT_COPY = {
   // Source: https://www.etsy.com/listing/1783672457
   // Source: https://www.kmart.com.au/product/palms-off-gaming-soft-card-sleeves-japanese-mini-size-100pc-clear-110178730/
   "BODS-JPN-M": {
+    seoName: "Palms Off Gaming Blackout Deck Sleeves — Japanese Mini Matte",
     metaDescription: "Palms Off Gaming Blackout Deck Sleeves, Japanese mini size, matte: 60 low-glare, opaque-backed sleeves for Yu-Gi-Oh! decks. Available in Australia.",
     intro: "The matte Blackout sleeve cut down to Japanese mini size, sold in packs of 60 to suit a Yu-Gi-Oh! main deck with Extra and Side Deck room to spare. The opaque back stops anyone reading your cards from behind, while the matte finish takes the shine off under store lights and gives small cards a bit of grip, which helps when you are fanning a hand of mini cards.",
     details: [
@@ -795,6 +801,7 @@ export const PALMS_OFF_PRODUCT_COPY = {
   },
   // Source: https://otakumart.co.nz/products/mint-fit-toploader-sleeves-35pt-100pc-palms-off
   "MF-SLIN-ST": {
+    seoName: "Palms Off Gaming Mint Fit Side-Load Inners — Standard Size",
     metaDescription: "Palms Off Gaming Mint Fit Side-Loading Inner Sleeves, standard size: seal Pokémon, Magic and One Piece cards when double-sleeving. Stocked in Australia.",
     intro: "Mint Fit Side-Loading Inner Sleeves open along the long edge instead of the top. Slide a standard-size card in from the side, drop it into a normal top-loading outer sleeve, and the two openings cross at right angles. The card is closed on all four edges without having to remember to flip the inner sleeve, which makes sleeving a whole deck quicker and less error-prone.",
     details: [
@@ -818,6 +825,7 @@ export const PALMS_OFF_PRODUCT_COPY = {
   // Source: https://otakumart.co.nz/products/mint-fit-toploader-sleeves-35pt-100pc-palms-off
   // Source: https://www.kmart.com.au/product/palms-off-gaming-soft-card-sleeves-japanese-mini-size-100pc-clear-110178730/
   "MF-SLIN-JPN": {
+    seoName: "Palms Off Gaming Mint Fit Side-Load Inners — Japanese Mini",
     metaDescription: "Palms Off Gaming Mint Fit Side-Loading Inner Sleeves, Japanese mini size: seal Yu-Gi-Oh! cards automatically when double-sleeving. Sold in Australia.",
     intro: "This is the side-loading Mint Fit inner sleeve in Japanese mini size, for Yu-Gi-Oh! players who double-sleeve. The card goes in from the long edge, then into any top-loading Japanese-size outer sleeve. Because the openings meet at right angles, the card is sealed whichever way round it goes in, and small cards, where a few millimetres of slack shows quickly, stay snug and square in the deck.",
     details: [

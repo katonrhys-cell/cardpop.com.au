@@ -159,6 +159,10 @@ describe('gradeEstimator helpers', () => {
       expect(out.data).toEqual({ grades: { PSA: { estimate: 8 } } });
       const [, init] = fetchSpy.mock.calls[0];
       expect(JSON.parse(init.body).stream).toBe(true);
+      // Sonnet 5.5: `disabled` thinking is a 400 there; between_tools is its
+      // lowest setting and needs no other field.
+      expect(JSON.parse(init.body).model).toBe('claude-sonnet-5-5');
+      expect(JSON.parse(init.body).thinking).toEqual({ type: 'between_tools' });
       expect(init.signal).toBeInstanceOf(AbortSignal);
     } finally {
       fetchSpy.mockRestore();

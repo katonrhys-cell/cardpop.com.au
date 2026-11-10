@@ -18,7 +18,7 @@ import {
 // about — how payments are secured, how purchases are protected, and how we
 // verify who's on the other end of a trade. Copy is deliberately accurate to
 // the integrations we run: Stripe for order checkout (PCI-DSS hosted payment,
-// with PayPal and wallets offered as methods), Stripe for membership
+// with card wallets offered as methods), Stripe for membership
 // billing, and Stripe Identity for the ID check. Every protection figure is
 // read from utils/buyerProtectionPolicy.js so this page can never promise a
 // window or a refund the Returns page and the refund code don't deliver.
@@ -81,7 +81,7 @@ const FAQ = [
   },
   {
     q: 'What payment methods can I use?',
-    a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.',
+    a: 'At checkout you can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay.',
   },
   {
     q: 'What happens if my card never arrives or is not as described?',
@@ -124,12 +124,15 @@ const TrustSafetyPage = () => {
       description="Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe."
     >
       <SEOHead
-        title="Trust & Safety — Secure Payments & Buyer Protection | CardPop™"
-        description={`How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`}
+        title="Trust & Safety — Secure Payments & Protection | CardPop™"
+        description={`How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, and ID-verified sellers.`}
         structuredData={faqStructuredData}
       />
 
-      {/* Three-pillar summary — escapes prose styling for the card grid. */}
+      {/* Three-pillar summary — escapes prose styling for the card grid. The
+          pillars are <h3>s, so the visually hidden <h2> keeps the outline from
+          jumping straight from the page <h1>. */}
+      <h2 className="sr-only">How CardPop keeps you safe</h2>
       <div className="not-prose mb-12 grid gap-4 sm:grid-cols-3">
         {PILLARS.map((p) => (
           <Pillar key={p.title} {...p} />
@@ -137,7 +140,7 @@ const TrustSafetyPage = () => {
       </div>
 
       <SectionHeading icon={Lock}>Secure Payments</SectionHeading>
-      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay</strong>. All traffic is protected by 256-bit SSL end to end.</p>
+      <p>Every purchase on <CardPopBrand /> is processed by <strong>Stripe</strong>, a globally certified <strong>PCI-DSS Level 1</strong> payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with <strong>Visa, Mastercard, American Express, Apple Pay or Google Pay</strong>. All traffic is protected by 256-bit SSL end to end.</p>
 
       <SectionHeading icon={ShieldCheck}>Buyer Protection</SectionHeading>
       <p>{PROTECTION_COPY.marketplaceSummary}</p>

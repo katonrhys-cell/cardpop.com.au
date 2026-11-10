@@ -307,7 +307,7 @@ const BlogPage = () => {
     ? `${activeCategory} from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian Pokémon, MTG and sports card collectors.`
     : tagParam
       ? `Articles tagged “${tagParam}” from The Parallel Report by CardPop — trading card analysis, guides and insights for Australian collectors.`
-      : 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
+      : 'The Parallel Report by CardPop — trading card news, market analysis and grading guides for Australian Pokémon, MTG and sports card collectors.';
 
   return (
     <div className="min-h-[100dvh] bg-background">

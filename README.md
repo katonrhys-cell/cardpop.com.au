@@ -7,9 +7,9 @@ Australian trading card marketplace — buy, sell, trade, and track the value of
 ## Stack
 
 - **Frontend**: React 18 SPA, Vite, React Router v7, shadcn/ui, Tailwind CSS
-- **Backend**: Express.js, one Node process (`server/index.js`) that also serves the built SPA
+- **Backend**: Express.js (Vercel serverless functions in production; `server/index.js` runs the same code as one Node process on the parked VPS stack)
 - **Database & Auth**: Supabase (PostgreSQL + RLS + Supabase Auth)
-- **Deployment**: Vultr VPS — one Node process under systemd behind Cloudflare; deployed on push to `main`
+- **Deployment**: Vercel (Git integration on `main`) behind Cloudflare. A self-hosted Vultr VPS stack is built and parked — see Deployment below
 - **Payments**: Stripe
 - **Market data**: eBay AU API
 - **Email marketing**: Kit.com
@@ -61,8 +61,6 @@ npm run test:coverage # Coverage report
 
 ## Deployment
 
-Push to `main` — `.github/workflows/deploy.yml` SSHes to the VPS and runs `deploy/deploy.sh`, which builds the commit into a new release directory on the box and restarts the service on it.
+**Today**: push to `main` and Vercel's Git integration builds and deploys it. Application secrets (Supabase service role key, Stripe, eBay, Kit.com, etc.) live in the Vercel dashboard — see `CLAUDE.md` → Deployment for the list.
 
-Requires four repository secrets: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`.
-
-All application secrets (Supabase service role key, Stripe, eBay, Kit.com, etc.) live in `/opt/cardpop/shared/.env` on the VPS — see `CLAUDE.md` → Deployment for the list and `docs/vultr-rollout.md` for the runbook.
+**Parked, ready to switch on**: a self-hosted stack for a Vultr VPS (`server/`, `deploy/`). `.github/workflows/deploy.yml` SSHes to the box and runs `deploy/deploy.sh`, which builds the commit into a new release directory and restarts the systemd service — but only while the repository variable `VPS_DEPLOY_ENABLED` is `true`; until then it skips. Needs four repository secrets (`VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`, `VPS_KNOWN_HOSTS`) and `/opt/cardpop/shared/.env` on the box. Runbook: `docs/vultr-rollout.md`.

@@ -3,12 +3,23 @@ import { processingFeeCents } from '../utils/processingFee.js';
 // Cached per instance for a short window (src/utils/platformSettings.js) — the
 // pricing path reads a dozen of these per cart, several per line.
 import { getPlatformSetting } from '../utils/platformSettings.js';
+import { createTtlCache } from '../utils/ttlCache.js';
+
+// fee_config rows change only when an admin edits commission settings, and the
+// pricing path reads one per cart line; cached per instance on the same
+// window as platform_settings. Only a found row is cached, never the default.
+const feeConfigCache = createTtlCache({ ttlMs: () => process.env.PLATFORM_SETTINGS_TTL_MS ?? 30_000, maxEntries: 50 });
 
 /**
  * Looks up the fee_config row for a given seller_tier and transaction_type.
  * Falls back to the 'none' tier if no match.
  */
 async function getFeeConfig(sellerTier, transactionType) {
+  const row = await feeConfigCache.get(`${sellerTier || 'none'}:${transactionType}`, () => loadFeeConfig(sellerTier, transactionType));
+  return row || { id: null, fee_pct: 3 };
+}
+
+async function loadFeeConfig(sellerTier, transactionType) {
   // Try exact tier match
   let { data } = await supabase
     .from('fee_config')
@@ -32,7 +43,7 @@ async function getFeeConfig(sellerTier, transactionType) {
     data = fallback;
   }
 
-  return data || { id: null, fee_pct: 3 };
+  return data || undefined; // undefined is never cached
 }
 
 /**

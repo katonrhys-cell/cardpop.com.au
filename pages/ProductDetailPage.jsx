@@ -24,7 +24,7 @@ import EbayMarketSection from '@/components/EbayMarketSection.jsx';
 import MarketPriceAnchor from '@/components/MarketPriceAnchor.jsx';
 import ListingWatchers from '@/components/ListingWatchers.jsx';
 import { addToRecentlyViewed } from '@/utils/recentlyViewed.js';
-import { publicImageUrl } from '@/utils/imageUrl.js';
+import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import CertificationVerificationSection from '@/components/CertificationVerificationSection.jsx';
 import GradeBadge from '@/components/GradeBadge.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
@@ -55,6 +55,7 @@ import BuyerProtection from '@/components/BuyerProtection.jsx';
 import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import MoreFromSeller from '@/components/MoreFromSeller.jsx';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
+import { brandedTitle, SHORT_BRAND_SUFFIXES } from '@/utils/seoTitle.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -101,7 +102,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     addToRecentlyViewed({
       id: product.id,
       title: product.name,
-      image: publicImageUrl(product.images?.[0]),
+      // A small strip tile: the 480 px companion thumbnail when the upload has one.
+      image: cardThumbUrl(product.images?.[0]),
       price: product.price,
       type: source,
       url: window.location.pathname,
@@ -120,7 +122,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     const io = new IntersectionObserver(([entry]) => setCtaOffscreen(!entry.isIntersecting && entry.boundingClientRect.top < 0), { threshold: 0 });
     io.observe(el);
     return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-observe when the CTA block (re)mounts
+    // Re-observe when the CTA block (re)mounts.
   }, [product?.id, product?.status]);
 
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
@@ -600,7 +602,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     <div className="bg-background min-h-screen">
       <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-8 md:py-12">
         <SEOHead
-          title={`${product.name} | CardPop`}
+          title={brandedTitle(product.name, { suffixes: SHORT_BRAND_SUFFIXES })}
           description={product.description?.split(/\n\s*\n/)[0] || `${product.name} — available on CardPop Australia's trading card marketplace.`}
           ogImage={publicImageUrl(product.images?.[0]) || undefined}
           canonicalUrl={source === 'marketplace'

@@ -35,8 +35,11 @@ import {
 import { resolvePalmsOffCategory } from '@/data/palmsOffCategories.js';
 import { shopMerchantReturnPolicyLd } from '@/utils/shopReturnPolicy.js';
 import { isEligibleProductLd } from '@/utils/seoUtils.js';
+import { shopShippingDetailsLd, shopShippingTerms } from '@/utils/productShippingLd.js';
+import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { trackViewItem } from '@/lib/analytics.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
+import { brandedTitle } from '@/utils/seoTitle.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -80,6 +83,8 @@ const ShopProductPage = () => {
   // Colours of one line share their reviews (family_sku = the line SKU).
   const reviewPool = reviewPoolKey({ familySku: family.length > 0 ? product?.sku : null, productId: row?.id });
   const { stats: reviewStats, reviews: shopReviews, loading: reviewsLoading } = useShopReviews(reviewPool);
+  // Shop flat rate + free-shipping threshold for the Offer's shippingDetails.
+  const { settings: platformSettings } = usePlatformSettings();
 
   // Not a catalogue product: any other shop product (e.g. CardPop house
   // products) is served at the same /shop/<category>/<slug> shape.
@@ -187,6 +192,7 @@ const ShopProductPage = () => {
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        shippingDetails: shopShippingDetailsLd(price, shopShippingTerms(platformSettings)),
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -216,7 +222,7 @@ const ShopProductPage = () => {
   return (
     <div className="min-h-screen bg-background">
       <SEOHead
-        title={`${product.title} | CardPop Australia`}
+        title={brandedTitle(product.seoName || product.title)}
         description={description}
         canonicalUrl={canonical}
         ogImage={images[0]}

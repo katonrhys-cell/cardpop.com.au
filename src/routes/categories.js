@@ -4,11 +4,12 @@ import supabase from '../utils/supabaseClient.js';
 import { authMiddleware, isAdminUser } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import logger from '../utils/logger.js';
+import { publicCache, CACHE_MEDIUM } from '../middleware/publicCache.js';
 
 const router = express.Router();
 
 // GET /categories — list all root categories
-router.get('/', async (req, res) => {
+router.get('/', publicCache(CACHE_MEDIUM), async (req, res) => {
   const { page = '1', limit = '50' } = req.query;
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
@@ -29,7 +30,7 @@ router.get('/', async (req, res) => {
 });
 
 // GET /categories/:id — single category with its subcategories
-router.get('/:id', async (req, res) => {
+router.get('/:id', publicCache(CACHE_MEDIUM), async (req, res) => {
   const { id } = req.params;
 
   const { data: category, error } = await supabase

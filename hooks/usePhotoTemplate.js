@@ -114,36 +114,6 @@ function drawStudioBackground(ctx, W, H) {
   ctx.fillRect(0, 0, W, H);
 }
 
-// Crop a canvas down to its non-transparent bounding box so a cut-out card
-// fills the frame without large empty margins. Returns the original canvas if
-// it has no usable alpha (e.g. a fully opaque rectangle).
-function trimToAlpha(canvas) {
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  let data;
-  try { data = ctx.getImageData(0, 0, canvas.width, canvas.height).data; }
-  catch { return canvas; }
-
-  const { width: w, height: h } = canvas;
-  let minX = w, minY = h, maxX = -1, maxY = -1;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      if (data[(y * w + x) * 4 + 3] > 12) {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-  }
-  if (maxX < 0 || (maxX - minX) < w * 0.05 || (maxY - minY) < h * 0.05) return canvas;
-
-  const tw = maxX - minX + 1, th = maxY - minY + 1;
-  const out = document.createElement('canvas');
-  out.width = tw; out.height = th;
-  out.getContext('2d').drawImage(canvas, minX, minY, tw, th, 0, 0, tw, th);
-  return out;
-}
-
 // Wrap an opaque (rectangular) card image in a canvas with rounded corners so
 // the fallback path still drops a card-shaped silhouette (with shadow) onto the
 // backdrop rather than a hard rectangle.
@@ -174,45 +144,26 @@ export function usePhotoTemplate() {
       setIsProcessing(true);
       setOriginalImageFile(imageFile);
 
-      // Build the foreground: ideally a clean, transparent cut-out of the card
-      // via the ML background remover; if that's unavailable or fails, fall back
-      // to colour-based card detection so the feature still works offline.
-      let foreground = null; // a canvas containing the card with transparency
-      try {
-        const { removeBackground } = await import('@imgly/background-removal');
-        const cutoutBlob = await removeBackground(imageFile);
-        const cutoutUrl = URL.createObjectURL(cutoutBlob);
-        try {
-          const cutImg = await loadImage(cutoutUrl);
-          const c = document.createElement('canvas');
-          c.width = cutImg.naturalWidth; c.height = cutImg.naturalHeight;
-          c.getContext('2d').drawImage(cutImg, 0, 0);
-          foreground = trimToAlpha(c);
-        } finally {
-          URL.revokeObjectURL(cutoutUrl);
-        }
-      } catch (err) {
-        console.warn('[PhotoTemplate] ML cut-out unavailable, using fallback', err);
-      }
-
-      if (!foreground) {
-        const dataUrl = await new Promise((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = (e) => resolve(e.target.result);
-          r.onerror = reject;
-          r.readAsDataURL(imageFile);
-        });
-        const img = await loadImage(dataUrl);
-        const region = detectCardRegion(img);
-        const sx = region ? region.sx : 0;
-        const sy = region ? region.sy : 0;
-        const sw = region ? region.sw : img.width;
-        const sh = region ? region.sh : img.height;
-        const crop = document.createElement('canvas');
-        crop.width = sw; crop.height = sh;
-        crop.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-        foreground = roundedCardCanvas(crop, sw, sh);
-      }
+      // The foreground is the card found by colour-based detection, cropped
+      // with rounded corners. (An ML background remover used to be tried
+      // first, but the build never shipped its runtime, so it always fell
+      // through to this; it was removed with the dependency.)
+      const dataUrl = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = (e) => resolve(e.target.result);
+        r.onerror = reject;
+        r.readAsDataURL(imageFile);
+      });
+      const img = await loadImage(dataUrl);
+      const region = detectCardRegion(img);
+      const sx = region ? region.sx : 0;
+      const sy = region ? region.sy : 0;
+      const sw = region ? region.sw : img.width;
+      const sh = region ? region.sh : img.height;
+      const crop = document.createElement('canvas');
+      crop.width = sw; crop.height = sh;
+      crop.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      const foreground = roundedCardCanvas(crop, sw, sh); // the card, rounded
 
       // Compose the card, centred on the studio backdrop, leaving margin so the
       // spotlight reads around it. A soft drop shadow lifts it off the canvas.
@@ -242,34 +193,6 @@ export function usePhotoTemplate() {
     } catch (error) {
       console.error('Error processing image:', error);
       toast.error('Failed to process image');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, []);
-
-  const removeBackgroundPreview = useCallback(async (imageFile) => {
-    try {
-      setIsProcessing(true);
-      setOriginalImageFile(imageFile);
-
-      // Load rembg ONNX model for browser-based background removal
-      const { removeBackground } = await import('@imgly/background-removal');
-
-      // Await the whole pipeline before clearing the processing flag. The old
-      // code scheduled a FileReader and fell straight through to the finally
-      // block, so isProcessing flipped to false while removeBackground was still
-      // running (a multi-second job), showing "done" prematurely.
-      const arrayBuffer = await imageFile.arrayBuffer();
-      const result = await removeBackground(arrayBuffer);
-      const url = URL.createObjectURL(result);
-      setPreviewUrl(prev => {
-        // Revoke the previous blob URL so it isn't leaked.
-        if (prev && prev.startsWith('blob:')) URL.revokeObjectURL(prev);
-        return url;
-      });
-    } catch (error) {
-      console.error('Background removal error:', error);
-      toast.error('Failed to remove background. Make sure your image is clear and well-lit.');
     } finally {
       setIsProcessing(false);
     }
@@ -326,7 +249,6 @@ export function usePhotoTemplate() {
     isProcessing,
     previewUrl,
     createSlabImagePreview,
-    removeBackgroundPreview,
     uploadProcessedImage,
     reset
   };

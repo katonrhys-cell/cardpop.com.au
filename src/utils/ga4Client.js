@@ -31,23 +31,143 @@ const REQUEST_TIMEOUT_MS = 15_000;
 const b64url = (input) =>
   Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+/** Escape line breaks that sit inside JSON string literals, leaving the rest. */
+const escapeBreaksInStrings = (text) => {
+  let out = '';
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (inString && ch === '\\') { out += ch + (text[i + 1] ?? ''); i += 1; continue; }
+    if (ch === '"') inString = !inString;
+    if (inString && (ch === '\n' || ch === '\r')) {
+      if (ch === '\r' && text[i + 1] === '\n') i += 1;
+      out += '\\n';
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+};
+
+/**
+ * The text forms a pasted key commonly arrives in, most likely first: as-is;
+ * with a BOM or wrapping quotes stripped (a value copied from a .env line);
+ * base64 (whitespace and line breaks ignored); and with real line breaks
+ * turned back into `\n` escapes (a private key whose escapes were expanded
+ * on the way into the dashboard is otherwise invalid JSON).
+ */
+const serviceAccountCandidates = (raw) => {
+  const original = String(raw).replace(/^\uFEFF/, '').trim();
+  const quoted = /^(['"]).*\1$/s.test(original);
+  const text = quoted ? original.slice(1, -1).trim() : original;
+  const forms = quoted ? [original, text] : [text];
+  if (!text.startsWith('{')) {
+    try { forms.push(Buffer.from(text.replace(/\s+/g, ''), 'base64').toString('utf8').trim()); } catch { /* not base64 */ }
+  }
+  // Typographic quotes, non-breaking spaces and zero-width characters, which
+  // a notes app or "smart punctuation" swaps in; none can appear in a real key.
+  for (const form of [...forms]) {
+    const plain = normaliseTypography(form);
+    if (plain !== form) forms.push(plain);
+  }
+  const out = [];
+  for (const form of forms) {
+    out.push(form);
+    if (/[\r\n]/.test(form)) out.push(escapeBreaksInStrings(form));
+  }
+  return out;
+};
+
+const normaliseTypography = (text) => text
+  .replace(/[\u201C\u201D\u201E\u201F\u2033\uFF02]/g, '"')
+  .replace(/[\u2018\u2019\u201A\u201B\u2032]/g, "'")
+  .replace(/[\u00A0\u2007\u202F]/g, ' ')
+  .replace(/[\u200B-\u200D\u2060\uFEFF]/g, '');
+
+/**
+ * Where JSON.parse gives up on the value, described without echoing it: the
+ * character position and, only when it is punctuation or whitespace (never a
+ * letter or digit, which could be part of the key), which character it is.
+ */
+const describeParseFailure = (text) => {
+  try {
+    JSON.parse(text);
+    return '';
+  } catch (err) {
+    const match = /position (\d+)/.exec(err.message || '');
+    if (!match) return ' JSON.parse stopped before the end of the value.';
+    const pos = Number(match[1]);
+    const ch = text[pos];
+    const safe = ch && !/[A-Za-z0-9+/=_-]/.test(ch);
+    const what = safe
+      ? ` (${JSON.stringify(ch)}, U+${ch.codePointAt(0).toString(16).toUpperCase().padStart(4, '0')})`
+      : '';
+    return ` It stops parsing at character ${pos + 1} of ${text.length}${what}.`;
+  }
+};
+
+const parseCandidate = (candidate) => {
+  try {
+    let parsed = JSON.parse(candidate);
+    // A key JSON-encoded twice (a string holding the JSON) parses to a string.
+    if (typeof parsed === 'string') parsed = JSON.parse(parsed);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const isServiceAccountKey = (o) => Boolean(o && typeof o.client_email === 'string' && typeof o.private_key === 'string');
+
 /** Parse GA4_SERVICE_ACCOUNT_JSON (raw JSON or base64). Returns null if unusable. */
 export const parseServiceAccount = (raw = process.env.GA4_SERVICE_ACCOUNT_JSON) => {
   if (!raw || !String(raw).trim()) return null;
-  const text = String(raw).trim();
-  const candidates = [text];
-  if (!text.startsWith('{')) {
-    try { candidates.push(Buffer.from(text, 'base64').toString('utf8')); } catch { /* not base64 */ }
-  }
-  for (const candidate of candidates) {
-    try {
-      const parsed = JSON.parse(candidate);
-      if (parsed && typeof parsed.client_email === 'string' && typeof parsed.private_key === 'string') {
-        return { clientEmail: parsed.client_email, privateKey: parsed.private_key.replace(/\\n/g, '\n') };
-      }
-    } catch { /* try the next form */ }
+  for (const candidate of serviceAccountCandidates(raw)) {
+    const parsed = parseCandidate(candidate);
+    if (isServiceAccountKey(parsed)) {
+      return { clientEmail: parsed.client_email, privateKey: parsed.private_key.replace(/\\n/g, '\n') };
+    }
   }
   return null;
+};
+
+/**
+ * Why GA4_SERVICE_ACCOUNT_JSON is unusable, in words an admin can act on, or
+ * null when it parses. Never echoes the value — only its length and, for a
+ * JSON object of the wrong kind, its top-level key names.
+ */
+export const describeServiceAccountProblem = (raw = process.env.GA4_SERVICE_ACCOUNT_JSON) => {
+  if (!raw || !String(raw).trim()) return 'GA4_SERVICE_ACCOUNT_JSON is not set in this deployment';
+  if (parseServiceAccount(raw)) return null;
+  const length = String(raw).trim().length;
+  const objects = serviceAccountCandidates(raw).map(parseCandidate).filter(Boolean);
+  if (objects.length) {
+    const keys = Object.keys(objects[0]).slice(0, 8).join(', ') || 'none';
+    const hint = objects[0].web || objects[0].installed
+      ? ' — that is an OAuth client, not a service-account key'
+      : '';
+    return `GA4_SERVICE_ACCOUNT_JSON is JSON but not a service-account key (it has: ${keys})${hint}. `
+      + 'Download a key from IAM & Admin → Service Accounts → Keys → Add key → JSON';
+  }
+  const text = String(raw).replace(/^\uFEFF/, '').trim();
+  const where = text.startsWith('{') ? describeParseFailure(text) : '';
+  const cause = length < 2000
+    ? 'it looks cut short (a full key is about 2,300 characters)'
+    : 'its length looks right, so something in it was altered when pasted';
+  return `GA4_SERVICE_ACCOUNT_JSON is set (${length} characters) but isn't valid JSON or base64 JSON — `
+    + `${cause}.${where} Paste the whole downloaded file again, or its base64`;
+};
+
+/** Why GA4_PROPERTY_ID is unusable, or null when it is a numeric id. */
+export const describePropertyIdProblem = (raw = process.env.GA4_PROPERTY_ID) => {
+  const id = String(raw || '').trim();
+  if (!id) return 'GA4_PROPERTY_ID is not set in this deployment';
+  if (getPropertyId(id)) return null;
+  if (/^G-/i.test(id)) {
+    return 'GA4_PROPERTY_ID is a G-… measurement id; it needs the numeric Property ID '
+      + '(GA4 → Admin → Property settings)';
+  }
+  return 'GA4_PROPERTY_ID must be the numeric Property ID (GA4 → Admin → Property settings)';
 };
 
 /** Numeric GA4 property id from GA4_PROPERTY_ID ("123456" or "properties/123456"). */

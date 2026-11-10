@@ -1,9 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
+import { GRADING_COMPANIES } from '../data/gradingCompanies.js';
+import { GRADING_PARTNERS_SEED } from '../data/gradingPartnersSeed.js';
+import { GRADING_SCALES, GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
+import { CONVICTION_LEVELS, CONVICTION_TYPES, CONVICTION_TYPE_KEYS } from '../utils/convictionRating.js';
+import { partnersForCompany, partnerLineText, gradingPartnersPath } from '../utils/gradingPartners.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
-import { buildEventReviewJsonLd } from '../utils/eventReview.js';
+import { buildEventReviewJsonLd, buildReviewVideoJsonLds, cleanVideos, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
+import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
@@ -22,14 +28,20 @@ import { MARKETPLACE_PROTECTION as MP, PROTECTION_COPY } from '../utils/buyerPro
 import { CARRIERS } from '../utils/shipmentTracking.js';
 import { productReviewsLd, reviewPoolKey } from '../utils/productReviews.js';
 import { shopProductIdentifiersLd, cardIdentifiersLd, cardBrandName } from '../utils/productIdentifiers.js';
+import { shopShippingTerms, shopShippingDetailsLd, marketplaceShippingDetailsLd, SHOP_DELIVERY_TIMES } from '../utils/productShippingLd.js';
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
+import { EVENT_REGIONS, eventRegionBySlug, eventRegionByState, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
+import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '../utils/eventNextEdition.js';
+import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
+import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH } from '../data/listYourEvent.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
 } from '../utils/players.js';
+import { brandedTitle, SHORT_BRAND_SUFFIXES } from '../utils/seoTitle.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -531,6 +543,28 @@ async function renderBlogArticle(supabase, param) {
         .join(' · ')}</nav>`
     : '';
 
+  // Event reviews (docs/event-reviews.md) add a Review node plus the structured
+  // parts — scorecard, videos, photos, deals, pickups — as plain HTML, because
+  // the crawler reads this document without running the SPA. The structured row
+  // lives in event_reviews and the reviewed event in events. Both lookups are
+  // best-effort — a plain article has neither and skips this.
+  let reviewLd = null;
+  let reviewVideoLds = [];
+  let reviewHtml = '';
+  if (article.category === 'event-reviews') {
+    const { data: reviewRow } = await supabase.from('event_reviews').select('*').eq('article_id', article.id).maybeSingle();
+    if (reviewRow) {
+      let event = null;
+      if (reviewRow.event_id) {
+        const { data: ev } = await supabase.from('events').select('id, slug, title, start_date, venue_name, address, suburb, state, postcode, image_url').eq('id', reviewRow.event_id).maybeSingle();
+        event = ev || null;
+      }
+      reviewLd = buildEventReviewJsonLd({ article, review: reviewRow, event, siteUrl: BASE_URL });
+      reviewVideoLds = buildReviewVideoJsonLds({ article, videos: cleanVideos(reviewRow.videos, reviewRow.video), event, siteUrl: BASE_URL });
+      reviewHtml = renderEventReviewHtml(reviewRow, event);
+    }
+  }
+
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(article.title)}</nav>
   <article>
@@ -540,28 +574,64 @@ async function renderBlogArticle(supabase, param) {
     ${article.excerpt ? `<p>${esc(article.excerpt)}</p>` : ''}
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
     ${addHeadingAnchors(bodyContent) || `<p>${esc(description)}</p>`}
+    ${reviewHtml}
     ${tagsHtml}
   </article>
   ${faqHtml}
 </main>`;
 
-  // Event reviews (docs/event-reviews.md) add a Review node: the structured
-  // row lives in event_reviews and the reviewed event in events. Both lookups
-  // are best-effort — a plain article has neither and skips this.
-  let reviewLd = null;
-  if (article.category === 'event-reviews') {
-    const { data: reviewRow } = await supabase.from('event_reviews').select('overall_rating, event_id').eq('article_id', article.id).maybeSingle();
-    if (reviewRow) {
-      let event = null;
-      if (reviewRow.event_id) {
-        const { data: ev } = await supabase.from('events').select('id, slug, title, start_date, venue_name, address, suburb, state, postcode, image_url').eq('id', reviewRow.event_id).maybeSingle();
-        event = ev || null;
-      }
-      reviewLd = buildEventReviewJsonLd({ article, review: reviewRow, event, siteUrl: BASE_URL });
-    }
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), ...reviewVideoLds, breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
+}
+
+// The structured half of an event review as crawlable HTML — scorecard, videos,
+// photos, deals of the day and pickups (utils/eventReview.js is the one source
+// for the cleaning rules). Mirrors what BlogArticlePage renders after hydration
+// so a crawler that never runs the SPA still sees the whole review.
+function renderEventReviewHtml(review, event) {
+  const parts = [];
+  const eventName = event?.title || 'the event';
+
+  if (hasScorecard(review)) {
+    const scores = cleanScores(review.scores);
+    const rows = SCORE_CATEGORIES.filter((c) => scores[c.id] != null)
+      .map((c) => `<li>${esc(c.label)}: ${esc(formatScore(scores[c.id]))}</li>`).join('');
+    parts.push(`<section><h2>Scorecard</h2>${formatScore(review.overall_rating) ? `<p>Overall: ${esc(formatScore(review.overall_rating))}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}${review.verdict ? `<p>${esc(review.verdict)}</p>` : ''}</section>`);
   }
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
+  const videos = cleanVideos(review.videos, review.video);
+  if (videos.length) {
+    const items = videos.map((v, i) => (v.caption ? `<li>${esc(v.caption)}</li>` : `<li>${esc(eventName)} video ${i + 1}</li>`)).join('');
+    parts.push(`<section><h2>Videos from the day</h2><ul>${items}</ul></section>`);
+  }
+
+  const gallery = cleanGallery(review.gallery);
+  if (gallery.length) {
+    const figures = gallery.map((g, i) => `<figure><img src="${esc(publicImageUrl(g.url) || g.url)}" alt="${esc(g.alt || g.caption || `${eventName} photo ${i + 1}`)}" loading="lazy" />${g.caption ? `<figcaption>${esc(g.caption)}</figcaption>` : ''}</figure>`).join('');
+    parts.push(`<section><h2>Photos from ${esc(eventName)}</h2>${figures}</section>`);
+  }
+
+  const deals = cleanDeals(review.deals);
+  if (deals.length) {
+    const items = deals.map((d) => {
+      const pct = dealSavingPct(d);
+      const bits = [
+        d.vendor ? esc(d.vendor) : '',
+        d.price_aud != null ? esc(formatAud(d.price_aud)) : '',
+        d.was_price_aud != null ? `usually ${esc(formatAud(d.was_price_aud))}${pct != null ? ` (${pct}% off)` : ''}` : '',
+        d.note ? esc(d.note) : '',
+      ].filter(Boolean).join(' — ');
+      return `<li><strong>${esc(d.title)}</strong>${bits ? ` — ${bits}` : ''}</li>`;
+    }).join('');
+    parts.push(`<section><h2>Deals of the day</h2><ul>${items}</ul></section>`);
+  }
+
+  const pickups = cleanPickups(review.pickups);
+  if (pickups.length) {
+    const items = pickups.map((p) => `<li><strong>${esc(p.name)}</strong>${p.price_aud != null ? ` — ${esc(formatAud(p.price_aud))}` : ''}${p.note ? ` — ${esc(p.note)}` : ''}</li>`).join('');
+    parts.push(`<section><h2>Pickups from the show</h2><ul>${items}</ul></section>`);
+  }
+
+  return parts.join('\n    ');
 }
 
 async function renderListing(supabase, id, slugParam) {
@@ -579,7 +649,7 @@ async function renderListing(supabase, id, slugParam) {
   // fails the whole query, which used to 404 every listing for crawlers.
   const { data: listing, error: listingErr } = await supabase
     .from('listings')
-    .select('id, slug, price_aud, price_min_aud, price_max_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
+    .select('id, slug, price_aud, price_min_aud, price_max_aud, shipping_cost_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
   if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
@@ -639,6 +709,8 @@ async function renderListing(supabase, id, slugParam) {
           ...(schemaItemCondition(condition) ? { itemCondition: schemaItemCondition(condition) } : {}),
           url: canonical,
           seller: { '@type': 'Organization', name: sellerName },
+          // The seller's own postage for this listing (0 = free postage).
+          shippingDetails: marketplaceShippingDetailsLd(listing.shipping_cost_aud),
         } }
       // Expression of Interest: no fixed price, but the seller's offer range is
       // real — an AggregateOffer from the minimum (max is optional).
@@ -779,6 +851,10 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   const inStock = product.status === 'preorder' || product.stock_quantity == null || product.stock_quantity > 0;
   // Sold now, shipped when stock arrives: schema.org has a value for exactly that.
   const preorder = product.status === 'preorder';
+  // Coming soon is public but can't be bought: it carries no Offer (an Offer
+  // would claim InStock for something the checkout refuses).
+  const purchasable = isPurchasableStatus(product.status) && price > 0;
+  const shippingTerms = purchasable ? await loadShopShippingTerms(supabase) : null;
   const description = product.description
     || `${name}${product.category ? ` — ${product.category}` : ''} available from the CardPop official store. Fast shipping across Australia.`;
 
@@ -793,7 +869,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     // global identifiers Google's Merchant listings report asks for.
     ...shopProductIdentifiersLd(product),
     ...(await loadShopReviewLd(supabase, { familySku: product.family_sku, productId: product.family_sku ? null : product.id })),
-    ...(price > 0
+    ...(purchasable
       ? { offers: {
           '@type': 'Offer',
           price: Number(price).toFixed(2),
@@ -802,6 +878,8 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
           itemCondition: 'https://schema.org/NewCondition',
           url: canonical,
           seller: { '@type': 'Organization', name: 'CardPop' },
+          shippingDetails: shopShippingDetailsLd(price, shippingTerms),
+          hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
         } }
       : {}),
   };
@@ -821,7 +899,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/shop">Shop</a> / ${categoryUrl ? `<a href="${categoryUrl}">${esc(product.category)}</a> / ` : ''}${esc(name)}</nav>
   <h1>${esc(name)}</h1>
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
-  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${!inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>` : ''}
+  ${price > 0 ? `<p><strong>A$${esc(Number(price).toFixed(2))}</strong> — ${!purchasable ? 'Coming soon' : !inStock ? 'Out of stock' : preorder ? 'Pre-order' : 'In stock'}</p>` : ''}
   ${product.category ? `<p>${esc(product.category)}</p>` : ''}
   ${descriptionParagraphs(product.description).map((p) => `<p>${esc(p)}</p>`).join('\n  ')}
 </main>`;
@@ -829,7 +907,7 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
   // The first paragraph of a shop description is written to stand alone as the
   // meta description; the rest is page body only.
   const metaDescription = toText(descriptionParagraphs(description)[0] || description, 300);
-  return htmlDoc({ title: `${name} | CardPop`, description: metaDescription, canonical, ogImage: image, jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
+  return htmlDoc({ title: brandedTitle(name, { suffixes: SHORT_BRAND_SUFFIXES }), description: metaDescription, canonical, ogImage: image, jsonLdItems: [isEligibleProductLd(productLd) ? productLd : null, breadcrumb].filter(Boolean), bodyHtml });
 }
 
 // ── Palms Off Gaming binders (/shop/binders and /shop/binders/:slug) ─────────
@@ -841,8 +919,8 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
 
 function renderBindersHub() {
   const canonical = `${BASE_URL}/shop/binders`;
-  const title = 'Palms Off Gaming Binders | Zip & Top Loader Binders | CardPop Australia';
-  const description = "Shop the full Palms Off Gaming binder range in Australia — Collector's Series and Stealth zip binders in 4, 9 and 12 pocket layouts, top loader binders and the ring binder.";
+  const title = 'Palms Off Gaming Binders — Zip & Top Loader | CardPop';
+  const description = "Shop the Palms Off Gaming binder range in Australia — Collector's Series and Stealth zip binders in 4, 9 and 12 pockets, top loader binders and the ring binder.";
 
   const itemList = {
     '@context': 'https://schema.org',
@@ -899,6 +977,28 @@ function isEligibleProductLd(ld) { return Boolean(ld && (ld.offers || ld.aggrega
 // Returns the schema.org aggregateRating/review properties for the Product, or
 // {} when there are none or the table isn't there yet: rating markup must only
 // ever describe reviews the page actually shows (components/shop/ProductReviews.jsx).
+// The shop's flat rate + free-shipping threshold for Offer.shippingDetails.
+// platform_settings is admin-only under RLS, so the anon client reads the two
+// keys through shop_shipping_terms() (20261105090739_shop_shipping_terms_rpc.sql).
+// Cached per instance for a minute — the same order as the API's settings
+// cache. Any failure (function not deployed yet, network) quotes the checkout
+// defaults and isn't cached.
+const SHIPPING_TERMS_TTL_MS = 60_000;
+let shippingTermsCache = null;
+async function loadShopShippingTerms(supabaseClient) {
+  if (shippingTermsCache && shippingTermsCache.expires > Date.now()) return shippingTermsCache.terms;
+  try {
+    const { data, error } = await supabaseClient.rpc('shop_shipping_terms');
+    if (error) throw error;
+    const terms = shopShippingTerms(data);
+    shippingTermsCache = { terms, expires: Date.now() + SHIPPING_TERMS_TTL_MS };
+    return terms;
+  } catch (e) {
+    console.error('[prerender] shop shipping terms lookup failed:', e?.message || e);
+    return shopShippingTerms(null);
+  }
+}
+
 async function loadShopReviewLd(supabaseClient, { familySku, productId, slug }) {
   try {
     const poolFor = async () => {
@@ -1011,6 +1111,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
   const { price, rrp, inStock, preorder, isPurchasable, barcode } = await loadShopLineCommerce(
     supabaseClient, { slug: product.slug, sku: product.sku },
   );
+  const shippingTerms = isPurchasable ? await loadShopShippingTerms(supabaseClient) : null;
 
   const productLd = {
     '@context': 'https://schema.org',
@@ -1032,6 +1133,7 @@ async function renderBinderProduct(supabaseClient, slugParam) {
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia™' },
+        shippingDetails: shopShippingDetailsLd(price, shippingTerms),
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -1125,6 +1227,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
   const { price, rrp, inStock, preorder, isPurchasable, barcode } = await loadShopLineCommerce(
     supabaseClient, { slug: product.slug, sku: product.sku },
   );
+  const shippingTerms = isPurchasable ? await loadShopShippingTerms(supabaseClient) : null;
   // Product copy wins where it exists; the product type's shared copy is the
   // fallback. FAQs stay type-level — they are genuinely shared within a type.
   const description = product.metaDescription
@@ -1152,6 +1255,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
         availability: !inStock ? 'https://schema.org/OutOfStock' : preorder ? 'https://schema.org/PreOrder' : 'https://schema.org/InStock',
         itemCondition: 'https://schema.org/NewCondition',
         seller: { '@type': 'Organization', name: 'CardPop Australia\u2122' },
+        shippingDetails: shopShippingDetailsLd(price, shippingTerms),
         hasMerchantReturnPolicy: shopMerchantReturnPolicyLd(),
       },
     } : {}),
@@ -1203,7 +1307,7 @@ async function renderPalmsOffProduct(supabaseClient, categorySlug, productSlug) 
 </main>`;
 
   return htmlDoc({
-    title: `${product.title} | CardPop Australia`,
+    title: brandedTitle(product.seoName || product.title),
     description,
     canonical,
     ogImage: images[0],
@@ -1232,8 +1336,8 @@ const LANDINGS = {
     intro: 'Hand-picked individual cards from the CardPop official store.',
   },
   '/marketplace': {
-    title: 'Buy & Sell Trading Cards Online Australia | CardPop Marketplace', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
-    description: 'Browse Pokémon, Magic: The Gathering, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade, price and more. Free to list — buy and sell trading cards online in Australia.',
+    title: 'Buy & Sell Trading Cards Online Australia | CardPop', h1: 'The Marketplace', breadcrumb: 'Marketplace', source: 'listings',
+    description: 'Browse Pokémon, Magic, Yu-Gi-Oh and sports cards listed by Australian collectors. Filter by game, grade and price. Free to list — buy and sell cards online.',
     intro: "Discover cards directly from other collectors' vaults alongside official CardPop listings.",
   },
 };
@@ -1524,9 +1628,21 @@ function buildEventOffers(event, canonical, startDate) {
   return offers.length === 1 ? offers[0] : offers;
 }
 
-async function renderEventsLanding(supabase, categorySlug) {
+// "Card shows by city" — internal links to every /card-shows/<city> page.
+const eventRegionLinksHtml = (current) => `  <h2>Card shows by city</h2>
+  <ul>
+${EVENT_REGIONS.map((r) => (r.slug === current?.slug
+    ? `    <li>Card shows in ${esc(r.city)}</li>`
+    : `    <li><a href="${BASE_URL}${eventRegionPath(r)}">Card shows in ${esc(r.city)}</a></li>`)).join('\n')}
+  </ul>`;
+
+// `region` (data/eventRegions.js) renders /card-shows/<city>: every upcoming
+// approved event in that state. A city with nothing listed is noindex.
+async function renderEventsLanding(supabase, categorySlug, region = null) {
   const cfg = categorySlug ? EVENT_CATEGORIES[categorySlug] : null;
-  const canonical = categorySlug ? `${BASE_URL}/events/${categorySlug}` : `${BASE_URL}/events`;
+  const regionSeo = region ? eventRegionSeo(region) : null;
+  const canonical = region ? `${BASE_URL}${regionSeo.path}`
+    : categorySlug ? `${BASE_URL}/events/${categorySlug}` : `${BASE_URL}/events`;
   const today = new Date().toISOString().split('T')[0];
 
   let q = supabase
@@ -1535,12 +1651,14 @@ async function renderEventsLanding(supabase, categorySlug) {
     .eq('status', 'approved')
     .gte('start_date', today);
   if (cfg?.type) q = q.eq('event_type', cfg.type);
+  if (region) q = q.eq('state', region.state);
   const { data } = await q.order('start_date', { ascending: true }).limit(100);
   const events = data || [];
 
-  const h1 = cfg ? cfg.h1 : 'Trading Card Events in Australia';
-  const title = cfg ? `${cfg.h1} | CardPop` : 'Trading Card Events, Shows & Expos in Australia | CardPop';
-  const description = cfg
+  const h1 = regionSeo ? regionSeo.heading : cfg ? cfg.h1 : 'Trading Card Events in Australia';
+  const title = regionSeo ? regionSeo.title
+    : cfg ? `${cfg.h1} | CardPop` : 'Trading Card Events, Shows & Expos in Australia | CardPop';
+  const description = regionSeo ? regionSeo.description : cfg
     ? `Upcoming ${cfg.label} for trading card collectors across Australia. Find dates, venues and details on CardPop.`
     : 'Find upcoming trading card shows, expos, tournaments and community events across Australia. Dates, venues and details for Pokémon, Magic, Yu-Gi-Oh and sports card collectors on CardPop.';
 
@@ -1548,7 +1666,7 @@ async function renderEventsLanding(supabase, categorySlug) {
     { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
     { '@type': 'ListItem', position: 2, name: 'Events', item: `${BASE_URL}/events` },
   ];
-  if (cfg) breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: cfg.h1, item: canonical });
+  if (cfg || region) breadcrumbItems.push({ '@type': 'ListItem', position: 3, name: h1, item: canonical });
   const breadcrumb = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
 
   const itemList = {
@@ -1580,16 +1698,22 @@ async function renderEventsLanding(supabase, categorySlug) {
   const imageAlt = firstCover ? (firstCover.title || h1) : 'CardPop — trading card events across Australia';
 
   const bodyHtml = `<main>
-  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a>${cfg ? ` / ${esc(cfg.h1)}` : ''}</nav>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a>${cfg || region ? ` / ${esc(h1)}` : ''}</nav>
   <h1>${esc(h1)}</h1>
   <p>${esc(description)}</p>
-  <h2>Upcoming Events (${events.length})</h2>
+${region ? `  <p>${esc(region.intro)}${region.nearby.length ? ` Includes events in ${esc(region.nearby.join(', '))}.` : ''}</p>\n` : ''}  <h2>Upcoming Events (${events.length})</h2>
   <ul>
 ${itemsHtml || '    <li>No upcoming events listed right now — check back soon.</li>'}
   </ul>
+${eventRegionLinksHtml(region)}
+  <p><a href="${BASE_URL}/list-your-event">Running a card show? List it free on CardPop</a></p>
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogImageAlt: imageAlt, jsonLdItems: [breadcrumb, itemList], bodyHtml });
+  return htmlDoc({
+    title, description, canonical, ogImage: image, ogImageAlt: imageAlt,
+    robots: region && events.length === 0 ? 'noindex, follow' : undefined,
+    jsonLdItems: [breadcrumb, itemList], bodyHtml,
+  });
 }
 
 // The organiser's logo (events.organizer_logo_url) for a crawler: an image
@@ -1599,6 +1723,113 @@ function organiserLogoHtml(event) {
   const url = safeLogoUrl(event.organizer_logo_url);
   if (!url || isVideoLogoUrl(url)) return '';
   return `<p><img src="${esc(url)}" alt="${esc(logoAltText(event))}" loading="lazy" /></p>`;
+}
+
+// ── Event organiser pages (/events/organisers/<slug>) ──────────────────────
+// Mirrors pages/community/EventOrganiserPage.jsx: the organiser's name and
+// logo plus every public event whose organizer_name names them (co-hosted
+// events included — namesOrganiser() keeps only whole-name matches, exactly
+// as the SPA does). An organiser with no public events is noindex, as in the
+// SPA; an unknown slug is a real 404.
+async function renderEventOrganiser(supabase, slug) {
+  const canonical = `${BASE_URL}/events/organisers/${encodeURIComponent(slug)}`;
+  const { data: org } = await supabase
+    .from('event_organisers')
+    .select('id, name, slug, logo_url')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!org) {
+    return notFound({
+      title: 'Organiser Not Found | CardPop Events',
+      description: 'This event organiser could not be found on CardPop.',
+      canonical,
+      bodyHtml: '<main><h1>Organiser Not Found</h1><p>This organiser page doesn’t exist or has moved.</p></main>',
+    });
+  }
+
+  const { data: rows } = await supabase
+    .from('events')
+    .select(EVENT_FIELDS)
+    .in('status', ['approved', 'completed'])
+    .ilike('organizer_name', ilikeContains(org.name))
+    .order('start_date', { ascending: false })
+    .limit(200);
+  const events = (rows || []).filter((e) => namesOrganiser(e.organizer_name, org.name));
+
+  const today = new Date().toISOString().split('T')[0];
+  const upcoming = [];
+  const past = [];
+  for (const ev of events) {
+    const last = ev.end_date || ev.start_date || '';
+    if (ev.status === 'approved' && last >= today) upcoming.push(ev); else past.push(ev);
+  }
+  upcoming.sort((a, b) => String(a.start_date).localeCompare(String(b.start_date)));
+
+  const name = org.name;
+  const title = `${name} — Card Shows & Events | CardPop`;
+  const description = `Card shows and trading card events hosted by ${name}: ${upcoming.length} upcoming and ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop.`;
+  const logo = safeLogoUrl(org.logo_url) && !isVideoLogoUrl(org.logo_url) ? safeLogoUrl(org.logo_url) : undefined;
+
+  const breadcrumb = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: 'Events', item: `${BASE_URL}/events` },
+      { '@type': 'ListItem', position: 3, name, item: canonical },
+    ],
+  };
+  const organisation = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name,
+    url: canonical,
+    ...(logo ? { logo } : {}),
+  };
+  const jsonLdItems = [breadcrumb, organisation];
+  if (upcoming.length) {
+    jsonLdItems.push({
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: `Upcoming events by ${name}`,
+      numberOfItems: upcoming.length,
+      itemListElement: upcoming.map((ev, i) => {
+        const { '@context': _c, ...item } = buildEventLd(ev);
+        return { '@type': 'ListItem', position: i + 1, item };
+      }),
+    });
+  }
+
+  const itemHtml = (ev) => {
+    const when = eventDateLine(ev);
+    const where = eventLocationLine(ev);
+    return `    <li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}"><strong>${esc(ev.title || 'Event')}</strong></a>`
+      + `${when ? ` — ${esc(when)}` : ''}${where ? ` (${esc(where)})` : ''}</li>`;
+  };
+  const listSection = (h2, list) => (list.length
+    ? `  <section>\n  <h2>${esc(h2)} (${list.length})</h2>\n  <ul>\n${list.map(itemHtml).join('\n')}\n  </ul>\n  </section>`
+    : '');
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
+  ${logo ? `<p><img src="${esc(logo)}" alt="${esc(name)} logo" loading="lazy" /></p>` : ''}
+  <p>Event organiser</p>
+  <h1>${esc(name)}</h1>
+  <p>${esc(description)}</p>
+${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
+  <p><a href="${BASE_URL}/events">Browse all trading card events in Australia</a></p>
+</main>`;
+
+  return htmlDoc({
+    title,
+    description,
+    canonical,
+    ogImage: logo || `${BASE_URL}/og-image.jpg`,
+    ogImageAlt: logo ? `${name} logo` : 'CardPop — trading card events across Australia',
+    robots: events.length ? undefined : 'noindex, follow',
+    jsonLdItems,
+    bodyHtml,
+  });
 }
 
 async function renderEvent(supabase, param) {
@@ -1642,10 +1873,39 @@ async function renderEvent(supabase, param) {
     ],
   };
 
+  // A finished event links its next edition (utils/eventNextEdition.js) —
+  // the same banner the SPA shows — so last edition's search equity flows
+  // to the new dated page instead of dead-ending.
+  const today = new Date().toISOString().split('T')[0];
+  const lastDay = String(event.end_date || event.start_date || '').slice(0, 10);
+  const isPast = event.status === 'completed' || (Boolean(lastDay) && lastDay < today);
+  let nextEdition = null;
+  if (isPast) {
+    const { data: upcoming } = await supabase
+      .from('events')
+      .select(NEXT_EDITION_COLUMNS)
+      .eq('status', 'approved')
+      .gte('start_date', today)
+      .order('start_date', { ascending: true })
+      .limit(NEXT_EDITION_SCAN_LIMIT);
+    nextEdition = pickNextEdition(event, upcoming || [], today);
+  }
+  const region = eventRegionByState(event.state);
+  let nextEditionHtml = '';
+  if (nextEdition) {
+    const nextWhen = eventDateLine(nextEdition);
+    const nextWhere = eventLocationLine(nextEdition);
+    nextEditionHtml = `<p><strong>This event has finished.</strong> Next edition: <a href="${BASE_URL}/events/${esc(nextEdition.slug || nextEdition.id)}">${esc(nextEdition.title || 'Upcoming event')}</a>`
+      + `${nextWhen ? ` — ${esc(nextWhen)}` : ''}${nextWhere ? ` (${esc(nextWhere)})` : ''}</p>`;
+  } else if (isPast) {
+    nextEditionHtml = `<p><strong>This event has finished.</strong>${region ? ` See <a href="${BASE_URL}${eventRegionPath(region)}">upcoming card shows in ${esc(region.city)}</a>.` : ''}</p>`;
+  }
+
   const feeLine = event.is_free ? 'Free entry' : (event.entry_fee_aud > 0 ? `Entry: A$${Number(event.entry_fee_aud).toFixed(2)}` : '');
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
   <h1>${esc(name)}</h1>
+  ${nextEditionHtml}
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
   <ul>
     ${when ? `<li>Date: ${esc(when)}</li>` : ''}
@@ -1661,6 +1921,7 @@ async function renderEvent(supabase, param) {
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
   ${organiserLinksHtml(event)}
+  ${region ? `<p><a href="${BASE_URL}${eventRegionPath(region)}">More card shows in ${esc(region.city)}</a></p>` : ''}
 </main>`;
 
   return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...videoLds], bodyHtml });
@@ -1680,6 +1941,17 @@ const LOCAL_GRADERS_SPORTS = [
   { text: '2. TCG Grading, Australia-wide — The broadest sports acceptance of any local grader: NRL, AFL, NBA, FIFA and F1 alongside TCG. Custom labels and sub-grade lookup.' },
   { text: '3. Premier Card Grading (PCG), Australia-wide — Accepts modern licensed sports cards. Express option ($60, 5 business days) is among the fastest local sports turnarounds.' },
 ];
+// One section per grading company listing the Australian partners that submit to
+// it — the bot copy of the "Grade with <company>" lists. Rendered from the seed
+// (data/gradingPartnersSeed.js); admin edits in the table reach the SPA only.
+const GRADING_PARTNER_SECTIONS = GRADING_COMPANIES.map((g) => {
+  const rows = partnersForCompany(GRADING_PARTNERS_SEED, g.key);
+  const paras = [g.submit?.note].filter(Boolean);
+  if (!rows.length) paras.push(`No Australian partner for ${g.name} is listed yet.`);
+  return { h2: `Grade with ${g.name} from Australia`, paras, items: rows.map((r) => ({ text: partnerLineText(r) })) };
+});
+const GRADING_PARTNER_INTRO = 'These Australian stores and services take your cards, handle the packaging, international shipping, insurance and customs, and return the graded slabs — you deal in AUD with someone local. Each list below is the partners that submit to that company.';
+
 const WHY_LOCAL_BULLETS = [
   { text: 'Transparent criteria — published grading standards and sub-grades.' },
   { text: 'Tamper-evident slabs — protection that buyers and sellers trust.' },
@@ -1702,7 +1974,7 @@ const LOCAL_DISCLAIMER = 'CardPop is not affiliated with any grading service or 
 const STATIC_CONTENT = {
   '/grading': {
     title: "Grading Hub | CardPop — Australia's Card Grading Resource",
-    description: "Australia's go-to trading card grading resource. Compare PSA, BGS, CGC and ACE Grading, understand condition scales, and learn how to maximise the value of your collection.",
+    description: "Australia's trading card grading resource. Compare PSA, BGS, CGC and ACE Grading, understand condition scales and learn how grading adds value to a collection.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Grading', path: '/grading' }],
     h1: 'The Grading Handbook',
     intro: "An Australian collector's guide, from your very first raw card to a sealed, graded slab. Six chapters take you from curious beginner to confident submitter.",
@@ -1801,20 +2073,8 @@ const STATIC_CONTENT = {
     h1: 'Grading Companies',
     intro: 'Compare the top third-party grading services like PSA, BGS, CGC and ACE. Learn their histories, scales and specialised features, and find the Australian submission partners who handle shipping and customs for you.',
     sections: [
-      { h2: 'Beckett (BGS) submission partners', paras: ['Beckett provides four sub-scores (centering, corners, edges, surface) alongside an overall grade, and is especially popular for high-value sports and premium TCG chases. These Australian partners handle packaging, international shipping and customs on your behalf.'], items: [
-        { text: 'Cherry Collectables — Australia’s exclusive Beckett submission partner, with Melbourne drop-off or mail-in.' },
-        { text: 'Graded Cards Australia — authorised BGS partner; cards appear in the official BGS Population Report. Accepts AFL, NBA and Pokémon.' },
-        { text: 'SLABD — fully insured Beckett submission handling all international shipping and customs.' },
-        { text: 'Slabbys — BGS submission with four tiers from Base ($45) to Priority ($500), sub-grades included, fully tracked and insured.' },
-        { text: 'The Card Spot — monthly BGS batch submissions dispatched the first week of each month.' },
-      ] },
-      { h2: 'PSA submission partners', paras: ['PSA is the world’s most recognised grading company and typically commands the highest resale premiums, especially for US-market sales. These authorised Australian dealers handle shipping, insurance, customs and tracking so you deal in AUD only.'], items: [
-        { text: 'The Hobby — Australia’s first PSA Certified Dealer in the Southern Hemisphere (since 2016). Grades TCG and sports including AFL and Pokémon.' },
-        { text: 'Slabbys — full-service PSA & Beckett submission with 7-stage tracking, fully insured, 12 PSA tiers from Value Bulk ($48).' },
-        { text: 'SLABD — Australian-based, fully insured PSA and BGS submission with clear tiered pricing.' },
-        { text: 'Cherry Collectables — PSA submission with Melbourne drop-off or mail-in; accepts TCG and AFL/sports.' },
-        { text: 'Mana Market — Gold Coast-based PSA Registered Dealer, ideal for Queensland collectors, with in-store drop-off.' },
-      ] },
+      { h2: 'Australian submission partners', paras: [GRADING_PARTNER_INTRO] },
+      ...GRADING_PARTNER_SECTIONS,
       { h2: 'Quick comparison', items: [
         { text: 'PSA — best for Pokémon and sports; 20–150 days; from about $25 USD.' },
         { text: 'BGS — best for all TCG and vintage; 15–90 days; from about $22 USD.' },
@@ -1842,10 +2102,10 @@ const STATIC_CONTENT = {
 
   '/grading/submission-partners': {
     title: 'Submission Partners — Australian Card Grading Services | CardPop',
-    description: 'Trusted Australian card grading submission partners for TCG and sports cards. AUD pricing, no customs, faster turnarounds than PSA or Beckett. Compare CGA, TCG Grading, ARK Grading, ACG, and PCG.',
+    description: 'Australian stores that submit your cards to PSA, Beckett, CGC, ACE, SGC and TAG, plus local graders for TCG and sports cards. AUD pricing, no customs hassle.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Grading', path: '/grading' }, { name: 'Submission Partners', path: '/grading/submission-partners' }],
     h1: 'Submission Partners',
-    intro: 'Trusted Australian grading services for TCG and sports cards — AUD pricing, no customs hassle, and faster returns than international submissions.',
+    intro: 'Australian stores that submit your cards to PSA, Beckett, CGC, ACE, SGC and TAG for you, plus trusted local graders — AUD pricing, no customs hassle, and someone nearby to hand cards to.',
     sections: [
       { h2: 'How to submit', items: [
         { text: 'Choose your grader — pick a partner below based on card type, turnaround and budget, and check their site for current pricing and submission windows.' },
@@ -1853,8 +2113,10 @@ const STATIC_CONTENT = {
         { text: 'Ship securely — use a rigid outer box with bubble wrap, mark "Do Not Bend", insure for the estimated value and keep your tracking number.' },
         { text: 'Receive your slabs — most local partners return graded cards within 2–8 weeks; check for slab damage on arrival before listing or storing.' },
       ] },
-      { h2: 'Australian partners — TCG', items: LOCAL_GRADERS_TCG },
-      { h2: 'Australian partners — sports cards', items: LOCAL_GRADERS_SPORTS },
+      { h2: 'Submit to PSA, Beckett, CGC, ACE, SGC or TAG', paras: [GRADING_PARTNER_INTRO] },
+      ...GRADING_PARTNER_SECTIONS,
+      { h2: 'Australian local graders — TCG', items: LOCAL_GRADERS_TCG },
+      { h2: 'Australian local graders — sports cards', items: LOCAL_GRADERS_SPORTS },
       { h2: 'Why submit locally in Australia?', paras: [WHY_LOCAL_PARA], items: WHY_LOCAL_BULLETS },
       { h2: 'Disclaimer', paras: [LOCAL_DISCLAIMER] },
     ],
@@ -1863,10 +2125,10 @@ const STATIC_CONTENT = {
 
   '/grading/estimator': {
     title: "Card Grade Estimator | CardPop — AI Grading Guide for Australian Collectors",
-    description: 'Upload photos of your trading card and get AI-powered preliminary grade estimates across PSA, BGS, CGC, ACE, and SGC. A guide only — always consult a professional grader.',
+    description: 'Upload photos of your trading card and get AI-powered preliminary grade estimates across PSA, BGS, CGC, ACE, SGC and TAG. A guide only — always consult a professional grader.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Grading', path: '/grading' }, { name: 'Grade Estimator', path: '/grading/estimator' }],
     h1: 'Grade Estimator',
-    intro: 'Upload photos of your trading card and receive AI-generated preliminary grade estimates across five major grading services. A guide to help you self-assess before professional submission.',
+    intro: 'Upload photos of your trading card and receive AI-generated preliminary grade estimates across six major grading services, each with a link to the Australian partners that submit to that company. A guide to help you self-assess before professional submission.',
     sections: [
       { h2: 'Preliminary estimate only', paras: ['This tool provides AI-generated grade estimates as a preliminary guide only. Results may vary significantly from professional grades. Always examine your card physically and consult a qualified grading professional before submitting. CardPop Australia accepts no liability for actual grades returned or any financial outcome.'] },
       { h2: 'How it works', items: [
@@ -1882,7 +2144,7 @@ const STATIC_CONTENT = {
         { text: 'SGC — Sportscard Guaranty Corporation.' },
       ] },
     ],
-    links: [{ text: 'Grading Scales', href: '/grading/scales' }, { text: 'Compare Companies', href: '/grading/companies' }, { text: 'Local Graders (AU)', href: '/grading/local-graders' }],
+    links: [{ text: 'Grade with PSA', href: gradingPartnersPath('psa') }, { text: 'Grade with BGS', href: gradingPartnersPath('bgs') }, { text: 'Grade with CGC', href: gradingPartnersPath('cgc') }, { text: 'Grade with ACE', href: gradingPartnersPath('ace') }, { text: 'Grade with SGC', href: gradingPartnersPath('sgc') }, { text: 'Grade with TAG', href: gradingPartnersPath('tag') }, { text: 'Grading Scales', href: '/grading/scales' }, { text: 'Compare Companies', href: '/grading/companies' }, { text: 'Local Graders (AU)', href: '/grading/local-graders' }],
   },
 
   '/grading/roi-calculator': {
@@ -1980,7 +2242,7 @@ const STATIC_CONTENT = {
 
   '/faq': {
     title: 'FAQ | CardPop Australia™ — Trading Card Marketplace',
-    description: "Answers to common questions about buying, selling and trading on CardPop™ — Australia's trusted trading card marketplace. Learn about fees, the Vault, trades, and payments.",
+    description: "Answers to common questions about buying, selling and trading on CardPop™, Australia's trading card marketplace — fees, the Vault, trades and payments.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'FAQ', path: '/faq' }],
     h1: 'Frequently Asked Questions',
     intro: 'Find answers to common questions about buying, selling, and vaulting on CardPop™.',
@@ -1999,15 +2261,15 @@ const STATIC_CONTENT = {
   },
 
   '/safe-buying': {
-    title: "Safe Buying — Australia's Safest Place to Buy Trading Cards | CardPop™",
-    description: `Buy Pokémon, Magic and sports cards safely in Australia. CardPop protects every order with secure Stripe payments (PCI-DSS), ID-verified sellers via Stripe Identity, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described or doesn't arrive.`,
+    title: "Safe Buying — Buy Trading Cards Safely | CardPop™",
+    description: `Buy cards safely in Australia: Stripe payments, ID-verified sellers and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if not as described.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Safe Buying', path: '/safe-buying' }],
     h1: 'Why CardPop Is Safe: Buyer Protection & Secure Payments',
     intro: 'Buying trading cards online should never feel like a gamble. CardPop™ is built to be Australia’s safest place to buy Pokémon, Magic: The Gathering, Yu-Gi-Oh! and sports cards — every order is paid securely, backed by buyer protection, and handled by identity-verified members.',
     // Keep in step with pages/info/SafeBuyingPage.jsx — no cloaking.
     sections: [
       { h2: 'Every payment is secure', paras: [
-        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay, all in Australian dollars.',
+        'All purchases are processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Your card details are entered on Stripe’s encrypted checkout and never touch CardPop’s servers. You can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay, all in Australian dollars.',
       ] },
       { h2: 'Buyer protection on every order', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
       { h2: 'You only trade with verified people', paras: [
@@ -2075,7 +2337,7 @@ const STATIC_CONTENT = {
 
   '/returns': {
     title: 'Returns & Refund Policy | CardPop',
-    description: `CardPop's returns policy — ${SHOP_RETURN_POLICY.windowDays}-day returns and exchanges on new CardPop Shop products, and ${MP.name}: a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery when a marketplace card isn't as described or doesn't arrive.`,
+    description: `CardPop returns: ${SHOP_RETURN_POLICY.windowDays}-day returns on new Shop products, and ${MP.name} — a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery if a card isn't as described.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Returns & Refunds', path: '/returns' }],
     h1: 'Returns & Refunds',
     intro: 'How returns, exchanges and refunds work for CardPop Shop products and cards bought from other collectors on the marketplace.',
@@ -2113,8 +2375,8 @@ const STATIC_CONTENT = {
       { h2: 'CardPop Shop orders', items: [
         { text: 'Orders under $100: $15 flat-rate tracked shipping, charged once per order.' },
         { text: 'Orders of $100 or more: free tracked shipping.' },
-        { text: 'Dispatch: within 2 business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout).' },
-        { text: 'Delivery: typically 3–7 business days with Australia Post, depending on where you are.' },
+        { text: `Dispatch: within ${SHOP_DELIVERY_TIMES.dispatchBusinessDays} business days of your order (pre-orders ship when stock arrives — the estimate is shown on the product and at checkout).` },
+        { text: `Delivery: typically ${SHOP_DELIVERY_TIMES.transitMinBusinessDays}–${SHOP_DELIVERY_TIMES.transitMaxBusinessDays} business days with Australia Post, depending on where you are.` },
       ], paras: ['The $100 threshold is based on the CardPop Shop items in your cart. All prices include GST.'] },
       { h2: 'Marketplace cards (bought from other collectors)', items: [
         { text: 'Postage: set by each seller and shown on the listing and in your cart before you pay; many sellers offer free postage.' },
@@ -2123,7 +2385,7 @@ const STATIC_CONTENT = {
         { text: 'If it goes missing: a tracked parcel that never arrives is the seller’s loss, not yours — see Buyer Protection on the Returns page.' },
       ] },
       { h2: 'Carriers and tracking', paras: [`Tracking links on CardPop support ${Object.values(CARRIERS).filter((c) => c.trackUrl).map((c) => c.label).join(', ')}. Every shipped order shows its carrier and tracking number in My Account → Orders, and the shipped email carries the same link.`] },
-      { h2: 'Where we ship', paras: ['We currently ship to Australian addresses only, and accept payment from Australian-issued cards and PayPal.'] },
+      { h2: 'Where we ship', paras: ['We currently ship to Australian addresses only, and accept payment from Australian-issued cards.'] },
       { h2: 'Packaging standards', paras: ['Single cards are shipped in a penny sleeve and top loader (or team bag), secured between rigid cardboard to prevent bending in transit. Graded cards are shipped in protective sleeves with bubble wrap. Sealed product is boxed, not bagged. Sellers are held to the same standard — a card that arrives damaged because it was poorly packed is covered by Buyer Protection.'] },
     ],
     links: [{ text: 'Returns & Refunds', href: '/returns' }],
@@ -2131,13 +2393,13 @@ const STATIC_CONTENT = {
 
   '/trust-safety': {
     title: 'Trust & Safety | CardPop™',
-    description: `How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`,
+    description: `How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, and ID-verified sellers.`,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Trust & Safety', path: '/trust-safety' }],
     h1: 'Trust & Safety',
     intro: 'Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe.',
     // Keep in step with pages/info/TrustSafetyPage.jsx — no cloaking.
     sections: [
-      { h2: 'Secure payments', paras: ['Every purchase on CardPop is processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.'] },
+      { h2: 'Secure payments', paras: ['Every purchase on CardPop is processed by Stripe, a globally certified PCI-DSS Level 1 payment provider. Card details are entered inside Stripe’s encrypted, hosted checkout — they never touch or pass through CardPop’s servers. At checkout you can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay.'] },
       { h2: 'Buyer protection', paras: [PROTECTION_COPY.marketplaceSummary, PROTECTION_COPY.notShippedSummary] },
       { h2: 'Seller protection', paras: ['Sellers are protected against fraudulent chargebacks and false claims. Ship to the buyer’s checkout address with tracking (signature on delivery for high-value cards), mark the order posted with the tracking number, and you’re covered — a would-be scammer can’t claim “item not received” against a tracked, delivered parcel. A sale is binding, so a buyer can’t return a card that matches its listing because they changed their mind.'] },
       { h2: 'Verified identity', paras: ['Real people stand behind every account. Before anyone can sell, they verify their identity through Stripe Identity: a photograph of a government-issued ID and a matching selfie. Buyers need a free account for any marketplace card and complete the same one-time check for larger orders. Stripe performs the check and confirms the match — CardPop never stores your document images.'] },
@@ -2145,7 +2407,7 @@ const STATIC_CONTENT = {
     ],
     faqs: [
       { q: 'Is my card information safe on CardPop?', a: 'Yes. Payments are processed by Stripe, a PCI-DSS Level 1 certified provider. Card details are entered inside Stripe’s encrypted checkout and are never stored on or transmitted through CardPop’s servers.' },
-      { q: 'What payment methods can I use?', a: 'At checkout you can pay with Visa, Mastercard, American Express, PayPal, Apple Pay or Google Pay.' },
+      { q: 'What payment methods can I use?', a: 'At checkout you can pay with Visa, Mastercard, American Express, Apple Pay or Google Pay.' },
       { q: 'What happens if my card never arrives or is not as described?', a: `You’re covered by ${MP.name}. Report it from My Account → Orders within ${MP.claimWindowDaysFromDelivery} days of delivery (or after ${MP.notShippedClaimAfterDays} days if the seller never posts it). If the card is significantly not as described, damaged, counterfeit or missing, you’re refunded in full — the card, postage and every fee — to your original payment method.` },
       { q: 'Can I return a marketplace card if I change my mind?', a: 'No. A marketplace sale is binding once the card is as advertised — you’re buying from another collector, not a shop. Change-of-mind returns apply to new CardPop Shop products only.' },
       { q: 'When do I have to verify my ID?', a: 'To sell, always. To buy a marketplace card, you need a free account; a one-time Stripe Identity check (government ID plus a matching selfie) is asked for on larger marketplace orders. Stripe performs the check and CardPop never stores your document images.' },
@@ -2173,7 +2435,7 @@ const STATIC_CONTENT = {
 
   '/community': {
     title: 'Community Hub | CardPop',
-    description: 'The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, the community map, card shows and events, Whatnot shows and The Parallel Report.',
+    description: 'The home for Australian trading card collectors: forum, leaderboard, collector profiles, local traders, card shows, Whatnot shows and The Parallel Report.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Community', path: '/community' }],
     h1: 'Community Hub',
     intro: 'A home for collectors. Talk cards on the forum, climb the monthly leaderboard, find traders and shows near you, and keep up with The Parallel Report — all in one place.',
@@ -2254,18 +2516,6 @@ const STATIC_CONTENT = {
     links: [{ text: 'Grading Hub', href: '/grading' }, { text: 'Browse the Marketplace', href: '/marketplace' }],
   },
 
-  '/insider-trading': {
-    title: 'Partner Deals | CardPop',
-    description: 'Shop with CardPop\'s trusted partner retailers and support the platform — deals on trading cards and accessories for Australian collectors.',
-    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Partner Deals', path: '/insider-trading' }],
-    h1: 'Partner Deals',
-    intro: 'Support CardPop Australia by shopping with our trusted affiliate partners. Get the best deals on premium trading cards and accessories from retailers vetted by the CardPop team.',
-    sections: [
-      { h2: 'Trusted partner retailers', paras: ['Browse curated affiliate partners offering premium trading cards, sealed product and accessories to Australian collectors.'] },
-    ],
-    links: [{ text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'The Shop', href: '/shop' }],
-  },
-
   '/analytics': {
     title: 'Card Market Analytics | CardPop',
     description: 'Track trading card market prices and trends for Pokemon, Magic: The Gathering, Yu-Gi-Oh and more in Australia.',
@@ -2320,12 +2570,31 @@ const STATIC_CONTENT = {
     links: [{ text: 'Apply as Partner', href: '/partners/apply' }, { text: 'Card Shop Directory', href: '/card-shops' }],
   },
 
+  // Organiser landing page — copy shared with pages/community/ListYourEventPage.jsx.
+  '/list-your-event': {
+    title: LIST_EVENT_SEO.title,
+    description: LIST_EVENT_SEO.description,
+    breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Events', path: '/events' }, { name: 'List your event', path: '/list-your-event' }],
+    h1: LIST_EVENT_HERO.h1,
+    intro: LIST_EVENT_HERO.intro,
+    sections: [
+      ...LIST_EVENT_TIERS.map((t) => ({
+        h2: `${t.name} (${t.price})`,
+        paras: [t.summary],
+        items: t.points.map((text) => ({ text })),
+      })),
+      { h2: 'How it works', items: LIST_EVENT_STEPS.map(({ step, body }) => ({ text: `${step}: ${body}` })) },
+    ],
+    faqs: LIST_EVENT_FAQS,
+    links: [{ text: 'Submit your event', href: SUBMIT_EVENT_PATH }, { text: 'Events calendar', href: '/events' }],
+  },
+
   // Keep pricing copy in sync with config/plans.js + config/subscription.js
   // (monthly listing limits 5/15/30/50/unlimited, prices $20/$40/$80/$150 AUD,
   // 30-day trial).
   '/pricing': {
     title: 'Pricing — Hobby, Pro, Premium, Elite & Ultimate | CardPop',
-    description: 'CardPop is free to join. Buy instantly, and sell once your ID is verified — paying only a small fee per sale. Upgrade to Pro, Premium, Elite or Ultimate for more monthly listings, your own store page and premium display styles.',
+    description: 'CardPop is free to join. Buy instantly and sell once your ID is verified, for a small fee per sale. Upgrade for more listings, a store page and premium styles.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }],
     h1: 'Simple, fair pricing',
     intro: 'Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Upgrade when you want more monthly listings, your own store page and the premium showcase styles.',
@@ -2443,6 +2712,90 @@ const STATIC_CONTENT = {
     ],
     links: [{ text: 'Card Shop Directory', href: '/card-shops' }, { text: 'Upcoming Events', href: '/events' }, { text: 'List Your Store', href: '/card-shops/add' }],
   },
+};
+
+// Per-company grading scales (/grading/scales/psa …) — built from the same
+// data the SPA page renders (data/gradingScales.js), so the crawler copy can't
+// drift from what people see. /grading/guide/:scale is an SPA alias whose
+// canonical points here, so only these URLs are prerendered and advertised.
+for (const slug of GRADING_SCALE_SLUGS) {
+  const company = GRADING_SCALES[slug];
+  const others = GRADING_SCALE_SLUGS.filter((s) => s !== slug);
+  STATIC_CONTENT[`/grading/scales/${slug}`] = {
+    title: `${company.name} Grading Scale — ${company.full} | CardPop Grading Hub`,
+    description: `Complete ${company.name} grading scale breakdown for Australian collectors. Learn what each ${company.name} grade means and how to maximise your submission results.`,
+    breadcrumb: [
+      { name: 'Home', path: '/' },
+      { name: 'Grading', path: '/grading' },
+      { name: 'Grading Scales', path: '/grading/scales' },
+      { name: `${company.name} Grading Scale`, path: `/grading/scales/${slug}` },
+    ],
+    h1: `${company.name} Grading Scale — ${company.full}`,
+    intro: company.intro,
+    sections: [
+      { h2: `The ${company.name} grades`, items: company.scales.map((g) => ({ text: `${company.name} ${g.grade} — ${g.label}: ${g.condition}` })) },
+      { h2: `${company.name} for Australian collectors`, paras: [company.auNote] },
+    ],
+    links: [
+      ...others.map((s) => ({ text: `${GRADING_SCALES[s].name} Grading Scale`, href: `/grading/scales/${s}` })),
+      { text: 'All Grading Scales', href: '/grading/scales' },
+      { text: 'Compare Grading Companies', href: '/grading/companies' },
+      { text: 'Grade Estimator', href: '/grading/estimator' },
+      { text: `Grade with ${company.name}`, href: gradingPartnersPath(slug) },
+    ],
+  };
+}
+
+// The Conviction Rating explainer (pages/info/ConvictionRatingPage.jsx), from
+// the same level/type tables the article badges use (utils/convictionRating.js).
+STATIC_CONTENT['/conviction-rating'] = {
+  title: 'The CardPop Conviction Rating Explained | CardPop',
+  description: "What CardPop's 1–5 Conviction Rating means: the five strength levels, the four rating types (Buy, Keeper, Grade, Impact) and what each level implies.",
+  breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Conviction Rating', path: '/conviction-rating' }],
+  h1: 'The CardPop Conviction Rating',
+  intro: 'Anyone can say a card is “a good buy.” The CardPop Conviction Rating puts a number on it — a single, honest measure of how strongly our research stands behind the central call of an article. It’s the same scale on every piece, so a “4” on one article means the same thing as a “4” on the next.',
+  sections: [
+    { h2: 'It measures strength, not direction', paras: [
+      'The rating is one-directional: it runs from weak conviction to strong conviction. A high number does not automatically mean “price going up” — it means “we’re highly confident in the call this article is making.” A low number isn’t a failure either: a well-argued “we looked, and we’d pass” is one of the most valuable things we can tell you.',
+      'Because we publish the full range — including the low end — the ratings build a track record you can judge us on.',
+    ] },
+    { h2: 'The five levels', items: CONVICTION_LEVELS.filter(Boolean).map((l) => ({ text: `${l.value} — ${l.label}: ${l.blurb}` })) },
+    ...CONVICTION_TYPE_KEYS.map((key) => {
+      const t = CONVICTION_TYPES[key];
+      return {
+        h2: t.name,
+        paras: [t.question],
+        items: CONVICTION_LEVELS.filter(Boolean).map((l) => ({ text: `${l.value} — ${l.label}: ${t.actions[l.value]}` })),
+      };
+    }),
+    { h2: 'What it is — and isn’t', items: [
+      { text: 'It is our honest, on-the-record read at the time of writing.' },
+      { text: 'It is a starting point for your own research, not a substitute for it.' },
+      { text: 'It isn’t financial advice, a price prediction, or a guarantee.' },
+      { text: 'It isn’t static — markets move, and each article states its own time horizon.' },
+    ], paras: ['Educational and how-to articles carry no rating — there’s no call to make, so they show a read-time cue instead.'] },
+  ],
+  links: [{ text: 'Read the latest CardPop research', href: '/blog' }, { text: 'Card Price Guide', href: '/prices' }],
+};
+
+// The card scanner (pages/ScanPage.jsx) — an interactive tool, so the crawler
+// copy is the page's own hero text plus what the tool does.
+STATIC_CONTENT['/scan'] = {
+  title: 'Card Scanner — Free Price Check | CardPop Australia™',
+  description: 'Scan any trading card or graded slab with your camera and get an instant identification and live AUD price check. Pokémon, sports cards, TCGs — free with a CardPop account.',
+  breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Card Scanner', path: '/scan' }],
+  h1: 'Scan any card. Know what it’s worth.',
+  intro: 'Point your camera at a raw card or a graded slab. CardPop identifies it and checks live market prices in AUD — then lists it for sale in a couple of clicks.',
+  sections: [
+    { h2: 'How the card scanner works', items: [
+      { text: 'Take or upload a photo of the card — front on, filling the frame, in even light.' },
+      { text: 'CardPop reads the card: name, set, card number and year, plus the grading company, grade and cert number on a slab.' },
+      { text: 'The card is matched against the catalogue and checked against live market prices, shown in AUD.' },
+      { text: 'List it on the CardPop marketplace straight from the result, with the details already filled in.' },
+    ] },
+    { h2: 'What it scans', paras: ['Pokémon, sports cards and other TCGs — raw cards or graded slabs. Scanning is free with a CardPop account.'] },
+  ],
+  links: [{ text: 'Card Price Guide', href: '/prices' }, { text: 'Grade Estimator', href: '/grading/estimator' }, { text: 'Browse the Marketplace', href: '/marketplace' }],
 };
 
 // Ordered list -> XML/HTML helpers for the static renderer.
@@ -2783,7 +3136,7 @@ ${tipsHtml ? `  <section>\n  <h2>Collector tips</h2>\n  <ul>\n${tipsHtml}\n  </u
 async function renderBlogIndex(supabase) {
   const canonical = `${BASE_URL}/blog`;
   const title = 'The Parallel Report | CardPop';
-  const description = 'The Parallel Report by CardPop — trading card news, market analysis, grading guides and investment insights for Australian Pokémon, MTG and sports card collectors.';
+  const description = 'The Parallel Report by CardPop — trading card news, market analysis and grading guides for Australian Pokémon, MTG and sports card collectors.';
 
   const { data } = await supabase
     .from('blog_articles')
@@ -2960,7 +3313,7 @@ async function renderPricesHub(supabase, categorySlug) {
     : 'Trading Card Prices in AUD | CardPop';
   const description = categoryLabel
     ? `Live Australian-dollar market prices for ${categoryLabel} trading cards — raw and graded averages updated daily from live listings.`
-    : 'Live Australian-dollar market prices for Pokémon, NBA, One Piece, AFL and NRL trading cards. Raw and graded averages updated daily.';
+    : 'Live Australian-dollar prices for Pokémon, NBA, One Piece, AFL and NRL cards. Raw and graded averages updated daily — no USD conversion guesswork.';
 
   const grouped = {};
   for (const card of cards || []) (grouped[card.category] ||= []).push(card);
@@ -3828,8 +4181,28 @@ async function renderStoresCity(supabase, citySlug) {
     .order('name')
     .limit(200);
 
-  const title = `Card Shops in ${cityInfo.label} — Pokémon, TCG & Sports Card Stores | CardPop`;
-  const description = `Find trading card shops in ${cityInfo.label}, ${cityInfo.state}: local stores for Pokémon, sports cards, One Piece and other TCGs, plus upcoming card shows near ${cityInfo.label}.`;
+  // Same copy as the SPA page (utils/cardShopSeo.js), and the same upcoming
+  // events and FAQ — the bot document used to list the stores only.
+  const today = new Date().toISOString().split('T')[0];
+  const { data: upcoming } = await supabase
+    .from('events')
+    .select('id, slug, title, start_date, end_date, venue_name, suburb, state')
+    .eq('status', 'approved')
+    .eq('state', cityInfo.state)
+    .gte('start_date', today)
+    .order('start_date', { ascending: true })
+    .limit(6);
+  const events = upcoming || [];
+  const storeCount = (stores || []).length;
+  const title = cardShopCityTitle(cityInfo.label, storeCount);
+  const description = cardShopCityDescription(cityInfo.label, cityInfo.state, storeCount);
+  const faqs = cardShopCityFaqs(cityInfo.label, cityInfo.state);
+  const showsRegion = eventRegionByState(cityInfo.state);
+  const eventItems = events.map((ev) => {
+    const when = eventDateLine(ev);
+    const where = [ev.venue_name, ev.suburb].filter(Boolean).join(', ');
+    return `<li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}">${esc(ev.title || 'Card event')}</a>${when ? ` — ${esc(when)}` : ''}${where ? ` (${esc(where)})` : ''}</li>`;
+  }).join('\n');
 
   const storeItems = (stores || []).map((store) => {
     const line = [store.suburb, store.state].filter(Boolean).join(', ');
@@ -3866,8 +4239,12 @@ async function renderStoresCity(supabase, citySlug) {
         },
       })),
     } : null,
+    faqPageLd(faqs),
   ].filter(Boolean);
 
+  const showsLink = showsRegion
+    ? `<a href="${BASE_URL}${eventRegionPath(showsRegion)}">Card shows in ${esc(showsRegion.city)} &amp; ${esc(showsRegion.stateName)}</a> · `
+    : '';
   return htmlDoc({
     title,
     description,
@@ -3879,7 +4256,9 @@ async function renderStoresCity(supabase, citySlug) {
 <h1>Card Shops in ${esc(cityInfo.label)}</h1>
 <p>${esc(description)}</p>
 <ul>${storeItems || '<li>No stores listed yet — know one? Add it below.</li>'}</ul>
-<p><a href="${BASE_URL}/card-shops/add">Add your store — free listing</a> · <a href="${BASE_URL}/events">Card events calendar</a></p>
+${eventItems ? `<h2>Upcoming card events in ${esc(cityInfo.state)}</h2>\n<ul>\n${eventItems}\n</ul>\n` : ''}<p>${showsLink}<a href="${BASE_URL}/events">Card events calendar</a> · <a href="${BASE_URL}/card-shops/add">Add your store — free listing</a></p>
+<h2>Frequently asked questions</h2>
+${faqs.map(({ q, a }) => `<h3>${esc(q)}</h3>\n<p>${esc(a)}</p>`).join('\n')}
 </main>`,
   });
 }
@@ -3907,7 +4286,7 @@ const HOME_HOW_IT_WORKS = [
   },
   {
     title: 'Pay securely',
-    desc: 'Checkout in AUD through Stripe — card, PayPal, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
+    desc: 'Checkout in AUD through Stripe — card, Apple Pay or Google Pay. Every fee is shown before you pay; nothing is added later.',
   },
   {
     title: 'Get it delivered, protected',
@@ -4214,6 +4593,20 @@ export default async function handler(req, res) {
 
     if (rawPath === '/events') {
       return sendDoc(res, await renderEventsLanding(supabase, null));
+    }
+
+    const regionMatch = rawPath.match(/^\/card-shows\/([^/?#]+)\/?$/);
+    if (regionMatch) {
+      const region = eventRegionBySlug(safeDecode(regionMatch[1]));
+      if (!region) return sendDoc(res, notFound({ title: 'Page not found | CardPop', description: 'This page could not be found.', canonical: `${BASE_URL}/events` }));
+      return sendDoc(res, await renderEventsLanding(supabase, null, region));
+    }
+
+    // Two segments — claimed before the single-event matcher below, which
+    // would otherwise read "organisers" as an event slug and 404.
+    const organiserMatch = rawPath.match(/^\/events\/organisers\/([^/?#]+)\/?$/);
+    if (organiserMatch) {
+      return sendDoc(res, await renderEventOrganiser(supabase, safeDecode(organiserMatch[1])));
     }
 
     const eventsMatch = rawPath.match(/^\/events\/([^/?#]+)/);

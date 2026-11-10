@@ -17,15 +17,16 @@ one-time, take ~15 minutes total, and everything recommended here is on the
 | Image CDN worker | Supabase storage egress exhaustion | `cloudflare/image-proxy-worker.js` on `img.cardpop.com.au` |
 
 The Express limiters are **abuse throttles, not DDoS defence**: they keep
-in-memory counters inside the single Node process on the VPS (formerly one per Vercel instance), reset on
-cold start. Volumetric traffic is Cloudflare's job; the app layer provides
+in-memory counters per Node process (one per Vercel instance today; a single
+process on the parked VPS stack), reset on cold start. Volumetric traffic is Cloudflare's job; the app layer provides
 precision (per-user, per-email, per-endpoint budgets).
 
 ## What the code does (this repo)
 
 - **Real client IPs behind Cloudflare** — `src/app.js` sets a `trust proxy`
   function that trusts Cloudflare's published edge ranges (and nothing before them —
-  `TRUST_PROXY_HOPS=0`, since Node faces Cloudflare directly on the VPS)
+  `TRUST_PROXY_HOPS=0` on the VPS stack, where Node faces Cloudflare directly;
+  Vercel's own proxy hop is handled by its platform)
   (`src/utils/cloudflareIps.js`). `req.ip` — and with it every rate-limit
   key, the login lockout, and audit logs — resolves to the actual visitor,
   not a shared Cloudflare edge IP. Requests that bypass Cloudflare (hitting
@@ -155,7 +156,7 @@ Defence in depth, cheapest first:
 
 ### a. Storage egress (the big one) — already engineered, verify it's live
 
-1. **`/opt/cardpop/shared/.env` on the VPS (then redeploy)**:
+1. **Vercel dashboard env vars (then redeploy)** — or `/opt/cardpop/shared/.env` on the VPS stack once that is live:
    confirm `VITE_IMAGE_CDN_HOST` and `IMAGE_CDN_HOST` are both set to
    `img.cardpop.com.au`. (Couldn't be verified from this session — it's the
    one config flag this whole layer hangs on. If missing, add both and

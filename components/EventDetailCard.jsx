@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { isFeaturedEvent } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
-import { eventTypeStyle, facebookEmbedUrl } from '@/lib/eventSeo.js';
+import { eventTypeStyle, facebookEmbedUrl, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
@@ -112,6 +113,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
             and the logo sits in the sidebar column above Event Details. */}
         <div className={hasLogo ? 'grid lg:grid-cols-3 gap-0' : ''}>
         <div className={hasLogo ? 'lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
+          <div className="flex flex-wrap items-center gap-2">
           {(() => {
             const style = eventTypeStyle(event);
             if (style) {
@@ -129,6 +131,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
               </span>
             );
           })()}
+          {isFeaturedEvent(event, toLocalDateStr(new Date())) && (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary text-primary-foreground text-sm font-bold shadow-md">
+              <Star className="w-3.5 h-3.5 fill-current" /> Featured event
+            </span>
+          )}
+          </div>
           <h1 className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight tracking-tight mt-4">
             {event.name}
           </h1>
