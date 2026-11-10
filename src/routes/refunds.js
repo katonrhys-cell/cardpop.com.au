@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import logger from '../utils/logger.js';
 import { computeRefundAmounts, getRefundPolicyOptions } from '../services/refundAmounts.js';
 import { refundWindow } from '../../utils/buyerProtectionPolicy.js';
+import { alertAdminsToReview } from '../services/adminReviewAlerts.js';
 
 const router = Router();
 router.use(authMiddleware);
@@ -92,6 +93,19 @@ router.post('/request', async (req, res) => {
     .update({ refund_status: 'requested', refund_requested_at: new Date().toISOString() })
     .eq('id', order.id);
   if (updErr) logger.warn(`[REFUND] order status update failed for ${order.id}: ${updErr.message}`);
+
+  await alertAdminsToReview({
+    type: 'refund_requested',
+    title: 'Refund requested',
+    body: `A buyer requested a refund on order ${String(order.id).slice(0, 8)} (${reason}).`,
+    path: '/admin/orders',
+    relatedId: order.id,
+    email: {
+      subject: `Refund requested on order ${String(order.id).slice(0, 8)}`,
+      intro: 'A buyer has requested a refund and it is waiting for your decision.',
+      rows: [['Order', order.id], ['Reason', reason], ['Buyer notes', notesText], ['Paid', `$${Number(order.total_aud || 0).toFixed(2)}`], ['Estimated refund', `$${Number(refundAmount || 0).toFixed(2)}`]],
+    },
+  });
 
   if (order.seller_id) {
     await supabase.from('notifications').insert({

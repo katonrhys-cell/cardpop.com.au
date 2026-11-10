@@ -6,6 +6,7 @@ import { authMiddleware } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
 import { validateRequestBody } from '../middleware/validateRequest.js';
 import { createShopReviewSchema, moderateShopReviewSchema } from '../schemas/shopReviewSchemas.js';
+import { alertAdminsToReview } from '../services/adminReviewAlerts.js';
 
 // Reviews of shop (catalogue) products. Reading published reviews is public and
 // goes straight to Supabase from the browser (RLS: status = 'published'); only
@@ -50,6 +51,21 @@ router.post('/', authMiddleware, validateRequestBody(createShopReviewSchema), as
       }
       throw error;
     }
+
+    // The insert trigger already bells every admin; add the email.
+    await alertAdminsToReview({
+      bell: false,
+      type: 'product_review_pending',
+      title: `Product review to moderate (${rating} stars)`,
+      body: title || 'A customer left a review on a shop product.',
+      path: '/admin/product-reviews',
+      relatedId: data?.id || null,
+      email: {
+        subject: `New ${rating}-star product review to moderate`,
+        intro: 'A verified buyer reviewed a shop product. It stays hidden until you approve it.',
+        rows: [['Rating', `${rating} / 5`], ['Title', title || ''], ['Review', (body || '').slice(0, 500)]],
+      },
+    });
 
     res.status(201).json(data);
   } catch (error) {

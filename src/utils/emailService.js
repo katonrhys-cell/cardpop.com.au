@@ -32,6 +32,7 @@ import {
   welcomeOfferReminderEmail,
   membershipTrialEndingEmail,
   giveawayWinnerEmail,
+  adminReviewAlertEmail,
 } from '../emails/templates.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -310,6 +311,16 @@ export async function sendIdentityReviewNeeded({ to, userId, userName, userEmail
     to,
     subject: `Identity verification needs review: ${userName || 'A user'}`,
     html: identityReviewNeededEmail({ userId, userName, userEmail }),
+  });
+}
+
+// Admin heads-up for any member submission waiting in a review queue
+// (src/services/adminReviewAlerts.js). `to` may be one address or an array.
+export async function sendAdminReviewAlert({ to, subject, heading, intro, rows, path }) {
+  return send({
+    to,
+    subject,
+    html: adminReviewAlertEmail({ heading: heading || subject, intro, rows, path }),
   });
 }
 
