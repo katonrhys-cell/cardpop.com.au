@@ -28,6 +28,7 @@ import CheckoutReassurance from '@/components/checkout/CheckoutReassurance.jsx';
 import StripeMark, { StripeWordmark } from '@/components/checkout/StripeMark.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import { getReferralCode } from '@/lib/referral.js';
+import { rememberPaidLines } from '@/lib/checkoutPaidLines.js';
 import { ADDRESS_AUTOCOMPLETE_ENABLED } from '@/lib/addressAutocomplete.js';
 import { isValidAbn, normalizeAbn } from '@/utils/abn.js';
 import { fetchSavedAddresses, addressRowToShipping, formatAddressLabel } from '@/lib/savedAddresses.js';
@@ -589,6 +590,9 @@ const CheckoutPage = () => {
     if (!validateShipping()) return;
     if (!validateBilling()) return;
     trackAddPaymentInfo(checkoutItems);
+    // So the confirmation page removes only what was paid for (a shop-only
+    // checkout leaves the marketplace cards in the cart).
+    if (!directItem) rememberPaidLines(checkoutItems);
     // Freeze exactly what the buyer reviewed; later renders can't change it.
     setPaymentBody(checkoutRequestBody);
     // Scroll the newly-revealed payment form into view (guarded — happy-dom in

@@ -13,7 +13,9 @@ router.get('/', publicCache(CACHE_MEDIUM), async (req, res) => {
     const { q } = req.query;
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
 
-    if (!q || q.length < 2) {
+    // ?q=a&q=b arrives as an array, which passed the length check and then
+    // threw on .toLowerCase() — a 500 from a public endpoint.
+    if (typeof q !== 'string' || q.length < 2) {
       return res.json({ suggestions: [], didYouMean: null });
     }
 

@@ -496,9 +496,15 @@ const MarketplacePage = () => {
         else if (filterMode === 'ForTrade') query = query.eq('accepts_trade', true);
         else if (filterMode === 'MakeOffer') query = query.eq('accepts_offers', true).neq('listing_type', 'trade');
 
-        if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true });
-        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false });
+        // Unpriced listings (trade-only, Expression of Interest) sort last
+        // either way — Postgres puts NULLs first on a descending sort, which
+        // led "Price: high to low" with every card that has no price. The id
+        // tie-breaker keeps equal rows in one order across pages, so a card
+        // can't repeat on page 2 or go missing between pages.
+        if (sort === 'price_asc')  query = query.order('price_aud', { ascending: true, nullsFirst: false });
+        else if (sort === 'price_desc') query = query.order('price_aud', { ascending: false, nullsFirst: false });
         else query = query.order('created_at', { ascending: false });
+        query = query.order('id', { ascending: true });
 
         const { data, count, error: fetchError } = await query;
         if (cancelled) return;

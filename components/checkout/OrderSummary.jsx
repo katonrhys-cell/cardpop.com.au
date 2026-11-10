@@ -42,10 +42,13 @@ const OrderSummary = ({ cartItems = [], hasPreorder = false, subtotal = 0, servi
                     <img src={cardThumbUrl(item.image)} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
                   )}
                   <span className="flex-1 min-w-0">
-                    <span className="block font-medium">{item.name ?? 'Card'}</span>
+                    <span className="block font-medium">
+                      {item.name ?? 'Card'}
+                      {Number(item.quantity) > 1 && <span className="font-normal text-muted-foreground"> × {item.quantity}</span>}
+                    </span>
                     {item.preorderEta && <PreorderNotice variant="inline" eta={item.preorderEta} className="mt-0.5" />}
                   </span>
-                  <span className="text-muted-foreground">${Number(item.price ?? 0).toFixed(2)}</span>
+                  <span className="text-muted-foreground">${(Number(item.price ?? 0) * Math.max(1, Number(item.quantity) || 1)).toFixed(2)}</span>
                 </li>
               ))}
             </ul>

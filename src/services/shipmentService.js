@@ -83,9 +83,14 @@ export async function markOrderShipped({ orderId, carrier, trackingNumber: rawTr
       shipped_at: order.shipped_at || now,
     })
     .eq('id', orderId)
+    // Guarded on the status that was just read: a refund or cancellation that
+    // lands between the read and this write must not be overwritten back to
+    // 'shipped'.
+    .eq('status', order.status)
     .select('id, status, tracking_carrier, tracking_number, shipped_at, shipping_notified_at')
-    .single();
+    .maybeSingle();
   if (updErr) throw updErr;
+  if (!updated) throw httpError(409, 'This order changed while it was being marked shipped — reload and try again');
 
   const orderRef = orderId.slice(0, 8).toUpperCase();
   const items = itemTitles(order);

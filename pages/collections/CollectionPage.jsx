@@ -601,9 +601,12 @@ const CollectionPage = () => {
       }
 
       if (filterSort === '-created') { q = q.order('created_at', { ascending: false }); }
-      else if (filterSort === 'price') { q = q.order('price_aud'); }
-      else if (filterSort === '-price') { q = q.order('price_aud', { ascending: false }); }
+      // Unpriced (trade / EOI) listings last on both price sorts, and an id
+      // tie-breaker so Load More can't repeat or skip equal-priced cards.
+      else if (filterSort === 'price') { q = q.order('price_aud', { ascending: true, nullsFirst: false }); }
+      else if (filterSort === '-price') { q = q.order('price_aud', { ascending: false, nullsFirst: false }); }
       else { q = q.order('created_at', { ascending: false }); }
+      q = q.order('id', { ascending: true });
 
       const { data, error, count } = await q;
 

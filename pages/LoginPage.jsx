@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { safeInternalPath } from '@/lib/safeInternalPath.js';
 import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -56,7 +57,13 @@ const LoginPage = () => {
   // Lock animation state: 'locked' | 'error' | 'unlocking' | 'unlocked'
   const [lockState, setLockState] = useState('locked');
 
-  const from = location.state?.from?.pathname || '/account';
+  // Where to go after signing in: the page a route guard bounced the visitor
+  // from — with its query string and hash, which guarded pages read
+  // (/verify-identity?next=/checkout) — else a validated ?next=, else the account.
+  const guardedFrom = location.state?.from;
+  const from = (guardedFrom?.pathname && `${guardedFrom.pathname}${guardedFrom.search || ''}${guardedFrom.hash || ''}`)
+    || safeInternalPath(new URLSearchParams(location.search).get('next'))
+    || '/account';
 
   // If user is already authenticated, skip the login page entirely.
   useEffect(() => {
@@ -69,7 +76,10 @@ const LoginPage = () => {
     e.preventDefault();
 
     const trimmedEmail    = email.trim();
-    const trimmedPassword = password.trim();
+    // The password is sent exactly as typed. Sign-up, reset and change-password
+    // don't trim, so trimming here locked out anyone whose password begins or
+    // ends with a space.
+    const trimmedPassword = password;
 
     if (!trimmedEmail || !trimmedPassword) {
       toast.error('Please enter both email and password');
