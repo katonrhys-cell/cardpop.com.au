@@ -21,6 +21,7 @@ import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
 import { isSoldOut, isComingSoon, isPreorder, preorderEta } from '@/utils/shopStock.js';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { hasVariants, chooseVariantLabel } from '@/utils/shopVariants.js';
+import { getPriceDeal, formatSaving } from '@/utils/priceDeal.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import SoldBadge from '@/components/SoldBadge.jsx';
 
@@ -42,6 +43,8 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const isSold = !soldOut && (
     (product.source === 'marketplace' && product.status === 'sold') || isSoldVaultItem(product)
   );
+  // Genuine markdown from the manufacturer RRP — buyable shop items only.
+  const deal = !comingSoon && !soldOut && !isSold ? getPriceDeal(product.price ?? product.price_aud, product.retail_price_aud) : null;
   const variants = (product.variant || product.cardVariant || '').split(',').map(v => v.trim()).filter(Boolean);
   const isRookie = variants.includes(ROOKIE_VARIANT) || !!(product.is_rookie || product.isRookie);
   const autoLabel = getAutographLabel(product);
@@ -92,6 +95,15 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             priority={priority}
           />
         )}
+        {/* Deal ribbon — top left, the thing the eye lands on first */}
+        {deal && !product.condition && (
+          <div className="absolute top-3 left-3 z-10">
+            <span className="inline-flex items-center rounded-md bg-brand-red px-2.5 py-1 text-xs font-black uppercase tracking-wide text-white shadow-md">
+              {deal.pct}% off
+            </span>
+          </div>
+        )}
+
         {/* Coming-soon ribbon — top right */}
         {comingSoon && (
           <div className="absolute top-3 right-3 z-10">
@@ -196,13 +208,18 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
         
         <div className="mt-auto pt-4 flex flex-col gap-3 border-t border-border">
           <div className="flex items-center justify-between gap-2">
-            {product.retail_price_aud && Number(product.price ?? product.price_aud) < Number(product.retail_price_aud) ? (
-              <div className="flex items-baseline gap-2">
-                <span className="font-extrabold text-xl tabular-nums text-foreground">
-                  ${Number(product.price ?? product.price_aud ?? 0).toFixed(2)}
-                </span>
-                <span className="text-sm text-muted-foreground line-through">
-                  ${Number(product.retail_price_aud).toFixed(2)}
+            {deal ? (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-baseline gap-2 flex-wrap">
+                  <span className="font-black text-2xl tabular-nums text-brand-red leading-none" data-testid="deal-price">
+                    ${deal.price.toFixed(2)}
+                  </span>
+                  <span className="text-sm text-muted-foreground line-through tabular-nums" aria-label={`Was $${deal.rrp.toFixed(2)}`}>
+                    ${deal.rrp.toFixed(2)}
+                  </span>
+                </div>
+                <span className="inline-flex w-fit items-center rounded-md bg-brand-red/10 px-2 py-0.5 text-xs font-extrabold text-brand-red">
+                  You save {formatSaving(deal.saving)} ({deal.pct}% off RRP)
                 </span>
               </div>
             ) : (
