@@ -10,7 +10,9 @@
  * Prices are AUD, GST-inclusive, per event. Paying turns `events.is_featured`
  * on (the webhook, src/services/eventFeatureService.js): the event moves into
  * the "Featured events" strip above the calendar, first in its month, with a
- * Featured badge — utils/eventFeatured.js. Instagram and the homepage spot are
+ * Featured badge — utils/eventFeatured.js. Full Feature also sets
+ * events.homepage_featured (the homepage Featured events section,
+ * components/home/HomepageFeaturedEvents.jsx). Instagram is
  * done by the CardPop team. Never promise anything here the site doesn't do.
  */
 

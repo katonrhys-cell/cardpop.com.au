@@ -150,12 +150,12 @@ describe('Stripe webhook for featuring', () => {
     await handleEventFeaturePaid(session);
 
     expect(claim.calls).toContainEqual(['neq', 'status', 'paid']);
-    expect(feature.calls).toContainEqual(['update', { is_featured: true }]);
+    expect(feature.calls).toContainEqual(['update', { is_featured: true, homepage_featured: true }]);
     const rows = bells.calls.find((c) => c[0] === 'insert')[1];
     expect(rows.map((r) => [r.user_id, r.type])).toEqual([['org-1', 'event_featured'], ['admin-1', 'event_featured']]);
     expect(mockSendFeaturePaid).toHaveBeenCalledWith(expect.objectContaining({
       packageName: 'Full Feature',
-      extras: expect.arrayContaining(['Homepage Featured events spot']),
+      extras: expect.not.arrayContaining(['Homepage Featured events spot']),
     }));
   });
 

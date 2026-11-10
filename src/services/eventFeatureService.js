@@ -35,9 +35,11 @@ export const MANUAL_EXTRAS = {
   full: [
     'Instagram post and story in the weeks before the show',
     'Second Instagram story in show week',
-    'Homepage Featured events spot',
   ],
 };
+
+/** Packages that also put the event in the homepage Featured events section. */
+export const HOMEPAGE_PACKAGES = new Set(['full']);
 
 export class FeatureCheckoutError extends Error {
   constructor(status, message) {
@@ -168,7 +170,9 @@ export async function handleEventFeaturePaid(session) {
 
   const { data: event, error: featureError } = await supabase
     .from('events')
-    .update({ is_featured: true })
+    .update(HOMEPAGE_PACKAGES.has(purchase.package)
+      ? { is_featured: true, homepage_featured: true }
+      : { is_featured: true })
     .eq('id', purchase.event_id)
     .select(EVENT_COLS)
     .maybeSingle();
