@@ -90,8 +90,35 @@ const COLUMNS = [
 // its own grey toggle and Pending badge, and it looks as if nothing happened.
 export const PUBLISHED_ROW_LINGER_MS = 1200;
 
+// "Submitted by …" under an event's title. Scanner finds say so; an event an
+// admin added says "Added by"; a member's says "Submitted by" and links to
+// their public seller page.
+const EventSubmitterLine = ({ event, submitter }) => {
+  if (event.auto_discovered) {
+    return <p className="text-xs mt-0.5 text-muted-foreground">Found by the automated scan</p>;
+  }
+  if (!event.organiser_id || submitter === undefined) return null;
+  if (submitter === null) {
+    return <p className="text-xs mt-0.5 text-muted-foreground">Submitted by a deleted account</p>;
+  }
+  const name = submitter.display_name || submitter.username || 'Unnamed account';
+  return (
+    <p className="text-xs mt-0.5 text-muted-foreground truncate">
+      {submitter.is_admin ? 'Added by ' : 'Submitted by '}
+      <Link to={`/seller/${submitter.id}`} className="font-semibold text-foreground hover:underline">
+        {name}
+      </Link>
+      {submitter.username && name !== submitter.username && <span> @{submitter.username}</span>}
+      {submitter.is_admin && <span> (CardPop admin)</span>}
+    </p>
+  );
+};
+
 const EventsManagementPage = () => {
   const [events, setEvents] = useState([]);
+  // Who submitted each event: profile rows keyed by events.organiser_id
+  // (public profile columns only — email stays server-side).
+  const [submitters, setSubmitters] = useState(() => new Map());
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isScraperOpen, setIsScraperOpen] = useState(false);
@@ -166,6 +193,34 @@ const EventsManagementPage = () => {
 
     return () => { supabase.removeChannel(channel); };
   }, []);
+
+  // Load the submitter profile for any organiser_id not yet known — covers the
+  // first load and rows arriving later through realtime.
+  useEffect(() => {
+    const missing = [...new Set(events.map((ev) => ev.organiser_id).filter(Boolean))]
+      .filter((id) => !submitters.has(id));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, username, display_name, is_admin')
+          .in('id', missing);
+        if (error) throw error;
+        if (cancelled) return;
+        setSubmitters((prev) => {
+          const next = new Map(prev);
+          for (const id of missing) next.set(id, null); // don't re-ask for a deleted account
+          for (const row of data ?? []) next.set(row.id, row);
+          return next;
+        });
+      } catch {
+        // The submitter line is a convenience; never break the list over it.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [events, submitters]);
 
   const loadOfferCounts = async () => {
     try {
@@ -308,10 +363,14 @@ const EventsManagementPage = () => {
   const sections = useMemo(
     () => {
       const today = toLocalDateStr(new Date());
-      return groupEventsByTiming(filterEvents(queueEvents, listFilters, { today }), sortKey, sortDir, { today });
+      const withSubmitter = queueEvents.map((ev) => {
+        const p = submitters.get(ev.organiser_id);
+        return p ? { ...ev, submitter_name: [p.display_name, p.username].filter(Boolean).join(' ') } : ev;
+      });
+      return groupEventsByTiming(filterEvents(withSubmitter, listFilters, { today }), sortKey, sortDir, { today });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- listFilters/sortKey/sortDir all derive from searchParams
-    [events, filter, lingeringIds, searchParams, unreviewedEdits],
+    [events, filter, lingeringIds, searchParams, unreviewedEdits, submitters],
   );
   const visibleCount = sections.reduce((n, s) => n + s.events.length, 0);
 
@@ -560,6 +619,7 @@ const EventsManagementPage = () => {
                           {event.short_description && (
                             <p className="text-muted-foreground text-xs mt-0.5 line-clamp-1">{event.short_description}</p>
                           )}
+                          <EventSubmitterLine event={event} submitter={submitters.get(event.organiser_id)} />
                           <p className="text-muted-foreground text-xs mt-1 font-medium md:hidden">
                             {event.start_date ? format(new Date(event.start_date), 'MMM d, yyyy') : 'TBA'}
                           </p>
