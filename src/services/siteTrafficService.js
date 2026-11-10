@@ -31,8 +31,10 @@
  * Runbook: docs/site-traffic.md.
  */
 import supabase from '../utils/supabaseClient.js';
-import { isGa4Configured, runGa4Report } from '../utils/ga4Client.js';
-import { isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
+import {
+  describePropertyIdProblem, describeServiceAccountProblem, isGa4Configured, runGa4Report,
+} from '../utils/ga4Client.js';
+import { getSiteUrl, isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
 import logger from '../utils/logger.js';
 
 // Earliest day to ask GA4 for. GA4 returns nothing for days before the
@@ -48,8 +50,10 @@ const SEARCH_CONSOLE_RETENTION_DAYS = 480;
 const SEARCH_WINDOW_DAYS = 30;
 
 export class Ga4NotConfiguredError extends Error {
-  constructor() {
-    super('GA4 is not configured: set GA4_PROPERTY_ID and GA4_SERVICE_ACCOUNT_JSON (and GSC_SITE_URL for Search Console)');
+  constructor(detail) {
+    super(detail
+      ? `GA4 is not configured: ${detail}`
+      : 'GA4 is not configured: set GA4_PROPERTY_ID and GA4_SERVICE_ACCOUNT_JSON (and GSC_SITE_URL for Search Console)');
     this.name = 'Ga4NotConfiguredError';
   }
 }
@@ -255,7 +259,13 @@ const syncSearchConsole = async (syncedAt) => {
 export const syncSiteTraffic = async () => {
   const ga4 = isGa4Configured();
   const gsc = isSearchConsoleConfigured();
-  if (!ga4 && !gsc) throw new Ga4NotConfiguredError();
+  if (!ga4 && !gsc) {
+    const problems = [describeServiceAccountProblem(), describePropertyIdProblem()].filter(Boolean);
+    if (!getSiteUrl() && process.env.GSC_SITE_URL) {
+      problems.push('GSC_SITE_URL must be sc-domain:cardpop.com.au or https://cardpop.com.au/');
+    }
+    throw new Ga4NotConfiguredError(problems.join('. ') || null);
+  }
 
   const syncedAt = new Date().toISOString();
   const result = { synced_at: syncedAt };
