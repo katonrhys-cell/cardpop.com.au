@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award, Plus } from 'lucide-react';
+import { Package, List, ArrowRightLeft, DollarSign, ArrowRight, AlertCircle, RefreshCw, PackageOpen, Award, Plus, CalendarDays } from 'lucide-react';
 import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,8 @@ import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { uniqueTopic } from '@/lib/realtimeTopic.js';
 import { toast } from 'sonner';
+import { todayInAustralia } from '@/utils/featuredPackages.js';
+import { countMyEventBuckets, activeEventCount } from '@/utils/myEventStatus.js';
 
 const AccountDashboard = () => {
   const { currentUser } = useAuth();
@@ -27,6 +29,10 @@ const AccountDashboard = () => {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
   const [sellerTier, setSellerTier] = useState(null);
+  // Counts per lifecycle bucket of the events this user organises (null until
+  // loaded, or when the read failed — the tile then shows a dash, not "0").
+  const [eventCounts, setEventCounts] = useState(null);
+  const [eventsLoading, setEventsLoading] = useState(true);
 
   const [vaultItems, setVaultItems]           = useState([]);
   const [vaultLoading, setVaultLoading]       = useState(false);
@@ -54,6 +60,18 @@ const AccountDashboard = () => {
       // Fetch seller tier independently — a missing profile row must not block stats
       supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).maybeSingle()
         .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); })
+
+      setEventsLoading(true);
+      // The user's own events (RLS + organiser_id), three small columns each.
+      // Independent of the stats batch so a failure here can't blank the rest.
+      supabase.from('events').select('status, start_date, end_date')
+        .eq('organiser_id', currentUser.id).limit(500)
+        .then(({ data, error }) => {
+          if (cancelled) return;
+          setEventsLoading(false);
+          if (error) { console.error('Failed to load event stats:', error); setEventCounts(null); return; }
+          setEventCounts(countMyEventBuckets(data, todayInAustralia()));
+        });
 
       try {
         const [salesRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
@@ -171,6 +189,7 @@ const AccountDashboard = () => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'listings', filter: `seller_id=eq.${uid}` }, refreshStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vault_items', filter: `owner_id=eq.${uid}` },
         () => { refreshStats(); refreshVault(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'events', filter: `organiser_id=eq.${uid}` }, refreshStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `initiator_id=eq.${uid}` }, refreshStats)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'trades', filter: `responder_id=eq.${uid}` }, refreshStats)
       .subscribe();
@@ -243,7 +262,7 @@ const AccountDashboard = () => {
       <AccountPlanBanner />
 
       {/* Top Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Total Revenue</CardTitle>
@@ -299,6 +318,34 @@ const AccountDashboard = () => {
             )}
             <Link to="/my-vault" className="text-xs font-bold text-primary hover:underline mt-2 inline-block">
               Open vault &rarr;
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-sm border-border hover:border-primary/30 transition-colors bg-card h-full flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Active Events</CardTitle>
+            <CalendarDays className="w-4 h-4 text-primary" />
+          </CardHeader>
+          <CardContent className="flex-1 flex flex-col justify-end">
+            {eventsLoading ? <Skeleton className="h-8 w-16" /> : (
+              <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">
+                {eventCounts ? activeEventCount(eventCounts) : '—'}
+              </div>
+            )}
+            {eventCounts && (eventCounts.pending > 0 || eventCounts.draft > 0) && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {[
+                  eventCounts.pending > 0 && `${eventCounts.pending} pending approval`,
+                  eventCounts.draft > 0 && `${eventCounts.draft} draft${eventCounts.draft === 1 ? '' : 's'}`,
+                ].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            <Link
+              to={eventCounts?.all === 0 ? '/account/events?new=1' : '/account/events'}
+              className="text-xs font-bold text-primary hover:underline mt-2 inline-block"
+            >
+              {eventCounts?.all === 0 ? 'List an event' : 'View all events'} &rarr;
             </Link>
           </CardContent>
         </Card>

@@ -71,6 +71,8 @@ describe('EventFormModal — a member creating an event', () => {
       organiser_id: 'user-1', is_featured: false, website_url: 'https://www.testshow.com.au',
     });
     expect(row.slug).toBe('test-card-show-2027-05-01');
+    // SEO + tags are the team's — an organiser insert never carries them.
+    for (const k of ['seo_title', 'seo_description', 'seo_keywords', 'tags']) expect(row).not.toHaveProperty(k);
     await waitFor(() => expect(mockApiFetch).toHaveBeenCalledWith('/events/notify-submission', expect.objectContaining({ method: 'POST' })));
   });
 
@@ -141,8 +143,13 @@ describe('EventFormModal — a member creating an event', () => {
     expect(screen.getByRole('switch', { name: 'Registration Required' })).toBeInTheDocument();
   });
 
-  it('keeps a tag typed without pressing Enter, and labels its remove button', () => {
+  it('keeps SEO and tags out of the organiser form and its insert', () => {
     renderNew();
+    expect(screen.queryByRole('tab', { name: 'SEO' })).not.toBeInTheDocument();
+  });
+
+  it('keeps a tag typed without pressing Enter, and labels its remove button (admin form)', () => {
+    render(<EventFormModal isOpen onClose={() => {}} event={null} onSaved={() => {}} mode="admin" />);
     openTab('SEO');
     const tags = screen.getByLabelText(/Event Tags/);
     fireEvent.change(tags, { target: { value: 'pokemon' } });

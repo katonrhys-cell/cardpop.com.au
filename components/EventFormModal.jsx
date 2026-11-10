@@ -694,13 +694,17 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
         registration_required: formData.registration_required,
-        // SEO
-        seo_title:           formData.seo_title.trim() || null,
-        seo_description:     formData.seo_description.trim() || null,
-        seo_keywords:        formData.seo_keywords.length ? formData.seo_keywords : null,
-        tags:                formData.tags.length ? formData.tags : null,
         source_url:          formData.source_url.trim() || null,
       };
+      // SEO + tags are admin-only: an organiser's save leaves whatever the
+      // team set untouched (and a new event starts blank, so the page uses
+      // the generated defaults).
+      if (!isUserMode) {
+        payload.seo_title       = formData.seo_title.trim() || null;
+        payload.seo_description = formData.seo_description.trim() || null;
+        payload.seo_keywords    = formData.seo_keywords.length ? formData.seo_keywords : null;
+        payload.tags            = formData.tags.length ? formData.tags : null;
+      }
       // Admin only, and only alongside a rejection — approving clears it in the DB.
       if (!isUserMode && formData.status === 'rejected') {
         payload.rejection_reason = formData.rejection_reason.trim() || null;
@@ -826,6 +830,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   };
 
   const inputCls = 'bg-background rounded-xl h-11';
+  // iOS Safari gives date/time inputs an intrinsic min-width wider than half a
+  // phone screen, so in a two-column grid they overflow and touch. min-w-0 +
+  // appearance-none let them shrink to their column; the value sits left like
+  // every other field (same fix as CommunityEventsPage's dateInputClass).
+  const dateTimeCls = `${inputCls} w-full min-w-0 appearance-none text-left [&::-webkit-date-and-time-value]:text-left`;
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) requestClose(); }}>
@@ -863,9 +872,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
-                  { id: 'seo',       label: 'SEO' },
+                  // SEO + tags are the CardPop team's job: blank fields fall
+                  // back to defaults built from the event (title, summary),
+                  // and admins refine them in Event Management.
+                  !isUserMode && { id: 'seo',       label: 'SEO' },
                   { id: 'offer', label: 'Member Offer' },
-                ].map(tab => (
+                ].filter(Boolean).map(tab => (
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
@@ -1066,22 +1078,22 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
 
                 <div className="pt-2 border-t border-border">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Dates & Times</p>
-                  <div className="grid grid-cols-2 gap-5">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-5 sm:gap-x-5">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="start_date" className="font-bold">Start Date <span className="text-destructive" aria-hidden="true">*</span></Label>
-                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={inputCls} aria-required="true" disabled={loading} />
+                      <Input id="start_date" name="start_date" type="date" value={formData.start_date} onChange={handleChange} className={dateTimeCls} aria-required="true" disabled={loading} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="end_date" className="font-bold">End Date</Label>
-                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} min={formData.start_date || undefined} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="end_date" name="end_date" type="date" value={formData.end_date} min={formData.start_date || undefined} onChange={handleChange} className={dateTimeCls} disabled={loading} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="start_time" className="font-bold">Start Time</Label>
-                      <Input id="start_time" name="start_time" type="time" value={formData.start_time} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="start_time" name="start_time" type="time" value={formData.start_time} onChange={handleChange} className={dateTimeCls} disabled={loading} />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 min-w-0">
                       <Label htmlFor="end_time" className="font-bold">End Time</Label>
-                      <Input id="end_time" name="end_time" type="time" value={formData.end_time} onChange={handleChange} className={inputCls} disabled={loading} />
+                      <Input id="end_time" name="end_time" type="time" value={formData.end_time} onChange={handleChange} className={dateTimeCls} disabled={loading} />
                     </div>
                   </div>
                 </div>

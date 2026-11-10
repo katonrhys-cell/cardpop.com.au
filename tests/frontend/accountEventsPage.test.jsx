@@ -98,3 +98,18 @@ describe('My Events page', () => {
     expect(await axe(container, { rules: { 'color-contrast': { enabled: false } } })).toHaveNoViolations();
   });
 });
+
+describe('My Events status tabs', () => {
+  it('filters to one lifecycle bucket from ?status=', async () => {
+    render(<MemoryRouter initialEntries={['/account/events?status=pending']}><AccountEvents /></MemoryRouter>);
+    await screen.findByText('Pending Show');
+    expect(screen.queryByText('Live Show')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pending approval/ })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: /^Live/ }));
+    expect(await screen.findByText('Live Show')).toBeInTheDocument();
+    expect(screen.queryByText('Pending Show')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^All/ }));
+    expect(await screen.findByText('Pending Show')).toBeInTheDocument();
+    expect(screen.getByText('Rejected Show')).toBeInTheDocument();
+  });
+});

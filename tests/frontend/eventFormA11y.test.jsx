@@ -29,7 +29,7 @@ vi.mock('@/lib/apiServerClient.js', () => {
 
 import EventFormModal from '@/components/EventFormModal.jsx';
 
-const TABS = ['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer'];
+const TABS = ['Details', 'Venue & Dates', 'Organiser', 'Member Offer'];
 // Colour contrast needs real layout (covered by e2e/a11y.spec.js).
 const rules = { 'color-contrast': { enabled: false } };
 
