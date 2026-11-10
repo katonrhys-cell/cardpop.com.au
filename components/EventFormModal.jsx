@@ -28,6 +28,7 @@ import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLog
 import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
 import { findOrganiser } from '@/utils/eventOrganisers.js';
 import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
+import { createStepRunner, reportStalledStep, UPLOAD_STEP_TIMEOUT_MS } from '@/utils/saveSteps.js';
 import { toast } from 'sonner';
 
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
@@ -182,6 +183,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const isLiveEdit = isUserMode && Boolean(event?.id) && event.status === 'approved';
   const isResubmission = isUserMode && event?.status === 'rejected';
   const [loading, setLoading] = useState(false);
+  // What the save is doing right now (shown on the button), so a slow step is visible.
+  const [saveStep, setSaveStep] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [formData, setFormData] = useState(INITIAL_STATE);
@@ -501,6 +504,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     }
 
     setLoading(true);
+    // Every upload and write runs as a named step with a deadline, so a stalled
+    // one fails with a message saying which step, and is reported (utils/saveSteps.js).
+    const step = createStepRunner({
+      onStep: setSaveStep,
+      onTimeout: (err) => reportStalledStep(err, { form: isUserMode ? 'event-organiser' : 'event-admin', eventId: event?.id ?? null }),
+    });
     try {
       let savedId = event?.id ?? null;
       let image_url = event?.image_url ?? null;
@@ -508,14 +517,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       if (imageFile) {
         // Throws on failure — don't silently save the event without its cover
         // image. Also writes the 480 px thumb the event tiles load.
-        image_url = await uploadEventImage(imageFile, { folder: 'events', stem: `${Date.now()}`, upsert: true });
+        image_url = await step('Uploading cover image', () => uploadEventImage(imageFile, { folder: 'events', stem: `${Date.now()}`, upsert: true }), UPLOAD_STEP_TIMEOUT_MS);
       } else if (removeExistingImage) {
         image_url = null;
       }
 
       let organizer_logo_url = event?.organizer_logo_url ?? null;
       if (logoFile) {
-        organizer_logo_url = await uploadEventOrganiserLogo(logoFile); // throws — don't save without the logo the organiser picked
+        // Throws — don't save without the logo the organiser picked.
+        organizer_logo_url = await step('Uploading organiser logo', () => uploadEventOrganiserLogo(logoFile), UPLOAD_STEP_TIMEOUT_MS);
       } else if (removeExistingLogo) {
         organizer_logo_url = null;
       } else if (pickedLogoUrl) {
@@ -526,14 +536,17 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       // immutable path; saved ones keep their URL. Album and photo order are
       // the editor's. Empty albums are dropped.
       const uploadedAlbums = [];
+      const newPhotos = gallery.reduce((n, album) => n + album.photos.filter(p => !p.url).length, 0);
+      let photoNo = 0;
       for (const [a, album] of gallery.entries()) {
         const images = [];
         for (const [i, photo] of album.photos.entries()) {
           if (photo.url) { images.push(photo.url); continue; }
-          images.push(await uploadEventImage(photo.file, {
+          photoNo += 1;
+          images.push(await step(`Uploading photo ${photoNo} of ${newPhotos}`, () => uploadEventImage(photo.file, {
             folder: 'events/gallery',
             stem: `${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}`,
-          }));
+          }), UPLOAD_STEP_TIMEOUT_MS));
         }
         uploadedAlbums.push({ title: album.title.trim(), images });
       }
@@ -613,7 +626,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         // NB: organiser_id is deliberately NOT in the update payload — editing
         // an event (incl. an admin fixing a user submission) must not reassign
         // its owner to the editor.
-        const { error } = await supabase.from('events').update(payload).eq('id', event.id);
+        const { error } = await step('Saving the event', () => supabase.from('events').update(payload).eq('id', event.id));
         if (error) throw error;
         toast.success(isLiveEdit
           ? 'Changes saved and live. The CardPop team has been notified of what changed.'
@@ -640,10 +653,10 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         if (currentUser?.id) payload.organiser_id = currentUser.id;
         // SEO-friendly slug for the event detail URL; suffix on collision
         payload.slug = `${slugify(formData.title)}-${formData.start_date}`;
-        let { data: inserted, error } = await supabase.from('events').insert(payload).select('id').single();
+        let { data: inserted, error } = await step('Saving the event', () => supabase.from('events').insert(payload).select('id').single());
         if (error?.code === '23505') {
           payload.slug = `${payload.slug}-${Math.random().toString(36).slice(2, 6)}`;
-          ({ data: inserted, error } = await supabase.from('events').insert(payload).select('id').single());
+          ({ data: inserted, error } = await step('Saving the event', () => supabase.from('events').insert(payload).select('id').single()));
         }
         if (error) throw error;
         savedId = inserted?.id ?? null;
@@ -669,7 +682,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       // organiser can write the offer on their own event (RLS).
       if (savedId) {
         try {
-          await saveAdminTicketOffer(savedId, offerForm, existingOffer);
+          await step('Saving the member offer', () => saveAdminTicketOffer(savedId, offerForm, existingOffer));
         } catch (err) {
           toast.error(err.message || 'Event saved, but the member offer failed to save.');
         }
@@ -704,8 +717,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       onClose();
     } catch (err) {
       console.error('Event save error:', err);
-      toast.error(err.message || 'Failed to save event');
+      toast.error(err.message || 'Failed to save event', err?.name === 'SaveStepTimeoutError' && /Saving the event/.test(err.step || '')
+        ? { description: 'It may still have saved — check your events list before trying again.', duration: 12000 }
+        : undefined);
     } finally {
+      setSaveStep('');
       setLoading(false);
     }
   };
@@ -1194,7 +1210,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {isLiveEdit ? 'Save & Publish Changes' : isResubmission ? 'Resubmit for Review' : event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
+                {loading && saveStep
+                  ? `${saveStep}…`
+                  : isLiveEdit ? 'Save & Publish Changes' : isResubmission ? 'Resubmit for Review' : event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
           </DialogFooter>
