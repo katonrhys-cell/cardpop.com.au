@@ -20,9 +20,10 @@ const renderForm = (mode) => render(
 );
 
 describe('EventFormModal — user/admin field parity', () => {
-  it('shows the SEO tab to user submissions so their events can rank', () => {
+  it('hides the SEO tab from organisers — the team handles SEO behind the scenes', () => {
     renderForm('user');
-    expect(screen.getByRole('tab', { name: 'SEO' })).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'SEO' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/SEO Title/)).not.toBeInTheDocument();
   });
 
   it('still hides the admin-only Status and homepage-feature controls in user mode', () => {
@@ -31,13 +32,13 @@ describe('EventFormModal — user/admin field parity', () => {
     expect(screen.queryByText('Feature on Homepage')).not.toBeInTheDocument();
   });
 
-  it('shows every tab in both modes, Member Offer included (organisers set their own code)', () => {
+  it('shows every tab to admins and all but SEO to organisers, Member Offer included', () => {
     const { unmount } = renderForm('admin');
     const tabNames = (els) => els.map((el) => el.textContent);
     expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer']);
     unmount();
     renderForm('user');
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'Member Offer']);
   });
 
   it('gives organisers their own wording on the Member Offer tab', () => {

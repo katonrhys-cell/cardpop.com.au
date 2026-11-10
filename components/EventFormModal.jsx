@@ -687,13 +687,17 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
         registration_required: formData.registration_required,
-        // SEO
-        seo_title:           formData.seo_title.trim() || null,
-        seo_description:     formData.seo_description.trim() || null,
-        seo_keywords:        formData.seo_keywords.length ? formData.seo_keywords : null,
-        tags:                formData.tags.length ? formData.tags : null,
         source_url:          formData.source_url.trim() || null,
       };
+      // SEO + tags are admin-only: an organiser's save leaves whatever the
+      // team set untouched (and a new event starts blank, so the page uses
+      // the generated defaults).
+      if (!isUserMode) {
+        payload.seo_title       = formData.seo_title.trim() || null;
+        payload.seo_description = formData.seo_description.trim() || null;
+        payload.seo_keywords    = formData.seo_keywords.length ? formData.seo_keywords : null;
+        payload.tags            = formData.tags.length ? formData.tags : null;
+      }
       // Admin only, and only alongside a rejection — approving clears it in the DB.
       if (!isUserMode && formData.status === 'rejected') {
         payload.rejection_reason = formData.rejection_reason.trim() || null;
@@ -856,9 +860,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'organiser', label: 'Organiser' },
-                  { id: 'seo',       label: 'SEO' },
+                  // SEO + tags are the CardPop team's job: blank fields fall
+                  // back to defaults built from the event (title, summary),
+                  // and admins refine them in Event Management.
+                  !isUserMode && { id: 'seo',       label: 'SEO' },
                   { id: 'offer', label: 'Member Offer' },
-                ].map(tab => (
+                ].filter(Boolean).map(tab => (
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
