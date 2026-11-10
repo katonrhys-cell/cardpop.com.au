@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -10,6 +10,9 @@ import {
   WORKSPACE_REFERRAL_EVENT,
   WORKSPACE_REFERRAL_PROGRAM,
 } from '@/utils/workspaceReferral.js';
+
+const APPS_IMAGE = '/images/partners/google-workspace-apps.webp';
+const ICON_IMAGE = '/images/partners/google-workspace-icon.webp';
 
 const COPY = {
   sole_trader: {
@@ -37,21 +40,33 @@ const WorkspaceReferralCard = ({ placement = 'sole_trader', className = '' }) =>
   const onClick = () => trackEvent(WORKSPACE_REFERRAL_EVENT, { program: WORKSPACE_REFERRAL_PROGRAM, placement });
 
   return (
-    <Card className={`shadow-sm ${className}`} data-testid="workspace-referral-card">
-      <CardContent className="p-6 flex flex-col sm:flex-row sm:items-center gap-4">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-          <Mail className="w-5 h-5 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0 space-y-1">
+    <Card className={`shadow-sm overflow-hidden ${className}`} data-testid="workspace-referral-card">
+      {/* White panel behind the artwork so the app icons read in dark mode too. */}
+      <div className="bg-white border-b border-border">
+        <img
+          src={APPS_IMAGE}
+          alt="Google Workspace apps: Drive, Docs, Sheets, Slides, Meet, Calendar, Gmail, Chat and more"
+          width={792}
+          height={464}
+          loading="lazy"
+          decoding="async"
+          className="w-full h-36 sm:h-44 object-contain"
+        />
+      </div>
+      <CardContent className="p-6 space-y-4">
+        <div className="space-y-1">
           <p className="font-bold text-foreground">{copy.title}</p>
           <p className="text-sm text-muted-foreground">{copy.body}</p>
+        </div>
+        <div className="space-y-2">
+          <Button asChild variant="outline" className="w-full sm:w-auto rounded-xl font-bold">
+            <a href={href} target="_blank" rel="sponsored nofollow noopener noreferrer" onClick={onClick}>
+              <img src={ICON_IMAGE} alt="" aria-hidden="true" width={20} height={20} className="w-5 h-5 mr-2" />
+              Try Google Workspace <ExternalLink className="w-4 h-4 ml-2" />
+            </a>
+          </Button>
           <p className="text-xs text-muted-foreground/80">{WORKSPACE_REFERRAL_DISCLOSURE}</p>
         </div>
-        <Button asChild variant="outline" className="rounded-xl font-bold shrink-0">
-          <a href={href} target="_blank" rel="sponsored nofollow noopener noreferrer" onClick={onClick}>
-            Try Google Workspace <ExternalLink className="w-4 h-4 ml-2" />
-          </a>
-        </Button>
       </CardContent>
     </Card>
   );
