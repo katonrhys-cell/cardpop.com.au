@@ -69,7 +69,7 @@ export const LIST_EVENT_TIERS = [
   },
   {
     key: 'featured',
-    name: 'Featured placement',
+    name: 'Featured Placement',
     price: 'Ask us',
     summary: 'We promote your show to CardPop\'s audience in the weeks before it runs.',
     points: [
@@ -77,7 +77,7 @@ export const LIST_EVENT_TIERS = [
       'A mention in the CardPop newsletter',
       'A clicks and reveals report after the show',
     ],
-    cta: { label: 'Ask about featuring', href: FEATURED_MAILTO, external: true },
+    cta: { label: 'Feature Now', href: FEATURED_MAILTO, external: true },
   },
 ];
 

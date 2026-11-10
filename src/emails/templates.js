@@ -36,11 +36,15 @@ export function esc(v) {
 export const EMAIL_LOGO_URL = 'https://cardpop.com.au/images/email/cardpop-logo-v1.png';
 const EMAIL_LOGO_BG = '#0A0A0A';
 const EMAIL_LOGO_WIDTH = 220; // 440px source ÷ 2
+// The footer repeats the logo smaller. The footer band uses the same
+// near-black ground as the header, so the email opens and closes in black and
+// the PNG's edges stay invisible there too.
+const EMAIL_FOOTER_LOGO_WIDTH = 160;
 
 // Email palette — the brand palette from tailwind.config.js (`brand.*`) plus
 // the neutral greys the body copy uses. Everything below reads from here so a
-// colour change is one edit. The header band is the logo artwork's own
-// near-black ground (EMAIL_LOGO_BG), not a palette colour.
+// colour change is one edit. The header and footer bands are the logo
+// artwork's own near-black ground (EMAIL_LOGO_BG), not a palette colour.
 const RED = '#CE1126';      // brand-red
 const CHARCOAL = '#1F2937'; // brand-charcoal
 const SILVER = '#C4CED4';   // brand-silver
@@ -79,8 +83,10 @@ export function cpEmail(preheader, titleBand, greeting, bodyHtml, ctaUrl, ctaTex
   const footerNoteRow = footerNote
     ? `<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">${footerNote}</p>`
     : '';
+  // nowrap keeps a two-word label ("My Account") on one line when the
+  // footer row wraps on a phone; only the gaps between links can break.
   const footerLink = (href, label, colour = SILVER) =>
-    `<a href="${href}" style="color:${colour};text-decoration:none;">${label}</a>`;
+    `<a href="${href}" style="color:${colour};text-decoration:none;white-space:nowrap;">${label}</a>`;
   const dot = '<span style="color:#4B5563;">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>';
 
   return `<!DOCTYPE html>
@@ -121,11 +127,11 @@ ${cta}
 <tr><td class="cp-pad" style="background:${PANEL};border-top:1px solid ${RULE};padding:20px 40px;">
 <p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};">Questions about this email? Our team is at <a href="mailto:support@cardpop.com.au" style="color:${RED};text-decoration:none;font-weight:600;">support@cardpop.com.au</a>.</p>
 </td></tr>
-<tr><td class="cp-pad" style="background:${CHARCOAL};border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
-<p style="margin:0 0 4px;font-size:15px;font-weight:700;color:#FFFFFF;letter-spacing:-0.2px;">CardPop Australia</p>
-<p style="margin:0 0 16px;font-size:12px;color:${SILVER};">Australia's premium trading card marketplace</p>
+<tr><td class="cp-pad" style="background:${EMAIL_LOGO_BG};border-radius:0 0 12px 12px;padding:28px 40px;text-align:center;">
+<a href="https://cardpop.com.au" style="text-decoration:none;display:inline-block;margin:0 0 14px;"><img src="${EMAIL_LOGO_URL}" width="${EMAIL_FOOTER_LOGO_WIDTH}" alt="CardPop Australia" style="display:block;width:${EMAIL_FOOTER_LOGO_WIDTH}px;max-width:100%;height:auto;border:0;outline:none;margin:0 auto;font-family:${FONT};font-size:15px;font-weight:700;color:#FFFFFF;text-align:center;"></a>
+<p style="margin:0 0 16px;font-size:12px;color:${SILVER};">Australia's Premium Trading Card Marketplace</p>
 <p style="margin:0;font-size:12px;line-height:1.8;">${footerLink('https://cardpop.com.au', 'cardpop.com.au', '#FFFFFF')}${dot}${footerLink('https://cardpop.com.au/marketplace', 'Marketplace')}${dot}${footerLink('https://cardpop.com.au/account', 'My Account')}${dot}${footerLink('mailto:support@cardpop.com.au', 'Support')}</p>
-<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">&copy; ${year} CardPop Australia. All rights reserved.</p>
+<p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#8B95A5;">&copy; ${year} CardPop Australia. All Rights Reserved.</p>
 ${footerNoteRow}
 </td></tr>
 </table>
@@ -521,39 +527,108 @@ ${centred(`The refund goes back to your original payment method within ${MARKETP
 // Sent to the admin notification recipient when a user submits an event to the
 // community calendar. It's an internal heads-up, not a customer email, so it
 // links straight to the moderation queue rather than a public page.
-export function eventSubmittedEmail({ event }) {
+export function eventSubmittedEmail({ event, addedBy = null, byAdmin = false }) {
   const EVENT_TYPE_LABELS = {
     card_show: 'Card Show',
     trade_event: 'Trade Event',
     community_event: 'Community Event',
     lgs_event: 'LGS Event',
   };
+  const STATUS_LABELS = {
+    pending_review: 'Pending review',
+    approved: 'Live',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+    rejected: 'Rejected',
+  };
+  const pending = !event.status || event.status === 'pending_review';
   const location = [event.suburb, event.state].filter(Boolean).map(esc).join(', ') || '—';
   const startDate = event.start_date
     ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
     : '—';
-  const submittedBy = event.organizer_name
+  const organiser = event.organizer_name
     ? `${esc(event.organizer_name)}${event.organizer_email ? ` (${esc(event.organizer_email)})` : ''}`
     : (esc(event.organizer_email) || '—');
+  const title = esc(event.title) || 'Untitled';
 
-  const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
+  const intro = pending
+    ? `<p>${byAdmin ? 'An admin' : 'A community member'} has submitted a new event for review. It won't appear on the public calendar until it's approved.</p>`
+    : `<p>A new event has been added to CardPop${event.status === 'approved' ? ' and is already live on the events calendar' : ''}.</p>`;
+  const body = `${intro}
 ${summaryTable([
-  ['Event', esc(event.title) || 'Untitled'],
+  ['Event', title],
+  ['Status', STATUS_LABELS[event.status] || esc(event.status) || '—'],
   ['Type', EVENT_TYPE_LABELS[event.event_type] || esc(event.event_type) || '—'],
   ['Location', location],
   ['Start date', startDate],
-  ['Submitted by', submittedBy],
+  ['Organiser', organiser],
+  ['Added by', esc(addedBy) || '—'],
 ])}
-<p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
+<p>${pending ? 'Review it in Event Management to approve, edit, or reject the submission.' : 'You can check or edit it in Event Management.'}</p>`;
 
   return cpEmail(
-    `New event pending review: ${esc(event.title) || 'Untitled'}`,
-    'New Event Submission',
-    'A new event needs your review',
+    `${pending ? 'New event pending review' : 'New event added'}: ${title}`,
+    pending ? 'New Event Submission' : 'New Event Added',
+    pending ? 'A new event needs your review' : 'A new event is on CardPop',
     body,
     'https://cardpop.com.au/admin/events',
-    'Review in Admin',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+    pending ? 'Review in Admin' : 'Open Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
+  );
+}
+
+// ─── Event review outcome (to the organiser) ─────────────────────────────────
+
+// Sent to the member who submitted an event once an admin approves or rejects
+// it. `note` is the admin's rejection reason, shown as written. See
+// docs/event-submissions.md.
+export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl }) {
+  const title = esc(eventTitle) || 'your event';
+  const greeting = `Hi ${esc(name) || 'there'},`;
+  const noteHtml = note
+    ? `<p style="margin:16px 0;padding:12px 16px;border-left:3px solid #CE1126;background:#f6f6f6;">${esc(note).replace(/\n/g, '<br>')}</p>`
+    : '';
+  const band = approved ? 'Your Event Is Live' : 'Event Not Approved';
+  const body = approved
+    ? `<p><strong>${title}</strong> has been approved and is now on the CardPop events calendar.</p>
+<p>Need to change something later? Edit it any time under <strong>Account → My Events</strong> — your changes go live straight away.</p>`
+    : `<p>We reviewed <strong>${title}</strong> and couldn't approve it as submitted.</p>${noteHtml}
+<p>You can edit it and resubmit from <strong>Account → My Events</strong>.</p>`;
+  const ctaUrl = approved && eventUrl ? eventUrl : 'https://cardpop.com.au/account/events';
+  const ctaText = approved && eventUrl ? 'View your event' : 'Go to My Events';
+  return cpEmail(
+    `${band}: ${title}`,
+    band,
+    greeting,
+    body,
+    ctaUrl,
+    ctaText,
+    'You received this because you submitted this event to CardPop. Turn these emails off under Account → Notification Settings.',
+  );
+}
+
+// ─── Organiser edited their live event (admin notification) ──────────────────
+
+// Every admin gets exactly what changed: one row per field, before → after.
+// The changes are already live; the button opens the event's edit history in
+// Event Management. `rows` values are already human-readable strings.
+export function eventChangesMadeEmail({ event, editorName, rows }) {
+  const cell = 'padding:8px 10px;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:14px;';
+  const table = `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:16px 0;">
+<tr><th align="left" style="${cell}font-weight:700;">Field</th><th align="left" style="${cell}font-weight:700;">Before</th><th align="left" style="${cell}font-weight:700;">Now</th></tr>
+${(rows || []).map((r) => `<tr><td style="${cell}font-weight:600;">${esc(r.label)}</td><td style="${cell}color:#777;text-decoration:line-through;">${esc(r.from).replace(/\n/g, '<br>')}</td><td style="${cell}">${esc(r.to).replace(/\n/g, '<br>')}</td></tr>`).join('\n')}
+</table>`;
+  const body = `<p>${esc(editorName) || 'The organiser'} edited <strong>${esc(event?.title) || 'their event'}</strong>. The changes are already live${event?.url ? ` on <a href="${esc(event.url)}">the event page</a>` : ''}.</p>
+${table}
+<p>Check them in Event Management, edit the event if anything needs undoing, and mark them reviewed.</p>`;
+  return cpEmail(
+    `Live event edited: ${esc(event?.title) || 'Untitled'}`,
+    'Live Event Edited',
+    'An organiser changed their live event',
+    body,
+    'https://cardpop.com.au/admin/events?view=edits',
+    'Review in Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 

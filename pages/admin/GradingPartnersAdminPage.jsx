@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Link } from 'react-router-dom';
-import { Plus, Search, Pencil, Trash2, RefreshCw, ExternalLink, Handshake, GripVertical } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, RefreshCw, ExternalLink, Handshake, GripVertical, BadgeCheck } from 'lucide-react';
+import WebsiteBadgeDialog from '@/components/WebsiteBadgeDialog.jsx';
+import { gradingPartnerBadgeSnippet } from '@/utils/websiteBadge.js';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,6 +88,7 @@ const GradingPartnersAdminPage = () => {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [badgePartner, setBadgePartner] = useState(null);
   const [editing, setEditing] = useState(null); // null | 'new' | row
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
@@ -222,6 +225,7 @@ const GradingPartnersAdminPage = () => {
                   <Switch checked={!!p.is_active} onCheckedChange={() => toggleActive(p)} aria-label={`Show ${p.name}`} />
                 </TableCell>
                 <TableCell className="text-right">
+                  <Button variant="ghost" size="icon" onClick={() => setBadgePartner(p)} aria-label={`Website badge for ${p.name}`} title="Website badge"><BadgeCheck className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => openEdit(p)} aria-label={`Edit ${p.name}`}><Pencil className="h-4 w-4" /></Button>
                   <Button variant="ghost" size="icon" onClick={() => setDeleting(p)} aria-label={`Delete ${p.name}`}><Trash2 className="h-4 w-4 text-destructive" /></Button>
                 </TableCell>
@@ -324,6 +328,14 @@ const GradingPartnersAdminPage = () => {
         </DialogContent>
       </Dialog>
 
+      <WebsiteBadgeDialog
+        open={badgePartner !== null}
+        onClose={() => setBadgePartner(null)}
+        kind="gradingPartner"
+        snippet={badgePartner ? gradingPartnerBadgeSnippet(badgePartner) : ''}
+        title={badgePartner ? `Website badge for ${badgePartner.name}` : 'Website badge'}
+        description="Send this code to the partner to paste on their website. It links to CardPop's submission-partner list, where they're featured, which gives CardPop a relevant Australian backlink."
+      />
       <AlertDialog open={deleting !== null} onOpenChange={(o) => { if (!o) setDeleting(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>

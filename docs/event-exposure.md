@@ -47,3 +47,21 @@ badge** button. It gives them a copy-paste snippet
 and links to the event's CardPop page. It's a followed link, so a badge on
 the organiser's own site is a real backlink to the event page. Ask
 organisers to add it when you approve their event.
+
+## Seller and grading-partner badges
+
+The same copy-paste badge exists for two more kinds of partner. Both are built by
+`utils/websiteBadge.js` (shared with the event badge) and shown in
+`components/WebsiteBadgeDialog.jsx`:
+
+- **Sellers**: Account → Listings → **Website badge** gives a "Buy my cards on
+  CardPop" badge (`public/badges/sell-on-cardpop.svg`) linking to the seller's
+  storefront, `/seller/<id>`. Sellers can put it on a website, blog or
+  link-in-bio page.
+- **Grading submission partners**: Admin → Grading Partners → the badge icon on
+  each row gives a "CardPop grading partner" badge
+  (`public/badges/grading-partner-cardpop.svg`) linking to
+  `/grading/submission-partners`. Send it to the partner when you list them.
+
+Every badge is a followed link. Never add `rel="nofollow"`, because the backlink
+is the reason the badge exists (a test checks this).

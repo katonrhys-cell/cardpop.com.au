@@ -32,7 +32,9 @@ import { shopShippingTerms, shopShippingDetailsLd, marketplaceShippingDetailsLd,
 import { articleDisclosure } from '../utils/articleProvenance.js';
 import { cleanTicketPrices, ticketPriceOfferName, ticketPriceLines } from '../utils/eventTicketPrices.js';
 import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
-import { EVENT_REGIONS, eventRegionBySlug, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
+import { EVENT_REGIONS, eventRegionBySlug, eventRegionByState, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
+import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '../utils/eventNextEdition.js';
+import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH } from '../data/listYourEvent.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
@@ -1871,10 +1873,39 @@ async function renderEvent(supabase, param) {
     ],
   };
 
+  // A finished event links its next edition (utils/eventNextEdition.js) —
+  // the same banner the SPA shows — so last edition's search equity flows
+  // to the new dated page instead of dead-ending.
+  const today = new Date().toISOString().split('T')[0];
+  const lastDay = String(event.end_date || event.start_date || '').slice(0, 10);
+  const isPast = event.status === 'completed' || (Boolean(lastDay) && lastDay < today);
+  let nextEdition = null;
+  if (isPast) {
+    const { data: upcoming } = await supabase
+      .from('events')
+      .select(NEXT_EDITION_COLUMNS)
+      .eq('status', 'approved')
+      .gte('start_date', today)
+      .order('start_date', { ascending: true })
+      .limit(NEXT_EDITION_SCAN_LIMIT);
+    nextEdition = pickNextEdition(event, upcoming || [], today);
+  }
+  const region = eventRegionByState(event.state);
+  let nextEditionHtml = '';
+  if (nextEdition) {
+    const nextWhen = eventDateLine(nextEdition);
+    const nextWhere = eventLocationLine(nextEdition);
+    nextEditionHtml = `<p><strong>This event has finished.</strong> Next edition: <a href="${BASE_URL}/events/${esc(nextEdition.slug || nextEdition.id)}">${esc(nextEdition.title || 'Upcoming event')}</a>`
+      + `${nextWhen ? ` — ${esc(nextWhen)}` : ''}${nextWhere ? ` (${esc(nextWhere)})` : ''}</p>`;
+  } else if (isPast) {
+    nextEditionHtml = `<p><strong>This event has finished.</strong>${region ? ` See <a href="${BASE_URL}${eventRegionPath(region)}">upcoming card shows in ${esc(region.city)}</a>.` : ''}</p>`;
+  }
+
   const feeLine = event.is_free ? 'Free entry' : (event.entry_fee_aud > 0 ? `Entry: A$${Number(event.entry_fee_aud).toFixed(2)}` : '');
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
   <h1>${esc(name)}</h1>
+  ${nextEditionHtml}
   ${image ? `<img src="${esc(image)}" alt="${esc(name)}" />` : ''}
   <ul>
     ${when ? `<li>Date: ${esc(when)}</li>` : ''}
@@ -1890,6 +1921,7 @@ async function renderEvent(supabase, param) {
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
   ${organiserLinksHtml(event)}
+  ${region ? `<p><a href="${BASE_URL}${eventRegionPath(region)}">More card shows in ${esc(region.city)}</a></p>` : ''}
 </main>`;
 
   return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...videoLds], bodyHtml });
@@ -4149,8 +4181,28 @@ async function renderStoresCity(supabase, citySlug) {
     .order('name')
     .limit(200);
 
-  const title = `Card Shops in ${cityInfo.label} — Pokémon, TCG & Sports Card Stores | CardPop`;
-  const description = `Find trading card shops in ${cityInfo.label}, ${cityInfo.state}: local stores for Pokémon, sports cards, One Piece and other TCGs, plus upcoming card shows near ${cityInfo.label}.`;
+  // Same copy as the SPA page (utils/cardShopSeo.js), and the same upcoming
+  // events and FAQ — the bot document used to list the stores only.
+  const today = new Date().toISOString().split('T')[0];
+  const { data: upcoming } = await supabase
+    .from('events')
+    .select('id, slug, title, start_date, end_date, venue_name, suburb, state')
+    .eq('status', 'approved')
+    .eq('state', cityInfo.state)
+    .gte('start_date', today)
+    .order('start_date', { ascending: true })
+    .limit(6);
+  const events = upcoming || [];
+  const storeCount = (stores || []).length;
+  const title = cardShopCityTitle(cityInfo.label, storeCount);
+  const description = cardShopCityDescription(cityInfo.label, cityInfo.state, storeCount);
+  const faqs = cardShopCityFaqs(cityInfo.label, cityInfo.state);
+  const showsRegion = eventRegionByState(cityInfo.state);
+  const eventItems = events.map((ev) => {
+    const when = eventDateLine(ev);
+    const where = [ev.venue_name, ev.suburb].filter(Boolean).join(', ');
+    return `<li><a href="${BASE_URL}/events/${esc(ev.slug || ev.id)}">${esc(ev.title || 'Card event')}</a>${when ? ` — ${esc(when)}` : ''}${where ? ` (${esc(where)})` : ''}</li>`;
+  }).join('\n');
 
   const storeItems = (stores || []).map((store) => {
     const line = [store.suburb, store.state].filter(Boolean).join(', ');
@@ -4187,8 +4239,12 @@ async function renderStoresCity(supabase, citySlug) {
         },
       })),
     } : null,
+    faqPageLd(faqs),
   ].filter(Boolean);
 
+  const showsLink = showsRegion
+    ? `<a href="${BASE_URL}${eventRegionPath(showsRegion)}">Card shows in ${esc(showsRegion.city)} &amp; ${esc(showsRegion.stateName)}</a> · `
+    : '';
   return htmlDoc({
     title,
     description,
@@ -4200,7 +4256,9 @@ async function renderStoresCity(supabase, citySlug) {
 <h1>Card Shops in ${esc(cityInfo.label)}</h1>
 <p>${esc(description)}</p>
 <ul>${storeItems || '<li>No stores listed yet — know one? Add it below.</li>'}</ul>
-<p><a href="${BASE_URL}/card-shops/add">Add your store — free listing</a> · <a href="${BASE_URL}/events">Card events calendar</a></p>
+${eventItems ? `<h2>Upcoming card events in ${esc(cityInfo.state)}</h2>\n<ul>\n${eventItems}\n</ul>\n` : ''}<p>${showsLink}<a href="${BASE_URL}/events">Card events calendar</a> · <a href="${BASE_URL}/card-shops/add">Add your store — free listing</a></p>
+<h2>Frequently asked questions</h2>
+${faqs.map(({ q, a }) => `<h3>${esc(q)}</h3>\n<p>${esc(a)}</p>`).join('\n')}
 </main>`,
   });
 }

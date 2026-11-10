@@ -11,7 +11,7 @@ vi.mock('../../src/utils/ga4Client.js', () => ({
   SEARCH_CONSOLE_SCOPE: 'https://www.googleapis.com/auth/webmasters.readonly',
 }));
 
-const { getSiteUrl, isSearchConsoleConfigured, runSearchAnalytics } = await import('../../src/utils/searchConsoleClient.js');
+const { describeSiteUrlProblem, getSiteUrl, isSearchConsoleConfigured, runSearchAnalytics } = await import('../../src/utils/searchConsoleClient.js');
 
 const savedSite = process.env.GSC_SITE_URL;
 const restore = () => {
@@ -25,7 +25,11 @@ describe('searchConsoleClient configuration', () => {
     expect(getSiteUrl('sc-domain:cardpop.com.au')).toBe('sc-domain:cardpop.com.au');
     expect(getSiteUrl('  https://cardpop.com.au  ')).toBe('https://cardpop.com.au/');
     expect(getSiteUrl('https://cardpop.com.au/')).toBe('https://cardpop.com.au/');
-    expect(getSiteUrl('cardpop.com.au')).toBeNull();
+    expect(getSiteUrl('cardpop.com.au')).toBe('sc-domain:cardpop.com.au');
+    expect(getSiteUrl('"sc-domain: cardpop.com.au"')).toBe('sc-domain:cardpop.com.au');
+    expect(getSiteUrl('Search Console')).toBeNull();
+    expect(describeSiteUrlProblem('Search Console')).toMatch(/"Search Console".*sc-domain:cardpop\.com\.au/);
+    expect(describeSiteUrlProblem('sc-domain:cardpop.com.au')).toBeNull();
     expect(getSiteUrl('')).toBeNull();
     expect(getSiteUrl(undefined)).toBeNull();
   });

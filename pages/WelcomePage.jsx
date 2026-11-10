@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { safeInternalPath } from '@/lib/safeInternalPath.js';
 import { Helmet } from 'react-helmet-async';
-import { Loader2, MailWarning, Compass, Tag, ShieldCheck, ArrowRight } from 'lucide-react';
+import { Loader2, MailWarning, Compass, Tag, ShieldCheck, ArrowRight, LayoutDashboard, CalendarPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -14,8 +14,9 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 // tokens out of the URL and signs the user in, which AuthContext picks up.
 //
 // Once confirmed, the user picks what they came for: browse, start selling
-// (which enters the ID-verification → card-on-file chain), or add a first
-// card. Previously everyone was funneled straight into ID verification —
+// (which enters the ID-verification → card-on-file chain), add a first card,
+// list an event (Account → My Events with the submit form open), or go to
+// their dashboard. Previously everyone was funneled straight into ID verification —
 // a passport-and-selfie check before they'd seen a single card.
 //
 // This is a PUBLIC route (not wrapped in ProtectedRoute) on purpose: the user
@@ -129,6 +130,18 @@ const WelcomePage = () => {
             icon={ShieldCheck}
             title="Set up selling"
             desc="Verify your ID and add payout details — about 3 minutes"
+          />
+          <Choice
+            to="/account/events?new=1"
+            icon={CalendarPlus}
+            title="List an event"
+            desc="Running a card show, tournament or trade night? Submit it for review"
+          />
+          <Choice
+            to="/account"
+            icon={LayoutDashboard}
+            title="Go to your dashboard"
+            desc="Your account, collection, orders and settings in one place"
           />
         </div>
       </Panel>

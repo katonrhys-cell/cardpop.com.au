@@ -152,7 +152,7 @@ Search Console knows it.
 
 | Symptom | Cause |
 |---|---|
-| 503 `GA4 is not configured` | one of the two env vars is missing or the JSON isn't a service-account key (needs `client_email` + `private_key`) |
+| 503 `GA4 is not configured: …` | the message names the problem (`describeServiceAccountProblem()` / `describePropertyIdProblem()` in `src/utils/ga4Client.js`, never echoing the value): a variable missing from this deployment, a key cut short when pasted, an OAuth client JSON instead of a service-account key, or a `G-…` measurement id in `GA4_PROPERTY_ID`. The parser already tolerates a BOM, wrapping quotes, line-wrapped base64, a twice-encoded key and `\n` escapes expanded into real line breaks. If in doubt, paste the key as base64 (`base64 -w0 key.json`, or `base64 -i key.json` on a Mac) |
 | 502, logs show `token exchange failed (400)` | malformed key or clock skew; re-download the JSON key |
 | 502, logs show `runReport failed (403)` | the service account isn't a Viewer on the property, or the Analytics Data API isn't enabled in the Cloud project |
 | 502, `runReport failed (429)` | GA4 Data API quota — the job makes 2 requests a night, so this is another consumer |

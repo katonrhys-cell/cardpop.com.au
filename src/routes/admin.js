@@ -742,6 +742,7 @@ router.patch('/events/:id/organiser', validateRequestParams(eventRsvpsSchema), v
     if (updateError) throw updateError;
     if (!updated) return res.status(404).json({ error: 'Event not found' });
 
+
     logger.info(`[ADMIN] ${req.user.id} linked organiser ${matches[0].id} to event ${req.params.id}`);
     res.json({ organiser: await loadEventOrganiser(updated.organiser_id) });
   } catch (err) {
