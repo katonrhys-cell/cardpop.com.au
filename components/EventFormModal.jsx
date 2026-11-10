@@ -166,6 +166,7 @@ const ticketPricesToForm = (rows) => cleanTicketPrices(rows).map(r => ({
   type: r.type,
   price_aud: String(r.price_aud),
   ...(r.type === 'group' ? { group_size: String(r.group_size) } : {}),
+  ...(r.type === 'custom' ? { label: r.label, sold_out: r.sold_out === true, waitlist_url: r.waitlist_url || '' } : {}),
 }));
 const isBlankFormValue = (v) => v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
 

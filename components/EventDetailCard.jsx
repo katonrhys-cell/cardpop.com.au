@@ -251,7 +251,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
                 </div>
                 <div>
                   <p className="font-bold text-foreground">Entry</p>
-                  <EventEntryPrices event={event} />
+                  <EventEntryPrices event={event} isPast={isPast} />
                 </div>
               </div>
 

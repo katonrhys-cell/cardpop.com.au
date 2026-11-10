@@ -122,7 +122,7 @@ export function describeEventValue(field, value) {
     return v.map((x) => x?.title || x?.url).filter(Boolean).join('\n') || plural(v.length, 'video');
   }
   if (field === 'ticket_prices' && Array.isArray(v)) {
-    return ticketPriceLines(v).map((t) => `${t.label}: ${t.price}`).join('\n') || '—';
+    return ticketPriceLines(v).map((t) => `${t.label}: ${t.price}${t.soldOut ? ' (sold out)' : ''}`).join('\n') || '—';
   }
   if (Array.isArray(v)) return v.join(', ');
   if (typeof v === 'object') return JSON.stringify(v);

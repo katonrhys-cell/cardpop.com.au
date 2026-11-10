@@ -1612,18 +1612,18 @@ function buildEventLd(event) {
 // price hasn't been published yet — then one per extra ticket price
 // (utils/eventTicketPrices.js). Mirrors lib/eventSeo.js.
 function buildEventOffers(event, canonical, startDate) {
-  const mkOffer = (price, name) => ({
+  const mkOffer = (price, name, rowSoldOut = false) => ({
     '@type': 'Offer',
     price,
     priceCurrency: 'AUD',
-    availability: event.tickets_sold_out ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
+    availability: event.tickets_sold_out || rowSoldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
     url: event.ticket_url || event.website_url || canonical,
     ...(event.created_at || startDate ? { validFrom: event.created_at || startDate } : {}),
     ...(name ? { name } : {}),
   });
   const presaleFee = Number(event.presale_fee_aud) > 0 ? Number(event.presale_fee_aud) : null;
   const extraOffers = event.is_free ? [] : cleanTicketPrices(event.ticket_prices)
-    .map(row => mkOffer(row.price_aud.toFixed(2), ticketPriceOfferName(row)));
+    .map(row => mkOffer(row.price_aud.toFixed(2), ticketPriceOfferName(row), row.sold_out === true));
   if (!presaleFee && !extraOffers.length) {
     return mkOffer(event.is_free ? '0' : (Number(event.entry_fee_aud) > 0 ? Number(event.entry_fee_aud).toFixed(2) : '0'));
   }
@@ -1920,7 +1920,7 @@ async function renderEvent(supabase, param) {
     ${location ? `<li>Location: ${esc(location)}</li>` : ''}
     ${event.address ? `<li>Address: ${esc(event.address)}</li>` : ''}
     ${feeLine ? `<li>${esc(feeLine)}</li>` : ''}
-    ${event.is_free ? '' : ticketPriceLines(event.ticket_prices).map(({ label, price }) => `<li>${esc(label)}: ${esc(price)}</li>`).join('')}
+    ${event.is_free ? '' : ticketPriceLines(event.ticket_prices).map(({ label, price, soldOut, waitlistUrl }) => `<li>${esc(label)}: ${esc(price)}${soldOut ? ` — sold out${waitlistUrl && !isPast ? ` (<a href="${esc(waitlistUrl)}" rel="nofollow noopener">join the waitlist</a>)` : ''}` : ''}</li>`).join('')}
     ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
   </ul>
   ${organiserLogoHtml(event)}

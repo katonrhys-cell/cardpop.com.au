@@ -62,4 +62,5 @@ other field — `EVENT_LOGGED_FIELDS` and `event_logged_fields()` stay equal).
 - **Join the waitlist** appears under it when a waitlist URL is set. It is
   only shown while the event is sold out and upcoming; the prerender emits the
   same line (`ticketStatusHtml()`) for no-JS readers.
+- **Your own ticket types:** the ticket list also takes free-text tickets (`type: "custom"` rows in `events.ticket_prices` — a name like "Player Entry", a price, an optional per-ticket sold out flag and waitlist link). No schema change; `cleanTicketPrices()` is the one normaliser (names deduped, max 10, http(s) waitlist links only, a waitlist only kept while sold out). A sold-out ticket shows a badge and "Join the waitlist" on the event page, SoldOut in that ticket's JSON-LD offer.
 - The waitlist is the organiser's own page — CardPop stores only the link.
