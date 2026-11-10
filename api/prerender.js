@@ -2378,7 +2378,7 @@ const STATIC_CONTENT = {
     description: "CardPop's privacy policy — how we collect, use and protect your personal information on our Australian trading card marketplace.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Privacy Policy', path: '/privacy-policy' }],
     h1: 'Privacy Policy',
-    intro: 'Your trust is our top priority. Learn how we handle your data with transparency, and care. Effective 14 May 2026; last updated 11 November 2026.',
+    intro: 'Your trust is our top priority. Learn how we handle your data with transparency and care. Effective 14 May 2026; last updated 11 November 2026.',
     sections: [
       { h2: '1. Introduction', paras: ['CardPop respects your privacy and is committed to protecting personal data. This policy explains how we collect, use, disclose and safeguard information when you use the platform, digital vault, or trading marketplace.'] },
       { h2: '2. Information we collect', paras: ['Personal identification (name, email, address, phone), payment information (card details, billing address and transaction history via our payment partners), browsing data (IP, browser, device identifiers, pages visited), and communication data (records of support and member interactions).'] },
