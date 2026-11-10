@@ -31,13 +31,22 @@ describe('EventFormModal — user/admin field parity', () => {
     expect(screen.queryByText('Feature on Homepage')).not.toBeInTheDocument();
   });
 
-  it('shows every tab in both modes (Member Offer is admin-only)', () => {
+  it('shows every tab in both modes, Member Offer included (organisers set their own code)', () => {
     const { unmount } = renderForm('admin');
     const tabNames = (els) => els.map((el) => el.textContent);
     expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer']);
     unmount();
     renderForm('user');
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer']);
+  });
+
+  it('gives organisers their own wording on the Member Offer tab', () => {
+    renderForm('user');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Member Offer' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Member Offer' }));
+    expect(screen.getByText(/Offer CardPop members a discount on your tickets/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Ticket discount code/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Referral \/ tracking link/)).toBeInTheDocument();
   });
 
   it('shows the video fields in user mode: the YouTube list on Details, Facebook on Organiser', () => {

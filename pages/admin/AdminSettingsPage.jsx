@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Save, Settings, Shield, Mail, MessageSquare, LayoutGrid, RefreshCcw, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Save, Settings, Shield, Mail, MessageSquare, LayoutGrid, RefreshCcw, AlertCircle, Gift } from 'lucide-react';
+import { safeReferralUrl, WORKSPACE_REFERRAL_DEFAULT_URL } from '@/utils/workspaceReferral.js';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -31,6 +32,10 @@ const DEFAULT_SETTINGS = {
   enable_trading: false,
   enable_blog: true,
   banned_words: '',
+  // Google Workspace referral card on Account → Sole Trader / My Events
+  // (mirrors src/routes/settings.js)
+  google_workspace_referral_enabled: true,
+  google_workspace_referral_url: WORKSPACE_REFERRAL_DEFAULT_URL,
 };
 
 const AdminSettingsPage = () => {
@@ -149,12 +154,13 @@ const AdminSettingsPage = () => {
       </AdminPageHeader>
 
       <Tabs defaultValue="general" className="w-full">
-        <TabsList className="grid grid-cols-3 md:grid-cols-5 mb-6 bg-muted/50 p-1 rounded-xl h-auto">
+        <TabsList className="grid grid-cols-3 md:grid-cols-6 mb-6 bg-muted/50 p-1 rounded-xl h-auto">
           <TabsTrigger value="general" className="rounded-lg py-2.5"><Settings className="w-4 h-4 mr-1.5 hidden sm:block" />General</TabsTrigger>
           <TabsTrigger value="listings" className="rounded-lg py-2.5"><LayoutGrid className="w-4 h-4 mr-1.5 hidden sm:block" />Listings</TabsTrigger>
           <TabsTrigger value="moderation" className="rounded-lg py-2.5"><MessageSquare className="w-4 h-4 mr-1.5 hidden sm:block" />Moderation</TabsTrigger>
           <TabsTrigger value="security" className="rounded-lg py-2.5"><Shield className="w-4 h-4 mr-1.5 hidden sm:block" />Security</TabsTrigger>
           <TabsTrigger value="features" className="rounded-lg py-2.5"><Mail className="w-4 h-4 mr-1.5 hidden sm:block" />Features</TabsTrigger>
+          <TabsTrigger value="referrals" className="rounded-lg py-2.5"><Gift className="w-4 h-4 mr-1.5 hidden sm:block" />Referrals</TabsTrigger>
         </TabsList>
 
         {/* General */}
@@ -342,6 +348,41 @@ const AdminSettingsPage = () => {
                   <p className="text-sm text-muted-foreground">Show the blog section and published articles.</p>
                 </div>
                 <Switch checked={!!settings.enable_blog} onCheckedChange={v => set('enable_blog', v)} />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* Referrals */}
+        <TabsContent value="referrals">
+          <Card className="border-border shadow-sm rounded-xl">
+            <CardHeader>
+              <CardTitle>Google Workspace Referral</CardTitle>
+              <CardDescription>
+                A card offering Google Workspace to sole traders (Account → Sole Trader) and event organisers (Account → My Events). Never shown on buying pages. Clicks are tracked in GA4 as <code>click_referral</code>.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="flex items-center justify-between max-w-md rounded-lg border border-border p-3 bg-muted/30">
+                <div className="space-y-0.5">
+                  <Label>Show referral card</Label>
+                  <p className="text-sm text-muted-foreground">Turn off to hide the card everywhere.</p>
+                </div>
+                <Switch checked={settings.google_workspace_referral_enabled !== false && settings.google_workspace_referral_enabled !== 'false'} onCheckedChange={v => set('google_workspace_referral_enabled', v)} />
+              </div>
+              <div className="space-y-2 max-w-xl">
+                <Label>Referral link</Label>
+                <Input
+                  type="url"
+                  value={settings.google_workspace_referral_url ?? ''}
+                  onChange={e => set('google_workspace_referral_url', e.target.value)}
+                  placeholder={WORKSPACE_REFERRAL_DEFAULT_URL}
+                  className="bg-background"
+                />
+                {settings.google_workspace_referral_url && !safeReferralUrl(settings.google_workspace_referral_url) ? (
+                  <p className="text-xs text-destructive">Must be a full https:// link. The card stays hidden until it is.</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Your unique link from the Impact referral email or dashboard. Changes show on the site within about a minute of saving.</p>
+                )}
               </div>
             </CardContent>
           </Card>

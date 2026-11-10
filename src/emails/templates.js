@@ -521,69 +521,73 @@ ${centred(`The refund goes back to your original payment method within ${MARKETP
 // Sent to the admin notification recipient when a user submits an event to the
 // community calendar. It's an internal heads-up, not a customer email, so it
 // links straight to the moderation queue rather than a public page.
-export function eventSubmittedEmail({ event }) {
+export function eventSubmittedEmail({ event, addedBy = null, byAdmin = false }) {
   const EVENT_TYPE_LABELS = {
     card_show: 'Card Show',
     trade_event: 'Trade Event',
     community_event: 'Community Event',
     lgs_event: 'LGS Event',
   };
+  const STATUS_LABELS = {
+    pending_review: 'Pending review',
+    approved: 'Live',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+    rejected: 'Rejected',
+  };
+  const pending = !event.status || event.status === 'pending_review';
   const location = [event.suburb, event.state].filter(Boolean).map(esc).join(', ') || '—';
   const startDate = event.start_date
     ? new Date(event.start_date).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
     : '—';
-  const submittedBy = event.organizer_name
+  const organiser = event.organizer_name
     ? `${esc(event.organizer_name)}${event.organizer_email ? ` (${esc(event.organizer_email)})` : ''}`
     : (esc(event.organizer_email) || '—');
+  const title = esc(event.title) || 'Untitled';
 
-  const body = `<p>A community member has submitted a new event for review. It won't appear on the public calendar until you approve it.</p>
+  const intro = pending
+    ? `<p>${byAdmin ? 'An admin' : 'A community member'} has submitted a new event for review. It won't appear on the public calendar until it's approved.</p>`
+    : `<p>A new event has been added to CardPop${event.status === 'approved' ? ' and is already live on the events calendar' : ''}.</p>`;
+  const body = `${intro}
 ${summaryTable([
-  ['Event', esc(event.title) || 'Untitled'],
+  ['Event', title],
+  ['Status', STATUS_LABELS[event.status] || esc(event.status) || '—'],
   ['Type', EVENT_TYPE_LABELS[event.event_type] || esc(event.event_type) || '—'],
   ['Location', location],
   ['Start date', startDate],
-  ['Submitted by', submittedBy],
+  ['Organiser', organiser],
+  ['Added by', esc(addedBy) || '—'],
 ])}
-<p>Review it in the Events moderation queue to approve, edit, or reject the submission.</p>`;
+<p>${pending ? 'Review it in Event Management to approve, edit, or reject the submission.' : 'You can check or edit it in Event Management.'}</p>`;
 
   return cpEmail(
-    `New event pending review: ${esc(event.title) || 'Untitled'}`,
-    'New Event Submission',
-    'A new event needs your review',
+    `${pending ? 'New event pending review' : 'New event added'}: ${title}`,
+    pending ? 'New Event Submission' : 'New Event Added',
+    pending ? 'A new event needs your review' : 'A new event is on CardPop',
     body,
     'https://cardpop.com.au/admin/events',
-    'Review in Admin',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+    pending ? 'Review in Admin' : 'Open Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 
 // ─── Event review outcome (to the organiser) ─────────────────────────────────
 
-// Sent to the member who submitted an event (kind 'submission') or asked to
-// change a live one (kind 'changes') once an admin decides. `note` is the
-// admin's reason / message, shown as written. See docs/event-submissions.md.
-export function eventReviewOutcomeEmail({ name, eventTitle, kind = 'submission', approved, note, eventUrl }) {
+// Sent to the member who submitted an event once an admin approves or rejects
+// it. `note` is the admin's rejection reason, shown as written. See
+// docs/event-submissions.md.
+export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl }) {
   const title = esc(eventTitle) || 'your event';
   const greeting = `Hi ${esc(name) || 'there'},`;
   const noteHtml = note
     ? `<p style="margin:16px 0;padding:12px 16px;border-left:3px solid #CE1126;background:#f6f6f6;">${esc(note).replace(/\n/g, '<br>')}</p>`
     : '';
-  let band;
-  let body;
-  if (kind === 'changes') {
-    band = approved ? 'Your Changes Are Live' : 'Changes Not Applied';
-    body = approved
-      ? `<p>The changes you asked for on <strong>${title}</strong> have been approved and are now on the event page.</p>${noteHtml}`
-      : `<p>We reviewed the changes you asked for on <strong>${title}</strong> and haven't applied them, so the event page is unchanged.</p>${noteHtml}
-<p>You can send a new request from <strong>Account → My Events</strong>.</p>`;
-  } else {
-    band = approved ? 'Your Event Is Live' : 'Event Not Approved';
-    body = approved
-      ? `<p><strong>${title}</strong> has been approved and is now on the CardPop events calendar.</p>${noteHtml}
-<p>Need to change something later? Use <strong>Request changes</strong> under Account → My Events — the live page stays as it is until we approve the update.</p>`
-      : `<p>We reviewed <strong>${title}</strong> and couldn't approve it as submitted.</p>${noteHtml}
+  const band = approved ? 'Your Event Is Live' : 'Event Not Approved';
+  const body = approved
+    ? `<p><strong>${title}</strong> has been approved and is now on the CardPop events calendar.</p>
+<p>Need to change something later? Edit it any time under <strong>Account → My Events</strong> — your changes go live straight away.</p>`
+    : `<p>We reviewed <strong>${title}</strong> and couldn't approve it as submitted.</p>${noteHtml}
 <p>You can edit it and resubmit from <strong>Account → My Events</strong>.</p>`;
-  }
   const ctaUrl = approved && eventUrl ? eventUrl : 'https://cardpop.com.au/account/events';
   const ctaText = approved && eventUrl ? 'View your event' : 'Go to My Events';
   return cpEmail(
@@ -597,24 +601,28 @@ export function eventReviewOutcomeEmail({ name, eventTitle, kind = 'submission',
   );
 }
 
-// ─── Organiser asked to change a live event (admin notification) ─────────────
+// ─── Organiser edited their live event (admin notification) ──────────────────
 
-export function eventChangeRequestedEmail({ event, organiserName, fields }) {
-  const body = `<p>The organiser of a live event has asked to change it. The event page stays as it is until you apply the changes.</p>
-${summaryTable([
-  ['Event', esc(event?.title) || 'Untitled'],
-  ['Requested by', esc(organiserName) || '—'],
-  ['Fields', (fields || []).map(esc).join(', ') || '—'],
-])}
-<p>Review the changes in Event Management to apply or dismiss them.</p>`;
+// Every admin gets exactly what changed: one row per field, before → after.
+// The changes are already live; the button opens the event's edit history in
+// Event Management. `rows` values are already human-readable strings.
+export function eventChangesMadeEmail({ event, editorName, rows }) {
+  const cell = 'padding:8px 10px;border-bottom:1px solid #e5e5e5;vertical-align:top;font-size:14px;';
+  const table = `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:16px 0;">
+<tr><th align="left" style="${cell}font-weight:700;">Field</th><th align="left" style="${cell}font-weight:700;">Before</th><th align="left" style="${cell}font-weight:700;">Now</th></tr>
+${(rows || []).map((r) => `<tr><td style="${cell}font-weight:600;">${esc(r.label)}</td><td style="${cell}color:#777;text-decoration:line-through;">${esc(r.from).replace(/\n/g, '<br>')}</td><td style="${cell}">${esc(r.to).replace(/\n/g, '<br>')}</td></tr>`).join('\n')}
+</table>`;
+  const body = `<p>${esc(editorName) || 'The organiser'} edited <strong>${esc(event?.title) || 'their event'}</strong>. The changes are already live${event?.url ? ` on <a href="${esc(event.url)}">the event page</a>` : ''}.</p>
+${table}
+<p>Check them in Event Management, edit the event if anything needs undoing, and mark them reviewed.</p>`;
   return cpEmail(
-    `Event changes to review: ${esc(event?.title) || 'Untitled'}`,
-    'Event Changes Requested',
-    'An organiser wants to update their event',
+    `Live event edited: ${esc(event?.title) || 'Untitled'}`,
+    'Live Event Edited',
+    'An organiser changed their live event',
     body,
-    'https://cardpop.com.au/admin/events?view=changes',
-    'Review changes',
-    'You received this because you are the CardPop admin contact. Change the recipient under Admin → Platform Settings → Notification Email.',
+    'https://cardpop.com.au/admin/events?view=edits',
+    'Review in Event Management',
+    'You received this because you are a CardPop admin. Change the extra recipient under Admin → Platform Settings → Notification Email.',
   );
 }
 

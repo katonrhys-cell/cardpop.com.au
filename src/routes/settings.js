@@ -30,6 +30,12 @@ const PUBLIC_SETTINGS = {
   // checkout page (the server still prices it — src/services/cartService.js).
   free_shipping_threshold_aud: 100,
   default_shipping_rate_aud: 15,
+  // Google Workspace referral (Impact advocate link) shown to sole traders and
+  // event organisers in their account pages (components/WorkspaceReferralCard.jsx).
+  // Editable at Admin → Settings → Referrals so the link can change without a
+  // deploy; the browser only renders an https URL (utils/workspaceReferral.js).
+  google_workspace_referral_enabled: true,
+  google_workspace_referral_url: 'https://sharegoogleworkspace.advocate.impact.com/mQZonNp',
 };
 
 // platform_settings.value is jsonb: booleans store as real JSON booleans, but

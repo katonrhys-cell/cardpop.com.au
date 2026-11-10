@@ -3,28 +3,28 @@ import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requireAdmin } from '../middleware/requireAal2.js';
-import { sendEventSubmitted, sendEventReviewOutcome, sendEventChangeRequested } from '../utils/emailService.js';
+import { sendEventSubmitted, sendEventReviewOutcome, sendEventChangesMade } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
-import { EVENT_CHANGE_LABELS } from '../../utils/eventChangeRequests.js';
+import { mergeChangeLog, changeRows, describeEventValue } from '../../utils/eventChangeLog.js';
 
 const router = Router();
 
 /**
  * POST /events/notify-submission
  *
- * Fired by the user-facing event form immediately after a user inserts a
- * `pending_review` event, so a new community submission doesn't sit unnoticed
- * in the moderation queue. Emails every admin account, plus the dedicated
- * Notification Email set under Admin → Platform Settings (falls back to the
- * contact address, then a default alerts inbox) for backward compatibility.
- * A separate DB trigger (see supabase/migrations) also fans out an in-app
- * notification to every admin — this endpoint only handles the email leg.
+ * Fired by the event form right after anyone adds an event — a member's
+ * submission (pending review), an admin's own event (often live straight
+ * away), or a member's resubmission of a rejected event — so every admin
+ * hears about every event. Emails every admin account plus the Notification
+ * Email under Admin → Platform Settings (getAdminNotificationEmails), minus
+ * the person who added it. The bell to every admin comes from a DB trigger
+ * (notify_admins_on_event_submission); this endpoint is the email leg.
+ * The nightly scanner's finds (auto_discovered) have their own queue.
  *
- * Auth + ownership are checked so a user can only trigger a notice for their own
- * freshly-submitted, still-pending event — never email an arbitrary address or
- * re-notify on an already-approved one. Fail-safe: the submission itself already
- * succeeded client-side, so any error here is logged and surfaced without
- * affecting the user's saved event.
+ * Only the event's own creator can trigger it, and it sends once per
+ * submission: the send is claimed through events.admins_notified_at, which
+ * the DB clears again when a rejected event is resubmitted. Fail-safe: the
+ * event is already saved, so any error is logged and reported only.
  */
 router.post('/notify-submission', authMiddleware, async (req, res) => {
   const { eventId } = req.body || {};
@@ -33,25 +33,52 @@ router.post('/notify-submission', authMiddleware, async (req, res) => {
   try {
     const { data: event, error } = await supabase
       .from('events')
-      .select('id, title, event_type, status, suburb, state, start_date, organiser_id, organizer_name, organizer_email')
+      .select('id, title, slug, event_type, status, suburb, state, start_date, organiser_id, organizer_name, organizer_email, auto_discovered, admins_notified_at')
       .eq('id', eventId)
       .maybeSingle();
     if (error) throw error;
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
-    // Only the submitter can trigger the notice, and only while the event is
-    // actually awaiting review — closes the "email anyone / re-notify" hole.
+    // Only the person who added the event can trigger the notice — closes the
+    // "email the admins about anything, any time" hole.
     if (event.organiser_id !== req.user.id) {
       return res.status(403).json({ error: 'You can only notify for your own event' });
     }
-    if (event.status !== 'pending_review') {
-      return res.json({ ok: true, skipped: 'not_pending' });
-    }
+    if (event.auto_discovered) return res.json({ ok: true, skipped: 'auto_discovered' });
+    // A draft hasn't been submitted — it's the organiser's own until they do.
+    if (event.status === 'draft') return res.json({ ok: true, skipped: 'draft' });
+    if (event.admins_notified_at) return res.json({ ok: true, skipped: 'already_sent' });
 
-    const recipients = await getAdminNotificationEmails();
-    await sendEventSubmitted({ to: recipients, event });
+    // Claim the send before making it, so a double call can't email twice.
+    const { data: claimed, error: claimError } = await supabase
+      .from('events')
+      .update({ admins_notified_at: new Date().toISOString() })
+      .eq('id', event.id)
+      .is('admins_notified_at', null)
+      .select('id');
+    if (claimError) throw claimError;
+    if (!claimed?.length) return res.json({ ok: true, skipped: 'already_sent' });
 
-    logger.info(`[EVENTS] Notified ${recipients.join(', ')} of pending event ${event.id}`);
+    const { data: creator } = await supabase
+      .from('profiles')
+      .select('email, display_name, username, is_admin')
+      .eq('id', req.user.id)
+      .maybeSingle();
+    const creatorEmail = creator?.email?.trim().toLowerCase() || null;
+    const all = await getAdminNotificationEmails();
+    // An admin doesn't need an email about the event they just added — unless
+    // they're the only recipient.
+    const others = creatorEmail ? all.filter((a) => a.trim().toLowerCase() !== creatorEmail) : all;
+    const recipients = others.length ? others : all;
+
+    await sendEventSubmitted({
+      to: recipients,
+      event,
+      addedBy: creator?.display_name || creator?.username || null,
+      byAdmin: Boolean(creator?.is_admin),
+    });
+
+    logger.info(`[EVENTS] Notified ${recipients.length} admin address(es) of new event ${event.id} (${event.status})`);
     res.json({ ok: true });
   } catch (err) {
     logger.error(`[EVENTS] notify-submission failed: ${err.message}`);
@@ -128,11 +155,11 @@ router.get('/:id/vendors', authMiddleware, async (req, res) => {
   }
 });
 
-// ─── Organiser emails: review outcomes and change requests ───────────────────
+// ─── Review outcomes and organiser edits ─────────────────────────────────────
 // The bell for each of these comes from DB triggers
 // (20261109235618_event_organiser_review_flow.sql); these routes are the email
 // leg. The admin UI calls them right after its decision write. Each send is
-// stamped (events.organiser_notified_status, event_change_requests.*_emailed_at)
+// stamped (events.organiser_notified_status, event_change_log.admins_emailed_at)
 // so a repeat call — a double click, a retry — never emails twice. Fail-safe:
 // the decision is already saved, so errors are logged and reported only.
 // See docs/event-submissions.md.
@@ -191,7 +218,6 @@ router.post('/:id/notify-decision', authMiddleware, requireAdmin, async (req, re
       to: to.email,
       name: to.name,
       eventTitle: event.title,
-      kind: 'submission',
       approved,
       note: approved ? null : event.rejection_reason,
       eventUrl: eventUrl(event),
@@ -204,99 +230,68 @@ router.post('/:id/notify-decision', authMiddleware, requireAdmin, async (req, re
 });
 
 /**
- * POST /events/change-requests/:id/notify-admins  (the requesting organiser)
+ * POST /events/:id/notify-changes  (the event's organiser)
  *
- * Emails the admin notification addresses that a live event has an open
- * change request. Once per request.
+ * Emails every admin exactly what the organiser just changed on their live
+ * event — each field before → after. The changes are already live and logged
+ * by the DB (event_change_log, which also bells every admin); the form calls
+ * this after saving the event and its offer. Sends every log entry the caller
+ * made on this event that hasn't been emailed yet, merged into one email, and
+ * stamps them first so a repeat never emails twice.
  */
-router.post('/change-requests/:id/notify-admins', authMiddleware, async (req, res) => {
-  const requestId = req.params.id;
-  if (!UUID_RE.test(requestId)) return res.status(400).json({ error: 'Invalid request ID' });
+const MAX_EMAIL_VALUE = 300;
+const clip = (s) => (s.length > MAX_EMAIL_VALUE ? `${s.slice(0, MAX_EMAIL_VALUE - 1)}…` : s);
+
+router.post('/:id/notify-changes', authMiddleware, async (req, res) => {
+  const eventId = req.params.id;
+  if (!UUID_RE.test(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
   try {
-    const { data: request, error } = await supabase
-      .from('event_change_requests')
-      .select('id, event_id, organiser_id, status, changes, admins_emailed_at')
-      .eq('id', requestId)
+    const { data: event, error } = await supabase
+      .from('events')
+      .select('id, title, slug, organiser_id')
+      .eq('id', eventId)
       .maybeSingle();
     if (error) throw error;
-    if (!request) return res.status(404).json({ error: 'Change request not found' });
-    if (request.organiser_id !== req.user.id) return res.status(403).json({ error: 'You can only notify for your own request' });
-    if (request.status !== 'pending' || request.admins_emailed_at) return res.json({ ok: true, skipped: 'already_sent' });
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (event.organiser_id !== req.user.id) {
+      return res.status(403).json({ error: 'You can only notify for your own event' });
+    }
 
-    const { data: claimed, error: claimError } = await supabase
-      .from('event_change_requests')
+    // Claim this caller's un-emailed entries in one statement.
+    const { data: entries, error: claimError } = await supabase
+      .from('event_change_log')
       .update({ admins_emailed_at: new Date().toISOString() })
-      .eq('id', request.id)
+      .eq('event_id', event.id)
+      .eq('changed_by', req.user.id)
       .is('admins_emailed_at', null)
-      .select('id');
+      .select('id, changes, created_at');
     if (claimError) throw claimError;
-    if (!claimed?.length) return res.json({ ok: true, skipped: 'already_sent' });
+    if (!entries?.length) return res.json({ ok: true, skipped: 'nothing_new' });
 
-    const [{ data: event }, { data: profile }] = await Promise.all([
-      supabase.from('events').select('id, title').eq('id', request.event_id).maybeSingle(),
-      supabase.from('profiles').select('display_name, username').eq('id', request.organiser_id).maybeSingle(),
-    ]);
-    const fields = Object.keys(request.changes || {}).map((f) => EVENT_CHANGE_LABELS[f] || f);
+    const rows = changeRows(mergeChangeLog(entries)).map(({ field, label, from, to }) => ({
+      label,
+      from: clip(describeEventValue(field, from)),
+      to: clip(describeEventValue(field, to)),
+    }));
+    if (!rows.length) return res.json({ ok: true, skipped: 'no_net_change' });
+
+    const { data: editor } = await supabase
+      .from('profiles')
+      .select('display_name, username')
+      .eq('id', req.user.id)
+      .maybeSingle();
     const recipients = await getAdminNotificationEmails();
-    await sendEventChangeRequested({
+    await sendEventChangesMade({
       to: recipients,
-      event: event || { title: 'An event' },
-      organiserName: profile?.display_name || profile?.username || null,
-      fields,
+      event: { ...event, url: eventUrl(event) },
+      editorName: editor?.display_name || editor?.username || null,
+      rows,
     });
+    logger.info(`[EVENTS] Emailed ${recipients.length} admin address(es) ${rows.length} change(s) to live event ${event.id}`);
     res.json({ ok: true });
   } catch (err) {
-    logger.error(`[EVENTS] change-request notify-admins failed for ${requestId}: ${err.message}`);
+    logger.error(`[EVENTS] notify-changes failed for ${eventId}: ${err.message}`);
     res.status(500).json({ error: 'Failed to send notification' });
-  }
-});
-
-/**
- * POST /events/change-requests/:id/notify-decision  (admin)
- *
- * Emails the organiser that their changes were applied or dismissed (with the
- * admin's note). Once per request.
- */
-router.post('/change-requests/:id/notify-decision', authMiddleware, requireAdmin, async (req, res) => {
-  const requestId = req.params.id;
-  if (!UUID_RE.test(requestId)) return res.status(400).json({ error: 'Invalid request ID' });
-  try {
-    const { data: request, error } = await supabase
-      .from('event_change_requests')
-      .select('id, event_id, organiser_id, status, review_note, organiser_emailed_at')
-      .eq('id', requestId)
-      .maybeSingle();
-    if (error) throw error;
-    if (!request) return res.status(404).json({ error: 'Change request not found' });
-    if (!['applied', 'dismissed'].includes(request.status)) return res.json({ ok: true, skipped: 'undecided' });
-    if (request.organiser_emailed_at || request.organiser_id === req.user.id) return res.json({ ok: true, skipped: 'already_sent' });
-
-    const approved = request.status === 'applied';
-    const to = await organiserRecipient(request.organiser_id, approved ? 'event_approved' : 'event_rejected');
-    const { data: claimed, error: claimError } = await supabase
-      .from('event_change_requests')
-      .update({ organiser_emailed_at: new Date().toISOString() })
-      .eq('id', request.id)
-      .is('organiser_emailed_at', null)
-      .select('id');
-    if (claimError) throw claimError;
-    if (!claimed?.length) return res.json({ ok: true, skipped: 'already_sent' });
-    if (!to) return res.json({ ok: true, skipped: 'no_recipient' });
-
-    const { data: event } = await supabase.from('events').select('id, title, slug').eq('id', request.event_id).maybeSingle();
-    const sent = await sendEventReviewOutcome({
-      to: to.email,
-      name: to.name,
-      eventTitle: event?.title,
-      kind: 'changes',
-      approved,
-      note: request.review_note,
-      eventUrl: event ? eventUrl(event) : null,
-    });
-    res.json({ ok: true, sent: Boolean(sent) });
-  } catch (err) {
-    logger.error(`[EVENTS] change-request notify-decision failed for ${requestId}: ${err.message}`);
-    res.status(500).json({ error: 'Failed to email the organiser' });
   }
 });
 

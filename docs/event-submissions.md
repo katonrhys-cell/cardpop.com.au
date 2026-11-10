@@ -1,54 +1,87 @@
 # Member event submissions
 
 How a member (an organiser who isn't a CardPop admin) gets an event onto the
-calendar, keeps it up to date, and hears back from us.
+calendar, keeps it up to date, and how admins stay across it.
+
+## Ownership — the hard rule
+
+A member can see and change **only their own events** (`events.organiser_id =
+auth.uid()`). Everything else belongs to admins. Enforced in the database, not
+the UI:
+
+- `events` — members insert only as themselves (the guard trigger overwrites
+  `organiser_id` and `status`), and update only their own event while it is
+  `pending_review`, `rejected` or `approved`. They can never set the status,
+  featuring, the CardPop-verified badge, the slug, the owner or any review
+  column (`trg_guard_event_organiser_write`), and can't delete an event.
+- `event_ticket_offers` — the member ticket offer of their own event only.
+- `event_change_log` — they read only their own entries; only admins mark
+  them reviewed.
+- Event info board, stalls and stall layout — `can_manage_event_board()` is
+  admins + the event's organiser (vendors used to qualify; not any more), and
+  a board post can't be moved onto another event.
+- RSVPs and collector reviews are each person's own rows.
+
+Test: `tests/db/run-event-organiser-review-migration.sh` (applies
+`20261109235618_event_organiser_review_flow.sql`,
+`20261110002320_event_organiser_offers_and_admin_alerts.sql`,
+`20261110020313_event_status_draft.sql` and
+`20261110020314_event_organiser_drafts.sql`). Drafts: an organiser inserts
+or saves `draft` or `pending_review` (the guard forces anything else to
+pending, and a live event stays `approved`), may delete only their own
+draft, and `notify_admins_on_event_submission()` / `POST
+/events/notify-submission` ignore drafts — submitting one is a new submission.
 
 ## The flow
 
-| Stage | Organiser (Account → My Events) | Admin (Admin → Event Management) |
+| Stage | Organiser (Account → My Events) | Admins (Admin → Event Management) |
 |---|---|---|
-| **Submit** | **Submit Event** → the form in user mode (no Status, Featured, Member Offer or re-scan controls). Saved as `pending_review`. | Bell (`event_pending_review`, DB trigger) + email (`POST /events/notify-submission`). |
-| **Pending** | **Edit** freely. | Toggle on = approve. **Ban** icon = reject with a reason. Or set the status in the form (a *Reason for the organiser* box appears for Rejected). |
-| **Approved** | Bell `event_approved` + email "Your event is live". Badge **Live**, **View Live**, **Website badge**, **Request changes**. | — |
-| **Rejected** | Bell `event_rejected` + email with the reason. Reason shown on the row. **Edit & resubmit** puts it back to `pending_review` (admins are belled and emailed again). | — |
-| **Live, needs a change** | **Request changes** opens the same form prefilled. Saving records only the changed fields as an `event_change_requests` row. **The live page is unchanged** until an admin applies it. Badge **Changes pending review**; editing again updates the same request (saving with no differences withdraws it). | Bell `event_change_requested` + email listing the fields. **Change requests (n)** filter / **Changes requested** badge opens a current → requested comparison. **Apply changes** or **Dismiss**, with an optional note. |
-| **Changes decided** | Bell + email: "Your event changes are live" / "weren't applied" (+ note). A dismissed request's note shows on the row. | — |
+| **Draft** | **Save Draft** on the form keeps the event private (`draft`): only the organiser sees it, under **Drafts** at the top of My Events, where they can **Edit & submit** or **Delete** it. A pending or rejected event can be parked back in drafts; a live one can't. | Nothing — no bell, no email, and the publish toggle is off for drafts. Admins can still see drafts in Event Management (status *Organiser draft*). |
+| **Submit** | **Submit Event** → the form in user mode (no Status, Featured or re-scan controls), incl. the **Member Offer** tab for their own ticket discount code and referral link (`docs/event-ticket-offers.md`). Saved as `pending_review`. | **Every admin**: bell (`event_pending_review`) + email. |
+| **Pending** | **Edit** freely. | Toggle on = approve. **Ban** icon = reject with a reason (or set the status in the form; a *Reason for the organiser* box appears). |
+| **Approved** | Bell `event_approved` + email "Your event is live". | — |
+| **Rejected** | Bell `event_rejected` + email with the reason, shown on the row. **Edit & resubmit** puts it back to `pending_review`. | Every admin: bell ("Event resubmitted") + email again. |
+| **Live, edited** | **Edit** — the save **goes live straight away** and the event stays approved. Offer changes too. | Every admin: bell `event_updated` + email with a **Field / Before / Now** table. In Event Management the row shows **Edited by organiser (n)** (and an **Organiser edits (n)** filter); it opens the field-by-field history with **Mark as reviewed**. The **History** icon on any live event shows past edits. To undo something, edit the event. |
 
-Organisers can turn the two organiser emails/bells off under Account →
+**Every event a person adds alerts every admin** — a member's submission or
+resubmission (`event_pending_review`), and an admin's own event, often live
+straight away (`event_created`), which goes to every *other* admin. The nightly
+scanner's finds (`auto_discovered`) are left to their own queue.
+
+Organisers can turn their approve / reject emails and bells off under Account →
 Notification Settings → *Events you organise*.
 
 ## Where it lives
 
-- **Schema:** `supabase/migrations/20261109235618_event_organiser_review_flow.sql`
-  (test: `tests/db/run-event-organiser-review-migration.sh`).
-  - `trg_guard_event_organiser_write` — a non-admin can't set `is_featured`,
-    `is_cardpop_verified`, `auto_discovered`, `organiser_id`, `slug`, or the
-    review columns; admin decisions stamp `reviewed_at` / `reviewed_by`, and
-    approval clears `rejection_reason`.
-  - Organiser UPDATE policy: editable while `pending_review` or `rejected`,
-    and every save lands in `pending_review`.
-  - `on_event_decision_notify_organiser` — the organiser's bell on approve /
-    reject (never for an admin deciding their own event).
-  - `event_change_requests` — one open (`pending`) request per event. Only the
-    columns in `event_change_request_fields()` survive (kept equal to
-    `EVENT_CHANGE_FIELDS` in `utils/eventChangeRequests.js` by a test). An
-    organiser can only open one on their own **approved** event and can't
-    decide it. `apply_event_change_request(id, note)` (admin-only, security
-    definer) writes the changes to the event and marks it applied in one
-    transaction.
-- **Emails:** `src/routes/events.js` — `POST /events/:id/notify-decision`
-  (admin), `POST /events/change-requests/:id/notify-admins` (the organiser),
-  `POST /events/change-requests/:id/notify-decision` (admin). The browser calls
-  them fire-and-forget after the write (`lib/eventReviewApi.js`); each send is
-  claimed first (`events.organiser_notified_status`,
-  `event_change_requests.admins_emailed_at` / `organiser_emailed_at`) so a
-  repeat never emails twice. Templates: `eventReviewOutcomeEmail`,
-  `eventChangeRequestedEmail` in `src/emails/templates.js`.
-- **UI:** `pages/account/AccountEvents.jsx`, `components/EventFormModal.jsx`
-  (`baseEvent` / `changeRequest` props → change-request mode),
+- **Change log:** `event_change_log` — one row per organiser save on a live
+  event, `changes = { field: { from, to } }`, written by
+  `log_organiser_event_edit()` (fields: `event_logged_fields()`, kept equal to
+  `EVENT_LOGGED_FIELDS` in `utils/eventChangeLog.js` by a test) and
+  `log_organiser_offer_edit()` (offer fields `offer_text`, `discount_code`,
+  `referral_url`, `offer_is_active`) through `record_event_change()`, which
+  also bells every admin. Admin edits and the offer's click / reveal counters
+  are never logged.
+- **Bells:** `notify_admins_on_event_submission()` (new events, resubmissions),
+  `notify_organiser_on_event_decision()` (approve / reject),
+  `record_event_change()` (live edits). The status triggers fire on any update
+  and check the change themselves — the guard can move the status without the
+  statement naming the column.
+- **Emails** (`src/routes/events.js`, called fire-and-forget by the form):
+  - `POST /events/notify-submission` — every admin, after every insert and
+    resubmission; claimed once via `events.admins_notified_at` (cleared on a
+    resubmission). Recipients: every admin account + the Notification Email,
+    minus whoever added it.
+  - `POST /events/:id/notify-changes` — every admin, after an organiser saves
+    their live event: the caller's un-emailed log entries for that event,
+    merged into one Before / Now table, stamped in `admins_emailed_at`.
+  - `POST /events/:id/notify-decision` (admin) — the organiser, once per
+    outcome (`events.organiser_notified_status`).
+  - Templates: `eventSubmittedEmail`, `eventChangesMadeEmail`,
+    `eventReviewOutcomeEmail` in `src/emails/templates.js`.
+- **UI:** `pages/account/AccountEvents.jsx`, `components/EventFormModal.jsx`,
   `pages/admin/EventsManagementPage.jsx`,
   `components/admin/EventRejectDialog.jsx`,
-  `components/admin/EventChangeReviewDialog.jsx`.
+  `components/admin/EventChangeLogDialog.jsx`, `lib/eventReviewApi.js`.
 
 ## Handing an event to its organiser
 
@@ -56,5 +89,5 @@ An event only appears in a member's My Events if it is theirs
 (`events.organiser_id`). An event an admin created belongs to that admin. To
 give it to the real organiser: Event Management → the **people** icon on the
 row → *Organiser account* → enter their username or login email → **Link**
-(`PATCH /admin/events/:id/organiser`). From then on they can request changes
-to it. Any open change request from the previous owner is dropped.
+(`PATCH /admin/events/:id/organiser`). From then on they can edit it (and the
+edits are logged as above); the previous owner can't.

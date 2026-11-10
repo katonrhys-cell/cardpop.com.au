@@ -5,9 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { MousePointerClick, Eye } from 'lucide-react';
 
-// Admin → Events → event form → "Member Offer" tab. Controlled: the form owns
-// the state and saves it with the event (lib/eventTicketOffers.js).
-const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled }) => {
+// The event form's "Member Offer" tab — for admins (Admin → Events) and for an
+// organiser on their own event (Account → My Events; `audience="organiser"`).
+// Controlled: the form owns the state and saves it with the event
+// (lib/eventTicketOffers.js). An organiser's change to a live event's offer is
+// logged for the admins like any other edit (docs/event-submissions.md).
+const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled, audience = 'admin' }) => {
+  const isOrganiser = audience === 'organiser';
   const set = (field, v) => onChange({ ...value, [field]: v });
   const inputCls = 'bg-background rounded-xl h-11';
   const fmt = (ts) => (ts ? format(new Date(ts), 'd MMM yyyy, h:mm a') : 'never');
@@ -15,6 +19,19 @@ const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled }) 
   return (
     <div className="space-y-5">
       <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-sm text-muted-foreground space-y-1">
+        {isOrganiser ? (
+          <>
+            <p>
+              <strong>Optional.</strong> Offer CardPop members a discount on your tickets. Your <strong>ticket code</strong> is
+              shown on your event page to signed-in members only; everyone else sees the offer line and a prompt to sign in.
+            </p>
+            <p>
+              Add a <strong>referral / tracking link</strong> from your ticket platform and "Get Tickets" will use it, so you
+              can see the sales CardPop sends you. Both disappear once the event ends, and our team reviews them with your event.
+            </p>
+          </>
+        ) : (
+          <>
         <p>
           Tickets are sold on the organiser's site. The <strong>ticket code</strong> is shown on the event page to
           signed-in members only; everyone else sees the offer line and a prompt to sign in.
@@ -23,6 +40,8 @@ const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled }) 
           The <strong>referral link</strong> replaces the Tickets URL as the "Get Tickets" destination, so the
           organiser can credit CardPop. Both disappear once the event ends.
         </p>
+          </>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -31,12 +50,12 @@ const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled }) 
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="discount_code" className="font-bold">Ticket discount code <span className="text-muted-foreground font-normal text-xs">(from the organiser — members only)</span></Label>
+        <Label htmlFor="discount_code" className="font-bold">Ticket discount code <span className="text-muted-foreground font-normal text-xs">{isOrganiser ? '(members only)' : '(from the organiser — members only)'}</span></Label>
         <Input id="discount_code" value={value.discount_code} onChange={e => set('discount_code', e.target.value)} maxLength={60} className={`${inputCls} font-mono`} placeholder="e.g. CARDPOP15" autoComplete="off" disabled={disabled} />
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="referral_url" className="font-bold">Referral / tracking link <span className="text-muted-foreground font-normal text-xs">(from the organiser or ticket platform)</span></Label>
+        <Label htmlFor="referral_url" className="font-bold">Referral / tracking link <span className="text-muted-foreground font-normal text-xs">{isOrganiser ? '(from your ticket platform)' : '(from the organiser or ticket platform)'}</span></Label>
         <Input id="referral_url" type="url" value={value.referral_url} onChange={e => set('referral_url', e.target.value)} className={inputCls} placeholder="https://…?ref=cardpop" disabled={disabled} />
         <p className="text-xs text-muted-foreground">
           {value.referral_url.trim()
@@ -68,7 +87,11 @@ const EventTicketOfferPanel = ({ value, onChange, stats, ticketUrl, disabled }) 
               <p className="text-xs text-muted-foreground">Last: {fmt(stats.last_reveal_at)}</p>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Ticket sales happen on the organiser's site — ask them for the referral sales report.</p>
+          <p className="text-xs text-muted-foreground">
+            {isOrganiser
+              ? 'Ticket sales happen on your ticketing site — check its referral report for the sales.'
+              : "Ticket sales happen on the organiser's site — ask them for the referral sales report."}
+          </p>
         </div>
       )}
     </div>

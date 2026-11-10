@@ -5,7 +5,7 @@ import request from 'supertest';
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 const mockSendEventSubmitted = vi.hoisted(() => vi.fn());
 const mockSendOutcome = vi.hoisted(() => vi.fn());
-const mockSendChangeRequested = vi.hoisted(() => vi.fn());
+const mockSendChangesMade = vi.hoisted(() => vi.fn());
 const mockIsAdmin = vi.hoisted(() => ({ value: true }));
 const mockGetAdminEmails = vi.hoisted(() => vi.fn());
 
@@ -22,7 +22,7 @@ vi.mock('../../src/middleware/requireAal2.js', () => ({
 vi.mock('../../src/utils/emailService.js', () => ({
   sendEventSubmitted: mockSendEventSubmitted,
   sendEventReviewOutcome: mockSendOutcome,
-  sendEventChangeRequested: mockSendChangeRequested,
+  sendEventChangesMade: mockSendChangesMade,
 }));
 vi.mock('../../src/utils/adminNotificationRecipient.js', () => ({ getAdminNotificationEmails: mockGetAdminEmails }));
 
@@ -35,13 +35,6 @@ function makeApp() {
   return app;
 }
 const app = makeApp();
-
-function makeBuilder(result = { data: null, error: null }) {
-  const b = {};
-  for (const m of ['select', 'eq']) b[m] = vi.fn(() => b);
-  b.maybeSingle = vi.fn(() => Promise.resolve(result));
-  return b;
-}
 
 const pendingEvent = {
   id: 'evt-1',
@@ -70,17 +63,41 @@ beforeEach(() => {
 });
 
 describe('POST /events/notify-submission', () => {
-  it('emails every resolved admin notification address for the submitter\'s pending event', async () => {
-    builders.push(makeBuilder({ data: pendingEvent, error: null }));
+  // chain() is defined below (function declaration — hoisted).
+  it('emails every admin notification address about the submitter\'s new event, once', async () => {
+    const claim = chain({ data: [{ id: 'evt-1' }], error: null });
+    builders.push(
+      chain({ data: pendingEvent, error: null }),
+      claim,
+      chain({ data: { email: 'jane@example.com', display_name: 'Jane', is_admin: false }, error: null }),
+    );
 
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ ok: true });
+    expect(claim.calls).toContainEqual(['is', 'admins_notified_at', null]);
     expect(mockSendEventSubmitted).toHaveBeenCalledWith({
       to: ['notifications@cardpop.com.au'],
       event: pendingEvent,
+      addedBy: 'Jane',
+      byAdmin: false,
     });
+  });
+
+  it('emails the other admins about an admin\'s own live event, not the admin who added it', async () => {
+    mockGetAdminEmails.mockResolvedValue(['Rhys@cardpop.com.au', 'second@cardpop.com.au', 'notifications@cardpop.com.au']);
+    builders.push(
+      chain({ data: { ...pendingEvent, status: 'approved' }, error: null }),
+      chain({ data: [{ id: 'evt-1' }], error: null }),
+      chain({ data: { email: 'rhys@cardpop.com.au', display_name: 'Rhys', is_admin: true }, error: null }),
+    );
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.status).toBe(200);
+    expect(mockSendEventSubmitted).toHaveBeenCalledWith(expect.objectContaining({
+      to: ['second@cardpop.com.au', 'notifications@cardpop.com.au'],
+      byAdmin: true,
+    }));
   });
 
   it('requires an eventId', async () => {
@@ -90,24 +107,44 @@ describe('POST /events/notify-submission', () => {
   });
 
   it('404s when the event does not exist', async () => {
-    builders.push(makeBuilder({ data: null, error: null }));
+    builders.push(chain({ data: null, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'nope' });
     expect(res.status).toBe(404);
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 
-  it('forbids notifying for an event the caller did not submit', async () => {
-    builders.push(makeBuilder({ data: { ...pendingEvent, organiser_id: 'someone-else' }, error: null }));
+  it('forbids notifying for an event the caller did not add', async () => {
+    builders.push(chain({ data: { ...pendingEvent, organiser_id: 'someone-else' }, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
     expect(res.status).toBe(403);
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 
-  it('skips (no email) when the event is not pending review', async () => {
-    builders.push(makeBuilder({ data: { ...pendingEvent, status: 'approved' }, error: null }));
+  it('does not email twice for the same submission', async () => {
+    builders.push(chain({ data: { ...pendingEvent, admins_notified_at: '2026-11-10T00:00:00Z' }, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ ok: true, skipped: 'not_pending' });
+    expect(res.body).toEqual({ ok: true, skipped: 'already_sent' });
+    expect(mockSendEventSubmitted).not.toHaveBeenCalled();
+  });
+
+  it('loses the race quietly when another call claimed the send first', async () => {
+    builders.push(chain({ data: pendingEvent, error: null }), chain({ data: [], error: null }));
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.body).toEqual({ ok: true, skipped: 'already_sent' });
+    expect(mockSendEventSubmitted).not.toHaveBeenCalled();
+  });
+
+  it('does not announce a draft — the organiser hasn\'t submitted it', async () => {
+    builders.push(chain({ data: { ...pendingEvent, status: 'draft' }, error: null }));
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.body).toEqual({ ok: true, skipped: 'draft' });
+    expect(mockSendEventSubmitted).not.toHaveBeenCalled();
+  });
+
+  it('leaves the nightly scanner\'s finds to their own queue', async () => {
+    builders.push(chain({ data: { ...pendingEvent, auto_discovered: true }, error: null }));
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.body).toEqual({ ok: true, skipped: 'auto_discovered' });
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 });
@@ -148,7 +185,7 @@ describe('POST /events/:id/notify-decision', () => {
     expect(res.status).toBe(200);
     expect(claim.calls).toContainEqual(['update', { organiser_notified_status: 'rejected' }]);
     expect(mockSendOutcome).toHaveBeenCalledWith(expect.objectContaining({
-      to: 'bec@example.com', name: 'Bec', kind: 'submission', approved: false, note: 'Already listed',
+      to: 'bec@example.com', name: 'Bec', approved: false, note: 'Already listed',
     }));
   });
 
@@ -179,59 +216,48 @@ describe('POST /events/:id/notify-decision', () => {
   });
 });
 
-describe('POST /events/change-requests/:id/notify-admins', () => {
-  beforeEach(() => { mockSendChangeRequested.mockResolvedValue(true); });
+describe('POST /events/:id/notify-changes', () => {
+  beforeEach(() => { mockSendChangesMade.mockResolvedValue(true); });
 
-  it('emails the admins the changed fields for the organiser\'s own open request', async () => {
+  it('emails every admin exactly what the organiser changed, merged and once', async () => {
+    const claim = chain({ data: [
+      { id: 'log-1', created_at: '2026-11-10T01:00:00Z', changes: { start_time: { from: '10:00:00', to: '09:30:00' } } },
+      { id: 'log-2', created_at: '2026-11-10T01:00:01Z', changes: { discount_code: { from: 'CARDPOP10', to: 'CARDPOP15' } } },
+    ], error: null });
     builders.push(
-      chain({ data: { id: REQUEST_ID, event_id: EVENT_ID, organiser_id: 'user-1', status: 'pending',
-        changes: { start_time: '09:30', venue_name: 'Showgrounds' }, admins_emailed_at: null }, error: null }),
-      chain({ data: [{ id: REQUEST_ID }], error: null }),
-      chain({ data: { id: EVENT_ID, title: 'CollectFest Sydney' }, error: null }),
+      chain({ data: { id: EVENT_ID, title: 'CollectFest Sydney', slug: 'collectfest-sydney', organiser_id: 'user-1' }, error: null }),
+      claim,
       chain({ data: { display_name: 'Bec' }, error: null }),
     );
-    const res = await request(app).post(`/change-requests/${REQUEST_ID}/notify-admins`);
+    const res = await request(app).post(`/${EVENT_ID}/notify-changes`);
     expect(res.status).toBe(200);
-    expect(mockSendChangeRequested).toHaveBeenCalledWith({
+    expect(claim.calls).toContainEqual(['eq', 'changed_by', 'user-1']);
+    expect(claim.calls).toContainEqual(['is', 'admins_emailed_at', null]);
+    expect(mockSendChangesMade).toHaveBeenCalledWith({
       to: ['notifications@cardpop.com.au'],
-      event: { id: EVENT_ID, title: 'CollectFest Sydney' },
-      organiserName: 'Bec',
-      fields: ['Start time', 'Venue'],
+      event: expect.objectContaining({ title: 'CollectFest Sydney', url: 'https://cardpop.com.au/events/collectfest-sydney' }),
+      editorName: 'Bec',
+      rows: [
+        { label: 'Start time', from: '10:00', to: '09:30' },
+        { label: 'Member ticket code', from: 'CARDPOP10', to: 'CARDPOP15' },
+      ],
     });
   });
 
-  it('refuses someone else\'s request', async () => {
-    builders.push(chain({ data: { id: REQUEST_ID, organiser_id: 'someone-else', status: 'pending', changes: {} }, error: null }));
-    const res = await request(app).post(`/change-requests/${REQUEST_ID}/notify-admins`);
+  it('refuses someone else\'s event', async () => {
+    builders.push(chain({ data: { id: EVENT_ID, organiser_id: 'someone-else' }, error: null }));
+    const res = await request(app).post(`/${EVENT_ID}/notify-changes`);
     expect(res.status).toBe(403);
-    expect(mockSendChangeRequested).not.toHaveBeenCalled();
+    expect(mockSendChangesMade).not.toHaveBeenCalled();
   });
-});
 
-describe('POST /events/change-requests/:id/notify-decision', () => {
-  beforeEach(() => { mockIsAdmin.value = true; mockSendOutcome.mockResolvedValue(true); });
-
-  it('emails the organiser that their changes were dismissed, with the note', async () => {
+  it('sends nothing when there is nothing new', async () => {
     builders.push(
-      chain({ data: { id: REQUEST_ID, event_id: EVENT_ID, organiser_id: 'org-1', status: 'dismissed',
-        review_note: 'Title must match your website', organiser_emailed_at: null }, error: null }),
-      chain({ data: { id: 'org-1', email: 'bec@example.com', display_name: 'Bec' }, error: null }),
-      chain({ data: null, error: null }),
-      chain({ data: [{ id: REQUEST_ID }], error: null }),
-      chain({ data: { id: EVENT_ID, title: 'CollectFest Sydney', slug: 'collectfest-sydney' }, error: null }),
+      chain({ data: { id: EVENT_ID, organiser_id: 'user-1' }, error: null }),
+      chain({ data: [], error: null }),
     );
-    const res = await request(app).post(`/change-requests/${REQUEST_ID}/notify-decision`);
-    expect(res.status).toBe(200);
-    expect(mockSendOutcome).toHaveBeenCalledWith(expect.objectContaining({
-      to: 'bec@example.com', kind: 'changes', approved: false, note: 'Title must match your website',
-      eventUrl: 'https://cardpop.com.au/events/collectfest-sydney',
-    }));
-  });
-
-  it('skips a request that is still open', async () => {
-    builders.push(chain({ data: { id: REQUEST_ID, organiser_id: 'org-1', status: 'pending' }, error: null }));
-    const res = await request(app).post(`/change-requests/${REQUEST_ID}/notify-decision`);
-    expect(res.body.skipped).toBe('undecided');
-    expect(mockSendOutcome).not.toHaveBeenCalled();
+    const res = await request(app).post(`/${EVENT_ID}/notify-changes`);
+    expect(res.body.skipped).toBe('nothing_new');
+    expect(mockSendChangesMade).not.toHaveBeenCalled();
   });
 });
