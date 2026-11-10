@@ -83,6 +83,10 @@ describe('HomePage stats strip', () => {
     expect(community).toHaveTextContent('Events Listed');
     expect(community).toHaveTextContent('Join free');
     expect(screen.getAllByRole('link', { name: /join free/i })[0]).toHaveAttribute('href', '/signup');
+    // List event: sign up first, then straight to the submit form.
+    for (const link of screen.getAllByRole('link', { name: /list event/i })) {
+      expect(link).toHaveAttribute('href', `/signup?next=${encodeURIComponent('/account/events?new=1')}`);
+    }
 
     expect(screen.queryByText('Live Listings')).toBeNull();
   });
@@ -96,5 +100,9 @@ describe('HomePage stats strip', () => {
     expect(community).toHaveTextContent('Events Listed');
     expect(screen.queryByTestId('stats-google')).toBeNull();
     expect(screen.queryByText('Join free')).toBeNull();
+    // Members go straight to the submit form.
+    const listLinks = screen.getAllByRole('link', { name: /list event/i });
+    expect(listLinks.length).toBeGreaterThan(0);
+    for (const link of listLinks) expect(link).toHaveAttribute('href', '/account/events?new=1');
   });
 });
