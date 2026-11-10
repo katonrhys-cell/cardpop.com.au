@@ -274,4 +274,62 @@ do $$ begin
 end $$;
 reset role;
 
+-- ════ 20261110020314: organiser drafts ════════════════════════════════════
+delete from public.notifications;
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+insert into public.events (id, organiser_id, title, status) values
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-00000000000b', 'Draft Show', 'draft');
+update public.events set venue_name = 'Somewhere' where id = '00000000-0000-0000-0000-0000000000d1';
+reset role;
+do $$ declare e record; begin
+  select * into e from public.events where id = '00000000-0000-0000-0000-0000000000d1';
+  assert e.status = 'draft', 'an organiser can keep an event as a draft, and editing keeps it a draft';
+  assert e.venue_name = 'Somewhere', 'the draft is editable';
+  assert not exists (select 1 from public.notifications), 'nobody is notified about a draft';
+end $$;
+
+-- Other members can't see it; the public can't either.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000c', false);
+do $$ begin
+  assert not exists (select 1 from public.events where id = '00000000-0000-0000-0000-0000000000d1'), 'another member cannot see a draft';
+end $$;
+reset role;
+set role anon;
+do $$ begin
+  assert not exists (select 1 from public.events where id = '00000000-0000-0000-0000-0000000000d1'), 'the public cannot see a draft';
+end $$;
+reset role;
+
+-- Submitting it is a new submission: every admin is belled.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+update public.events set status = 'pending_review' where id = '00000000-0000-0000-0000-0000000000d1';
+reset role;
+do $$ begin
+  assert (select status from public.events where id = '00000000-0000-0000-0000-0000000000d1') = 'pending_review', 'submitted';
+  assert (select count(*) from public.notifications where title = 'New event submitted for review'
+            and related_id = '00000000-0000-0000-0000-0000000000d1') = 2, 'every admin is belled on submission';
+end $$;
+
+-- It can go back to draft before review, and a draft can be deleted; a submitted one can't.
+set role authenticated;
+select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-00000000000b', false);
+delete from public.events where id = '00000000-0000-0000-0000-0000000000d1';
+do $$ begin
+  assert exists (select 1 from public.events where id = '00000000-0000-0000-0000-0000000000d1'), 'a submitted event cannot be deleted by its organiser';
+end $$;
+update public.events set status = 'draft' where id = '00000000-0000-0000-0000-0000000000d1';
+delete from public.events where id = '00000000-0000-0000-0000-0000000000d1';
+do $$ begin
+  assert not exists (select 1 from public.events where id = '00000000-0000-0000-0000-0000000000d1'), 'an organiser can delete their own draft';
+end $$;
+-- A live event can't be pulled back to draft.
+update public.events set status = 'draft' where id = '00000000-0000-0000-0000-0000000000e1';
+reset role;
+do $$ begin
+  assert (select status from public.events where id = '00000000-0000-0000-0000-0000000000e1') = 'approved', 'a live event stays live';
+end $$;
+
 \echo 'event organiser review: all checks passed'

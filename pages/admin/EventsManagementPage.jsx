@@ -28,6 +28,7 @@ import {
 
 const STATUS_STYLES = {
   pending_review: 'bg-amber-500/10 text-amber-700 border-amber-200 dark:text-amber-400',
+  draft:          'bg-muted text-muted-foreground border-dashed border-border',
   cancelled:      'bg-muted text-muted-foreground border-border',
   completed:      'bg-blue-500/10 text-blue-700 border-blue-200 dark:text-blue-400',
   rejected:       'bg-destructive/10 text-destructive border-destructive/20',
@@ -35,6 +36,7 @@ const STATUS_STYLES = {
 
 const STATUS_LABELS = {
   pending_review: 'Pending',
+  draft:          'Organiser draft',
   cancelled:      'Cancelled',
   completed:      'Completed',
   rejected:       'Rejected',
@@ -532,7 +534,8 @@ const EventsManagementPage = () => {
                         <Switch
                           checked={event.status === 'approved'}
                           onCheckedChange={() => handleQuickTogglePublished(event)}
-                          disabled={event.status === 'completed' || event.status === 'rejected'}
+                          disabled={event.status === 'completed' || event.status === 'rejected' || event.status === 'draft'}
+                          title={event.status === 'draft' ? "The organiser hasn't submitted this draft yet" : undefined}
                         />
                         {event.status !== 'approved' && (
                           <Badge

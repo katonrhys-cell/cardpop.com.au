@@ -23,13 +23,20 @@ the UI:
 - RSVPs and collector reviews are each person's own rows.
 
 Test: `tests/db/run-event-organiser-review-migration.sh` (applies
-`20261109235618_event_organiser_review_flow.sql` and
-`20261110002320_event_organiser_offers_and_admin_alerts.sql`).
+`20261109235618_event_organiser_review_flow.sql`,
+`20261110002320_event_organiser_offers_and_admin_alerts.sql`,
+`20261110020313_event_status_draft.sql` and
+`20261110020314_event_organiser_drafts.sql`). Drafts: an organiser inserts
+or saves `draft` or `pending_review` (the guard forces anything else to
+pending, and a live event stays `approved`), may delete only their own
+draft, and `notify_admins_on_event_submission()` / `POST
+/events/notify-submission` ignore drafts — submitting one is a new submission.
 
 ## The flow
 
 | Stage | Organiser (Account → My Events) | Admins (Admin → Event Management) |
 |---|---|---|
+| **Draft** | **Save Draft** on the form keeps the event private (`draft`): only the organiser sees it, under **Drafts** at the top of My Events, where they can **Edit & submit** or **Delete** it. A pending or rejected event can be parked back in drafts; a live one can't. | Nothing — no bell, no email, and the publish toggle is off for drafts. Admins can still see drafts in Event Management (status *Organiser draft*). |
 | **Submit** | **Submit Event** → the form in user mode (no Status, Featured or re-scan controls), incl. the **Member Offer** tab for their own ticket discount code and referral link (`docs/event-ticket-offers.md`). Saved as `pending_review`. | **Every admin**: bell (`event_pending_review`) + email. |
 | **Pending** | **Edit** freely. | Toggle on = approve. **Ban** icon = reject with a reason (or set the status in the form; a *Reason for the organiser* box appears). |
 | **Approved** | Bell `event_approved` + email "Your event is live". | — |

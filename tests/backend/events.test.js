@@ -134,6 +134,13 @@ describe('POST /events/notify-submission', () => {
     expect(mockSendEventSubmitted).not.toHaveBeenCalled();
   });
 
+  it('does not announce a draft — the organiser hasn\'t submitted it', async () => {
+    builders.push(chain({ data: { ...pendingEvent, status: 'draft' }, error: null }));
+    const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });
+    expect(res.body).toEqual({ ok: true, skipped: 'draft' });
+    expect(mockSendEventSubmitted).not.toHaveBeenCalled();
+  });
+
   it('leaves the nightly scanner\'s finds to their own queue', async () => {
     builders.push(chain({ data: { ...pendingEvent, auto_discovered: true }, error: null }));
     const res = await request(app).post('/notify-submission').send({ eventId: 'evt-1' });

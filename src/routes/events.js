@@ -45,6 +45,8 @@ router.post('/notify-submission', authMiddleware, async (req, res) => {
       return res.status(403).json({ error: 'You can only notify for your own event' });
     }
     if (event.auto_discovered) return res.json({ ok: true, skipped: 'auto_discovered' });
+    // A draft hasn't been submitted — it's the organiser's own until they do.
+    if (event.status === 'draft') return res.json({ ok: true, skipped: 'draft' });
     if (event.admins_notified_at) return res.json({ ok: true, skipped: 'already_sent' });
 
     // Claim the send before making it, so a double call can't email twice.
