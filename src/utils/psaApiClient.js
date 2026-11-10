@@ -2,7 +2,29 @@ import logger from './logger.js';
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 
 const PSA_API_BASE = 'https://api.psacard.com/publicapi';
-const PSA_API_TOKEN = process.env.PSA_API_TOKEN;
+// Tokens get pasted into the Vercel dashboard by hand, so tolerate the usual
+// copy-paste debris: surrounding whitespace/newlines, wrapping quotes, and a
+// "Bearer " prefix copied along with the token (we add our own, and PSA
+// refuses "bearer Bearer …" with a bare 403).
+export function normalizePsaToken(raw) {
+  if (raw == null) return '';
+  let t = String(raw).trim().replace(/^["']+|["']+$/g, '').trim();
+  t = t.replace(/^bearer\s+/i, '').trim();
+  return t;
+}
+
+const PSA_API_TOKEN = normalizePsaToken(process.env.PSA_API_TOKEN);
+
+// PSA's error body usually says why it refused (bad token, daily quota spent…).
+// Keep a short, single-line snippet for the logs — never the request headers.
+async function errorDetail(response) {
+  try {
+    const text = (await response.text()).replace(/\s+/g, ' ').trim();
+    return text ? ` — ${text.slice(0, 200)}` : '';
+  } catch {
+    return '';
+  }
+}
 
 // Transient failures (network drops, PSA 5xx, rate limits) are retried with
 // exponential backoff; definitive answers (404 not-found, auth/4xx) are not —
@@ -54,14 +76,15 @@ export const psaApiClient = {
 
         // Server errors and rate limits are worth retrying.
         if (response.status >= 500 || response.status === 429) {
-          throw new Error(`PSA API error: ${response.status} ${response.statusText}`);
+          throw new Error(`PSA API error: ${response.status} ${response.statusText}${await errorDetail(response)}`.trim());
         }
 
         // Any other non-OK status (e.g. 401/403 auth) is a definitive client
         // error — surface it immediately rather than burning retries.
         if (!response.ok) {
+          const detail = await errorDetail(response);
           throw Object.assign(
-            new Error(`PSA API error: ${response.status} ${response.statusText}`),
+            new Error(`PSA API error: ${response.status} ${response.statusText}${detail}`.trim()),
             { fatal: true }
           );
         }
@@ -107,7 +130,7 @@ export const psaApiClient = {
       );
 
       if (!response.ok) {
-        logger.warn(`[PSA_API] Image lookup for ${cert} returned ${response.status}`);
+        logger.warn(`[PSA_API] Image lookup for ${cert} returned ${response.status}${await errorDetail(response)}`);
         return [];
       }
 
