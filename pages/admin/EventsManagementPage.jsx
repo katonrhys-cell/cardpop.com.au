@@ -598,7 +598,17 @@ const EventsManagementPage = () => {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-base leading-tight truncate">{event.title}</p>
+                            <p className="font-bold text-foreground text-base leading-tight truncate">
+                              <a
+                                href={`/events/${event.slug || event.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline hover:text-primary"
+                                title="Open the event page in a new tab"
+                              >
+                                {event.title}
+                              </a>
+                            </p>
                             {event.is_featured && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
                             {event.auto_discovered && (
                               <Radar
