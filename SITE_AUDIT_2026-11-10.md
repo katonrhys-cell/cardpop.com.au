@@ -59,9 +59,9 @@ The last five are `20261110203544_close_direct_write_gaps.sql`, tested by
 ## 2. Needs your action (not code)
 
 1. **Merge this PR promptly** — the offers fix only reaches production when the migration is pushed on merge.
-2. **Sentry is receiving nothing.** The organisation has one project and has accepted **zero** error events in 30 days, while the code points at two DSNs. Either the DSNs belong to another organisation / deleted projects, or events are being dropped. Until this is fixed, production errors are invisible. Check Sentry → Settings → Projects → Client Keys against `main.jsx` and `src/app.js`.
-3. **PSA verification is failing in production**: the PSA API answers `403` (12 errors in the last 10 days). `PSA_API_TOKEN` is expired or revoked — every cert check shows "Verification error".
-4. **eBay credentials are missing in Vercel** (`EBAY_APP_ID`, `EBAY_CLIENT_SECRET`) — price lookups fail.
+2. **Sentry was reporting to a different organisation than the one in use** — corrected after the audit: the DSNs in the code and in Vercel pointed at an older Sentry organisation, while the connected one (`cardpop-australia-yr`) had received nothing. Repointed on 2026-11-10 (code fallbacks + Vercel `SENTRY_DSN`).
+3. **PSA verification was failing in production** with `403` from the PSA API. `PSA_API_TOKEN` was replaced in Vercel on 2026-11-10; confirm by looking up a cert on the live site after the next deploy.
+4. ~~eBay credentials are missing~~ — **wrong, withdrawn.** The keys are set for production; the error seen came from a preview deployment, where they are not set.
 5. **Turn on leaked-password protection** in Supabase Auth (one switch; flagged by the advisor).
 6. `/api/prerender` has hit its 10 s limit twice — raise `maxDuration` to 20–30 s when convenient.
 

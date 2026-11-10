@@ -148,7 +148,7 @@ const initSentry = () => {
   import('@sentry/react')
     .then((Sentry) => {
       Sentry.init({
-        dsn: import.meta.env.VITE_SENTRY_DSN || 'https://7dfd1130af7b40d7d508a4902e85a1d9@o4511534905884672.ingest.us.sentry.io/4511534921416704',
+        dsn: import.meta.env.VITE_SENTRY_DSN || 'https://fe32f5ea5d8c9f4196ec601fae47e046@o4511766283026432.ingest.us.sentry.io/4511767250141184',
         integrations: [
           Sentry.browserTracingIntegration(),
         ],

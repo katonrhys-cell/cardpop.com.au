@@ -254,3 +254,26 @@ describe('buildEventJsonLd typicalAgeRange', () => {
     expect(ld).not.toHaveProperty('typicalAgeRange');
   });
 });
+
+describe('buildEventJsonLd sold out', () => {
+  const base = { title: 'Show', start_date: '2027-03-01', venue_name: 'Hall', suburb: 'Sydney', state: 'NSW', entry_fee_aud: 10, slug: 'show' };
+  const availability = (ld) => [].concat(ld.offers).map((o) => o.availability);
+
+  it('advertises SoldOut once the organiser marks tickets sold out', () => {
+    expect(availability(buildEventJsonLd({ ...base, tickets_sold_out: true }))).toEqual(['https://schema.org/SoldOut']);
+  });
+
+  it('stays InStock otherwise', () => {
+    expect(availability(buildEventJsonLd(base))).toEqual(['https://schema.org/InStock']);
+  });
+});
+
+import { formatBookingFee } from '@/lib/eventSeo.js';
+describe('formatBookingFee', () => {
+  it('states the fee per ticket', () => expect(formatBookingFee({ booking_fee_aud: 3.95 })).toBe('+ $3.95 booking fee per ticket'));
+  it('is null when free, zero or unset', () => {
+    expect(formatBookingFee({ is_free: true, booking_fee_aud: 3.95 })).toBeNull();
+    expect(formatBookingFee({ booking_fee_aud: 0 })).toBeNull();
+    expect(formatBookingFee({})).toBeNull();
+  });
+});

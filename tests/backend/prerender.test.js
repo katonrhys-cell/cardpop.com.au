@@ -641,6 +641,61 @@ describe('prerender events', () => {
     expect(body).not.toContain('noindex');
   });
 
+  describe('sold out, waitlist and booking fee', () => {
+    const base = {
+      id: UUID, slug: 'flame-coliseum', title: 'Flame Coliseum', status: 'approved', state: 'VIC', suburb: 'Melbourne',
+      start_date: '2099-01-24', entry_fee_aud: 65, is_free: false, organizer_name: 'Organiser',
+      ticket_url: 'https://events.humanitix.com/flame',
+    };
+    const offers = (body) => {
+      const ld = [...body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+        .flatMap((m) => { const j = JSON.parse(m[1]); return j['@graph'] || [j]; }).find((j) => j['@type'] === 'Event');
+      return [].concat(ld.offers);
+    };
+
+    it('advertises SoldOut and links the waitlist when the organiser marks tickets sold out', async () => {
+      state.result = { data: { ...base, tickets_sold_out: true, waitlist_url: 'https://events.humanitix.com/waitlist' } };
+      const { body } = await run('/events/flame-coliseum');
+      expect(offers(body).map((o) => o.availability)).toEqual(['https://schema.org/SoldOut']);
+      expect(body).toContain('Tickets sold out.');
+      expect(body).toContain('<a href="https://events.humanitix.com/waitlist" rel="nofollow noopener">Join the waitlist</a>');
+    });
+
+    it('never emits a non-http(s) waitlist link', async () => {
+      state.result = { data: { ...base, tickets_sold_out: true, waitlist_url: 'javascript:alert(1)' } };
+      const { body } = await run('/events/flame-coliseum');
+      expect(body).toContain('Tickets sold out.');
+      expect(body).not.toContain('javascript:');
+      expect(body).not.toContain('Join the waitlist');
+    });
+
+    it('stays InStock with no sold-out banner otherwise', async () => {
+      state.result = { data: { ...base, waitlist_url: 'https://events.humanitix.com/waitlist' } };
+      const { body } = await run('/events/flame-coliseum');
+      expect(offers(body).map((o) => o.availability)).toEqual(['https://schema.org/InStock']);
+      expect(body).not.toContain('Tickets sold out.');
+      expect(body).not.toContain('Join the waitlist');
+    });
+
+    it('marks only the sold-out custom ticket SoldOut, with its own waitlist link', async () => {
+      state.result = { data: { ...base, ticket_prices: [
+        { type: 'custom', label: 'Player Entry', price_aud: 65, sold_out: true, waitlist_url: 'https://events.humanitix.com/p' },
+        { type: 'custom', label: 'Spectator', price_aud: 10 },
+      ] } };
+      const { body } = await run('/events/flame-coliseum');
+      const byName = Object.fromEntries(offers(body).map((o) => [o.name, o.availability]));
+      expect(byName['Player Entry']).toBe('https://schema.org/SoldOut');
+      expect(byName.Spectator).toBe('https://schema.org/InStock');
+      expect(body).toContain('Player Entry: $65.00 — sold out (<a href="https://events.humanitix.com/p" rel="nofollow noopener">join the waitlist</a>)');
+    });
+
+    it('states the booking fee beside the entry price', async () => {
+      state.result = { data: { ...base, booking_fee_aud: 3.95 } };
+      const { body } = await run('/events/flame-coliseum');
+      expect(body).toContain('Entry: A$65.00 + A$3.95 booking fee per ticket');
+    });
+  });
+
   it('links a finished event to its next edition, and every event to its city page', async () => {
     state.result = { data: {
       id: UUID, slug: 'hobby-hangout-xl-sydney-2025', title: 'Hobby Hangout XL Sydney 2025', status: 'approved',
