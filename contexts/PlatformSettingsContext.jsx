@@ -22,6 +22,8 @@ const DEFAULTS = {
   marketplace_identity_threshold_aud: 500,
   free_shipping_threshold_aud: 100,
   default_shipping_rate_aud: 15,
+  google_workspace_referral_enabled: true,
+  google_workspace_referral_url: 'https://sharegoogleworkspace.advocate.impact.com/mQZonNp',
 };
 
 // The last settings this browser fetched, used as the starting point on the

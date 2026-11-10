@@ -5,6 +5,7 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
+import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -171,6 +172,8 @@ const AccountEvents = () => {
           })}
         </div>
       )}
+
+      {!isLoading && !loadError && <WorkspaceReferralCard placement="organiser" />}
 
       <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
       <EventBadgeDialog event={badgeEvent} onClose={() => setBadgeEvent(null)} />

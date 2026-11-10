@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Link } from 'react-router-dom';
+import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
 
 const CATEGORIES = [
   'Basketball Cards', 'Football Cards', 'Pokémon Cards', 'Graded Cards',
@@ -440,6 +441,8 @@ const AccountSoleTrader = () => {
         )}
 
       </form>
+
+      {isSoleTrader && <WorkspaceReferralCard placement="sole_trader" className="mt-6" />}
     </AccountPageShell>
   );
 };
