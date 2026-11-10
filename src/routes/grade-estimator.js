@@ -6,6 +6,8 @@ import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { toImageBlocks } from '../utils/cardOcr.js';
 import { compressImageBuffer } from '../utils/compressImageBuffer.js';
 import { streamGradeEstimate, describeGradeFailure } from '../utils/gradeEstimator.js';
+import { recordAiUsage } from '../utils/aiUsage.js';
+import { requireAiAllowance } from '../middleware/aiAllowance.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -38,7 +40,7 @@ async function toCompressedImageBlocks(files) {
 	return toImageBlocks(compressed);
 }
 
-router.post('/estimate', integratedAiRateLimit, requireAuth, uploadFiles({
+router.post('/estimate', integratedAiRateLimit, requireAuth, requireAiAllowance('grade_estimate'), uploadFiles({
 	allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 	fieldName: 'images',
 	maxCount: 2,
@@ -67,7 +69,12 @@ router.post('/estimate', integratedAiRateLimit, requireAuth, uploadFiles({
 		const imageBlocks = await toCompressedImageBlocks(req.files);
 		// Forward the reply as it is written — the hook concatenates `content`
 		// events, so the member sees the stream move rather than a spinner.
-		await streamGradeEstimate({ apiKey, imageBlocks, onText: (text) => sseWrite(res, 'content', text) });
+		await streamGradeEstimate({
+			apiKey,
+			imageBlocks,
+			onText: (text) => sseWrite(res, 'content', text),
+			onUsage: ({ model, usage }) => recordAiUsage({ feature: 'grade_estimate', model, usage, userId: req.userId }),
+		});
 
 		sseWrite(res, 'completed', '[COMPLETED]');
 		res.end();

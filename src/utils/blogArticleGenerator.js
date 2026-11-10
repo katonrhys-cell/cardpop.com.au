@@ -1,6 +1,7 @@
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
+import { recordAiUsage } from './aiUsage.js';
 import { buildPriceContext, quotableFigures } from './blogPriceContext.js';
 import { checkDraft, BANNED_PHRASE_LIST } from './blogStyleGuard.js';
 
@@ -210,6 +211,7 @@ async function requestDraft(topic, priceContext, violations) {
   });
 
   const message = await stream.finalMessage();
+  await recordAiUsage({ feature: 'blog_draft', model: message.model || MODEL, usage: message.usage });
 
   if (message.stop_reason === 'refusal') {
     throw new Error(`Model declined the request (${message.stop_details?.category || 'unknown'}).`);

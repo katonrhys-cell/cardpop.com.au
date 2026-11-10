@@ -1,6 +1,7 @@
 import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
+import { recordAiUsage } from './aiUsage.js';
 import { fetchWebpageContent, extractTextFromHtml, isFetchableHttpUrl } from './safeFetch.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
 import {
@@ -280,6 +281,8 @@ export async function discoverCandidates(queries) {
       },
     ],
   });
+  // Recorded before any check below: the call is billed either way.
+  await recordAiUsage({ feature: 'event_discovery', model: message.model || DISCOVERY_MODEL, usage: message.usage });
 
   if (message.stop_reason === 'refusal') {
     throw new Error(`Discovery declined by the model (${message.stop_details?.category || 'unknown'}).`);
@@ -404,6 +407,8 @@ ${pageText}`,
       },
     ],
   });
+  // Recorded before any check below: the call is billed either way.
+  await recordAiUsage({ feature: 'event_extraction', model: message.model || EXTRACTION_MODEL, usage: message.usage });
 
   if (message.stop_reason === 'refusal') {
     throw new Error(`Extraction declined by the model (${message.stop_details?.category || 'unknown'}).`);

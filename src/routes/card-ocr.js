@@ -4,6 +4,8 @@ import { uploadFiles } from '../middleware/file-upload.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import { runCardOcr, toImageBlocks, describeOcrFailure } from '../utils/cardOcr.js';
+import { recordAiUsage } from '../utils/aiUsage.js';
+import { requireAiAllowance } from '../middleware/aiAllowance.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -21,7 +23,7 @@ function sseWrite(res, type, content) {
 	res.write(`data: ${JSON.stringify({ type, data: { content } })}\n\n`);
 }
 
-router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
+router.post('/scan', integratedAiRateLimit, requireAuth, requireAiAllowance('card_scan'), uploadFiles({
 	allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
 	fieldName: 'images',
 }), async (req, res) => {
@@ -45,6 +47,10 @@ router.post('/scan', integratedAiRateLimit, requireAuth, uploadFiles({
 			apiKey,
 			imageBlocks: toImageBlocks(req.files),
 			log: msg => logger.info(`[CARD_OCR] ${msg}`),
+			onUsage: ({ model, usage, escalation }) => recordAiUsage({
+				feature: escalation ? 'card_scan_escalation' : 'card_scan',
+				model, usage, userId: req.userId,
+			}),
 		});
 
 		sseWrite(res, 'content', content);
