@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatEntryFee } from '@/lib/eventSeo.js';
+import { formatEntryFee, formatBookingFee } from '@/lib/eventSeo.js';
 import { ticketPriceLines } from '@/utils/eventTicketPrices.js';
 
 // An event's entry price (GA / presale, or "Free entry") followed by its extra
@@ -12,6 +12,7 @@ const EventEntryPrices = ({ event, isPast = false, className = 'text-muted-foreg
   return (
     <>
       {showFee && <p className={className}>{formatEntryFee(event)}</p>}
+      {formatBookingFee(event) && <p className={`text-sm ${className}`}>{formatBookingFee(event)}</p>}
       {lines.length > 0 && (
         <dl className={`mt-1 space-y-0.5 ${className}`} aria-label="Ticket prices">
           {lines.map(({ label, price, soldOut, waitlistUrl }) => (

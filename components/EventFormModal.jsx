@@ -100,6 +100,7 @@ const INITIAL_STATE = {
   waitlist_url: '',
   facebook_video_url: '',
   entry_fee_aud: '',
+  booking_fee_aud: '',
   presale_fee_aud: '',
   // Child / VIP / GA early & late access / group prices (utils/eventTicketPrices.js),
   // held as { type, price_aud, group_size } with string inputs.
@@ -159,7 +160,7 @@ const TagInput = ({ id, value = [], onChange, placeholder, disabled }) => {
   );
 };
 
-const NUMBER_FIELDS = ['entry_fee_aud', 'presale_fee_aud', 'capacity'];
+const NUMBER_FIELDS = ['entry_fee_aud', 'presale_fee_aud', 'booking_fee_aud', 'capacity'];
 
 // Saved ticket prices → the editor's string inputs.
 const ticketPricesToForm = (rows) => cleanTicketPrices(rows).map(r => ({
@@ -398,6 +399,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         waitlist_url:        event.waitlist_url || '',
         facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
+        booking_fee_aud:     event.booking_fee_aud != null ? String(event.booking_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
         ticket_prices:       ticketPricesToForm(event.ticket_prices),
         is_free:             event.is_free ?? true,
@@ -699,6 +701,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         facebook_video_url:  urls.facebook_video_url || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
+        booking_fee_aud:     formData.is_free ? null : (parseFloat(formData.booking_fee_aud) || null),
         ticket_prices:       formData.is_free ? [] : cleanTicketPrices(formData.ticket_prices),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
@@ -1255,7 +1258,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                 <div className="pt-2 border-t border-border space-y-5">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Entry & Capacity</p>
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch id="is_free" checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} aria-describedby="is_free_hint" />
+                    <Switch id="is_free" checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('booking_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} aria-describedby="is_free_hint" />
                     <div>
                       <Label htmlFor="is_free" className="text-sm font-semibold cursor-pointer">Free Entry</Label>
                       <p id="is_free_hint" className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
@@ -1271,6 +1274,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                         <Label htmlFor="presale_fee_aud" className="font-bold">Presale / Early Bird (AUD)</Label>
                         <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
                       </div>
+                    </div>
+                  )}
+                  {!formData.is_free && (
+                    <div className="space-y-2">
+                      <Label htmlFor="booking_fee_aud" className="font-bold">Booking / Service Fee per ticket (AUD)</Label>
+                      <Input id="booking_fee_aud" name="booking_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.booking_fee_aud} onChange={handleChange} className={inputCls} placeholder="e.g. 3.95 — leave blank if none" disabled={loading} />
+                      <p className="text-xs text-muted-foreground">The fee your ticketing site adds on top of each ticket (Humanitix, Eventbrite…). It is shown next to the prices so collectors know the real cost.</p>
                     </div>
                   )}
                   {!formData.is_free && (

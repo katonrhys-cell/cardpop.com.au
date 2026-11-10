@@ -393,6 +393,13 @@ describe('EventDetailCard — organiser links', () => {
   });
 });
 
+describe('EventDetailCard — booking fee', () => {
+  it('shows the booking fee next to the entry price', () => {
+    renderCard({ ...baseEvent, is_free: false, entry_fee_aud: 65, booking_fee_aud: 3.95 });
+    expect(screen.getByText('+ $3.95 booking fee per ticket')).toBeInTheDocument();
+  });
+});
+
 describe('EventDetailCard — sold out + waitlist', () => {
   const soldOut = { ...baseEvent, ticket_url: 'https://tickets.example.com/x', tickets_sold_out: true };
 

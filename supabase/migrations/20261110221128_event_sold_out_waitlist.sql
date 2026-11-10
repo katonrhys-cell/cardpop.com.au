@@ -1,4 +1,4 @@
--- Organiser "Sold out" + waitlist link.
+-- Organiser "Sold out" + waitlist link, and the per-ticket booking fee.
 --
 -- An organiser can mark an event's tickets as sold out and point collectors at
 -- the page where they can join the waitlist:
@@ -10,18 +10,33 @@
 --                     form). Shown as "Join the waitlist" only while the
 --                     event is sold out and upcoming.
 --
--- Both are ordinary organiser-editable columns (not pinned by
+--   booking_fee_aud   the booking / service fee the organiser's ticketing site
+--                     adds on top of each ticket (e.g. Humanitix's $3.95), so
+--                     the event page can show what a ticket really costs.
+--
+-- All three are ordinary organiser-editable columns (not pinned by
 -- guard_event_organiser_write) and are logged on live edits. events_public is
 -- recreated with the columns appended; everything else is
 -- 20261110124303_event_homepage_featured.sql.
 
 alter table public.events add column if not exists tickets_sold_out boolean not null default false;
 alter table public.events add column if not exists waitlist_url text;
+alter table public.events add column if not exists booking_fee_aud numeric(10,2);
+
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'events_booking_fee_nonnegative') then
+    alter table public.events
+      add constraint events_booking_fee_nonnegative check (booking_fee_aud is null or booking_fee_aud >= 0);
+  end if;
+end $$;
 
 comment on column public.events.tickets_sold_out is
   'Organiser has marked tickets sold out: the page shows "Sold Out" instead of "Get Tickets" and JSON-LD availability is SoldOut.';
 comment on column public.events.waitlist_url is
   'Where collectors join the waitlist for a sold-out event ("Join the waitlist" button, upcoming + sold out only).';
+
+comment on column public.events.booking_fee_aud is
+  'Booking / service fee (AUD) the ticketing site adds on top of each ticket; shown as "+ $X booking fee per ticket" on the event page.';
 
 create or replace function public.event_logged_fields()
 returns text[]
@@ -34,7 +49,7 @@ as $$
     'venue_name', 'address', 'suburb', 'state', 'postcode',
     'start_date', 'end_date', 'start_time', 'end_time',
     'organizer_name', 'organizer_logo_url', 'organizer_email', 'organizer_phone',
-    'website_url', 'ticket_url', 'vendor_application_url', 'tickets_sold_out', 'waitlist_url',
+    'website_url', 'ticket_url', 'vendor_application_url', 'tickets_sold_out', 'waitlist_url', 'booking_fee_aud',
     'instagram_url', 'facebook_url', 'youtube_url', 'youtube_channel_url', 'tiktok_url', 'x_url', 'discord_url',
     'facebook_video_url',
     'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'capacity', 'registration_required',
@@ -97,6 +112,7 @@ select
   organizer_logo_url,
   homepage_featured,
   tickets_sold_out,
-  waitlist_url
+  waitlist_url,
+  booking_fee_aud
 from public.events
 where status in ('approved'::event_status, 'completed'::event_status);
