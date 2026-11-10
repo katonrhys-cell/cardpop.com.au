@@ -16,6 +16,7 @@ vi.mock('@/lib/supabaseClient.js', () => {
   };
   return { supabase: { from: builder } };
 });
+vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => ({ currentUser: null, isAdmin: false }) }));
 vi.mock('@/components/EventRsvp.jsx', () => ({ default: () => null }));
 vi.mock('@/components/SEOHead.jsx', () => ({ default: () => null }));
 

@@ -646,6 +646,33 @@ export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, even
   );
 }
 
+// ─── Organiser request decision (to the applicant) ───────────────────────────
+
+// Sent to a member once an admin approves or declines their request to manage an
+// event organiser page. `note` is the admin's reason on a decline, shown as
+// written. See docs/event-organiser-access.md.
+export function organiserRequestOutcomeEmail({ name, organiserName, approved, note, pageUrl }) {
+  const org = esc(organiserName) || 'your organiser page';
+  const noteHtml = note
+    ? `<p style="margin:16px 0;padding:12px 16px;border-left:3px solid #CE1126;background:#f6f6f6;">${esc(note).replace(/\n/g, '<br>')}</p>`
+    : '';
+  const band = approved ? 'Organiser Access Approved' : 'Organiser Request Not Approved';
+  const body = approved
+    ? `<p>We've confirmed you as the organiser of <strong>${org}</strong>.</p>
+<p>You can now edit your organiser page — logo, description and links — straight from the page itself, and add or update your events under <strong>Account → My Events</strong>.</p>`
+    : `<p>We couldn't confirm you as the organiser of <strong>${org}</strong> yet.</p>${noteHtml}
+<p>If that's something you can fix, send a new request from <strong>Account → My Events</strong> with a link to your website or social page so we can check it.</p>`;
+  return cpEmail(
+    band,
+    band,
+    `Hi ${esc(name) || 'there'},`,
+    body,
+    approved && pageUrl ? pageUrl : 'https://cardpop.com.au/account/events',
+    approved && pageUrl ? 'Open your organiser page' : 'Go to My Events',
+    'You received this because you asked to manage an event organiser page on CardPop.',
+  );
+}
+
 // ─── Organiser edited their live event (admin notification) ──────────────────
 
 // Every admin gets exactly what changed: one row per field, before → after.
