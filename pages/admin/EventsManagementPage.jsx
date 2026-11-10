@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Helmet } from 'react-helmet-async';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent, Ban, FilePen, History } from 'lucide-react';
+import { Plus, Pencil, Trash2, Calendar, MapPin, ImageOff, Wand2, Star, Radar, Users, ClipboardPen, Search, X, ArrowUp, ArrowDown, ArrowUpDown, ChevronRight, BadgePercent, Ban, FilePen, History, BellRing } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -22,7 +22,7 @@ import { loadUnreviewedChanges, notifyEventDecision } from '@/lib/eventReviewApi
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { toLocalDateStr } from '@/lib/eventSeo.js';
 import {
-  filterEvents, groupEventsByTiming, defaultSortDir,
+  filterEvents, groupEventsByTiming, defaultSortDir, isPendingReview,
   EVENT_STATUS_OPTIONS, EVENT_TYPE_OPTIONS, EVENT_STATE_OPTIONS, EVENT_SOURCE_OPTIONS, EVENT_SORT_OPTIONS,
 } from '@/utils/adminEventList.js';
 
@@ -267,6 +267,27 @@ const EventsManagementPage = () => {
   };
 
   const discoveredCount = events.filter(FILTERS.discovered).length;
+  // Everything waiting on an admin's approve / reject, across the whole list
+  // (not just the current view), so the alert can't be hidden by a filter.
+  const pendingEvents = events.filter(isPendingReview);
+  const pendingSubmitted = pendingEvents.filter((ev) => !ev.auto_discovered).length;
+  const pendingScanned = pendingEvents.length - pendingSubmitted;
+  // "Review now": back to the full list with no filters hiding the Pending
+  // section, open it, and scroll it into view.
+  const reviewPending = () => {
+    setFilter('all');
+    clearFilters();
+    setCollapsed((prev) => {
+      if (!prev.has('pending')) return prev;
+      const next = new Set(prev);
+      next.delete('pending');
+      saveCollapsed(next);
+      return next;
+    });
+    requestAnimationFrame(() => {
+      document.querySelector('[data-section="pending"]')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
   const editsCount = events.filter((ev) => unreviewedEdits.has(ev.id)).length;
   const queueEvents = events.filter(
     filter === 'discovered'
@@ -316,6 +337,31 @@ const EventsManagementPage = () => {
           <Plus className="w-5 h-5 mr-2" /> Create Event
         </Button>
       </AdminPageHeader>
+
+      {!isLoading && pendingEvents.length > 0 && (
+        <div
+          role="status"
+          data-testid="pending-review-alert"
+          className="flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-900 sm:flex-row sm:items-center dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200"
+        >
+          <BellRing className="w-5 h-5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+          <div className="flex-1 min-w-0">
+            <p className="font-bold">
+              {pendingEvents.length === 1 ? '1 event is' : `${pendingEvents.length} events are`} waiting for your review
+            </p>
+            <p className="text-sm">
+              {[
+                pendingSubmitted > 0 && `${pendingSubmitted} submitted by ${pendingSubmitted === 1 ? 'a member' : 'members'}`,
+                pendingScanned > 0 && `${pendingScanned} found by the automated scan`,
+              ].filter(Boolean).join(' · ')}
+              {' '}— approve to publish it, or reject it with a reason.
+            </p>
+          </div>
+          <Button onClick={reviewPending} size="sm" className="rounded-xl font-bold shrink-0">
+            Review now
+          </Button>
+        </div>
+      )}
 
       {(discoveredCount > 0 || editsCount > 0 || filter !== 'all') && (
         <div className="flex flex-wrap items-center gap-2">
@@ -457,7 +503,12 @@ const EventsManagementPage = () => {
                   const open = !collapsed.has(key);
                   return (
                   <React.Fragment key={key}>
-                  <tr className="bg-muted/60 hover:bg-muted/80" data-section={key}>
+                  <tr
+                    className={key === 'pending'
+                      ? 'scroll-mt-40 bg-amber-100/70 hover:bg-amber-100 dark:bg-amber-500/15 dark:hover:bg-amber-500/20'
+                      : 'bg-muted/60 hover:bg-muted/80'}
+                    data-section={key}
+                  >
                     <td colSpan={4} className="p-0">
                       <button
                         type="button"
@@ -466,6 +517,7 @@ const EventsManagementPage = () => {
                         className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-foreground"
                       >
                         <ChevronRight aria-hidden="true" className={`w-4 h-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-90' : ''}`} />
+                        {key === 'pending' && <BellRing aria-hidden="true" className="w-3.5 h-3.5 shrink-0 text-amber-600 dark:text-amber-400" />}
                         {label} <span className="font-semibold text-muted-foreground normal-case tracking-normal">· {rows.length}</span>
                       </button>
                     </td>

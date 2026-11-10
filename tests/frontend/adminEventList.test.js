@@ -96,32 +96,45 @@ describe('sortEvents', () => {
 });
 
 describe('groupEventsByTiming', () => {
-  it('splits current from past, leaving out an empty section', () => {
+  it('splits pending review, current and past, leaving out an empty section', () => {
     const sections = groupEventsByTiming(events, 'date', 'desc', { today: TODAY });
-    expect(sections.map((s) => s.key)).toEqual(['current', 'past']);
-    expect(sections[0].label).toBe('Current & upcoming');
-    expect(ids(sections[1].events)).toEqual(['scanned', 'done']);
+    expect(sections.map((s) => s.key)).toEqual(['pending', 'current', 'past']);
+    expect(sections[0].label).toBe('Pending review');
+    expect(ids(sections[0].events)).toEqual(['scanned']);
+    expect(sections[1].label).toBe('Current & upcoming');
+    expect(ids(sections[2].events)).toEqual(['done']);
     const onlyPast = groupEventsByTiming(events.filter((e) => e.id === 'done'), 'date', 'desc', { today: TODAY });
     expect(onlyPast.map((s) => s.key)).toEqual(['past']);
     expect(groupEventsByTiming([], 'date', 'desc', { today: TODAY })).toEqual([]);
   });
 
   it('shows current events soonest-first and past events most-recent-first by default', () => {
-    const [current, past] = groupEventsByTiming(events, 'date', 'desc', { today: TODAY });
+    const [, current, past] = groupEventsByTiming(events, 'date', 'desc', { today: TODAY });
     expect(ids(current.events)).toEqual(['hangout', 'tcxpo', 'sydney', 'perth', 'undated']);
-    expect(ids(past.events)).toEqual(['scanned', 'done']);
+    expect(ids(past.events)).toEqual(['done']);
   });
 
   it('flips both sections when the date direction is reversed', () => {
-    const [current, past] = groupEventsByTiming(events, 'date', 'asc', { today: TODAY });
+    const [, current] = groupEventsByTiming(events, 'date', 'asc', { today: TODAY });
     expect(ids(current.events)).toEqual(['perth', 'sydney', 'tcxpo', 'hangout', 'undated']);
-    expect(ids(past.events)).toEqual(['done', 'scanned']);
   });
 
   it('sorts both sections the same way for a non-date column', () => {
-    const [current, past] = groupEventsByTiming(events, 'title', 'asc', { today: TODAY });
+    const [, current] = groupEventsByTiming(events, 'title', 'asc', { today: TODAY });
     expect(ids(current.events)[0]).toBe('undated');
-    expect(ids(past.events)).toEqual(['scanned', 'done']);
+  });
+
+  it('moves a pending event into Current & upcoming once approved, soonest first while pending', () => {
+    const sub = (o) => E({ status: 'pending_review', ...o });
+    const list = [sub({ id: 'later', title: 'Later', start_date: '2027-03-01' }), sub({ id: 'soon', title: 'Soon', start_date: '2026-11-20' })];
+    const [pending] = groupEventsByTiming(list, 'date', 'desc', { today: TODAY });
+    expect(pending.key).toBe('pending');
+    expect(ids(pending.events)).toEqual(['soon', 'later']);
+    const approved = list.map((e) => (e.id === 'soon' ? { ...e, status: 'approved' } : e));
+    const sections = groupEventsByTiming(approved, 'date', 'desc', { today: TODAY });
+    expect(sections.map((s) => [s.key, ids(s.events)])).toEqual([['pending', ['later']], ['current', ['soon']]]);
+    const rejected = approved.map((e) => (e.id === 'later' ? { ...e, status: 'rejected' } : e));
+    expect(groupEventsByTiming(rejected, 'date', 'desc', { today: TODAY }).map((s) => s.key)).toEqual(['current']);
   });
 
   it('files a completed event under Past even if its date is in the future', () => {

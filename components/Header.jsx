@@ -313,12 +313,13 @@ const Header = () => {
               </Button>
             )}
 
+            {/* Notifications show on every screen size — phones included — so a
+                signed-in member never has to open the menu to see an alert.
+                The fallback holds the bell's footprint so the row doesn't shift. */}
             {!authLoading && isAuthenticated && (
-              <div className="hidden sm:block">
-                <Suspense fallback={null}>
-                  <NotificationBell />
-                </Suspense>
-              </div>
+              <Suspense fallback={<div className="h-11 w-11 shrink-0" aria-hidden="true" />}>
+                <NotificationBell />
+              </Suspense>
             )}
 
             {/* Sell CTA — the primary marketplace action (list a card). Routes to
@@ -331,10 +332,12 @@ const Header = () => {
               </Link>
             </Button>
 
+            {/* On phones a signed-in member's row also carries the bell, so the
+                theme switch gives up its slot there (it's in the menu sheet). */}
             <Button
               variant="ghost"
               size="icon"
-              className="shrink-0 rounded-xl hover:bg-muted"
+              className={`shrink-0 rounded-xl hover:bg-muted ${isAuthenticated ? 'hidden sm:inline-flex' : ''}`}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               onClick={toggleDarkMode}
             >
