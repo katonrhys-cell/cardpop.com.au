@@ -34,9 +34,10 @@ const AccountEvents = () => {
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
 
-  const fetchMyEvents = useCallback(async () => {
+  // `silent`: refresh after a save without swapping the list for skeletons.
+  const fetchMyEvents = useCallback(async ({ silent = false } = {}) => {
     if (!currentUser?.id) return;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setLoadError(null);
     try {
       const { data, error } = await supabase
@@ -48,14 +49,19 @@ const AccountEvents = () => {
       setEvents(data || []);
     } catch (err) {
       console.error('Failed to load your events:', err);
-      setLoadError('We couldn’t load your events right now. Please try again shortly.');
-      setEvents([]);
+      if (silent) {
+        toast.error('Saved — but we couldn’t refresh your list. Reload the page to see the latest.');
+      } else {
+        setLoadError('We couldn’t load your events right now. Please try again shortly.');
+        setEvents([]);
+      }
     } finally {
       setIsLoading(false);
     }
   }, [currentUser?.id]);
 
   useEffect(() => { fetchMyEvents(); }, [fetchMyEvents]);
+  const refreshAfterSave = useCallback(() => fetchMyEvents({ silent: true }), [fetchMyEvents]);
 
   // A verified organiser (set by an admin) can see the vendor list for their
   // events. RLS lets a user read only their own verification row.
@@ -105,20 +111,25 @@ const AccountEvents = () => {
   const renderEvent = (event) => {
     const badge = STATUS_BADGES[event.status] || STATUS_BADGES.pending_review;
     return (
-      <div key={event.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+      <article key={event.id} aria-labelledby={`event-${event.id}-title`} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap mb-1.5">
-            <h3 className="text-lg font-bold text-foreground truncate">{event.title}</h3>
+            <h3 id={`event-${event.id}-title`} className="text-lg font-bold text-foreground break-words min-w-0">{event.title}</h3>
             <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <CalendarDays className="w-4 h-4" /> {formatEventDate(event)}
+              <CalendarDays className="w-4 h-4 shrink-0" aria-hidden="true" /> {formatEventDate(event)}
             </span>
             <span className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4" /> <span className="truncate">{formatEventLocation(event)}</span>
+              <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" /> <span className="truncate">{formatEventLocation(event)}</span>
             </span>
           </div>
+          {event.status === 'pending_review' && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              With the CardPop team for review — you can keep editing it in the meantime.
+            </p>
+          )}
           {event.status === 'rejected' && event.rejection_reason && (
             <p className="mt-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
               Reason: {event.rejection_reason}
@@ -127,39 +138,39 @@ const AccountEvents = () => {
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
           {isVerifiedOrganiser && (
-            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setVendorsEvent(event)}>
-              <Store className="w-3.5 h-3.5" /> Vendors
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setVendorsEvent(event)} aria-label={`Vendors for ${event.title}`}>
+              <Store className="w-3.5 h-3.5" aria-hidden="true" /> Vendors
             </Button>
           )}
           {(event.status === 'draft' || event.status === 'pending_review' || event.status === 'approved') && (
-            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
-              <Pencil className="w-3.5 h-3.5" /> {event.status === 'draft' ? 'Edit & submit' : 'Edit'}
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)} aria-label={`${event.status === 'draft' ? 'Edit & submit' : 'Edit'} ${event.title}`}>
+              <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> {event.status === 'draft' ? 'Edit & submit' : 'Edit'}
             </Button>
           )}
           {event.status === 'draft' && (
-            <Button variant="ghost" size="sm" className="rounded-xl gap-1.5 text-muted-foreground hover:text-destructive" onClick={() => deleteDraft(event)}>
-              <Trash2 className="w-3.5 h-3.5" /> Delete
+            <Button variant="ghost" size="sm" className="rounded-xl gap-1.5 text-muted-foreground hover:text-destructive" onClick={() => deleteDraft(event)} aria-label={`Delete draft ${event.title}`}>
+              <Trash2 className="w-3.5 h-3.5" aria-hidden="true" /> Delete
             </Button>
           )}
           {event.status === 'rejected' && (
-            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
-              <RotateCcw className="w-3.5 h-3.5" /> Edit &amp; resubmit
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)} aria-label={`Edit & resubmit ${event.title}`}>
+              <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" /> Edit &amp; resubmit
             </Button>
           )}
           {event.status === 'approved' && (
-            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setBadgeEvent(event)}>
-              <BadgeCheck className="w-3.5 h-3.5" /> Website badge
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setBadgeEvent(event)} aria-label={`Website badge for ${event.title}`}>
+              <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> Website badge
             </Button>
           )}
           {event.status === 'approved' && (
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5" asChild>
-              <Link to={eventPath(event)}>
-                <ExternalLink className="w-3.5 h-3.5" /> View Live
+              <Link to={eventPath(event)} aria-label={`View ${event.title} live`}>
+                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> View Live
               </Link>
             </Button>
           )}
         </div>
-      </div>
+      </article>
     );
   };
 
@@ -171,13 +182,13 @@ const AccountEvents = () => {
       description="Submit card events and track their review status."
       actions={
         <Button size="sm" onClick={openSubmit} className="rounded-xl shadow-sm h-10 px-4 font-bold">
-          <Plus className="w-4 h-4 mr-2" /> Submit Event
+          <Plus className="w-4 h-4 mr-2" aria-hidden="true" /> Submit Event
         </Button>
       }
     >
 
       <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl text-sm text-muted-foreground">
-        <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+        <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />
         <p>
           Every submission is reviewed by the CardPop team before it appears on the{' '}
           <Link to="/events" className="text-primary font-semibold hover:underline">public events calendar</Link>.
@@ -189,27 +200,27 @@ const AccountEvents = () => {
       </div>
 
       {isLoading ? (
-        <div className="space-y-4">
+        <div className="space-y-4" role="status" aria-label="Loading your events">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
         </div>
       ) : loadError ? (
         <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-destructive/30">
-          <CalendarDays className="w-14 h-14 text-destructive mx-auto mb-4 opacity-40" />
+          <CalendarDays className="w-14 h-14 text-destructive mx-auto mb-4 opacity-40" aria-hidden="true" />
           <h2 className="text-xl font-bold mb-2">Couldn’t load your events</h2>
           <p className="text-muted-foreground mb-6 max-w-sm mx-auto">{loadError}</p>
-          <Button onClick={fetchMyEvents} variant="outline" className="rounded-xl font-bold">
+          <Button onClick={() => fetchMyEvents()} variant="outline" className="rounded-xl font-bold">
             Try again
           </Button>
         </div>
       ) : events.length === 0 ? (
         <div className="text-center py-20 bg-card rounded-3xl border border-dashed border-border">
-          <CalendarDays className="w-14 h-14 text-muted-foreground mx-auto mb-4 opacity-40" />
+          <CalendarDays className="w-14 h-14 text-muted-foreground mx-auto mb-4 opacity-40" aria-hidden="true" />
           <h2 className="text-xl font-bold mb-2">No events yet</h2>
           <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
             Running a card show, tournament or trade night? Submit it and reach collectors across Australia.
           </p>
           <Button onClick={openSubmit} className="rounded-xl font-bold">
-            <Plus className="w-4 h-4 mr-2" /> Submit Your First Event
+            <Plus className="w-4 h-4 mr-2" aria-hidden="true" /> Submit Your First Event
           </Button>
         </div>
       ) : (
@@ -218,7 +229,7 @@ const AccountEvents = () => {
             <section aria-labelledby="drafts-heading" className="space-y-4">
               <div>
                 <h2 id="drafts-heading" className="text-lg font-bold flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-muted-foreground" /> Drafts
+                  <FileText className="w-5 h-5 text-muted-foreground" aria-hidden="true" /> Drafts
                   <span className="text-sm font-semibold text-muted-foreground">({drafts.length})</span>
                 </h2>
                 <p className="text-sm text-muted-foreground">
@@ -230,9 +241,7 @@ const AccountEvents = () => {
           )}
           {submitted.length > 0 && (
             <section aria-labelledby="submitted-heading" className="space-y-4">
-              {drafts.length > 0 && (
-                <h2 id="submitted-heading" className="text-lg font-bold">Submitted &amp; live</h2>
-              )}
+              <h2 id="submitted-heading" className={drafts.length > 0 ? 'text-lg font-bold' : 'sr-only'}>Submitted &amp; live</h2>
               {submitted.map(renderEvent)}
             </section>
           )}
@@ -249,7 +258,7 @@ const AccountEvents = () => {
         onClose={() => setIsModalOpen(false)}
         event={editingEvent}
         mode="user"
-        onSaved={fetchMyEvents}
+        onSaved={refreshAfterSave}
       />
     </AccountPageShell>
   );
