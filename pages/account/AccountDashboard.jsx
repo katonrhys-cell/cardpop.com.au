@@ -32,6 +32,7 @@ const AccountDashboard = () => {
   // Counts per lifecycle bucket of the events this user organises (null until
   // loaded, or when the read failed — the tile then shows a dash, not "0").
   const [eventCounts, setEventCounts] = useState(null);
+  const [eventsLoading, setEventsLoading] = useState(true);
 
   const [vaultItems, setVaultItems]           = useState([]);
   const [vaultLoading, setVaultLoading]       = useState(false);
@@ -60,12 +61,14 @@ const AccountDashboard = () => {
       supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).maybeSingle()
         .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); })
 
+      setEventsLoading(true);
       // The user's own events (RLS + organiser_id), three small columns each.
       // Independent of the stats batch so a failure here can't blank the rest.
       supabase.from('events').select('status, start_date, end_date')
         .eq('organiser_id', currentUser.id).limit(500)
         .then(({ data, error }) => {
           if (cancelled) return;
+          setEventsLoading(false);
           if (error) { console.error('Failed to load event stats:', error); setEventCounts(null); return; }
           setEventCounts(countMyEventBuckets(data, todayInAustralia()));
         });
@@ -325,7 +328,7 @@ const AccountDashboard = () => {
             <CalendarDays className="w-4 h-4 text-primary" />
           </CardHeader>
           <CardContent className="flex-1 flex flex-col justify-end">
-            {statsLoading ? <Skeleton className="h-8 w-16" /> : (
+            {eventsLoading ? <Skeleton className="h-8 w-16" /> : (
               <div className="text-2xl font-extrabold tabular-nums tracking-tight text-foreground">
                 {eventCounts ? activeEventCount(eventCounts) : '—'}
               </div>
@@ -339,10 +342,10 @@ const AccountDashboard = () => {
               </p>
             )}
             <Link
-              to={eventCounts && eventCounts.all > 0 ? '/account/events' : '/account/events?new=1'}
+              to={eventCounts?.all === 0 ? '/account/events?new=1' : '/account/events'}
               className="text-xs font-bold text-primary hover:underline mt-2 inline-block"
             >
-              {eventCounts && eventCounts.all > 0 ? 'View all events' : 'List an event'} &rarr;
+              {eventCounts?.all === 0 ? 'List an event' : 'View all events'} &rarr;
             </Link>
           </CardContent>
         </Card>

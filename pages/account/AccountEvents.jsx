@@ -148,8 +148,8 @@ const AccountEvents = () => {
   const drafts = events.filter((ev) => ev.status === 'draft');
   const submitted = events.filter((ev) => ev.status !== 'draft');
 
-  // `?status=` picks a lifecycle tab (the dashboard's Active Events tile
-  // links to `?status=live`). Unknown values fall back to All.
+  // `?status=` picks a lifecycle tab, so a tab can be linked to directly.
+  // Unknown values fall back to All.
   const bucket = normaliseBucket(searchParams.get('status'));
   const counts = countMyEventBuckets(events, today);
   const bucketMeta = MY_EVENT_BUCKETS.find((b) => b.key === bucket);
