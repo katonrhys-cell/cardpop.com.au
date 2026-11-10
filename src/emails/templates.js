@@ -614,7 +614,9 @@ ${todo}`;
 // Sent to the member who submitted an event once an admin approves or rejects
 // it. `note` is the admin's rejection reason, shown as written. See
 // docs/event-submissions.md.
-export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl }) {
+// `feature` ({ fromPrice, earlyBird, url } | null): on approval, the offer to
+// feature the event (src/routes/events.js featureOffer()).
+export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl, feature = null }) {
   const title = esc(eventTitle) || 'your event';
   const greeting = `Hi ${esc(name) || 'there'},`;
   const noteHtml = note
@@ -623,7 +625,12 @@ export function eventReviewOutcomeEmail({ name, eventTitle, approved, note, even
   const band = approved ? 'Your Event Is Live' : 'Event Not Approved';
   const body = approved
     ? `<p><strong>${title}</strong> has been approved and is now on the CardPop events calendar.</p>
-<p>Need to change something later? Edit it any time under <strong>Account → My Events</strong> — your changes go live straight away.</p>`
+<p>Need to change something later? Edit it any time under <strong>Account → My Events</strong> — your changes go live straight away.</p>${feature ? `
+<div style="margin:20px 0;padding:16px 18px;border:2px solid #fbbf24;border-radius:12px;background:#fffbeb;">
+<p style="margin:0 0 6px;font-weight:700;">&#9733; Want more collectors to see it?</p>
+<p style="margin:0 0 12px;">Featured events sit at the top of the CardPop events calendar in gold, from <strong>${esc(feature.fromPrice)}</strong>${feature.earlyBird ? ` (${esc(feature.earlyBird)})` : ''}. It switches on as soon as you pay and lasts until your show ends.</p>
+<p style="margin:0;"><a href="${esc(feature.url)}" style="display:inline-block;padding:10px 18px;border-radius:999px;background:#fbbf24;color:#451a03;font-weight:700;text-decoration:none;">Feature your event</a></p>
+</div>` : ''}`
     : `<p>We reviewed <strong>${title}</strong> and couldn't approve it as submitted.</p>${noteHtml}
 <p>You can edit it and resubmit from <strong>Account → My Events</strong>.</p>`;
   const ctaUrl = approved && eventUrl ? eventUrl : 'https://cardpop.com.au/account/events';

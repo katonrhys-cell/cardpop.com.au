@@ -24,6 +24,7 @@ vi.mock('@/components/account/AccountPageShell.jsx', () => ({ default: ({ childr
 vi.mock('@/components/EventFormModal.jsx', () => ({ default: (props) => { state.modalProps = props; return null; } }));
 vi.mock('@/components/events/OrganiserVendorsDialog.jsx', () => ({ default: () => null }));
 vi.mock('@/components/events/EventBadgeDialog.jsx', () => ({ default: () => null }));
+vi.mock('@/components/events/FeatureEventDialog.jsx', () => ({ default: () => null }));
 vi.mock('@/components/WorkspaceReferralCard.jsx', () => ({ default: () => null }));
 vi.mock('@/lib/supabaseClient.js', () => {
   const builder = (table) => {
@@ -111,5 +112,24 @@ describe('My Events status tabs', () => {
     fireEvent.click(screen.getByRole('button', { name: /^All/ }));
     expect(await screen.findByText('Pending Show')).toBeInTheDocument();
     expect(screen.getByText('Rejected Show')).toBeInTheDocument();
+  });
+
+  it('offers featuring once, right after an event is submitted', async () => {
+    renderPage();
+    await screen.findByText('Pending Show');
+    expect(screen.queryByTestId('feature-upsell')).not.toBeInTheDocument();
+    await act(async () => { state.modalProps.onSubmitted('p1'); });
+    const card = await screen.findByTestId('feature-upsell');
+    expect(card).toHaveTextContent('Want more collectors to see Pending Show?');
+    expect(card).toHaveTextContent(/from \$/);
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    expect(screen.queryByTestId('feature-upsell')).not.toBeInTheDocument();
+  });
+
+  it('does not offer featuring for an event that cannot be featured', async () => {
+    renderPage();
+    await screen.findByText('Rejected Show');
+    await act(async () => { state.modalProps.onSubmitted('r1'); });
+    expect(screen.queryByTestId('feature-upsell')).not.toBeInTheDocument();
   });
 });

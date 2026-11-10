@@ -7,6 +7,7 @@ import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
+import FeatureUpsellCard from '@/components/events/FeatureUpsellCard.jsx';
 import { featureEligibility, todayInAustralia } from '@/utils/featuredPackages.js';
 import { MY_EVENT_BUCKETS, myEventBucket, countMyEventBuckets, normaliseBucket } from '@/utils/myEventStatus.js';
 import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
@@ -73,6 +74,8 @@ const AccountEvents = () => {
 
   useEffect(() => { fetchMyEvents(); }, [fetchMyEvents]);
   const refreshAfterSave = useCallback(() => fetchMyEvents({ silent: true }), [fetchMyEvents]);
+  // The event just submitted for review — offered featuring once, right away.
+  const [justSubmittedId, setJustSubmittedId] = useState(null);
 
   // A verified organiser (set by an admin) can see the vendor list for their
   // events. RLS lets a user read only their own verification row.
@@ -109,12 +112,21 @@ const AccountEvents = () => {
   // `?feature=1` ("Feature Now" on /list-your-event): open the package picker
   // for the one event that can be featured, point at the buttons if there are
   // several, or open the submit form when there's nothing to feature yet.
+  // `?feature=<event id>` (the "your event is live" email) opens that event's
+  // picker when it can still be featured.
   useEffect(() => {
-    if (isLoading || searchParams.get('feature') !== '1') return;
+    const wanted = searchParams.get('feature');
+    if (isLoading || !wanted) return;
     const next = new URLSearchParams(searchParams);
     next.delete('feature');
     setSearchParams(next, { replace: true });
     const featurable = events.filter((ev) => featureEligibility(ev, today).ok);
+    if (wanted !== '1') {
+      const target = events.find((ev) => ev.id === wanted);
+      if (target && featureEligibility(target, today).ok) setFeatureEvent(target);
+      else if (target) toast.info(featureEligibility(target, today).reason);
+      return;
+    }
     if (featurable.length === 1) setFeatureEvent(featurable[0]);
     else if (featurable.length > 1) toast.info('Press "Feature" next to the event you want to promote.');
     else {
@@ -270,6 +282,19 @@ const AccountEvents = () => {
         </p>
       </div>
 
+      {(() => {
+        const submitted = justSubmittedId && events.find((ev) => ev.id === justSubmittedId);
+        if (!submitted || !featureEligibility(submitted, today).ok) return null;
+        return (
+          <FeatureUpsellCard
+            event={submitted}
+            today={today}
+            onFeature={() => { setFeatureEvent(submitted); setJustSubmittedId(null); }}
+            onDismiss={() => setJustSubmittedId(null)}
+          />
+        );
+      })()}
+
       {isLoading ? (
         <div className="space-y-4" role="status" aria-label="Loading your events">
           {[1, 2, 3].map(i => <Skeleton key={i} className="h-28 w-full rounded-2xl" />)}
@@ -369,6 +394,7 @@ const AccountEvents = () => {
         event={editingEvent}
         mode="user"
         onSaved={refreshAfterSave}
+        onSubmitted={setJustSubmittedId}
       />
     </AccountPageShell>
   );

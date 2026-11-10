@@ -65,3 +65,18 @@ edge-cached homepage bundle (`queryHomepageEvents` in
 Admins can switch it either way in the event form ("Show on the homepage",
 next to "Featured on the calendar"); organisers can't write the column (a
 BEFORE trigger pins it, like `is_featured`).
+
+## Where featuring is offered
+
+- **Right after submitting** (Account → My Events): the form's `onSubmitted`
+  callback (a member's real submission, never a draft or a live edit) shows a
+  gold card, `components/events/FeatureUpsellCard.jsx`, with the cheapest
+  package's price for that event, early bird included. Once, dismissable,
+  and only while `featureEligibility()` allows it.
+- **In the "your event is live" email**: `featureOffer()` in
+  `src/routes/events.js` adds a gold block to the approval email with the
+  same price and a link to `/account/events?feature=<event id>`, which opens
+  that event's package picker. Left out once the event is featured or has
+  started.
+- **On `/list-your-event`**: the packages section and "Feature Now"
+  (`?feature=1`).

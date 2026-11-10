@@ -226,7 +226,15 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
  * count-up tiles separated by hairlines, a footnote, and (community panel,
  * signed-out visitors) a "Join free" call to action.
  */
+// "List event" in the community panel: straight to the submit form when signed
+// in; otherwise sign up first, and the confirmation link brings them back to it
+// (SignupPage carries ?next= through, validated by lib/safeInternalPath.js).
+const LIST_EVENT_SIGNED_IN = '/account/events?new=1';
+const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGNED_IN)}`;
+
 const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testId }) => {
+  // `cta` is one { to, label } or a list of them, all in the same style.
+  const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
   return (
     <div
@@ -243,10 +251,14 @@ const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testI
             <p className="mt-0.5 text-sm font-semibold text-foreground sm:text-base">{title}</p>
           </div>
         </div>
-        {cta && (
-          <Button asChild size="sm" className="hidden shrink-0 rounded-full font-bold sm:inline-flex">
-            <Link to={cta.to}>{cta.label} <ArrowRight className="ml-1 h-4 w-4" /></Link>
-          </Button>
+        {ctas.length > 0 && (
+          <div className="hidden shrink-0 gap-2 sm:flex">
+            {ctas.map((c) => (
+              <Button key={c.label} asChild size="sm" className="rounded-full font-bold">
+                <Link to={c.to}>{c.label} <ArrowRight className="ml-1 h-4 w-4" /></Link>
+              </Button>
+            ))}
+          </div>
         )}
       </div>
       <div className={`mt-6 grid flex-1 items-start divide-x divide-border ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
@@ -256,10 +268,14 @@ const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testI
       </div>
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground sm:text-xs">
         <span>{note}</span>
-        {cta && (
-          <Link to={cta.to} className="shrink-0 font-bold text-primary hover:underline sm:hidden">
-            {cta.label} <ArrowRight className="inline h-3 w-3 align-[-1px]" />
-          </Link>
+        {ctas.length > 0 && (
+          <span className="flex shrink-0 gap-4 sm:hidden">
+            {ctas.map((c) => (
+              <Link key={c.label} to={c.to} className="font-bold text-primary hover:underline">
+                {c.label} <ArrowRight className="inline h-3 w-3 align-[-1px]" />
+              </Link>
+            ))}
+          </span>
         )}
       </div>
     </div>
@@ -707,7 +723,9 @@ const HomePage = () => {
                 note={isAuthenticated ? 'Live counts across CardPop' : 'Free to join · list your first card in minutes'}
                 stats={communityStats}
                 inView={statsInView}
-                cta={isAuthenticated ? null : { to: '/signup', label: 'Join free' }}
+                cta={isAuthenticated
+                  ? [{ to: LIST_EVENT_SIGNED_IN, label: 'List event' }]
+                  : [{ to: '/signup', label: 'Join free' }, { to: LIST_EVENT_SIGNED_OUT, label: 'List event' }]}
               />
             </div>
           </div>
