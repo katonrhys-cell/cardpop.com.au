@@ -15,6 +15,7 @@ import AccountPlanBanner from '@/components/AccountPlanBanner.jsx';
 import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { uniqueTopic } from '@/lib/realtimeTopic.js';
+import { useRefreshOnReturn } from '@/hooks/useRefreshOnReturn.js';
 import { toast } from 'sonner';
 import { todayInAustralia } from '@/utils/featuredPackages.js';
 import { countMyEventBuckets, activeEventCount } from '@/utils/myEventStatus.js';
@@ -28,6 +29,7 @@ const AccountDashboard = () => {
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [sellerTier, setSellerTier] = useState(null);
   // Counts per lifecycle bucket of the events this user organises (null until
   // loaded, or when the read failed — the tile then shows a dash, not "0").
@@ -53,25 +55,31 @@ const AccountDashboard = () => {
 
     let cancelled = false;
 
-    const run = async () => {
-      setStatsLoading(true);
+    // Resolves true when every read succeeded. `silent` keeps the numbers on
+    // screen while they refresh (returning to the tab) instead of skeletons.
+    const run = async ({ silent = false } = {}) => {
+      if (!silent) setStatsLoading(true);
       setStatsError(null);
 
       // Fetch seller tier independently — a missing profile row must not block stats
       supabase.from('profiles').select('seller_tier').eq('id', currentUser.id).maybeSingle()
         .then(({ data }) => { if (!cancelled && data) setSellerTier(data.seller_tier); })
 
-      setEventsLoading(true);
+      if (!silent) setEventsLoading(true);
       // The user's own events (RLS + organiser_id), three small columns each.
       // Independent of the stats batch so a failure here can't blank the rest.
-      supabase.from('events').select('status, start_date, end_date')
+      const eventsRead = supabase.from('events').select('status, start_date, end_date')
         .eq('organiser_id', currentUser.id).limit(500)
         .then(({ data, error }) => {
           if (cancelled) return;
           setEventsLoading(false);
-          if (error) { console.error('Failed to load event stats:', error); setEventCounts(null); return; }
+          if (error) { console.error('Failed to load event stats:', error); setEventCounts(null); return false; }
           setEventCounts(countMyEventBuckets(data, todayInAustralia()));
-        });
+          return true;
+        })
+        .catch((err) => { console.error('Failed to load event stats:', err); return false; });
+
+      let statsOk = false;
 
       try {
         const [salesRes, listingsRes, vaultRes, tradesRes] = await Promise.all([
@@ -92,7 +100,7 @@ const AccountDashboard = () => {
             .eq('status', 'proposed'),
         ]);
 
-        if (cancelled) return;
+        if (cancelled) return null;
 
         // Log individual errors without crashing the whole dashboard. Supabase
         // resolves (never rejects) a failed query, so a per-query error here
@@ -115,11 +123,15 @@ const AccountDashboard = () => {
           vaultItemsCount: vaultRes.count    || 0,
           pendingTrades:   tradesRes.count   || 0,
         });
+        statsOk = failed.length === 0;
       } catch (err) {
         if (!cancelled) setStatsError('Failed to load live statistics. Please try refreshing.');
       } finally {
         if (!cancelled) setStatsLoading(false);
       }
+      const eventsOk = await eventsRead;
+      if (cancelled) return null; // unmounted / user changed: no verdict
+      return statsOk && eventsOk !== false;
     };
 
     fetchStatsRef.current = run;
@@ -134,9 +146,9 @@ const AccountDashboard = () => {
     let cancelled = false;
     const uid = currentUser.id;
 
-    const run = async (page = vaultPage) => {
-      setVaultLoading(true);
-      setVaultError(null);
+    // Resolves true on success; `silent` as for the stats fetch.
+    const run = async (page = vaultPage, { silent = false } = {}) => {
+      if (!silent) { setVaultLoading(true); setVaultError(null); }
       try {
         const from = (page - 1) * 10;
         const { data: items, count, error: vaultFetchError } = await supabase
@@ -145,18 +157,22 @@ const AccountDashboard = () => {
           .order('created_at', { ascending: false })
           .range(from, from + 9);
         if (vaultFetchError) throw vaultFetchError;
-        if (cancelled) return;
+        if (cancelled) return null;
+        setVaultError(null);
         setVaultItems(items ?? []);
         setVaultPage(page);
         setVaultTotalPages(Math.ceil((count ?? 0) / 10));
+        return true;
       } catch (err) {
-        if (!cancelled) setVaultError(err.message || 'Failed to load vault items.');
+        if (cancelled) return null;
+        setVaultError(err.message || 'Failed to load vault items.');
+        return false;
       } finally {
         if (!cancelled) setVaultLoading(false);
       }
     };
 
-    fetchVaultRef.current = (page) => run(page ?? vaultPageRef.current);
+    fetchVaultRef.current = (page, opts) => run(page ?? vaultPageRef.current, opts);
     run(vaultPage);
     return () => { cancelled = true; };
   }, [currentUser?.id, vaultPage]);
@@ -200,11 +216,33 @@ const AccountDashboard = () => {
     };
   }, [currentUser?.id]);
 
-  const handleRefresh = () => {
-    fetchStatsRef.current?.();
-    fetchVaultRef.current?.();
-    toast.success('Dashboard data refreshed successfully');
+  // Report what actually happened: the toast waits for the reads, and a
+  // failed one says so instead of claiming success.
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const [statsOk, vaultOk] = await Promise.all([
+        fetchStatsRef.current?.() ?? true,
+        fetchVaultRef.current?.() ?? true,
+      ]);
+      // null = the page went away mid-refresh: say nothing.
+      if (statsOk === null || vaultOk === null) return;
+      if (statsOk && vaultOk) toast.success('Dashboard refreshed');
+      else toast.error('Some of your dashboard couldn’t be refreshed. Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  // Realtime can't see everything — a deleted row arrives without the
+  // owner column the listeners filter on (e.g. a draft event deleted in
+  // another tab) — so refetch quietly whenever the user comes back to the
+  // tab after a little while away.
+  useRefreshOnReturn(() => {
+    fetchStatsRef.current?.({ silent: true });
+    fetchVaultRef.current?.(undefined, { silent: true });
+  }, { staleMs: 15_000, enabled: !!currentUser?.id });
 
   const formattedRevenue = new Intl.NumberFormat('en-AU', {
     style: 'currency',
@@ -223,10 +261,10 @@ const AccountDashboard = () => {
             variant="outline"
             size="sm"
             onClick={handleRefresh}
-            disabled={statsLoading || vaultLoading}
+            disabled={refreshing || statsLoading || vaultLoading}
             className="rounded-xl shadow-sm h-10 px-4 font-bold transition-transform active:scale-95"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${(statsLoading || vaultLoading) ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 mr-2 ${(refreshing || statsLoading || vaultLoading) ? 'animate-spin' : ''}`} />
             Refresh Data
           </Button>
           {/* Primary action, sitting to the right of Refresh Data. Adding a card
