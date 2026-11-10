@@ -139,8 +139,11 @@ const ShopSealedBoxesPage = () => {
       manage_inventory: !hasUnlimitedStock(product) && product.stock_quantity != null,
       inventory_quantity: product.stock_quantity,
     };
-    addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999);
-    toast.success(`${product.title || 'Item'} added to cart`);
+    // addToCart rejects when the cart already holds all the stock there is —
+    // only claim success when it actually went in.
+    Promise.resolve(addToCart(cartProduct, cartVariant, 1, product.stock_quantity ?? 999))
+      .then(() => toast.success(`${product.title || 'Item'} added to cart`))
+      .catch((err) => toast.error(err?.message || 'Could not add this item to your cart'));
   };
 
   const handleClearFilters = () => {

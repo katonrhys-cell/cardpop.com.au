@@ -95,20 +95,23 @@ export const PUBLISHED_ROW_LINGER_MS = 1200;
 // their public seller page.
 const EventSubmitterLine = ({ event, submitter }) => {
   if (event.auto_discovered) {
-    return <p className="text-xs mt-0.5 text-muted-foreground">Found by the automated scan</p>;
+    return <p className="text-xs mt-0.5 text-brand-red">Found by the automated scan</p>;
   }
   if (!event.organiser_id || submitter === undefined) return null;
   if (submitter === null) {
-    return <p className="text-xs mt-0.5 text-muted-foreground">Submitted by a deleted account</p>;
+    return <p className="text-xs mt-0.5 text-brand-red">Submitted by a deleted account</p>;
   }
   const name = submitter.display_name || submitter.username || 'Unnamed account';
+  // A draft hasn't been submitted — nobody has asked for a review yet.
+  const isDraft = event.status === 'draft';
   return (
-    <p className="text-xs mt-0.5 text-muted-foreground truncate">
-      {submitter.is_admin ? 'Added by ' : 'Submitted by '}
-      <Link to={`/seller/${submitter.id}`} className="font-semibold text-foreground hover:underline">
+    <p className="text-xs mt-0.5 text-brand-red truncate">
+      {submitter.is_admin ? 'Added by ' : isDraft ? 'Created by ' : 'Submitted by '}
+      <Link to={`/seller/${submitter.id}`} className="font-semibold text-brand-red hover:underline">
         {name}
       </Link>
       {submitter.username && name !== submitter.username && <span> @{submitter.username}</span>}
+      {isDraft && !submitter.is_admin && <span className="italic"> · not submitted yet</span>}
       {submitter.is_admin && <span> (CardPop admin)</span>}
     </p>
   );
@@ -598,7 +601,17 @@ const EventsManagementPage = () => {
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
-                            <p className="font-bold text-foreground text-base leading-tight truncate">{event.title}</p>
+                            <p className="font-bold text-foreground text-base leading-tight truncate">
+                              <a
+                                href={`/events/${event.slug || event.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:underline hover:text-primary"
+                                title="Open the event page in a new tab"
+                              >
+                                {event.title}
+                              </a>
+                            </p>
                             {event.is_featured && <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />}
                             {event.auto_discovered && (
                               <Radar

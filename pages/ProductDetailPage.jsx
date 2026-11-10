@@ -1122,7 +1122,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-muted-foreground">{product.name}</p>
               <p className="text-lg font-extrabold tabular-nums text-foreground">
-                {isEOI ? formatOfferRange(product) : `$${(product.price || 0).toFixed(2)}`}
+                {isEOI ? (formatOfferRange(product.price_min_aud, product.price_max_aud) ?? 'Open to offers') : `$${(product.price || 0).toFixed(2)}`}
                 {!isShop && !isEOI && Number(product.shipping_cost_aud) > 0 && (
                   <span className="ml-1 text-xs font-medium text-muted-foreground">+ ${Number(product.shipping_cost_aud).toFixed(2)} post</span>
                 )}

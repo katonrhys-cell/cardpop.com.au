@@ -21,17 +21,31 @@ const cache = createTtlCache({ ttlMs: () => process.env.PLATFORM_SETTINGS_TTL_MS
 const MISSING = Symbol('missing');
 
 async function readOne(key) {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('platform_settings')
     .select('value')
     .eq('key', key)
     .maybeSingle();
+  // A failed read is not "no row": throwing keeps it out of the cache (the TTL
+  // cache never stores a rejected loader), so one transient error can't pin
+  // every checkout on this instance to the code defaults for a whole window.
+  if (error) throw new SettingsReadError(error.message);
   return data?.value !== undefined ? data.value : MISSING;
 }
 
+class SettingsReadError extends Error {}
+
 /** The stored value for `key`, or `defaultValue` when there is no row. */
 export async function getPlatformSetting(key, defaultValue) {
-  const value = await cache.get(key, () => readOne(key));
+  let value;
+  try {
+    value = await cache.get(key, () => readOne(key));
+  } catch (err) {
+    if (!(err instanceof SettingsReadError)) throw err;
+    // Same answer the caller always got on a failed read — the default — but
+    // not remembered, so the next call asks the database again.
+    return defaultValue;
+  }
   return value === MISSING || value === undefined ? defaultValue : value;
 }
 
@@ -48,10 +62,13 @@ export async function getPlatformSettings(keys) {
     else if (hit !== MISSING) out[key] = hit;
   }
   if (toFetch.length > 0) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('platform_settings')
       .select('key, value')
       .in('key', toFetch);
+    // Failed read: answer with what the cache held and cache nothing, rather
+    // than recording every requested key as missing.
+    if (error) return out;
     const found = new Map((data || []).map((r) => [r.key, r.value]));
     for (const key of toFetch) {
       const value = found.has(key) ? found.get(key) : MISSING;

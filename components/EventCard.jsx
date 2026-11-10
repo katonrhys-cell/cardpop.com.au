@@ -87,17 +87,17 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
               <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
             );
           })()}
-          {showFeaturedPill && (
-            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${FEATURED_PILL_CLASS} text-xs font-bold shadow-sm`}>
-              <Star className="w-3 h-3 fill-current" /> Featured
-            </span>
-          )}
           {past && (
             <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground gap-1">
               <History className="w-3 h-3" /> Past event
             </Badge>
           )}
         </div>
+        {showFeaturedPill && (
+          <span className={`absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${FEATURED_PILL_CLASS} text-xs font-bold shadow-sm`}>
+            <Star className="w-3 h-3 fill-current" /> Featured
+          </span>
+        )}
         <div className="absolute bottom-3 right-3 bg-background/90 backdrop-blur-md px-3 py-1.5 rounded-lg text-sm font-bold shadow-sm flex items-center gap-1.5">
           <Calendar className="w-4 h-4 text-primary" />
           {formattedDate}

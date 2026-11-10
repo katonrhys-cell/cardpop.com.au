@@ -16,6 +16,7 @@ import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { renderSurveyOptIn } from '@/lib/googleCustomerReviews.js';
 import { trackPurchase } from '@/lib/analytics.js';
+import { takePaidLines } from '@/lib/checkoutPaidLines.js';
 import { CHECKOUT_FORM_STORAGE_KEY } from '@/pages/CheckoutPage.jsx';
 import { MARKETPLACE_PROTECTION } from '@/utils/buyerProtectionPolicy.js';
 
@@ -131,7 +132,7 @@ const CheckoutSuccessPage = () => {
   // A buy-now / accepted-offer purchase (CheckoutModal) is paid outside the
   // cart, so confirming it must not empty whatever else is in the cart.
   const singleItem = searchParams.get('single') === '1';
-  const { clearCart } = useCart();
+  const { clearCart, removeFromCart } = useCart();
   const { isAuthenticated } = useAuth();
 
   const [sessionData, setSessionData] = useState(null);
@@ -171,14 +172,21 @@ const CheckoutSuccessPage = () => {
           });
         }
         // Only empty the cart once payment is actually confirmed.
-        if (paid && !singleItem) clearCart();
+        if (paid && !singleItem) {
+          // Remove the lines this checkout paid for; anything else (the cards
+          // a shop-only checkout left behind) stays. No record → the old
+          // behaviour, an empty cart.
+          const paidLines = takePaidLines();
+          if (paidLines) paidLines.forEach((key) => removeFromCart(key));
+          else clearCart();
+        }
       })
       .catch(err => {
         if (!cancelled) setStatus('error');
       });
 
     return () => { cancelled = true; };
-  }, [sessionId, singleItem, clearCart]);
+  }, [sessionId, singleItem, clearCart, removeFromCart]);
 
   // Google Customer Reviews: once payment is confirmed, offer Google's survey
   // opt-in. Pre-orders are skipped — they ship weeks out, and the survey would
