@@ -101,22 +101,20 @@ const AccountPlanBanner = () => {
               <Link
                 to={to}
                 aria-current={isCurrent ? 'true' : undefined}
-                className={`flex h-full flex-col rounded-xl border px-3 py-2.5 text-sm transition-colors ${
+                className={`relative flex h-full flex-col rounded-xl border px-3 py-2.5 text-sm transition-colors ${
                   isCurrent
-                    ? 'border-brand-red bg-brand-red/5 ring-2 ring-brand-red/20'
+                    ? 'border-brand-red bg-brand-red/5'
                     : isBelow
                       ? 'border-border bg-muted/30 text-muted-foreground hover:bg-muted/50'
                       : 'border-border bg-card hover:border-brand-red/40'
                 }`}
               >
-                <span className="flex items-center justify-between gap-2">
-                  <span className={`font-bold ${isCurrent || !isBelow ? 'text-foreground' : ''}`}>{plan.name}</span>
-                  {isCurrent && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-red px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                      <Check className="h-3 w-3" /> Current
-                    </span>
-                  )}
-                </span>
+                {isCurrent && (
+                  <span className="absolute right-1.5 top-1.5 inline-flex items-center gap-0.5 rounded-full bg-brand-red px-1.5 py-px text-[9px] font-bold uppercase leading-4 tracking-wide text-white">
+                    <Check className="h-2.5 w-2.5" /> Current
+                  </span>
+                )}
+                <span className={`font-bold ${isCurrent ? 'pr-16 text-foreground' : !isBelow ? 'text-foreground' : ''}`}>{plan.name}</span>
                 <span className="text-xs text-muted-foreground">
                   {isCurrent && complimentary ? 'Included free' : plan.priceAud ? `$${plan.priceAud}/mo` : 'Free'}
                   {' · '}
