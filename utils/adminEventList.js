@@ -66,7 +66,7 @@ export const EVENT_SORT_OPTIONS = [
 // Fields the search box looks through. Arrays (tags, card games) are joined.
 const SEARCH_FIELDS = [
   'title', 'short_description', 'venue_name', 'address', 'suburb', 'state', 'postcode',
-  'organizer_name', 'organiser_name', 'tags', 'featured_card_games',
+  'organizer_name', 'organiser_name', 'submitter_name', 'tags', 'featured_card_games',
 ];
 
 const searchable = (ev) => SEARCH_FIELDS
