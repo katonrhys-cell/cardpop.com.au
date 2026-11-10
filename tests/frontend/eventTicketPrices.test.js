@@ -34,10 +34,10 @@ describe('ticketPriceLines', () => {
       { type: 'group', group_size: 4, price_aud: 40 },
       { type: 'vip', price_aud: 0 },
     ])).toEqual([
-      { label: 'Child', price: '$5.00' },
-      { label: 'VIP', price: 'Free' },
-      { label: 'GA Late Access', price: '$10.00' },
-      { label: 'Group of 4', price: '$40.00' },
+      { label: 'Child', price: '$5.00', soldOut: false, waitlistUrl: null },
+      { label: 'VIP', price: 'Free', soldOut: false, waitlistUrl: null },
+      { label: 'GA Late Access', price: '$10.00', soldOut: false, waitlistUrl: null },
+      { label: 'Group of 4', price: '$40.00', soldOut: false, waitlistUrl: null },
     ]);
   });
 });
@@ -51,5 +51,42 @@ describe('ticketPricesFormError', () => {
       { type: 'group', group_size: '4', price_aud: '35' },
     ])).toMatch(/two group prices for 4 people/);
     expect(ticketPricesFormError([{ type: 'vip', price_aud: '60' }, { type: 'group', group_size: '6', price_aud: '50' }])).toBeNull();
+  });
+});
+
+import { cleanTicketPrices as _clean, ticketPriceLines as _lines, ticketPricesFormError as _err, ticketPriceOfferName as _name } from '@/utils/eventTicketPrices.js';
+
+describe('custom (organiser-named) tickets', () => {
+  it('keeps a free-text ticket with its sold-out flag and waitlist link', () => {
+    const rows = _clean([
+      { type: 'custom', label: '  Flame   Flame Fruit Coliseum Player Entry ', price_aud: '65', sold_out: true, waitlist_url: 'https://events.humanitix.com/x' },
+      { type: 'vip', price_aud: 100 },
+    ]);
+    expect(rows).toEqual([
+      { type: 'vip', price_aud: 100 },
+      { type: 'custom', label: 'Flame Flame Fruit Coliseum Player Entry', price_aud: 65, sold_out: true, waitlist_url: 'https://events.humanitix.com/x' },
+    ]);
+    expect(_lines(rows)[1]).toEqual({ label: 'Flame Flame Fruit Coliseum Player Entry', price: '$65.00', soldOut: true, waitlistUrl: 'https://events.humanitix.com/x' });
+    expect(_name(rows[1])).toBe('Flame Flame Fruit Coliseum Player Entry');
+  });
+
+  it('drops unnamed and duplicate rows, bad waitlist links, and waitlists on tickets that are not sold out', () => {
+    const rows = _clean([
+      { type: 'custom', label: '', price_aud: 5 },
+      { type: 'custom', label: 'Spectator', price_aud: 5, waitlist_url: 'https://ok.example' },
+      { type: 'custom', label: 'spectator', price_aud: 6 },
+      { type: 'custom', label: 'Player', price_aud: 9, sold_out: true, waitlist_url: 'javascript:alert(1)' },
+    ]);
+    expect(rows).toEqual([
+      { type: 'custom', label: 'Spectator', price_aud: 5 },
+      { type: 'custom', label: 'Player', price_aud: 9, sold_out: true },
+    ]);
+  });
+
+  it('explains what is wrong before saving', () => {
+    expect(_err([{ type: 'custom', label: '', price_aud: '5' }])).toMatch(/name/);
+    expect(_err([{ type: 'custom', label: 'Player', price_aud: '' }])).toMatch(/price/);
+    expect(_err([{ type: 'custom', label: 'Player', price_aud: '5', sold_out: true, waitlist_url: 'nope' }])).toMatch(/http/);
+    expect(_err([{ type: 'custom', label: 'Player', price_aud: '5' }])).toBeNull();
   });
 });

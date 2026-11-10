@@ -48,3 +48,21 @@ button.
    `sameAs` in `lib/eventSeo.js` if it is a profile, and the detail card.
 4. Tests: `tests/frontend/eventFormModal.test.jsx` (labels),
    `eventDetailSections.test.jsx` (buttons), `eventSeo.test.js` (`sameAs`).
+
+## Sold out + waitlist
+
+`events.tickets_sold_out` (boolean, default false) and `events.waitlist_url`
+(`20261110221128_event_sold_out_waitlist.sql`) are set on the Organiser tab,
+by an admin or by the event's own organiser (live edits are logged like any
+other field — `EVENT_LOGGED_FIELDS` and `event_logged_fields()` stay equal).
+
+- **Sold out** replaces **Get Tickets** with a disabled **Sold Out** button
+  (`EventDetailCard.jsx`); Event JSON-LD (`lib/eventSeo.js`) and the
+  prerender's offers advertise `schema.org/SoldOut`.
+- **Join the waitlist** appears under it when a waitlist URL is set. It is
+  only shown while the event is sold out and upcoming; the prerender emits the
+  same line (`ticketStatusHtml()`) for no-JS readers.
+- **Your own ticket types:** the ticket list also takes free-text tickets (`type: "custom"` rows in `events.ticket_prices` — a name like "Player Entry", a price, an optional per-ticket sold out flag and waitlist link). No schema change; `cleanTicketPrices()` is the one normaliser (names deduped, max 10, http(s) waitlist links only, a waitlist only kept while sold out). A sold-out ticket shows a badge and "Join the waitlist" on the event page, SoldOut in that ticket's JSON-LD offer.
+- The waitlist is the organiser's own page — CardPop stores only the link.
+
+**Booking fee.** `events.booking_fee_aud` is the per-ticket fee the organiser's ticketing site adds on top (e.g. Humanitix's $3.95), entered under Entry Fee on the Organiser tab. The event page and prerender show "+ $X booking fee per ticket" beside the prices (`formatBookingFee()` in `lib/eventSeo.js`); JSON-LD offer prices stay the ticket price.

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, MapPin, Clock, DollarSign, Info, Ticket, ExternalLink, Accessibility, ShieldAlert, History } from 'lucide-react';
+import { Calendar, MapPin, Clock, DollarSign, Info, Ticket, ExternalLink, Accessibility, ShieldAlert, History, ListPlus } from 'lucide-react';
 import { eventPath, eventTypeLabel, formatEventDate, formatEventTime, formatEventLocation, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
@@ -127,7 +127,7 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
               </div>
             )}
 
-            {!past && <EventTicketOffer eventId={event.id} offer={ticketOffer} />}
+            {!past && !event.tickets_sold_out && <EventTicketOffer eventId={event.id} offer={ticketOffer} />}
 
             <div>
               <h3 className="text-lg font-bold text-foreground mb-3 flex items-center gap-2">
@@ -165,8 +165,21 @@ const EventDetailModal = ({ isOpen, onClose, event }) => {
         {/* Equal-width columns so every action reads as the same size — the
             dialog's own X is the only way out, so there's no Close button. */}
         <DialogFooter className="p-3 sm:p-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:pb-4 bg-muted/20 border-t border-border grid grid-cols-2 sm:grid-flow-col sm:auto-cols-fr gap-2 sm:space-x-0 shrink-0">
-          {!past && <AddToCalendarButton event={event} className={`h-11 px-2 sm:px-4 max-[374px]:text-xs max-[374px]:[&>svg]:mr-1 max-[359px]:[&>svg]:hidden font-semibold ${ticketLink ? '' : 'col-span-2 sm:col-span-1'}`} />}
-          {!past && ticketLink && (
+          {!past && <AddToCalendarButton event={event} className={`h-11 px-2 sm:px-4 max-[374px]:text-xs max-[374px]:[&>svg]:mr-1 max-[359px]:[&>svg]:hidden font-semibold ${ticketLink || event.tickets_sold_out ? '' : 'col-span-2 sm:col-span-1'}`} />}
+          {!past && event.tickets_sold_out && (
+            event.waitlist_url ? (
+              <Button className="w-full h-11 px-2 sm:px-4 max-[374px]:text-xs max-[374px]:[&>svg]:mr-1 font-semibold" asChild>
+                <a href={event.waitlist_url} target="_blank" rel="noopener noreferrer">
+                  <ListPlus className="w-4 h-4 mr-2" /> Join the waitlist
+                </a>
+              </Button>
+            ) : (
+              <Button variant="secondary" className="w-full h-11 px-2 sm:px-4 font-semibold" disabled>
+                <Ticket className="w-4 h-4 mr-2" /> Sold Out
+              </Button>
+            )
+          )}
+          {!past && !event.tickets_sold_out && ticketLink && (
             <Button variant="secondary" className="w-full h-11 px-2 sm:px-4 max-[374px]:text-xs max-[374px]:[&>svg]:mr-1 font-semibold" asChild>
               <a href={ticketLink} target="_blank" rel="noopener noreferrer" onClick={countTicketClick} onAuxClick={countTicketClick}>
                 <Ticket className="w-4 h-4 mr-2" /> Tickets & Info

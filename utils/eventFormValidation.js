@@ -31,6 +31,7 @@ export const EVENT_URL_FIELDS = {
   website_url: 'Event Website',
   ticket_url: 'Tickets / Registration URL',
   vendor_application_url: 'Trader / Vendor Applications URL',
+  waitlist_url: 'Waitlist URL',
   instagram_url: 'Instagram URL',
   facebook_url: 'Facebook URL',
   youtube_channel_url: 'YouTube Channel URL',
@@ -95,7 +96,7 @@ export function validateEventForm(form) {
     }
   }
   if (!form.is_free) {
-    for (const [field, label] of [['entry_fee_aud', 'Entry fee'], ['presale_fee_aud', 'Presale price']]) {
+    for (const [field, label] of [['entry_fee_aud', 'Entry fee'], ['presale_fee_aud', 'Presale price'], ['booking_fee_aud', 'Booking fee']]) {
       const raw = String(form[field] ?? '').trim();
       if (raw && !(Number(raw) >= 0)) return fail(field, 'organiser', `${label} must be a price of $0 or more.`);
     }

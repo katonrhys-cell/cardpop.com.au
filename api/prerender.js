@@ -1482,8 +1482,8 @@ const eventIsoDate = (date, time) => {
 const EVENT_FIELDS =
   'id, slug, title, description, short_description, image_url, event_type, status, ' +
   'venue_name, address, suburb, state, postcode, start_date, end_date, start_time, end_time, ' +
-  'entry_fee_aud, presale_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, organizer_logo_url, seo_title, seo_description, ' +
-  'instagram_url, facebook_url, youtube_channel_url, tiktok_url, x_url, discord_url, vendor_application_url, ' +
+  'entry_fee_aud, presale_fee_aud, booking_fee_aud, ticket_prices, is_free, website_url, ticket_url, youtube_url, organizer_name, organizer_logo_url, seo_title, seo_description, ' +
+  'instagram_url, facebook_url, youtube_channel_url, tiktok_url, x_url, discord_url, vendor_application_url, tickets_sold_out, waitlist_url, ' +
   'gallery_images, gallery_albums, event_videos, created_at, updated_at';
 
 // Organiser links from the event form's Organiser tab (migration
@@ -1505,6 +1505,14 @@ const organiserLinksHtml = (event) => {
     .filter(([url]) => /^https?:\/\//i.test(url));
   if (!links.length) return '';
   return `<section><h2>Follow the Organiser</h2><ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul></section>`;
+};
+
+// Sold-out status + waitlist link (events.tickets_sold_out / waitlist_url).
+// Only http(s) waitlist URLs are emitted; past events show neither.
+const ticketStatusHtml = (event, isPast) => {
+  if (!event.tickets_sold_out || isPast) return '';
+  const url = typeof event.waitlist_url === 'string' ? event.waitlist_url.trim() : '';
+  return `<p><strong>Tickets sold out.</strong>${/^https?:\/\//i.test(url) ? ` <a href="${esc(url)}" rel="nofollow noopener">Join the waitlist</a>` : ''}</p>`;
 };
 
 // Event photo albums (events.gallery_albums, utils/eventGallery.js). Bots
@@ -1619,18 +1627,18 @@ function buildEventLd(event) {
 // price hasn't been published yet — then one per extra ticket price
 // (utils/eventTicketPrices.js). Mirrors lib/eventSeo.js.
 function buildEventOffers(event, canonical, startDate) {
-  const mkOffer = (price, name) => ({
+  const mkOffer = (price, name, rowSoldOut = false) => ({
     '@type': 'Offer',
     price,
     priceCurrency: 'AUD',
-    availability: 'https://schema.org/InStock',
+    availability: event.tickets_sold_out || rowSoldOut ? 'https://schema.org/SoldOut' : 'https://schema.org/InStock',
     url: event.ticket_url || event.website_url || canonical,
     ...(event.created_at || startDate ? { validFrom: event.created_at || startDate } : {}),
     ...(name ? { name } : {}),
   });
   const presaleFee = Number(event.presale_fee_aud) > 0 ? Number(event.presale_fee_aud) : null;
   const extraOffers = event.is_free ? [] : cleanTicketPrices(event.ticket_prices)
-    .map(row => mkOffer(row.price_aud.toFixed(2), ticketPriceOfferName(row)));
+    .map(row => mkOffer(row.price_aud.toFixed(2), ticketPriceOfferName(row), row.sold_out === true));
   if (!presaleFee && !extraOffers.length) {
     return mkOffer(event.is_free ? '0' : (Number(event.entry_fee_aud) > 0 ? Number(event.entry_fee_aud).toFixed(2) : '0'));
   }
@@ -1916,7 +1924,7 @@ async function renderEvent(supabase, param) {
     nextEditionHtml = `<p><strong>This event has finished.</strong>${region ? ` See <a href="${BASE_URL}${eventRegionPath(region)}">upcoming card shows in ${esc(region.city)}</a>.` : ''}</p>`;
   }
 
-  const feeLine = event.is_free ? 'Free entry' : (event.entry_fee_aud > 0 ? `Entry: A$${Number(event.entry_fee_aud).toFixed(2)}` : '');
+  const feeLine = event.is_free ? 'Free entry' : (event.entry_fee_aud > 0 ? `Entry: A$${Number(event.entry_fee_aud).toFixed(2)}${Number(event.booking_fee_aud) > 0 ? ` + A$${Number(event.booking_fee_aud).toFixed(2)} booking fee per ticket` : ''}` : '');
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
   <h1>${esc(name)}</h1>
@@ -1927,7 +1935,7 @@ async function renderEvent(supabase, param) {
     ${location ? `<li>Location: ${esc(location)}</li>` : ''}
     ${event.address ? `<li>Address: ${esc(event.address)}</li>` : ''}
     ${feeLine ? `<li>${esc(feeLine)}</li>` : ''}
-    ${event.is_free ? '' : ticketPriceLines(event.ticket_prices).map(({ label, price }) => `<li>${esc(label)}: ${esc(price)}</li>`).join('')}
+    ${event.is_free ? '' : ticketPriceLines(event.ticket_prices).map(({ label, price, soldOut, waitlistUrl }) => `<li>${esc(label)}: ${esc(price)}${soldOut ? ` — sold out${waitlistUrl && !isPast ? ` (<a href="${esc(waitlistUrl)}" rel="nofollow noopener">join the waitlist</a>)` : ''}` : ''}</li>`).join('')}
     ${event.organizer_name ? `<li>Organiser: ${esc(event.organizer_name)}</li>` : ''}
   </ul>
   ${organiserLogoHtml(event)}
@@ -1935,6 +1943,7 @@ async function renderEvent(supabase, param) {
   ${eventGalleryHtml(event, name)}
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
+  ${ticketStatusHtml(event, isPast)}
   ${organiserLinksHtml(event)}
   ${region ? `<p><a href="${BASE_URL}${eventRegionPath(region)}">More card shows in ${esc(region.city)}</a></p>` : ''}
 </main>`;
