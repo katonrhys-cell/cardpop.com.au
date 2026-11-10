@@ -5,6 +5,25 @@ import { authMiddleware } from '../middleware/auth.js';
 import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
 import { invalidReturnUrl } from '../utils/returnUrl.js';
 import { createFeatureCheckout, FeatureCheckoutError } from '../services/eventFeatureService.js';
+import {
+  FEATURED_PACKAGES, EARLY_BIRD, featureEligibility, featuredQuote, formatAud, todayInAustralia,
+} from '../../utils/featuredPackages.js';
+
+/**
+ * The featuring offer in the "your event is live" email: the cheapest
+ * package's price for this event (early bird included) and a link that opens
+ * its package picker in My Events. null when the event can't be featured
+ * (already featured, already started, no date).
+ */
+export function featureOffer(event, today = todayInAustralia()) {
+  if (!featureEligibility(event, today).ok) return null;
+  const quote = featuredQuote(FEATURED_PACKAGES[0].key, event.start_date, today);
+  return {
+    fromPrice: formatAud(quote.priceCents),
+    earlyBird: quote.earlyBird ? `${EARLY_BIRD.pct}% early bird discount applied` : null,
+    url: `https://cardpop.com.au/account/events?feature=${encodeURIComponent(event.id)}`,
+  };
+}
 import { sendEventSubmitted, sendEventReviewOutcome, sendEventChangesMade } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import { mergeChangeLog, changeRows, describeEventValue } from '../../utils/eventChangeLog.js';
@@ -193,7 +212,7 @@ router.post('/:id/notify-decision', authMiddleware, requireAdmin, async (req, re
   try {
     const { data: event, error } = await supabase
       .from('events')
-      .select('id, title, slug, status, organiser_id, rejection_reason, organiser_notified_status')
+      .select('id, title, slug, status, organiser_id, rejection_reason, organiser_notified_status, start_date, is_featured')
       .eq('id', eventId)
       .maybeSingle();
     if (error) throw error;
@@ -223,6 +242,7 @@ router.post('/:id/notify-decision', authMiddleware, requireAdmin, async (req, re
       approved,
       note: approved ? null : event.rejection_reason,
       eventUrl: eventUrl(event),
+      feature: approved ? featureOffer(event) : null,
     });
     res.json({ ok: true, sent: Boolean(sent) });
   } catch (err) {

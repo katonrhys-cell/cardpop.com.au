@@ -194,7 +194,9 @@ const CharCount = ({ value = '', max, warn = 0.85 }) => {
 // an edit of a pending / rejected one goes (back) to the review queue; an edit
 // of their live event goes live straight away, and the database logs exactly
 // what changed for the admins (event_change_log, utils/eventChangeLog.js).
-const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = 'admin' }) => {
+// `onSubmitted(eventId)` fires when a member submits an event for review (not
+// a draft, not an edit of a live event) — My Events offers featuring then.
+const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmitted, mode = 'admin' }) => {
   const { currentUser } = useAuth();
   const isUserMode = mode === 'user';
   const isLiveEdit = isUserMode && Boolean(event?.id) && event.status === 'approved';
@@ -817,6 +819,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
       }
 
       if (onSaved) onSaved();
+      if (isUserMode && !asDraft && !isLiveEdit && savedId && onSubmitted) onSubmitted(savedId);
       onClose();
     } catch (err) {
       console.error('Event save error:', err);

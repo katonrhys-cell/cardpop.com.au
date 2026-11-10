@@ -262,3 +262,29 @@ describe('POST /events/:id/notify-changes', () => {
     expect(mockSendChangesMade).not.toHaveBeenCalled();
   });
 });
+
+describe('featureOffer (the "your event is live" email)', () => {
+  it('offers the cheapest package with a link to its picker', async () => {
+    const { featureOffer } = await import('../../src/routes/events.js');
+    const offer = featureOffer({ id: EVENT_ID, status: 'approved', start_date: '2026-11-20', is_featured: false }, '2026-11-10');
+    expect(offer).toEqual({
+      fromPrice: '$49',
+      earlyBird: null,
+      url: `https://cardpop.com.au/account/events?feature=${EVENT_ID}`,
+    });
+  });
+
+  it('applies the early bird four weeks out', async () => {
+    const { featureOffer } = await import('../../src/routes/events.js');
+    const offer = featureOffer({ id: EVENT_ID, status: 'approved', start_date: '2026-12-20', is_featured: false }, '2026-11-10');
+    expect(offer.fromPrice).toBe('$39.20');
+    expect(offer.earlyBird).toMatch(/20% early bird/);
+  });
+
+  it('offers nothing for a featured or started event', async () => {
+    const { featureOffer } = await import('../../src/routes/events.js');
+    expect(featureOffer({ id: EVENT_ID, status: 'approved', start_date: '2026-11-20', is_featured: true }, '2026-11-10')).toBeNull();
+    expect(featureOffer({ id: EVENT_ID, status: 'approved', start_date: '2026-11-01', is_featured: false }, '2026-11-10')).toBeNull();
+  });
+});
+

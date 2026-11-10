@@ -285,13 +285,13 @@ export async function sendEventSubmitted({ to, event, addedBy = null, byAdmin = 
 }
 
 // Organiser email when an admin approves or rejects their event submission.
-export async function sendEventReviewOutcome({ to, name, eventTitle, approved, note, eventUrl }) {
+export async function sendEventReviewOutcome({ to, name, eventTitle, approved, note, eventUrl, feature = null }) {
   return send({
     to,
     subject: approved
       ? `Your event ${eventTitle || ''} is live`.replace(/\s+/g, ' ')
       : `Your event ${eventTitle || ''} wasn’t approved`.replace(/\s+/g, ' '),
-    html: eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl }),
+    html: eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl, feature }),
   });
 }
 
