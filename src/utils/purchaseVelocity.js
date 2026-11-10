@@ -18,8 +18,13 @@ export const VELOCITY_LIMITS = {
 };
 
 // Orders in these states don't count toward velocity (no money actually moved /
-// the purchase was reversed).
-const NON_COUNTING_STATUSES = new Set(['payment_failed', 'cancelled', 'canceled', 'refunded']);
+// the purchase was reversed). 'pending' is a checkout that was opened but not
+// paid: the cart path writes one row per "Review and pay" press, so counting
+// them locked a real new buyer out for a day after five looks at the payment
+// form — and let anyone lock a stranger's email out of guest checkout with
+// five unauthenticated calls. A declined card lands in payment_failed, which
+// never counted either, so card testing is no easier for this.
+export const NON_COUNTING_STATUSES = new Set(['pending', 'payment_failed', 'cancelled', 'canceled', 'refunded']);
 
 /**
  * @returns {Promise<{ allowed: true } | { allowed: false, reason: string, message: string }>}

@@ -1048,10 +1048,16 @@ async function handleSingleItemOrder(session, stripe) {
 
 async function handlePaymentFailed(paymentIntent) {
   logger.warn(`[STRIPE] Payment failed: ${paymentIntent.id}`);
+  // Only an order that is still waiting for payment can fail. A declined first
+  // attempt whose event is delivered late (Stripe retries for days) must not
+  // flip an order the buyer went on to pay for — the same PaymentIntent
+  // carries both attempts — back to payment_failed after it was confirmed,
+  // shipped or completed.
   await supabase
     .from('orders')
     .update({ status: 'payment_failed' })
-    .eq('stripe_payment_intent_id', paymentIntent.id);
+    .eq('stripe_payment_intent_id', paymentIntent.id)
+    .eq('status', 'pending');
 }
 
 /**

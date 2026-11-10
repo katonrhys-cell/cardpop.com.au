@@ -105,7 +105,12 @@ export function refundWindow(order, now = new Date()) {
   if (isShopOrderLines(order)) {
     // Shop: the return window runs from delivery. Until delivery is known we
     // let the buyer report a problem from day one (it's our own parcel).
-    const closes = delivered ? addDays(delivered, SHOP_PROTECTION.windowDays) : cap;
+    // A shop order we haven't posted yet (a pre-order can ship months after it
+    // was paid for) has no deadline at all — the 45-day cap from purchase used
+    // to tell a buyer still waiting on a delayed pre-order that their "return
+    // window has closed" before the parcel had left.
+    if (!delivered) return { state: 'open', opensAt: purchased, closesAt: null, reason: `Returns accepted for ${SHOP_PROTECTION.windowDays} days from delivery.` };
+    const closes = addDays(delivered, SHOP_PROTECTION.windowDays);
     if (now > closes) return { state: 'closed', opensAt: null, closesAt: closes, reason: `The ${SHOP_PROTECTION.windowDays}-day return window has closed.` };
     return { state: 'open', opensAt: purchased, closesAt: closes, reason: `Returns accepted for ${SHOP_PROTECTION.windowDays} days from delivery.` };
   }

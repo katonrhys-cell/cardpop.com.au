@@ -59,7 +59,10 @@ async function send({ to, subject, html, attachments, replyTo }) {
     const payload = { from: FROM, to, subject, html };
     if (attachments?.length) payload.attachments = attachments;
     // Let support reply straight to the person who wrote in (contact form).
-    if (replyTo) payload.reply_to = replyTo;
+    // The Resend SDK maps only the camelCase `replyTo` onto the API's
+    // `reply_to`; a snake_case key on this object is silently discarded, which
+    // sent every reply to noreply@ instead of the person who wrote in.
+    if (replyTo) payload.replyTo = replyTo;
     const { error } = await client.emails.send(payload);
     if (error) {
       logger.error(`[EMAIL] Send failed to ${to}: ${error.message}`);

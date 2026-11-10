@@ -40,6 +40,7 @@ const toDate = (v) => {
 };
 
 const DELIVERED_RE = /\bdelivered\b/i;
+const NOT_YET_DELIVERED_RE = /\b(cannot|can't|couldn't|won't|to be|will be|being|scheduled|expected|due|partial(ly)?|failed|out for)\b/i;
 const NOT_DELIVERED_RE = /\b(not|un|attempted|awaiting|left|card)\b.*\bdeliver/i;
 
 /** True when an event description means the parcel reached the recipient. */
@@ -48,6 +49,11 @@ export function isDeliveredDescription(text) {
   if (!DELIVERED_RE.test(text)) return false;
   // "Delivery attempted", "Awaiting collection", "Card left" … are not deliveries.
   if (/attempt|awaiting|collect|card left|left in|unable|could not|returning|return to/i.test(text) && !/^delivered\b/i.test(text.trim())) return false;
+  // "Cannot be delivered", "To be delivered today", "Scheduled to be
+  // delivered", "Partially delivered" all contain the word but none of them is
+  // a delivery — and a false positive here completes the order and starts the
+  // Buyer Protection clock on a parcel that never arrived.
+  if (NOT_YET_DELIVERED_RE.test(text) && !/^delivered\b/i.test(text.trim())) return false;
   return !NOT_DELIVERED_RE.test(text) || /^delivered\b/i.test(text.trim());
 }
 

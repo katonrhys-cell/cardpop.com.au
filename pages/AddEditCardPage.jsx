@@ -163,6 +163,13 @@ const AddEditCardPage = () => {
   const maxExtraSlots = Math.min(19, Math.max(0, (parseInt(platformSettings.max_images_per_listing, 10) || 10) - 1));
   const [extraFiles, setExtraFiles]     = useState(() => Array(maxExtraSlots).fill(null));
   const [extraPreviews, setExtraPreviews] = useState(() => Array(maxExtraSlots).fill(null));
+  // Storage paths of the extra photos a card already has, by slot (edit mode).
+  // A slot keeps its stored photo until it is removed or replaced; on save the
+  // kept paths are sent back alongside any new uploads. Without this, saving
+  // an edit with one new photo replaced the whole set with just that photo,
+  // and removing a photo never saved at all.
+  const [existingExtraPaths, setExistingExtraPaths] = useState([]);
+  const [extraPhotosTouched, setExtraPhotosTouched] = useState(false);
   // One optional short video. `videoPath` is the stored object on an edited
   // card; `videoFile` a newly picked clip; `videoPreview` what the <video> plays.
   const [videoFile, setVideoFile]       = useState(null);
@@ -761,7 +768,10 @@ const AddEditCardPage = () => {
             publicImageUrl(p)
           );
           const filled = Array.from({ length: Math.max(maxExtraSlots, urls.length) }, (_, i) => urls[i] ?? null);
-          if (!cancelled) setExtraPreviews(filled);
+          if (!cancelled) {
+            setExtraPreviews(filled);
+            setExistingExtraPaths(Array.from({ length: filled.length }, (_, i) => card.card_images[i] ?? null));
+          }
         }
       } catch {
         if (!cancelled) {
@@ -842,6 +852,8 @@ const AddEditCardPage = () => {
       runPhotoQuality(croppedFile);
     } else {
       const nf = [...extraFiles]; nf[key] = croppedFile; setExtraFiles(nf);
+      setExistingExtraPaths((prev) => prev.map((path, i) => (i === key ? null : path)));
+      setExtraPhotosTouched(true);
       const np = [...extraPreviews]; np[key] = croppedUrl; setExtraPreviews(np);
     }
     clearCrop();
@@ -1518,9 +1530,17 @@ const AddEditCardPage = () => {
         cardImagePath = filePath;
       }
 
+      // Slot order: a new file wins its slot, otherwise the photo the card
+      // already stores there is kept. (card_images is a full replace on the
+      // server, so the kept paths have to go back with the new ones.)
       const extraImagePaths = [];
-      for (const file of extraFiles) {
-        if (!file) continue;
+      const extraSlotCount = Math.max(extraFiles.length, existingExtraPaths.length);
+      for (let slot = 0; slot < extraSlotCount; slot++) {
+        const file = extraFiles[slot];
+        if (!file) {
+          if (isEdit && existingExtraPaths[slot]) extraImagePaths.push(existingExtraPaths[slot]);
+          continue;
+        }
         const compressed = await compressImage(file);
         const fileExt = compressed.name.split('.').pop();
         const filePath = `${currentUser.id}/${Date.now()}-extra-${Math.random().toString(36).slice(2)}.${fileExt}`;
@@ -1634,7 +1654,12 @@ const AddEditCardPage = () => {
       };
 
       if (cardImagePath) payload.card_image = cardImagePath;
-      if (extraImagePaths.length) payload.card_images = extraImagePaths;
+      // New card: only when there are photos. Edit: whenever the set changed —
+      // including down to none, so removing the last extra photo saves — and
+      // otherwise omitted so the server keeps what is stored.
+      if (isEdit
+        ? (extraFiles.some(Boolean) || extraPhotosTouched)
+        : extraImagePaths.length > 0) payload.card_images = extraImagePaths;
       // New clip → its path; removed on an edit → explicit null; otherwise omit
       // so the server keeps whatever is stored.
       if (cardVideoPath) payload.card_video = cardVideoPath;
@@ -1691,24 +1716,9 @@ const AddEditCardPage = () => {
         showListingOutcome(syncStatus, 'Card added to your vault!', {
           action: {
             label: 'Add Another',
-            onClick: () => {
-              setFormData({ ...emptyForm, collection: formData.collection });
-              setImageFile(null);
-              setImagePreview(null);
-              setExtraFiles(Array(maxExtraSlots).fill(null));
-              setExtraPreviews(Array(maxExtraSlots).fill(null));
-              removeVideo();
-              setErrors({});
-              clearCrop();
-              setAdjusting(null);
-              clearScan();
-              clearScanLog();
-              setAnalysedImageCount(0);
-              setWizardStep(0);
-              setMaxStepReached(0);
-              // Keep franchise/manufacturer selected for fast repeat entry
-              window.scrollTo(0, 0);
-            },
+            // The page has already navigated to the vault by the time this is
+            // clicked, so resetting this (unmounted) form did nothing.
+            onClick: () => navigate('/vault/add'),
           },
         });
         navigate('/vault');
@@ -1875,6 +1885,8 @@ const AddEditCardPage = () => {
                                 const nf = [...extraFiles]; nf[idx] = null;
                                 const np = [...extraPreviews]; np[idx] = null;
                                 setExtraFiles(nf); setExtraPreviews(np);
+                                setExistingExtraPaths((prev) => prev.map((path, i) => (i === idx ? null : path)));
+                                setExtraPhotosTouched(true);
                                 if (cropCandidate?.key === idx) clearCrop();
                               }}
                               aria-label="Remove photo"

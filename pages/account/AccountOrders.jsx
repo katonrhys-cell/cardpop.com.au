@@ -53,6 +53,9 @@ const STATUS_CONFIG = {
   cancelled:         { label: 'Cancelled',   color: 'bg-muted text-muted-foreground border-border' },
 };
 
+// An unknown status must never read as a confirmed payment.
+const STATUS_FALLBACK = { label: 'Processing', color: 'bg-muted text-muted-foreground border-border' };
+
 const REFUND_STATUS_CONFIG = {
   requested: { label: 'Refund Requested', Icon: Clock,        color: 'text-amber-600' },
   approved:  { label: 'Refund Approved',  Icon: CheckCircle2, color: 'text-blue-600' },
@@ -182,7 +185,7 @@ const RefundDialog = ({ order, onClose, onSuccess }) => {
 
 const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewRequest, onReceived, reviewed, productReviews }) => {
   const refundQuote = computeRefundAmounts(order);
-  const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_CONFIG.payment_confirmed;
+  const statusCfg   = STATUS_CONFIG[order.status]        || STATUS_FALLBACK;
   const refundCfg   = REFUND_STATUS_CONFIG[order.refund_status];
   // The claim window from utils/buyerProtectionPolicy.js — the same rule the
   // server enforces on POST /refunds/request.
@@ -418,6 +421,10 @@ const AccountOrders = () => {
           .from('orders')
           .select('*, seller:profiles!seller_id(id, display_name, username), listing:listings!listing_id(vault_item:vault_items!inner(card_name))')
           .eq('buyer_id', currentUser.id)
+          // 'pending' is a checkout that was opened but never paid (one row per
+          // visit to the payment step) — not an order. Showing them here, under
+          // a "Confirmed" badge, told buyers they had paid when they hadn't.
+          .neq('status', 'pending')
           .order('created_at', { ascending: false })
           .limit(100),
         // Which orders already carry a review — drives the Rate button state.

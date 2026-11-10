@@ -229,6 +229,21 @@ ${bodyHtml}
 // tag" in Search Console) and keep recrawling it, instead of dropping it as
 // "Not found (404)".
 const notFound = (opts) => ({ status: 404, html: htmlDoc({ robots: 'noindex, follow', ...opts }) });
+
+// The row a detail page is about, or null when it genuinely isn't there.
+// supabase-js *returns* `{ error }` rather than throwing, so a timeout, a 5xx
+// or a selected column that no longer exists used to look exactly like "no
+// such row" — and the page answered 404 + noindex, cached at the edge for an
+// hour (stale for a day), telling Googlebot to drop a perfectly good URL.
+// Throwing sends it down the handler's 503 / no-store path instead, where
+// crawlers retry and keep the indexed copy. A malformed id (22P02) is a real
+// not-found, not an outage.
+const rowOrThrow = ({ data, error }, what) => {
+  if (error && error.code !== '22P02' && error.code !== 'PGRST116') {
+    throw new Error(`[prerender] ${what} lookup failed: ${error.message}`);
+  }
+  return data ?? null;
+};
 // { status: 301, location } is a permanent redirect (e.g. a legacy
 // /product/shop/:id URL onto its canonical /shop/<category>/<slug>).
 const sendDoc = (res, doc) => {
@@ -323,7 +338,7 @@ async function renderDealer(supabase, param) {
     .from('profiles')
     .select('id, store_slug, business_name, display_name, username, business_tagline, bio, business_logo_url, avatar_url, location_state, location_suburb, rating, reviews_count, total_sales, is_sole_trader, is_public, subscription_tier, subscription_status, is_featured_seller, created_at');
   dealerQuery = byUuid ? dealerQuery.eq('id', param) : dealerQuery.eq('store_slug', param);
-  const { data: dealer } = await dealerQuery.maybeSingle();
+  const dealer = rowOrThrow(await dealerQuery.maybeSingle(), 'dealer');
 
   const canonical = `${BASE_URL}/dealer/${dealer?.store_slug || param}`;
 
@@ -447,7 +462,7 @@ async function renderBlogArticle(supabase, param) {
   // `faqs` column) without coupling deploys to migration timing.
   let query = supabase.from('blog_articles').select('*');
   query = byUuid ? query.eq('id', param) : query.eq('slug', param);
-  const { data: article } = await query.maybeSingle();
+  const article = rowOrThrow(await query.maybeSingle(), 'article');
 
   if (!article || article.is_published === false) {
     return notFound({
@@ -652,7 +667,7 @@ async function renderListing(supabase, id, slugParam) {
     .select('id, slug, price_aud, price_min_aud, price_max_aud, shipping_cost_aud, grading_company, status, accepts_offers, created_at, updated_at, seller_id, vault_item:vault_items(card_name, collection, set_name, card_number, year, condition, grade, grading_company, card_image, vault_images(storage_path), franchise:categories!vault_items_franchise_id_fkey(name), category:categories!vault_items_category_id_fkey(name)), seller:profiles!seller_id(username, display_name, business_name, store_slug)')
     .eq('id', id)
     .maybeSingle();
-  if (listingErr) console.error('[prerender] listing lookup failed:', listingErr.message);
+  rowOrThrow({ data: listing, error: listingErr }, 'listing');
 
   // Derive a descriptive slug from the card name (the ID is the stable key; the
   // slug is decorative but should carry the keyword). Falls back to the DB slug,
@@ -820,11 +835,11 @@ async function renderShopProduct(supabase, id, slugParam, { canonicalPath } = {}
     });
   }
 
-  const { data: product } = await supabase
+  const product = rowOrThrow(await supabase
     .from('shop_products')
     .select('id, title, slug, sku, brand, barcode, family_sku, colour, description, price_aud, stock_quantity, category, product_type, images, image_url, status, created_at, updated_at')
     .eq('id', id)
-    .maybeSingle();
+    .maybeSingle(), 'shop product');
 
   const isPublic = product && PUBLIC_SHOP_STATUSES.includes(product.status);
   if (isPublic && !canonicalPath && shopProductBasePath(product)) {
@@ -1836,7 +1851,7 @@ async function renderEvent(supabase, param) {
   const byUuid = UUID_RE.test(param);
   let query = supabase.from('events').select(EVENT_FIELDS);
   query = byUuid ? query.eq('id', param) : query.eq('slug', param);
-  const { data: event } = await query.maybeSingle();
+  const event = rowOrThrow(await query.maybeSingle(), 'event');
 
   // Approved, or completed — an admin's archive. A finished event keeps its
   // page (collectors review it there); only pending/rejected/cancelled 404.
@@ -4027,11 +4042,11 @@ async function renderSeller(supabase, param) {
     });
   }
 
-  const { data: profile } = await supabase
+  const profile = rowOrThrow(await supabase
     .from('profiles')
     .select('id, store_slug, business_name, display_name, username, bio, business_tagline, avatar_url, business_logo_url, location_state, location_suburb, rating, reviews_count, is_sole_trader, is_public, subscription_tier, subscription_status, is_featured_seller')
     .eq('id', param)
-    .maybeSingle();
+    .maybeSingle(), 'seller');
 
   if (!profile || profile.is_public === false) {
     return notFound({

@@ -77,8 +77,11 @@ const OrderReviewSection = ({
               {item.image && (
                 <img src={toCdnUrl(item.image)} alt={item.name} className="h-10 w-10 rounded object-cover border border-border" />
               )}
-              <span className="flex-1">{item.name ?? 'Card'}</span>
-              <span className="text-muted-foreground">${Number(item.price ?? 0).toFixed(2)}</span>
+              <span className="flex-1">
+                {item.name ?? 'Card'}
+                {Number(item.quantity) > 1 && <span className="text-muted-foreground"> × {item.quantity}</span>}
+              </span>
+              <span className="text-muted-foreground">${(Number(item.price ?? 0) * Math.max(1, Number(item.quantity) || 1)).toFixed(2)}</span>
             </div>
           ))}
           <Separator />
