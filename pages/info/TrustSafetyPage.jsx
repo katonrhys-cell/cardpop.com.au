@@ -124,12 +124,15 @@ const TrustSafetyPage = () => {
       description="Secure payments, verified members and buyer protection on every order — here’s exactly how we keep your money and your trades safe."
     >
       <SEOHead
-        title="Trust & Safety — Secure Payments & Buyer Protection | CardPop™"
-        description={`How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, seller chargeback protection, and Stripe Identity ID verification for sellers.`}
+        title="Trust & Safety — Secure Payments & Protection | CardPop™"
+        description={`How CardPop protects you: PCI-DSS payments via Stripe, ${MP.name} with a full refund within ${MP.claimWindowDaysFromDelivery} days of delivery, and ID-verified sellers.`}
         structuredData={faqStructuredData}
       />
 
-      {/* Three-pillar summary — escapes prose styling for the card grid. */}
+      {/* Three-pillar summary — escapes prose styling for the card grid. The
+          pillars are <h3>s, so the visually hidden <h2> keeps the outline from
+          jumping straight from the page <h1>. */}
+      <h2 className="sr-only">How CardPop keeps you safe</h2>
       <div className="not-prose mb-12 grid gap-4 sm:grid-cols-3">
         {PILLARS.map((p) => (
           <Pillar key={p.title} {...p} />

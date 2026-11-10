@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff, History, MessageSquareQuote } from 'lucide-react';
+import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff, History, MessageSquareQuote, Star } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,12 +9,18 @@ import EventRsvp from '@/components/EventRsvp.jsx';
 import HalfStars from '@/components/reviews/HalfStars.jsx';
 import { publicImageUrl, cardThumbUrl } from '@/utils/imageUrl.js';
 import { isPastEvent } from '@/utils/eventPast.js';
+import { isFeaturedEvent } from '@/utils/eventFeatured.js';
 
 // `reviewStats` ({ review_count, average_rating }) is the past grid's star
 // summary, batch-loaded by the page; an upcoming event never shows one.
-const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewStats }) => {
+// `inFeaturedSection` is set by the events page's "Featured events" strip:
+// the section heading already says it, so the card drops its own Featured
+// pill and highlight border there and keeps one plain, crisp outline.
+const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewStats, inFeaturedSection = false }) => {
   const eventTitle = event.title || event.name;
-  const past = isPastEvent(event, toLocalDateStr(new Date()));
+  const today = toLocalDateStr(new Date());
+  const past = isPastEvent(event, today);
+  const featured = !inFeaturedSection && isFeaturedEvent(event, today);
   const reviewCount = Number(reviewStats?.review_count) || 0;
   const formattedDate = formatEventDate(event);
   const formattedTime = formatEventTime(event);
@@ -29,23 +35,35 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
   const imgError = !imgSrc;
 
   return (
-    <Card className="flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group border-border">
+    <Card className={`flex flex-col overflow-hidden h-full shadow-md hover:shadow-lg transition-all duration-300 rounded-2xl group ${featured ? 'border-2 border-primary' : 'border-border'}`}>
       <div className="relative h-48 w-full overflow-hidden bg-muted flex items-center justify-center">
         {rawImageUrl && !imgError ? (
-          <img
-            src={imgSrc}
-            alt={eventTitle}
-            className="object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
-            loading="lazy"
-            onError={() => setImgSrc(imgSrc !== rawImageUrl ? rawImageUrl : null)}
-          />
+          <>
+            {/* The poster is shown whole (contain) so its text isn't cropped;
+                a blurred cover copy of the same image fills the letterbox so
+                the card never shows empty bands between poster and border. */}
+            <img
+              src={imgSrc}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-cover scale-110 blur-xl opacity-70"
+              loading="lazy"
+            />
+            <img
+              src={imgSrc}
+              alt={eventTitle}
+              className="relative object-contain w-full h-full group-hover:scale-105 transition-transform duration-500"
+              loading="lazy"
+              onError={() => setImgSrc(imgSrc !== rawImageUrl ? rawImageUrl : null)}
+            />
+          </>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-muted to-muted/60">
             <ImageOff className="w-8 h-8 text-muted-foreground opacity-40" />
             <span className="text-xs text-muted-foreground font-medium">No image</span>
           </div>
         )}
-        <div className="absolute top-3 left-3 flex gap-2">
+        <div className="absolute top-3 left-3 right-3 flex flex-wrap gap-2">
           {(() => {
             const style = eventTypeStyle(event);
             if (style) {
@@ -61,6 +79,11 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
               <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
             );
           })()}
+          {featured && (
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary text-primary-foreground text-xs font-bold shadow-sm">
+              <Star className="w-3 h-3 fill-current" /> Featured
+            </span>
+          )}
           {past && (
             <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground gap-1">
               <History className="w-3 h-3" /> Past event

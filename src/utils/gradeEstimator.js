@@ -20,6 +20,7 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 // grade is written straight from the photos, inside the same time budget.
 export const GRADE_MODEL = 'claude-sonnet-5-5';
 const GRADE_THINKING = { type: 'between_tools' };
+const GRADE_MAX_TOKENS = 4500;
 
 /** Joins a Messages API reply's text blocks; thinking blocks are skipped. */
 function textFromContent(content) {
@@ -95,9 +96,10 @@ export async function requestGradeEstimate({ apiKey, imageBlocks, onUsage }) {
 		},
 		body: JSON.stringify({
 			model: GRADE_MODEL,
-			// Six grader blocks with notes plus four assessments: a truncated
-			// reply reads as unparseable JSON, so leave headroom.
-			max_tokens: 3000,
+			// Six grader blocks with notes, four assessments and up to eight
+			// located findings: a truncated reply reads as unparseable JSON,
+			// so leave headroom.
+			max_tokens: GRADE_MAX_TOKENS,
 			thinking: GRADE_THINKING,
 			system: GradeEstimatorPrompt,
 			messages: [{
@@ -201,7 +203,7 @@ export async function streamGradeEstimate({ apiKey, imageBlocks, onText, onUsage
 		},
 		body: JSON.stringify({
 			model: GRADE_MODEL,
-			max_tokens: 3000,
+			max_tokens: GRADE_MAX_TOKENS,
 			stream: true,
 			thinking: GRADE_THINKING,
 			system: GradeEstimatorPrompt,

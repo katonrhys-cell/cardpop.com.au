@@ -7,6 +7,7 @@ import { isPastEvent } from '@/utils/eventPast.js';
 export const EVENT_STATUS_OPTIONS = [
   { value: 'approved',       label: 'Live' },
   { value: 'pending_review', label: 'Pending review' },
+  { value: 'draft', label: 'Organiser draft' },
   { value: 'cancelled',      label: 'Cancelled' },
   { value: 'completed',      label: 'Completed' },
   { value: 'rejected',       label: 'Rejected' },
@@ -35,7 +36,7 @@ export const EVENT_SOURCE_OPTIONS = [
 
 // The order an admin works through: what needs a decision first, then what's
 // live, then the archive.
-const STATUS_ORDER = { pending_review: 0, approved: 1, cancelled: 2, completed: 3, rejected: 4 };
+const STATUS_ORDER = { pending_review: 0, approved: 1, cancelled: 2, completed: 3, rejected: 4, draft: 5 };
 
 const lower = (v) => String(v ?? '').trim().toLowerCase();
 const isoDay = (v) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null);

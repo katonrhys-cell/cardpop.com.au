@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabaseClient.js';
 import EventCard from '@/components/EventCard.jsx';
 import { toLocalDateStr } from '@/lib/eventSeo.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
+import { Link } from 'react-router-dom';
+import { eventRegionByState, eventRegionPath } from '@/data/eventRegions.js';
 
 const RelatedEvents = ({ currentEventId, currentState }) => {
   const [relatedEvents, setRelatedEvents] = useState([]);
@@ -50,12 +52,20 @@ const RelatedEvents = ({ currentEventId, currentState }) => {
   }, [currentEventId, currentState]);
 
   if (relatedEvents.length === 0) return null;
+  const region = eventRegionByState(currentState);
 
   return (
     <div className="mt-16 pt-12 border-t border-border">
-      <h2 className="font-serif text-2xl font-bold mb-6 text-foreground">
-        More Upcoming Card Events{currentState ? ` in ${currentState}` : ''}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-3 mb-6">
+        <h2 className="font-serif text-2xl font-bold text-foreground">
+          More Upcoming Card Events{currentState ? ` in ${currentState}` : ''}
+        </h2>
+        {region && (
+          <Link to={eventRegionPath(region)} className="text-sm font-semibold text-primary hover:underline">
+            All card shows in {region.city} &rarr;
+          </Link>
+        )}
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {relatedEvents.map(event => (
           <EventCard key={event.id} event={event} />

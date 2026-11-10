@@ -562,7 +562,7 @@ describe('prerender landing pages', () => {
       { id: UUID, slug: 'charizard', title: 'Charizard', price_aud: 1000, vault_item: { card_name: 'Charizard' } },
     ] };
     const { body } = await run('/marketplace');
-    expect(body).toContain('Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop</title>');
     expect(body).toContain('/marketplace/' + UUID + '/charizard');
     expect(body).toContain('"@type":"ItemList"');
   });
@@ -570,7 +570,7 @@ describe('prerender landing pages', () => {
   it('renders an empty but valid landing when there are no items', async () => {
     state.listResult = { data: [] };
     const { body } = await run('/marketplace');
-    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop Marketplace</title>');
+    expect(body).toContain('<title>Buy &amp; Sell Trading Cards Online Australia | CardPop</title>');
     expect(body).toContain('No items available right now.');
     expect(body).not.toContain('noindex');
   });
@@ -639,6 +639,55 @@ describe('prerender events', () => {
     expect(body).toContain('"addressRegion":"VIC"');
     expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/melbourne-card-expo" />');
     expect(body).not.toContain('noindex');
+  });
+
+  it('links a finished event to its next edition, and every event to its city page', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'hobby-hangout-xl-sydney-2025', title: 'Hobby Hangout XL Sydney 2025', status: 'approved',
+      start_date: '2025-11-01', state: 'NSW', organizer_name: 'The Hobby Hangout',
+    } };
+    state.listResult = { data: [
+      { id: 'n1', slug: 'tcxpo-2099', title: 'TCXPO', status: 'approved', organizer_name: 'TCXPO', state: 'NSW', start_date: '2099-01-01' },
+      { id: 'n2', slug: 'hobby-hangout-xl-melbourne-2099', title: 'Hobby Hangout XL Melbourne 2099', status: 'approved', organizer_name: 'The Hobby Hangout', state: 'VIC', start_date: '2099-04-24', venue_name: 'Royal Exhibition Building' },
+    ] };
+    let { body } = await run('/events/hobby-hangout-xl-sydney-2025');
+    expect(body).toContain('Next edition: <a href="https://cardpop.com.au/events/hobby-hangout-xl-melbourne-2099">Hobby Hangout XL Melbourne 2099</a>');
+    expect(body).not.toContain('/events/tcxpo-2099');
+    expect(body).toContain('<a href="https://cardpop.com.au/card-shows/sydney">More card shows in Sydney</a>');
+
+    // No next edition: point at the city page instead.
+    state.listResult = { data: [] };
+    ({ body } = await run('/events/hobby-hangout-xl-sydney-2025'));
+    expect(body).not.toContain('Next edition');
+    expect(body).toContain('See <a href="https://cardpop.com.au/card-shows/sydney">upcoming card shows in Sydney</a>.');
+
+    // An upcoming event says nothing about having finished.
+    state.result = { data: { id: UUID, slug: 'future', title: 'Future Show', status: 'approved', start_date: '2099-01-01', state: 'VIC' } };
+    ({ body } = await run('/events/future'));
+    expect(body).not.toContain('This event has finished');
+  });
+
+  it('renders a card-shop city page with the store count, upcoming events, the card-shows link and an FAQ', async () => {
+    const stores = ['A', 'B', 'C', 'D'].map((n) => ({ slug: `shop-${n}`, name: `Shop ${n}`, suburb: 'Carlton', state: 'VIC', city: 'melbourne' }));
+    state.listResultByTable = {
+      local_game_stores: { data: stores },
+      events: { data: [{ id: 'e1', slug: 'vic-show', title: 'VIC Card Show', start_date: '2099-01-10', venue_name: 'Town Hall', suburb: 'Malvern', state: 'VIC' }] },
+    };
+    const { status, body } = await run('/card-shops/melbourne');
+    expect(status).toBe(200);
+    expect(body).toMatch(/<title>4 Card Shops in Melbourne \([A-Z][a-z]{2} \d{4}\) — Pokémon, TCG &amp; Sports Cards<\/title>/);
+    expect(body).toContain('4 trading card shops in Melbourne, VIC');
+    expect(body).toContain('<a href="https://cardpop.com.au/events/vic-show">VIC Card Show</a>');
+    expect(body).toContain('<a href="https://cardpop.com.au/card-shows/melbourne">Card shows in Melbourne &amp; Victoria</a>');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('<h3>Where can I buy Pokémon or sports cards in Melbourne?</h3>');
+  });
+
+  it('keeps the plain card-shop title when a city lists only a couple of stores', async () => {
+    state.listResultByTable = { local_game_stores: { data: [{ slug: 's', name: 'Only Shop', state: 'NT', city: 'darwin' }] }, events: { data: [] } };
+    const { body } = await run('/card-shops/darwin');
+    expect(body).toContain('<title>Card Shops in Darwin — Pokémon, TCG &amp; Sports Card Stores | CardPop</title>');
+    expect(body).not.toContain('Upcoming card events in');
   });
 
   it('shows an image organiser logo to bots and puts it on the Organization, but never a video loop', async () => {
@@ -829,6 +878,45 @@ describe('prerender static content pages', () => {
     const { body } = await run('/faq');
     expect(body).toContain('How does the CardPop™ Vault work?');
     expect(body).toContain('"@type":"Question"');
+  });
+
+  it('renders a city card-show page with its events and city links', async () => {
+    state.listResult = { data: [{
+      id: UUID, slug: 'melbourne-card-show', title: 'Melbourne Card Show', status: 'approved',
+      state: 'VIC', suburb: 'Docklands', venue_name: 'Marvel Stadium', start_date: '2099-03-01',
+    }] };
+    const { status, body } = await run('/card-shows/melbourne');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Card Shows in Melbourne</h1>');
+    expect(body).toContain('Melbourne Card Show');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/card-shows/melbourne" />');
+    expect(body).toContain('href="https://cardpop.com.au/card-shows/sydney"');
+    expect(body).toContain('"@type":"ItemList"');
+    expect(body).not.toContain('noindex');
+  });
+
+  it('noindexes a city with no upcoming events and 404s an unknown city', async () => {
+    const empty = await run('/card-shows/darwin');
+    expect(empty.status).toBe(200);
+    expect(empty.body).toContain('noindex, follow');
+    const unknown = await run('/card-shows/atlantis');
+    expect(unknown.status).toBe(404);
+  });
+
+  it('links the events landing to every city page', async () => {
+    const { body } = await run('/events');
+    expect(body).toContain('href="https://cardpop.com.au/card-shows/brisbane"');
+    expect(body).toContain('href="https://cardpop.com.au/list-your-event"');
+  });
+
+  it('renders the organiser landing page from the shared copy', async () => {
+    const { status, body } = await run('/list-your-event');
+    expect(status).toBe(200);
+    expect(body).toContain('Put your card show in front of Australian collectors.');
+    expect(body).toContain('Member ticket offer (Free)');
+    expect(body).toContain('Who sees my discount code?');
+    expect(body).toContain('href="https://cardpop.com.au/account/events"');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/list-your-event" />');
   });
 
   it('renders the analytics page', async () => {

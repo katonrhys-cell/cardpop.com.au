@@ -427,7 +427,11 @@ describe('cpEmail layout', () => {
   it('uses the brand palette, never the old off-brand red or charcoal', () => {
     expect(html).not.toContain('#E63946');
     expect(html).not.toContain('#1C1C1E');
-    expect(html).toContain('#1F2937');
+  });
+
+  it('closes on a black footer band matching the header, with the logo in it', () => {
+    expect(html).toMatch(/background:#0A0A0A;border-radius:0 0 12px 12px/);
+    expect(html.split(EMAIL_LOGO_URL).length - 1).toBe(2);
   });
 
   it('puts the support line, the © line and the footer note in the footer', () => {

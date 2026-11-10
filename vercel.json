@@ -318,6 +318,17 @@
       "destination": "/api/prerender?path=/events/organisers/:slug"
     },
     {
+      "source": "/card-shows/:city",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|mediapartners-google|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/card-shows/:city"
+    },
+    {
       "source": "/events/:slug",
       "has": [
         {
@@ -329,7 +340,7 @@
       "destination": "/api/prerender?path=/events/:slug"
     },
     {
-      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch|conviction-rating|scan)",
+      "source": "/:page(about|contact|faq|privacy-policy|terms|returns|shipping|trust-safety|safe-buying|accessibility|community|australian-markets|analytics|blog|partners|pricing|photography-standard|launch|conviction-rating|scan|list-your-event)",
       "has": [
         {
           "type": "header",

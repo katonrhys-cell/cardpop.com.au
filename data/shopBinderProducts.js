@@ -75,9 +75,9 @@ const BINDER_ROWS = [
       'ZB-04-BLK_collectors-series-4-pocket-zip-binder-black_pkg2.png',
       'ZB-04-BLK_collectors-series-4-pocket-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Zip Binder",
     metaDescription:
-      "The 4-pocket Collector's Series zip binder from Palms Off Gaming — side-loading archival pockets, a padded PU leather cover and a full metal zip. Eight colours, shipped Australia-wide.",
+      "Palms Off Gaming's 4-pocket Collector's Series zip binder — side-loading archival pockets, padded PU leather cover and a full metal zip. Eight colours.",
     intro:
       "Four pockets to a page is the layout collectors reach for when the cards themselves are the point. Oversized art, full-art trainers, jumbo promos and thick-stock inserts all sit comfortably in a 4-pocket page, with enough margin around each card that nothing crowds the artwork. This is the Palms Off Gaming Collector's Series build: a padded textured-PU cover, a metal zip that runs the full perimeter, and side-loading pockets that hold cards in place even when the binder is upside down.",
     highlights: [
@@ -130,9 +130,9 @@ const BINDER_ROWS = [
       'ZB-09-BLK_collectors-series-9-pocket-zip-binder-black_pkg2.png',
       'ZB-09-BLK_collectors-series-9-pocket-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 9-Pocket Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming Collector's Series 9-Pocket Zip Binder",
     metaDescription:
-      "The 9-pocket Collector's Series zip binder from Palms Off Gaming — side-loading archival pockets, padded PU leather and a full metal zip. Eight colours, shipped Australia-wide.",
+      "Palms Off Gaming's 9-pocket Collector's Series zip binder — side-loading archival pockets, padded PU leather and a full metal zip. Eight colours.",
     intro:
       "Nine pockets is the layout almost every trading card collection is organised in — three by three, set order, one page per row of a master set. The Palms Off Gaming Collector's Series takes that familiar layout and builds it properly: side-loading pockets so cards stay put, a metal zip around the full perimeter, and a padded textured-PU cover that survives being carried to locals every week.",
     highlights: [
@@ -185,9 +185,9 @@ const BINDER_ROWS = [
       'ZB-12-BLK_collectors-series-12-pocket-zip-binder-black_pkg2.png',
       'ZB-12-BLK_collectors-series-12-pocket-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 12-Pocket Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming Collector's Series 12-Pocket Zip Binder",
     metaDescription:
-      "The 12-pocket Collector's Series zip binder from Palms Off Gaming — the highest-capacity layout in the range, with side-loading archival pockets and a full metal zip. Eight colours.",
+      "Palms Off Gaming's 12-pocket Collector's Series zip binder — the highest-capacity layout, with side-loading archival pockets and a metal zip. Eight colours.",
     intro:
       "Twelve pockets to a page is the highest-density layout Palms Off Gaming builds, and it exists for the collector whose problem is volume. Bulk rares, trade stock, a set you are sorting before it goes into long-term storage — a 12-pocket page holds a third more than a 9-pocket one, in the same footprint of binder. The construction is unchanged from the rest of the Collector's Series: side-loading pockets, a full metal zip and a padded textured-PU cover.",
     highlights: [
@@ -242,9 +242,9 @@ const BINDER_ROWS = [
       'TOP-04-BLK_collectors-series-4-pocket-top-loader-zip-binder-black_pkg2.png',
       'TOP-04-BLK_collectors-series-4-pocket-top-loader-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 4-Pocket Top Loader Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming 4-Pocket Top Loader Zip Binder | CardPop",
     metaDescription:
-      'A zip binder with pockets cut for 35pt top loaders, four to a page — store cards already in loaders without taking them out. Eight colours, shipped Australia-wide from CardPop.',
+      'A zip binder with pockets cut for 35pt top loaders, four to a page — store cards already in loaders without taking them out. Eight colours.',
     intro:
       "Most binders force a choice: leave a card in its top loader and have nowhere to file it, or pull it out of the loader to fit a page. This binder removes the choice. The pockets are cut to take a standard 35pt top loader whole, four to a page, so the card never leaves the protection it is already in. It is the natural home for a trade binder, for cards waiting on a grading submission, or for anything valuable enough that you would rather not handle it twice.",
     highlights: [
@@ -297,9 +297,9 @@ const BINDER_ROWS = [
       'TOP-09-BLK_collectors-series-9-pocket-top-loader-zip-binder-black_pkg2.png',
       'TOP-09-BLK_collectors-series-9-pocket-top-loader-zip-binder-black_pkg3.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series 9-Pocket Top Loader Zip Binder | CardPop",
+    metaTitle: "Palms Off Gaming 9-Pocket Top Loader Zip Binder | CardPop",
     metaDescription:
-      'Nine 35pt top loaders to a page in a zipped, archival-safe binder — the highest-capacity way to store loaded cards without unloading them. Eight colours, shipped Australia-wide.',
+      'Nine 35pt top loaders to a page in a zipped, archival-safe binder — the highest-capacity way to store loaded cards without unloading them. Eight colours.',
     intro:
       "The nine-pocket version of the top loader binder is the one traders end up carrying. Nine loaders to a page means a full trade binder fits in a single volume rather than three, and because every card stays inside its loader, a binder that gets opened and flipped through a dozen times at an event is not putting wear on the cards themselves. Same Collector's Series construction as the rest of the range, metal zip and padded PU cover, with velvet-lined inside covers.",
     highlights: [
@@ -353,9 +353,9 @@ const BINDER_ROWS = [
       'STL-09-BLK_stealth-9-pocket-zip-binder-black_logo.png',
       'STL-09-BLK_stealth-9-pocket-zip-binder-black_pkg2.png',
     ],
-    metaTitle: 'Palms Off Gaming Stealth 9-Pocket Zip Binder | CardPop Australia',
+    metaTitle: 'Palms Off Gaming Stealth 9-Pocket Zip Binder | CardPop',
     metaDescription:
-      'The Stealth 9-pocket zip binder from Palms Off Gaming — a understated, blacked-out take on the nine-pocket zip binder with side-loading archival pockets. Seven colours.',
+      'The Stealth 9-pocket zip binder from Palms Off Gaming — an understated take on the nine-pocket zip binder, with side-loading archival pockets. Seven colours.',
     intro:
       "The Stealth range is the Collector's Series with the volume turned down. Same nine-pocket layout, same side-loading pockets and zip closure, but finished so the binder reads as a plain object rather than a piece of collecting gear — which is the point when it is going in a backpack, sitting on a shelf, or being carried somewhere you would rather it did not announce what is inside.",
     highlights: [
@@ -403,9 +403,9 @@ const BINDER_ROWS = [
       'STL-12-BLK_stealth-12-pocket-zip-binder-black_logo.png',
       'STL-12-BLK_stealth-12-pocket-zip-binder-black_pkg2.png',
     ],
-    metaTitle: 'Palms Off Gaming Stealth 12-Pocket Zip Binder | CardPop Australia',
+    metaTitle: 'Palms Off Gaming Stealth 12-Pocket Zip Binder | CardPop',
     metaDescription:
-      'The Stealth 12-pocket zip binder from Palms Off Gaming — maximum capacity in an understated finish, with side-loading archival pockets and a full metal zip. Seven colours.',
+      'The Stealth 12-pocket zip binder from Palms Off Gaming — maximum capacity in an understated finish, with side-loading archival pockets and a metal zip.',
     intro:
       'Twelve pockets in the Stealth finish is the highest-capacity, lowest-profile binder Palms Off Gaming makes. It holds a third more per page than a nine-pocket binder and looks like nothing in particular from the outside — a useful combination for bulk storage, trade stock, or any collection that is better off not advertising itself.',
     highlights: [
@@ -452,9 +452,9 @@ const BINDER_ROWS = [
       'RB-BLK_collectors-series-ring-binder-black_open2.png',
       'RB-BLK_collectors-series-ring-binder-black_empty.png',
     ],
-    metaTitle: "Palms Off Gaming Collector's Series Ring Binder | CardPop Australia",
+    metaTitle: "Palms Off Gaming Collector's Series Ring Binder | CardPop",
     metaDescription:
-      "The Collector's Series ring binder from Palms Off Gaming — takes interchangeable pages, including PSA 4-slot graded card pages, so a collection can be re-ordered rather than re-filed.",
+      "Palms Off Gaming's Collector's Series ring binder takes interchangeable pages, including PSA 4-slot graded card pages, so a collection can be re-ordered.",
     intro:
       "Every zip binder in the Collector's Series has its pages bound in, which is what keeps them from tearing loose — but it also means the order is fixed. The ring binder is the answer when the collection needs to move around: pages come out, go back in a different order, and can be swapped for a different layout entirely as what you collect changes. It also takes PSA 4-slot pages, which is the only way to file graded cards in a binder rather than a box.",
     highlights: [

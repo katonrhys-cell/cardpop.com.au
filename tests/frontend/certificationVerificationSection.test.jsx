@@ -142,3 +142,12 @@ describe('CertificationVerificationSection — merged PSA details', () => {
     expect(screen.queryByText(/verified by cardpop/i)).not.toBeInTheDocument();
   });
 });
+
+describe('CertificationVerificationSection — company logo', () => {
+  it('shows the PSA logo in the Company row', async () => {
+    mockVerify.mockRejectedValue(new Error('down'));
+    render(<CertificationVerificationSection certNumber="123" gradingCompany="psa" grade="9" />);
+    const logo = await screen.findByAltText(/professional sports authenticator logo/i);
+    expect(logo).toHaveAttribute('src', '/images/grading/psa.png');
+  });
+});
