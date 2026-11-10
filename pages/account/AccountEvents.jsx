@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
@@ -72,6 +72,18 @@ const AccountEvents = () => {
   }, [currentUser?.id]);
 
   const openSubmit = () => { setEditingEvent(null); setIsModalOpen(true); };
+
+  // `?new=1` (the "List an event" option after email confirmation) opens the
+  // submit form straight away; the param is dropped so a refresh or closing
+  // the form doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    openSubmit();
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Only a draft can be deleted by its organiser (RLS); submitted and live
   // events are the CardPop team's to remove.
