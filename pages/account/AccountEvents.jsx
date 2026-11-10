@@ -201,9 +201,16 @@ const AccountEvents = () => {
               <Store className="w-3.5 h-3.5" aria-hidden="true" /> Vendors
             </Button>
           )}
-          {(event.status === 'draft' || event.status === 'pending_review' || event.status === 'approved') && (
-            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)} aria-label={`${event.status === 'draft' ? 'Edit & submit' : 'Edit'} ${event.title}`}>
-              <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> {event.status === 'draft' ? 'Edit & submit' : 'Edit'}
+          {/* A draft's one job is to be finished and submitted, so its button
+              is the page's primary action: a red pill, white capitals. */}
+          {event.status === 'draft' && (
+            <Button size="sm" className="rounded-full gap-1.5 px-4 bg-primary text-primary-foreground hover:bg-primary/90 font-bold uppercase tracking-wide" onClick={() => openEdit(event)} aria-label={`Edit & submit ${event.title}`}>
+              <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit &amp; submit
+            </Button>
+          )}
+          {(event.status === 'pending_review' || event.status === 'approved') && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)} aria-label={`Edit ${event.title}`}>
+              <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit
             </Button>
           )}
           {event.status === 'draft' && (
