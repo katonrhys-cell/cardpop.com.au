@@ -102,13 +102,16 @@ const EventSubmitterLine = ({ event, submitter }) => {
     return <p className="text-xs mt-0.5 text-muted-foreground">Submitted by a deleted account</p>;
   }
   const name = submitter.display_name || submitter.username || 'Unnamed account';
+  // A draft hasn't been submitted — nobody has asked for a review yet.
+  const isDraft = event.status === 'draft';
   return (
     <p className="text-xs mt-0.5 text-muted-foreground truncate">
-      {submitter.is_admin ? 'Added by ' : 'Submitted by '}
+      {submitter.is_admin ? 'Added by ' : isDraft ? 'Created by ' : 'Submitted by '}
       <Link to={`/seller/${submitter.id}`} className="font-semibold text-foreground hover:underline">
         {name}
       </Link>
       {submitter.username && name !== submitter.username && <span> @{submitter.username}</span>}
+      {isDraft && !submitter.is_admin && <span className="italic"> · not submitted yet</span>}
       {submitter.is_admin && <span> (CardPop admin)</span>}
     </p>
   );

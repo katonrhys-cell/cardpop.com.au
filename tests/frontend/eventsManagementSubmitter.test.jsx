@@ -36,10 +36,12 @@ const fixtureEvents = () => [
   { id: 'mel',  title: 'CollectFest Melbourne',  status: 'approved',       start_date: '2027-04-03', organiser_id: 'u-admin' },
   { id: 'scan', title: 'Gundam Oceania',         status: 'pending_review', start_date: '2027-01-16', organiser_id: null, auto_discovered: true },
   { id: 'gone', title: 'Orphaned Swap Meet',     status: 'approved',       start_date: '2027-02-01', organiser_id: 'u-deleted' },
+  { id: 'drft', title: 'CollectFest Perth',      status: 'draft',          start_date: '2027-05-01', organiser_id: 'u-mkt' },
 ];
 const fixtureProfiles = () => [
   { id: 'u-member', username: 'tascards', display_name: 'Jamie Smith', is_admin: false },
   { id: 'u-admin',  username: 'cardpop',  display_name: null,          is_admin: true },
+  { id: 'u-mkt',    username: 'marketing', display_name: 'Marketing EEA', is_admin: false },
 ];
 
 const rowFor = (title) => screen.getByText(title).closest('tr');
@@ -55,6 +57,8 @@ describe('EventsManagementPage — submitted by', () => {
     expect(within(rowFor('CollectFest Melbourne')).getByText(/Added by/)).toHaveTextContent('Added by cardpop (CardPop admin)');
     expect(within(rowFor('Gundam Oceania')).getByText('Found by the automated scan')).toBeInTheDocument();
     expect(within(rowFor('Orphaned Swap Meet')).getByText('Submitted by a deleted account')).toBeInTheDocument();
+    // A draft was never submitted, so it says "Created by", not "Submitted by".
+    expect(within(rowFor('CollectFest Perth')).getByText(/Created by/)).toHaveTextContent('Created by Marketing EEA @marketing · not submitted yet');
     // One batched lookup, no repeat for the account that no longer exists.
     expect(profileQuery).toHaveBeenCalledTimes(1);
   });
