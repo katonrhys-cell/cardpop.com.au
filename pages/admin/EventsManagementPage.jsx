@@ -95,19 +95,19 @@ export const PUBLISHED_ROW_LINGER_MS = 1200;
 // their public seller page.
 const EventSubmitterLine = ({ event, submitter }) => {
   if (event.auto_discovered) {
-    return <p className="text-xs mt-0.5 text-muted-foreground">Found by the automated scan</p>;
+    return <p className="text-xs mt-0.5 text-brand-red">Found by the automated scan</p>;
   }
   if (!event.organiser_id || submitter === undefined) return null;
   if (submitter === null) {
-    return <p className="text-xs mt-0.5 text-muted-foreground">Submitted by a deleted account</p>;
+    return <p className="text-xs mt-0.5 text-brand-red">Submitted by a deleted account</p>;
   }
   const name = submitter.display_name || submitter.username || 'Unnamed account';
   // A draft hasn't been submitted — nobody has asked for a review yet.
   const isDraft = event.status === 'draft';
   return (
-    <p className="text-xs mt-0.5 text-muted-foreground truncate">
+    <p className="text-xs mt-0.5 text-brand-red truncate">
       {submitter.is_admin ? 'Added by ' : isDraft ? 'Created by ' : 'Submitted by '}
-      <Link to={`/seller/${submitter.id}`} className="font-semibold text-foreground hover:underline">
+      <Link to={`/seller/${submitter.id}`} className="font-semibold text-brand-red hover:underline">
         {name}
       </Link>
       {submitter.username && name !== submitter.username && <span> @{submitter.username}</span>}
