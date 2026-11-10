@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw } from 'lucide-react';
+import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText } from 'lucide-react';
+import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
@@ -14,6 +15,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { eventPath, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
 
 const STATUS_BADGES = {
+  draft:          { label: 'Draft',          cls: 'bg-muted text-muted-foreground border-dashed border-border' },
   pending_review: { label: 'Pending Review', cls: 'bg-amber-500/10 text-amber-700 border-amber-300 dark:text-amber-400' },
   approved:       { label: 'Live',           cls: 'bg-emerald-500/10 text-emerald-700 border-emerald-300 dark:text-emerald-400' },
   rejected:       { label: 'Rejected',       cls: 'bg-destructive/10 text-destructive border-destructive/30' },
@@ -70,7 +72,84 @@ const AccountEvents = () => {
   }, [currentUser?.id]);
 
   const openSubmit = () => { setEditingEvent(null); setIsModalOpen(true); };
+
+  // Only a draft can be deleted by its organiser (RLS); submitted and live
+  // events are the CardPop team's to remove.
+  const deleteDraft = async (event) => {
+    if (!window.confirm(`Delete the draft “${event.title}”? This can’t be undone.`)) return;
+    const { data, error } = await supabase.from('events').delete().eq('id', event.id).eq('status', 'draft').select('id');
+    if (error || !data?.length) {
+      toast.error('Couldn’t delete that draft. Please try again.');
+      return;
+    }
+    setEvents((prev) => prev.filter((ev) => ev.id !== event.id));
+    toast.success('Draft deleted.');
+  };
   const openEdit = (event) => { setEditingEvent(event); setIsModalOpen(true); };
+
+  const drafts = events.filter((ev) => ev.status === 'draft');
+  const submitted = events.filter((ev) => ev.status !== 'draft');
+
+  const renderEvent = (event) => {
+    const badge = STATUS_BADGES[event.status] || STATUS_BADGES.pending_review;
+    return (
+      <div key={event.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap mb-1.5">
+            <h3 className="text-lg font-bold text-foreground truncate">{event.title}</h3>
+            <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <CalendarDays className="w-4 h-4" /> {formatEventDate(event)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4" /> <span className="truncate">{formatEventLocation(event)}</span>
+            </span>
+          </div>
+          {event.status === 'rejected' && event.rejection_reason && (
+            <p className="mt-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
+              Reason: {event.rejection_reason}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          {isVerifiedOrganiser && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setVendorsEvent(event)}>
+              <Store className="w-3.5 h-3.5" /> Vendors
+            </Button>
+          )}
+          {(event.status === 'draft' || event.status === 'pending_review' || event.status === 'approved') && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
+              <Pencil className="w-3.5 h-3.5" /> {event.status === 'draft' ? 'Edit & submit' : 'Edit'}
+            </Button>
+          )}
+          {event.status === 'draft' && (
+            <Button variant="ghost" size="sm" className="rounded-xl gap-1.5 text-muted-foreground hover:text-destructive" onClick={() => deleteDraft(event)}>
+              <Trash2 className="w-3.5 h-3.5" /> Delete
+            </Button>
+          )}
+          {event.status === 'rejected' && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
+              <RotateCcw className="w-3.5 h-3.5" /> Edit &amp; resubmit
+            </Button>
+          )}
+          {event.status === 'approved' && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setBadgeEvent(event)}>
+              <BadgeCheck className="w-3.5 h-3.5" /> Website badge
+            </Button>
+          )}
+          {event.status === 'approved' && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" asChild>
+              <Link to={eventPath(event)}>
+                <ExternalLink className="w-3.5 h-3.5" /> View Live
+              </Link>
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <AccountPageShell
@@ -90,6 +169,7 @@ const AccountEvents = () => {
         <p>
           Every submission is reviewed by the CardPop team before it appears on the{' '}
           <Link to="/events" className="text-primary font-semibold hover:underline">public events calendar</Link>.
+          Not ready to submit? <strong>Save Draft</strong> keeps an event private until you are.
           You can edit an event while it&apos;s pending review, or edit and resubmit it if it wasn&apos;t approved.
           Once it&apos;s live, your edits go live straight away and our team is notified of what changed.
           You can only see and edit events you submitted.
@@ -121,62 +201,29 @@ const AccountEvents = () => {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {events.map(event => {
-            const badge = STATUS_BADGES[event.status] || STATUS_BADGES.pending_review;
-            return (
-              <div key={event.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 flex-wrap mb-1.5">
-                    <h3 className="text-lg font-bold text-foreground truncate">{event.title}</h3>
-                    <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1.5">
-                      <CalendarDays className="w-4 h-4" /> {formatEventDate(event)}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4" /> <span className="truncate">{formatEventLocation(event)}</span>
-                    </span>
-                  </div>
-                  {event.status === 'rejected' && event.rejection_reason && (
-                    <p className="mt-2 text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-lg px-3 py-2">
-                      Reason: {event.rejection_reason}
-                    </p>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2 shrink-0">
-                  {isVerifiedOrganiser && (
-                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setVendorsEvent(event)}>
-                      <Store className="w-3.5 h-3.5" /> Vendors
-                    </Button>
-                  )}
-                  {(event.status === 'pending_review' || event.status === 'approved') && (
-                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
-                      <Pencil className="w-3.5 h-3.5" /> Edit
-                    </Button>
-                  )}
-                  {event.status === 'rejected' && (
-                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => openEdit(event)}>
-                      <RotateCcw className="w-3.5 h-3.5" /> Edit &amp; resubmit
-                    </Button>
-                  )}
-                  {event.status === 'approved' && (
-                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setBadgeEvent(event)}>
-                      <BadgeCheck className="w-3.5 h-3.5" /> Website badge
-                    </Button>
-                  )}
-                  {event.status === 'approved' && (
-                    <Button variant="outline" size="sm" className="rounded-xl gap-1.5" asChild>
-                      <Link to={eventPath(event)}>
-                        <ExternalLink className="w-3.5 h-3.5" /> View Live
-                      </Link>
-                    </Button>
-                  )}
-                </div>
+        <div className="space-y-8">
+          {drafts.length > 0 && (
+            <section aria-labelledby="drafts-heading" className="space-y-4">
+              <div>
+                <h2 id="drafts-heading" className="text-lg font-bold flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-muted-foreground" /> Drafts
+                  <span className="text-sm font-semibold text-muted-foreground">({drafts.length})</span>
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Only you can see these. Finish them off, then <strong>Submit for Review</strong> when they’re ready — we’re only notified once you submit.
+                </p>
               </div>
-            );
-          })}
+              {drafts.map(renderEvent)}
+            </section>
+          )}
+          {submitted.length > 0 && (
+            <section aria-labelledby="submitted-heading" className="space-y-4">
+              {drafts.length > 0 && (
+                <h2 id="submitted-heading" className="text-lg font-bold">Submitted &amp; live</h2>
+              )}
+              {submitted.map(renderEvent)}
+            </section>
+          )}
         </div>
       )}
 

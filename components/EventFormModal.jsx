@@ -43,6 +43,7 @@ const EVENT_TYPES = [
 const STATUS_OPTIONS = [
   { value: 'approved',       label: 'Approved (Live)' },
   { value: 'pending_review', label: 'Pending Review' },
+  { value: 'draft',          label: 'Draft (organiser hasn’t submitted it)' },
   { value: 'cancelled',      label: 'Cancelled' },
   { value: 'completed',      label: 'Completed (archived — stays under Past Events)' },
   { value: 'rejected',       label: 'Rejected' },
@@ -182,9 +183,14 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
   const isUserMode = mode === 'user';
   const isLiveEdit = isUserMode && Boolean(event?.id) && event.status === 'approved';
   const isResubmission = isUserMode && event?.status === 'rejected';
+  const isDraft = isUserMode && event?.status === 'draft';
+  // Organisers can keep an event private as a draft until they submit it
+  // (docs/event-submissions.md). A live event can't go back to draft.
+  const canSaveDraft = isUserMode && !isLiveEdit;
   const [loading, setLoading] = useState(false);
   // What the save is doing right now (shown on the button), so a slow step is visible.
   const [saveStep, setSaveStep] = useState('');
+  const [savingDraft, setSavingDraft] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [formData, setFormData] = useState(INITIAL_STATE);
@@ -474,8 +480,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  // `asDraft` (the "Save Draft" button): keep the event private, unsubmitted.
+  const handleSubmit = async (e, { asDraft = false } = {}) => {
+    e?.preventDefault?.();
 
     if (!formData.title.trim()) {
       toast.error('Event title is required.');
@@ -570,7 +577,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         event_type:          formData.event_type,
         // An organiser never picks the status: a live event stays live, anything
         // else (re-)enters the review queue. The DB guard enforces this too.
-        status:              isUserMode ? (isLiveEdit ? 'approved' : 'pending_review') : formData.status,
+        status:              isUserMode ? (isLiveEdit ? 'approved' : asDraft ? 'draft' : 'pending_review') : formData.status,
         featured_card_games: formData.featured_card_games.length ? formData.featured_card_games : null,
         is_featured:         isUserMode ? false : formData.is_featured,
         image_url,
@@ -628,12 +635,18 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         // its owner to the editor.
         const { error } = await step('Saving the event', () => supabase.from('events').update(payload).eq('id', event.id));
         if (error) throw error;
+        // Submitted just now (a draft or a rejected event going to review).
+        const justSubmitted = isUserMode && payload.status === 'pending_review' && event.status !== 'pending_review';
         toast.success(isLiveEdit
           ? 'Changes saved and live. The CardPop team has been notified of what changed.'
-          : isResubmission
-            ? 'Event resubmitted — our team will review it again before it goes live.'
-            : isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
-        if (isResubmission) {
+          : asDraft
+            ? 'Draft saved. Only you can see it — submit it for review when it’s ready.'
+            : isResubmission
+              ? 'Event resubmitted — our team will review it again before it goes live.'
+              : justSubmitted
+                ? 'Event submitted! Our team will review it before it appears on the calendar.'
+                : isUserMode ? 'Event updated — it will be reviewed before publishing.' : 'Event updated successfully');
+        if (justSubmitted) {
           // Same admin email a fresh submission gets.
           apiServerClient
             .fetch('/events/notify-submission', {
@@ -660,13 +673,16 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         }
         if (error) throw error;
         savedId = inserted?.id ?? null;
-        toast.success(isUserMode
-          ? 'Event submitted! Our team will review it before it appears on the calendar.'
-          : 'Event created successfully');
+        toast.success(asDraft
+          ? 'Draft saved. Only you can see it — submit it for review when it’s ready.'
+          : isUserMode
+            ? 'Event submitted! Our team will review it before it appears on the calendar.'
+            : 'Event created successfully');
 
         // Email every admin about the new event (the bell is a DB trigger).
-        // Fire-and-forget so a mail hiccup never blocks the saved event.
-        if (inserted?.id) {
+        // Fire-and-forget so a mail hiccup never blocks the saved event. A
+        // draft isn't announced until it's submitted.
+        if (inserted?.id && !asDraft) {
           apiServerClient
             .fetch('/events/notify-submission', {
               method: 'POST',
@@ -734,7 +750,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
         <DialogHeader className="px-6 py-5 border-b border-border bg-muted/20 shrink-0">
           <div className="flex items-center gap-3">
             <DialogTitle className="text-2xl font-bold font-heading text-foreground">
-              {isLiveEdit ? 'Edit Live Event' : isResubmission ? 'Edit & Resubmit' : event?.id ? 'Edit Event' : 'Create New Event'}
+              {isLiveEdit ? 'Edit Live Event' : isResubmission ? 'Edit & Resubmit' : isDraft ? 'Edit Draft' : event?.id ? 'Edit Event' : 'Create New Event'}
             </DialogTitle>
             {scrapedData && (
               <Badge variant="secondary" className="bg-primary/10 text-primary border-none shadow-sm h-6 font-semibold px-3">
@@ -748,7 +764,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
               : isResubmission
                 ? 'Fix what the review asked for, then resubmit. Our team will review it again before it goes live.'
                 : isUserMode
-                  ? 'Submit your card event to the CardPop calendar. Our team reviews every submission before it goes live.'
+                  ? 'Submit your card event to the CardPop calendar — our team reviews every submission before it goes live. Not ready yet? Save it as a draft: only you can see it until you submit.'
                   : event?.id ? 'Update event details, SEO, and visibility.' : 'Add a comprehensive event listing with full SEO setup.'}
           </DialogDescription>
         </DialogHeader>
@@ -1208,11 +1224,27 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, mode = '
             </Button>
             <div className="flex gap-3 sm:justify-end">
               <Button type="button" variant="ghost" onClick={onClose} disabled={loading} className="rounded-xl font-bold">Cancel</Button>
+              {canSaveDraft && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  onClick={(e) => { setSavingDraft(true); handleSubmit(e, { asDraft: true }).finally(() => setSavingDraft(false)); }}
+                  className="rounded-xl font-bold"
+                >
+                  {loading && savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                  {loading && savingDraft && saveStep ? `${saveStep}…` : 'Save Draft'}
+                </Button>
+              )}
               <Button type="submit" disabled={loading} className="rounded-xl font-bold px-8 shadow-md">
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {loading && saveStep
+                {loading && !savingDraft && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                {loading && !savingDraft && saveStep
                   ? `${saveStep}…`
-                  : isLiveEdit ? 'Save & Publish Changes' : isResubmission ? 'Resubmit for Review' : event?.id ? 'Save Changes' : isUserMode ? 'Submit for Review' : 'Create Event'}
+                  : isLiveEdit ? 'Save & Publish Changes'
+                    : isResubmission ? 'Resubmit for Review'
+                      : isDraft ? 'Submit for Review'
+                        : event?.id ? 'Save Changes'
+                          : isUserMode ? 'Submit for Review' : 'Create Event'}
               </Button>
             </div>
           </DialogFooter>
