@@ -103,7 +103,7 @@
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.1.7",
+    "@vitest/coverage-v8": "^5.1.0",
     "autoprefixer": "^10.4.20",
     "axe-core": "^4.12.1",
     "beasties": "^0.4.2",
