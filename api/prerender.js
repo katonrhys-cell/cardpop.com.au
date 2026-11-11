@@ -37,6 +37,8 @@ import { EVENT_REGIONS, eventRegionBySlug, eventRegionByState, eventRegionPath, 
 import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '../utils/eventNextEdition.js';
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
+import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
+import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
@@ -1616,6 +1618,33 @@ const eventGalleryHtml = (event, name) => {
   return `<section><h2>Event Photos</h2>${sections}</section>`;
 };
 
+// Side events (events.side_events, utils/eventSideEvents.js): the schedule as
+// real text under one heading per day, so a crawler without JS sees it.
+const eventSideEventsHtml = (sideEvents) => {
+  if (sideEvents.length === 0) return '';
+  const days = groupSideEventsByDay(sideEvents).map((group) => {
+    const items = group.events.map((e) => {
+      const bits = [formatSideEventTime(e), formatSideEventFee(e) ? (e.entry_fee_aud === 0 ? 'Free entry' : `${formatSideEventFee(e)} entry`) : '', e.player_cap ? `${e.player_cap} player cap` : '']
+        .filter(Boolean).join(' · ');
+      return `<li><strong>${esc(e.title)}</strong>${bits ? ` — ${esc(bits)}` : ''}${e.description ? `<br />${esc(e.description)}` : ''}${e.url ? ` <a href="${esc(e.url)}" rel="nofollow noopener">Register</a>` : ''}</li>`;
+    }).join('');
+    return `<h3>${esc(formatSideEventDay(group.date) || 'Day to be confirmed')}</h3><ul>${items}</ul>`;
+  }).join('');
+  return `<section><h2>Side Events &amp; Schedule</h2>${days}</section>`;
+};
+
+// Prize table (events.event_prizes / prize_pool, utils/eventPrizes.js):
+// pool, each placing with its payout, and the card photos as <figure>s.
+const eventPrizesHtml = (prizes, prizePool, name) => {
+  if (prizes.length === 0 && !prizePool) return '';
+  const rows = prizes.map((p) => {
+    const figures = p.images.map(absUrl).filter((u) => /^https?:\/\//.test(u))
+      .map((u, j) => `<figure><img src="${esc(u)}" alt="${esc(`${p.place ? `${p.place} prize` : 'Prize'} card ${j + 1} — ${name}`)}" loading="lazy" /></figure>`).join('');
+    return `<li><strong>${esc(p.place)}</strong>${p.place && p.reward ? ': ' : ''}${esc(p.reward)}${figures}</li>`;
+  }).join('');
+  return `<section><h2>Prizes</h2>${prizePool ? `<p>Total prize pool: ${esc(prizePool)}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}</section>`;
+};
+
 // schema.org VideoObject per YouTube video (utils/eventVideos.js; a bare
 // youtube_url still counts as one) — video rich results. Google requires
 // uploadDate; the closest truthful value we hold is when the listing was
@@ -1945,6 +1974,17 @@ async function renderEvent(supabase, param) {
   query = byUuid ? query.eq('id', param) : query.eq('slug', param);
   const event = rowOrThrow(await query.maybeSingle(), 'event');
 
+  // Side events + prizes are read separately and best-effort: the columns come
+  // from a migration, and an event page must still render if it has not landed
+  // (or this read fails) — they are extras, never the page.
+  if (event) {
+    try {
+      const { data: extras } = await supabase
+        .from('events').select('side_events, event_prizes, prize_pool').eq('id', event.id).maybeSingle();
+      if (extras) Object.assign(event, extras);
+    } catch { /* no extras */ }
+  }
+
   // Approved, or completed — an admin's archive. A finished event keeps its
   // page (collectors review it there); only pending/rejected/cancelled 404.
   if (!event || !['approved', 'completed'].includes(event.status)) {
@@ -1966,7 +2006,12 @@ async function renderEvent(supabase, param) {
     || toText(event.description || '')
     || `${name}${location ? ` at ${location}` : ''}${when ? ` on ${when}` : ''} — a trading card event listed on CardPop Australia.`;
 
-  const eventLd = { ...buildEventLd(event), description: toText(description, 500) };
+  const sideEvents = cleanSideEvents(event.side_events);
+  const prizes = cleanEventPrizes(event.event_prizes);
+  const prizePool = cleanPrizePool(event.prize_pool);
+  const builtEventLd = buildEventLd(event);
+  const subEvents = buildSubEventLds(sideEvents, { location: builtEventLd.location });
+  const eventLd = { ...builtEventLd, description: toText(description, 500), ...(subEvents.length ? { subEvent: subEvents } : {}) };
   const videoLds = buildEventVideoLds(event);
   const videos = cleanEventVideos(event.event_videos, event.youtube_url);
 
@@ -2024,7 +2069,9 @@ async function renderEvent(supabase, param) {
   </ul>
   ${organiserLogoHtml(event)}
   ${event.description ? `<p>${esc(toText(event.description, 800))}</p>` : ''}
+  ${eventSideEventsHtml(sideEvents)}
   ${eventGalleryHtml(event, name)}
+  ${eventPrizesHtml(prizes, prizePool, name)}
   ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
   ${ticketStatusHtml(event, isPast)}
