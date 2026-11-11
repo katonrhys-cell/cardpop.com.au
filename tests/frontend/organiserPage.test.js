@@ -48,3 +48,18 @@ describe('organiserMetaDescription', () => {
     expect(out).not.toMatch(/wor…$/);
   });
 });
+
+describe('organiserLogos (joint organisers)', () => {
+  it('lists the primary logo first, then the extras, http(s) only and de-duplicated', async () => {
+    const { organiserLogos } = await import('@/utils/organiserPage.js');
+    expect(organiserLogos({
+      logo_url: 'https://x.test/a.png',
+      extra_logo_urls: ['https://x.test/b.png', 'javascript:alert(1)', 'https://x.test/a.png', ' https://x.test/c.png '],
+    })).toEqual(['https://x.test/a.png', 'https://x.test/b.png', 'https://x.test/c.png']);
+  });
+  it('copes with a missing column or no logo', async () => {
+    const { organiserLogos } = await import('@/utils/organiserPage.js');
+    expect(organiserLogos({ logo_url: 'https://x.test/a.png' })).toEqual(['https://x.test/a.png']);
+    expect(organiserLogos(null)).toEqual([]);
+  });
+});

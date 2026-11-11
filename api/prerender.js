@@ -10,7 +10,7 @@ import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd, buildReviewVideoJsonLds, cleanVideos, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserMetaDescription } from '../utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
@@ -1837,6 +1837,7 @@ async function renderEventOrganiser(supabase, slug) {
     .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
   let { data: org, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
   // The profile columns ship in a migration; fall back to the original ones.
+  if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
   if (orgError) ({ data: org } = await readOrganiser(BASE_ORGANISER_COLUMNS));
   if (!org) {
     return notFound({
@@ -1871,7 +1872,8 @@ async function renderEventOrganiser(supabase, slug) {
   // The organiser's own words lead the meta description once they've written some.
   const description = organiserMetaDescription(org, summary);
   const links = organiserLinks(org);
-  const logo = safeLogoUrl(org.logo_url) && !isVideoLogoUrl(org.logo_url) ? safeLogoUrl(org.logo_url) : undefined;
+  const logoImages = organiserLogos(org).filter((u) => !isVideoLogoUrl(u));
+  const logo = logoImages[0];
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -1887,7 +1889,7 @@ async function renderEventOrganiser(supabase, slug) {
     '@type': 'Organization',
     name,
     url: canonical,
-    ...(logo ? { logo } : {}),
+    ...(logo ? { logo: logoImages.length > 1 ? logoImages : logo } : {}),
     ...(org.description ? { description: String(org.description).replace(/\s+/g, ' ').trim() } : {}),
     ...(links.length ? { sameAs: links.map((l) => l.url) } : {}),
   };
@@ -1917,7 +1919,7 @@ async function renderEventOrganiser(supabase, slug) {
 
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
-  ${logo ? `<p><img src="${esc(logo)}" alt="${esc(name)} logo" loading="lazy" /></p>` : ''}
+  ${logoImages.length ? `<p>${logoImages.map((u) => `<img src="${esc(u)}" alt="${esc(name)} logo" loading="lazy" />`).join(' ')}</p>` : ''}
   <p>Event organiser</p>
   <h1>${esc(name)}</h1>
   <p>${esc(summary)}</p>
