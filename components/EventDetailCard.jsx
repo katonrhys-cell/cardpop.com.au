@@ -11,11 +11,15 @@ import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import EventVideos from '@/components/events/EventVideos.jsx';
+import EventSideEvents from '@/components/events/EventSideEvents.jsx';
+import EventPrizes from '@/components/events/EventPrizes.jsx';
 import EventOrganiserLogo, { EventOrganiserLogoTile } from '@/components/events/EventOrganiserLogo.jsx';
 import { safeLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
 import { organisersForEvent, organiserNameParts, organiserPath } from '@/utils/eventOrganisers.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
+import { cleanSideEvents } from '@/utils/eventSideEvents.js';
+import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
@@ -50,6 +54,10 @@ const EventDetailCard = ({ event, isPast = false }) => {
   // below the photo gallery by EventVideos, which also starts the first one.
   const videos = cleanEventVideos(event.event_videos, event.youtube_url);
   const fbEmbedUrl = facebookEmbedUrl(event.facebook_video_url);
+  // Side events (schedule) and the prize table — utils/eventSideEvents.js, utils/eventPrizes.js.
+  const sideEvents = cleanSideEvents(event.side_events);
+  const prizes = cleanEventPrizes(event.event_prizes);
+  const prizePool = cleanPrizePool(event.prize_pool);
   // Member ticket code + referral link (lib/eventTicketOffers.js). Finished
   // events show no tickets, so don't ask.
   const ticketOffer = useEventTicketOffer(event.id, { enabled: !isPast });
@@ -168,6 +176,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
               {event.description}
             </p>
 
+            {sideEvents.length > 0 && (
+              <div className="mt-10">
+                <EventSideEvents sideEvents={sideEvents} isPast={isPast} />
+              </div>
+            )}
+
             {(() => {
               const albums = cleanGalleryAlbums(event.gallery_albums, event.gallery_images);
               return albums.length > 0 && (
@@ -176,6 +190,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
                 </div>
               );
             })()}
+
+            {(prizes.length > 0 || prizePool) && (
+              <div className="mt-10">
+                <EventPrizes prizes={prizes} prizePool={prizePool} eventName={event.name} />
+              </div>
+            )}
 
             {(videos.length > 0 || fbEmbedUrl) && (
               <div className="mt-10">

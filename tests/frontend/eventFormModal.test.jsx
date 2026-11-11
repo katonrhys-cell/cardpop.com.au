@@ -36,10 +36,24 @@ describe('EventFormModal — user/admin field parity', () => {
   it('shows every tab to admins and all but SEO to organisers, Member Offer included', () => {
     const { unmount } = renderForm('admin');
     const tabNames = (els) => els.map((el) => el.textContent);
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'SEO', 'Member Offer']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Side Events & Prizes', 'Organiser', 'SEO', 'Member Offer']);
     unmount();
     renderForm('user');
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Organiser', 'Member Offer']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Side Events & Prizes', 'Organiser', 'Member Offer']);
+  });
+
+  it('gives organisers the Side Events & Prizes tab, with both editors', () => {
+    renderForm('user');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Side Events & Prizes' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Side Events & Prizes' }));
+    expect(screen.getByRole('button', { name: /Add a side event/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add a prize/ })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Total prize pool/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Add a side event/ }));
+    expect(screen.getByLabelText('Side event 1 name')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Add a prize/ }));
+    expect(screen.getByLabelText('Prize 1 placing')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add photos of the cards won/ })).toBeInTheDocument();
   });
 
   it('gives organisers their own wording on the Member Offer tab', () => {

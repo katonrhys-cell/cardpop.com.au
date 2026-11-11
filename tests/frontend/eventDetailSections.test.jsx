@@ -487,3 +487,64 @@ describe('EventDetailCard — organiser links', () => {
     expect(screen.getByText('Collect-It Con')).toBeInTheDocument();
   });
 });
+
+describe('EventDetailCard — side events and prizes', () => {
+  const sideEvents = [
+    { title: 'Silver Age Showdown', date: '2026-11-15', start_time: '09:00', entry_fee_aud: 100, player_cap: 224 },
+    { title: 'Classic Constructed', date: '2026-11-14', start_time: '09:00', entry_fee_aud: 120, player_cap: 250, url: 'https://example.com/reg', description: 'Day 1 REL Competitive' },
+    { title: 'Sealed Deck', date: '2026-11-14', start_time: '13:00', entry_fee_aud: 0 },
+  ];
+  const prizes = [
+    { place: '1st Place', reward: '$1,500 USD + a Pro Tour Invitation', images: ['https://example.com/blossom.jpg'] },
+    { place: '2nd Place', reward: '$800 USD', images: [] },
+  ];
+
+  it('shows nothing when there are none', () => {
+    renderCard(baseEvent);
+    expect(screen.queryByRole('heading', { name: /Side Events/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Prizes' })).not.toBeInTheDocument();
+  });
+
+  it('lists side events by day and time with fee, cap, details and a register link', () => {
+    renderCard({ ...baseEvent, side_events: sideEvents });
+    expect(screen.getByRole('heading', { name: /Side Events/ })).toBeInTheDocument();
+    const section = within(screen.getByRole('heading', { name: /Side Events/ }).closest('section'));
+    const days = section.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+    expect(days).toEqual(['Saturday 14 November', 'Sunday 15 November']);
+    const titles = section.getAllByRole('heading', { level: 4 }).map((h) => h.textContent);
+    expect(titles).toEqual(['Classic Constructed', 'Sealed Deck', 'Silver Age Showdown']);
+    expect(screen.getByText('$120.00 entry')).toBeInTheDocument();
+    expect(screen.getByText('Free entry')).toBeInTheDocument();
+    expect(screen.getByText('250 player cap')).toBeInTheDocument();
+    expect(screen.getByText('Day 1 REL Competitive')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Register/ }).getAttribute('href')).toBe('https://example.com/reg');
+  });
+
+  it('hides the register link once the event is over', () => {
+    render(<MemoryRouter><EventDetailCard event={{ ...baseEvent, side_events: sideEvents }} isPast /></MemoryRouter>);
+    expect(screen.queryByRole('link', { name: /Register/ })).not.toBeInTheDocument();
+  });
+
+  it('shows the prize pool, each placing and its card photos', () => {
+    renderCard({ ...baseEvent, prize_pool: '$5,000 USD + packs', event_prizes: prizes });
+    expect(screen.getByRole('heading', { name: 'Prizes' })).toBeInTheDocument();
+    expect(screen.getByText(/\$5,000 USD \+ packs/)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '1st Place' })).toBeInTheDocument();
+    expect(screen.getByText('$1,500 USD + a Pro Tour Invitation')).toBeInTheDocument();
+    expect(screen.getByAltText('1st Place prize card 1 of 1 — Test Card Show')).toBeInTheDocument();
+  });
+
+  it('puts side events after About, and the prizes above the videos and below the photos', () => {
+    renderCard({
+      ...baseEvent,
+      side_events: sideEvents,
+      gallery_albums: [{ title: '', images: ['https://example.com/a.jpg'] }],
+      event_prizes: prizes,
+      event_videos: [{ title: 'Recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }],
+    });
+    const order = ['About This Event', /Side Events/, 'Event Photos', 'Prizes', 'Event Video'].map((name) => screen.getByRole('heading', { name }));
+    for (let i = 0; i < order.length - 1; i += 1) {
+      expect(order[i].compareDocumentPosition(order[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+});

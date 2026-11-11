@@ -18,6 +18,10 @@ import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastS
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
 import { cleanEventVideos, emptyVideo } from '@/utils/eventVideos.js';
+import EventSideEventsEditor from '@/components/events/EventSideEventsEditor.jsx';
+import EventPrizesEditor from '@/components/events/EventPrizesEditor.jsx';
+import { cleanSideEvents, sideEventsFormError, sideEventsToForm } from '@/utils/eventSideEvents.js';
+import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
 import { cleanGalleryAlbums, flattenGalleryAlbums } from '@/utils/eventGallery.js';
 import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
 import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
@@ -235,6 +239,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const [gallery, setGallery] = useState([]);
   // [{ title, url }] — YouTube videos in display order (utils/eventVideos.js).
   const [videos, setVideos] = useState([]);
+  // Side events (string rows, utils/eventSideEvents.js) and the prize table:
+  // { pool, prizes: [{ place, reward, photos }] } where a photo is { url }
+  // (saved) or { file, preview } (uploaded on save).
+  const [sideEvents, setSideEvents] = useState([]);
+  const [prizeForm, setPrizeForm] = useState({ pool: '', prizes: [] });
   const fileInputRef = useRef(null);
   // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
   // existing watch's on/off state replaces the default once it loads.
@@ -256,6 +265,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   };
   const changeGallery = (v) => { markDirty(); setGallery(v); };
   const changeVideos = (v) => { markDirty(); setVideos(v); };
+  const changeSideEvents = (v) => { markDirty(); setSideEvents(v); };
+  const changePrizes = (v) => { markDirty(); setPrizeForm(v); };
   const changeOffer = (v) => { markDirty(); setOfferForm(v); };
 
   // Switch to the tab holding a field and put the cursor in it, so an error
@@ -421,6 +432,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
       setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
         .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
       setVideos(cleanEventVideos(event.event_videos, event.youtube_url).map(v => ({ title: v.title, url: v.url })));
+      setSideEvents(sideEventsToForm(event.side_events));
+      setPrizeForm({
+        pool: cleanPrizePool(event.prize_pool),
+        prizes: cleanEventPrizes(event.event_prizes).map(p => ({ place: p.place, reward: p.reward, photos: p.images.map(url => ({ url })) })),
+      });
       setActiveTab('details');
 
       // Member offer: admins and the event's own organiser can read it (RLS).
@@ -447,6 +463,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
 
     if (!event?.id || scrapedData) setGallery([emptyAlbum()]);
     if (!event?.id || scrapedData) setVideos([emptyVideo()]);
+    if (!event?.id || scrapedData) { setSideEvents([]); setPrizeForm({ pool: '', prizes: [] }); }
     setImageFile(null);
     setRemoveExistingImage(false);
     setLogoFile(null);
@@ -555,6 +572,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     clearLogo();
     setGallery([emptyAlbum()]);
     setVideos([emptyVideo()]);
+    setSideEvents([]);
+    setPrizeForm({ pool: '', prizes: [] });
     setOfferForm(EMPTY_OFFER_FORM);
     setActiveTab('details');
     dirtyRef.current = false;
@@ -577,6 +596,16 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     if (ticketPriceError) {
       toast.error(ticketPriceError);
       focusField('organiser');
+      return;
+    }
+
+    // Side event links typed as "humanitix.com/…" become full https:// URLs
+    // before the check, like the Organiser tab's links.
+    const sideRows = sideEvents.map(r => ({ ...r, url: normalizeEventUrl(r.url) || '' }));
+    const sideEventError = sideEventsFormError(sideRows);
+    if (sideEventError) {
+      toast.error(sideEventError);
+      focusField('extras');
       return;
     }
 
@@ -650,6 +679,29 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
       // video's URL for readers that predate the list (SEO, older clients).
       const event_videos = cleanEventVideos(videos).map(v => ({ title: v.title, url: v.url }));
 
+      // Prize photos: same drill as the gallery — new files go up now under
+      // immutable paths, saved ones keep their URL, and uploaded photos become
+      // saved ones so a retry doesn't upload twice.
+      const uploadedPrizes = [];
+      const newPrizePhotos = prizeForm.prizes.reduce((n, p) => n + p.photos.filter(ph => !ph.url).length, 0);
+      let prizePhotoNo = 0;
+      for (const [a, prize] of prizeForm.prizes.entries()) {
+        const images = [];
+        for (const [i, photo] of prize.photos.entries()) {
+          if (photo.url) { images.push(photo.url); continue; }
+          prizePhotoNo += 1;
+          images.push(await step(`Uploading prize photo ${prizePhotoNo} of ${newPrizePhotos}`, () => uploadEventImage(photo.file, {
+            folder: 'events/prizes',
+            stem: `${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+          }), UPLOAD_STEP_TIMEOUT_MS));
+        }
+        uploadedPrizes.push({ place: prize.place, reward: prize.reward, images });
+      }
+      setPrizeForm(prev => ({ ...prev, prizes: uploadedPrizes.map(p => ({ place: p.place, reward: p.reward, photos: p.images.map(url => ({ url })) })) }));
+      const event_prizes = cleanEventPrizes(uploadedPrizes);
+      const prize_pool = cleanPrizePool(prizeForm.pool) || null;
+      const side_events = cleanSideEvents(sideRows);
+
       const payload = {
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
@@ -670,6 +722,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         gallery_images,
         gallery_albums,
         event_videos,
+        side_events,
+        event_prizes,
+        prize_pool,
         // Venue
         venue_name:          formData.venue_name.trim() || null,
         address:             formData.address.trim() || null,
@@ -884,6 +939,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                 {[
                   { id: 'details',   label: 'Details' },
                   { id: 'venue',     label: 'Venue & Dates' },
+                  { id: 'extras',    label: 'Side Events & Prizes' },
                   { id: 'organiser', label: 'Organiser' },
                   // SEO + tags are the CardPop team's job: blank fields fall
                   // back to defaults built from the event (title, summary),
@@ -1113,6 +1169,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
               </TabsContent>
 
               {/* ── TAB 3: ORGANISER ── */}
+              {/* ── TAB: SIDE EVENTS & PRIZES ── */}
+              <TabsContent value="extras" className="mt-0 space-y-8 animate-in fade-in">
+                <EventSideEventsEditor value={sideEvents} onChange={changeSideEvents} disabled={loading} defaultDate={formData.start_date} />
+                <EventPrizesEditor value={prizeForm} onChange={changePrizes} disabled={loading} />
+              </TabsContent>
+
               <TabsContent value="organiser" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {organisers.length > 0 && (

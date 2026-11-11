@@ -860,6 +860,34 @@ describe('prerender events', () => {
     expect(body).toContain('"@type":"VideoObject","name":"Legacy Video — Event Video"');
   });
 
+  it('renders side events by day and the prize table for bots, with subEvent JSON-LD', async () => {
+    state.result = { data: {
+      id: UUID, slug: 'the-calling', title: 'The Calling', status: 'approved',
+      start_date: '2026-11-13', end_date: '2026-11-15', venue_name: 'Club Central Hurstville',
+      side_events: [
+        { title: 'Silver Age Showdown', date: '2026-11-15', start_time: '09:00', entry_fee_aud: 100, player_cap: 224 },
+        { title: 'Classic Constructed', date: '2026-11-14', start_time: '09:00', entry_fee_aud: 120, url: 'https://example.com/reg' },
+        { title: 'Evil', date: '2026-11-14', url: 'javascript:alert(1)' },
+      ],
+      prize_pool: '$5,000 USD',
+      event_prizes: [
+        { place: '1st Place', reward: '$1,500 USD', images: ['https://cdn.test/blossom.jpg', 'javascript:alert(1)'] },
+      ],
+    } };
+    const { body } = await run('/events/the-calling');
+    expect(body).toContain('<h2>Side Events &amp; Schedule</h2>');
+    expect(body.indexOf('Saturday 14 November')).toBeLessThan(body.indexOf('Sunday 15 November'));
+    expect(body).toContain('<strong>Classic Constructed</strong> — 9:00 AM · $120.00 entry');
+    expect(body).toContain('<a href="https://example.com/reg" rel="nofollow noopener">Register</a>');
+    expect(body).toContain('224 player cap');
+    expect(body).toContain('<h2>Prizes</h2><p>Total prize pool: $5,000 USD</p>');
+    expect(body).toContain('<strong>1st Place</strong>: $1,500 USD');
+    expect(body).toContain('<img src="https://cdn.test/blossom.jpg" alt="1st Place prize card 1 — The Calling" loading="lazy" />');
+    expect(body).not.toContain('javascript:');
+    expect(body).toContain('"subEvent":[');
+    expect(body).toContain('"startDate":"2026-11-14T09:00:00+10:00"');
+  });
+
   it('renders a single untitled album without an album heading', async () => {
     state.result = { data: {
       id: UUID, slug: 'one-album', title: 'One Album', status: 'approved',
