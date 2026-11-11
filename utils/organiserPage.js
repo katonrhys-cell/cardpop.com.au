@@ -3,7 +3,26 @@
 // until it lands, readers fall back to BASE_ORGANISER_COLUMNS.
 
 export const BASE_ORGANISER_COLUMNS = 'id, name, slug, logo_url';
-export const ORGANISER_PAGE_COLUMNS = `${BASE_ORGANISER_COLUMNS}, owner_id, description, website_url, instagram_url, facebook_url, youtube_url`;
+export const ORGANISER_PROFILE_COLUMNS = `${BASE_ORGANISER_COLUMNS}, owner_id, description, website_url, instagram_url, facebook_url, youtube_url`;
+// extra_logo_urls ships in 20261111050000_organiser_extra_logos.sql; readers try
+// this set first and fall back to ORGANISER_PROFILE_COLUMNS, then BASE.
+export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_PROFILE_COLUMNS}, extra_logo_urls`;
+
+// A joint organiser: the primary logo plus up to this many more.
+export const MAX_EXTRA_LOGOS = 5;
+
+/** Every logo on the page, primary first — http(s) only, de-duplicated. */
+export function organiserLogos(org) {
+  const seen = new Set();
+  const out = [];
+  for (const raw of [org?.logo_url, ...(Array.isArray(org?.extra_logo_urls) ? org.extra_logo_urls : [])]) {
+    const url = typeof raw === 'string' ? raw.trim() : '';
+    if (!/^https?:\/\//i.test(url) || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+  }
+  return out.slice(0, MAX_EXTRA_LOGOS + 1);
+}
 
 const LINK_FIELDS = [
   ['website_url', 'Website'],
