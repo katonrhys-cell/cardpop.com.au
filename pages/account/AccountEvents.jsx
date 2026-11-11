@@ -4,6 +4,8 @@ import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeChe
 import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
+import OrganiserAccessCard from '@/components/events/OrganiserAccessCard.jsx';
+import { useOrganiserAccess } from '@/hooks/useOrganiserAccess.js';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
@@ -43,6 +45,7 @@ const AccountEvents = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [isVerifiedOrganiser, setIsVerifiedOrganiser] = useState(false);
+  const organiserAccess = useOrganiserAccess(currentUser?.id);
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
   const [featureEvent, setFeatureEvent] = useState(null);
@@ -279,6 +282,8 @@ const AccountEvents = () => {
         </Button>
       }
     >
+
+      <OrganiserAccessCard access={organiserAccess} />
 
       <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl text-sm text-muted-foreground">
         <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />

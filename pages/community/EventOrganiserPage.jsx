@@ -1,12 +1,15 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, History, ArrowLeft, Users } from 'lucide-react';
+import { CalendarDays, History, ArrowLeft, Users, Pencil, ExternalLink } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import EventCard from '@/components/EventCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import OrganiserPageEditor from '@/components/events/OrganiserPageEditor.jsx';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, canEditOrganiserPage } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -48,17 +51,20 @@ export default function EventOrganiserPage() {
   const [org, setOrg] = useState(null);
   const [events, setEvents] = useState([]);
   const [status, setStatus] = useState('loading'); // loading | ready | missing | error
+  const { currentUser, isAdmin } = useAuth();
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setStatus('loading');
       try {
-        const { data: found, error: orgError } = await supabase
-          .from('event_organisers')
-          .select('id, name, slug, logo_url')
-          .eq('slug', slug)
-          .maybeSingle();
+        const readOrganiser = (columns) => supabase
+          .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
+        let { data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
+        // The profile columns ship in a migration; fall back to the original
+        // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(BASE_ORGANISER_COLUMNS));
         if (orgError) throw orgError;
         if (!found) { if (!cancelled) setStatus('missing'); return; }
 
@@ -106,6 +112,8 @@ export default function EventOrganiserPage() {
   }
 
   const name = org?.name ?? '';
+  const links = organiserLinks(org);
+  const canEdit = canEditOrganiserPage(org, currentUser?.id, isAdmin);
   const total = upcoming.length + past.length;
   const description = name
     ? `Card shows and trading card events hosted by ${name}: ${upcoming.length} upcoming and ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop.`
@@ -116,7 +124,7 @@ export default function EventOrganiserPage() {
       {status === 'ready' && (
         <SEOHead
           title={`${name} — Card Shows & Events | CardPop`}
-          description={description}
+          description={org.description ? `${org.description.replace(/\s+/g, ' ').slice(0, 155)}` : description}
           canonicalUrl={`${SITE_URL}${organiserPath(org)}`}
           ogImage={safeLogoUrl(org.logo_url) && !isVideoLogoUrl(org.logo_url) ? publicImageUrl(org.logo_url) : undefined}
           noindex={total === 0}
@@ -144,6 +152,25 @@ export default function EventOrganiserPage() {
                     ? 'No public events listed yet.'
                     : `${upcoming.length} upcoming · ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop`}
                 </p>
+                {org.description && (
+                  <p className="text-sm md:text-base text-foreground/80 mt-4 max-w-2xl whitespace-pre-line">{org.description}</p>
+                )}
+                {(links.length > 0 || canEdit) && (
+                  <div className="flex flex-wrap items-center gap-2 mt-4">
+                    {links.map(({ key, label, url }) => (
+                      <Button key={key} asChild variant="outline" size="sm" className="rounded-full gap-1.5">
+                        <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc">
+                          {label} <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                        </a>
+                      </Button>
+                    ))}
+                    {canEdit && (
+                      <Button size="sm" className="rounded-full gap-1.5 font-bold" onClick={() => setEditing(true)}>
+                        <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit page
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -183,6 +210,10 @@ export default function EventOrganiserPage() {
           </>
         )}
       </div>
+
+      {canEdit && editing && (
+        <OrganiserPageEditor org={org} open={editing} onOpenChange={setEditing} onSaved={(next) => setOrg((o) => ({ ...o, ...next }))} />
+      )}
     </div>
   );
 }

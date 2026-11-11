@@ -5,7 +5,7 @@ import {
   Tag, CheckCircle2, XCircle, RefreshCw, MessageSquare, UserPlus,
   Star, ShieldCheck, ShieldAlert, Shield, Settings, Check, CalendarClock,
   ShoppingBag, UserCheck, ArrowRightLeft, Store, Handshake, Flag, Undo2,
-  CalendarCheck, CalendarX, CalendarCog, CalendarPlus, FilePen,
+  CalendarCheck, CalendarX, CalendarCog, CalendarPlus, FilePen, Megaphone, BadgeCheck,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,9 @@ const TYPE_CONFIG = {
   // Admin review queues (src/services/adminReviewAlerts.js)
   store_submitted:          { icon: Store,         color: 'text-primary' },
   partner_application:      { icon: Handshake,     color: 'text-primary' },
+  organiser_request:        { icon: Megaphone,     color: 'text-primary' },
+  organiser_approved:       { icon: BadgeCheck,    color: 'text-emerald-500' },
+  organiser_rejected:       { icon: XCircle,       color: 'text-red-500' },
   report_escalation:        { icon: Flag,          color: 'text-red-500' },
   refund_requested:         { icon: Undo2,         color: 'text-amber-500' },
   product_review_pending:   { icon: Star,          color: 'text-amber-500' },

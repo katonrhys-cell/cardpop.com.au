@@ -17,6 +17,7 @@ import gradeEstimatorRouter from './grade-estimator.js';
 import eventScraperRouter from './event-scraper.js';
 import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
+import organiserRequestsRouter from './organiser-requests.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
@@ -109,6 +110,10 @@ export default () => {
     // Event submission notifications (admin heads-up on user-submitted events)
     router.use('/events', apiLimiter);
     router.use('/events', eventsRouter);
+
+    // Event organiser access: member requests + admin confirmation — docs/event-organiser-access.md
+    router.use('/organiser-requests', apiLimiter);
+    router.use('/organiser-requests', organiserRequestsRouter);
     
     // Auth routes with endpoint-specific rate limiting
     router.use('/auth/login', loginLimiter);
