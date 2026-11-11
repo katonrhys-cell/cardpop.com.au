@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, ChevronsUpDown, ExternalLink, UserRound, X } from 'lucide-react';
+import { Check, ChevronsUpDown, ExternalLink, UserPlus, UserRound, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import PlayerRequestDialog from '@/components/PlayerRequestDialog.jsx';
 import usePlayers from '@/hooks/usePlayers.js';
 import { matchPlayers, playerInitials, playerPath, playerSubtitle } from '@/utils/players.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
@@ -33,13 +34,21 @@ export const PlayerAvatar = ({ player, className = 'h-9 w-9' }) => {
  * so a half-finished listing is never abandoned. `onSelect(player | null)`
  * receives the whole row so the form can, for example, default the card name.
  */
-const PlayerPicker = ({ value, onSelect, disabled = false, className = '', id = 'player' }) => {
+const PlayerPicker = ({ value, onSelect, disabled = false, className = '', id = 'player', sport = '' }) => {
   const { players, loading, error } = usePlayers();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [requesting, setRequesting] = useState(false);
+  const [requestName, setRequestName] = useState('');
 
   const selected = useMemo(() => players.find((p) => p.id === value) || null, [players, value]);
   const results = useMemo(() => matchPlayers(players, query, 12), [players, query]);
+
+  const openRequest = () => {
+    setRequestName(query.trim());
+    setOpen(false);
+    setRequesting(true);
+  };
 
   const choose = (player) => {
     onSelect?.(player);
@@ -92,7 +101,7 @@ const PlayerPicker = ({ value, onSelect, disabled = false, className = '', id = 
             <CommandList>
               <CommandEmpty>
                 <span className="block px-2 text-sm text-muted-foreground">
-                  No player found. Only the most collected athletes have pages so far — leave this blank and the card name still carries the player.
+                  No player found. Not every athlete has a page yet.
                 </span>
               </CommandEmpty>
               <CommandGroup heading={query ? 'Matches' : 'Most collected'}>
@@ -113,6 +122,18 @@ const PlayerPicker = ({ value, onSelect, disabled = false, className = '', id = 
                 ))}
               </CommandGroup>
             </CommandList>
+            <div className="border-t border-border p-2">
+              <button
+                type="button"
+                onClick={openRequest}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm font-medium text-primary hover:bg-muted"
+              >
+                <UserPlus className="h-4 w-4 shrink-0" />
+                <span className="min-w-0 truncate">
+                  {query.trim() ? `Can’t find “${query.trim()}”? Ask us to add them` : 'Can’t find them? Ask us to add a player'}
+                </span>
+              </button>
+            </div>
           </Command>
         </PopoverContent>
       </Popover>
@@ -143,6 +164,8 @@ const PlayerPicker = ({ value, onSelect, disabled = false, className = '', id = 
           </button>
         </div>
       )}
+
+      <PlayerRequestDialog open={requesting} onOpenChange={setRequesting} initialName={requestName} initialSport={sport} />
     </div>
   );
 };

@@ -2403,6 +2403,7 @@ const AddEditCardPage = () => {
                       </Label>
                       <PlayerPicker
                         id="player"
+                        sport={SPORTS_COLLECTIONS.includes(formData.collection) ? formData.collection : ''}
                         value={playerId}
                         onSelect={(p) => {
                           formDirtyRef.current = true;
