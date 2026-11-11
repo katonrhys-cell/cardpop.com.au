@@ -9,6 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
+import RedditIcon from '@/components/RedditIcon.jsx';
+import RedditLatestPosts from '@/components/community/RedditLatestPosts.jsx';
+import { REDDIT_SUBREDDIT_URL } from '@/utils/redditLinks.js';
 import { MessageSquare, Search, TrendingUp, Clock, Plus, Flame, Pin } from 'lucide-react';
 
 const CATEGORIES = ['All', 'General', 'Trading', 'Grading', 'Market Talk', 'Buying Advice', 'Show & Tell', 'Events'];
@@ -110,10 +113,19 @@ const ForumPage = () => {
               </Button>
             </div>
           )}
+          <div className="mt-4">
+            <Button asChild variant="outline" className="rounded-xl font-bold gap-2">
+              <a href={REDDIT_SUBREDDIT_URL} target="_blank" rel="noopener noreferrer">
+                <RedditIcon className="w-4 h-4 text-[#FF4500]" /> Join us on Reddit
+              </a>
+            </Button>
+          </div>
         </div>
       </section>
 
       <div className="container-default py-10">
+
+        <RedditLatestPosts />
 
         {/* Search + filter bar */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">

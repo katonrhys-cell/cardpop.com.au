@@ -6,6 +6,7 @@ import { queryHomepageBundle, bundleHasErrors, queryTickerRows, queryShowcaseRow
 import { SHOP_FACET_COLUMNS } from '../../utils/shopColumns.js';
 import { PUBLIC_SHOP_STATUSES } from '../../utils/shopStock.js';
 import { loadPublicSettings } from './settings.js';
+import { fetchSubredditPosts } from '../utils/redditFeed.js';
 import { priceWidgetSvg, priceWidgetFallbackSvg, PRICE_WIDGET_DAYS } from '../../utils/priceWidget.js';
 
 // Edge-cached public reads.
@@ -167,6 +168,18 @@ router.get('/settings', async (req, res) => {
     uncacheable(res);
     return res.json(error instanceof PartialResult ? error.payload : (await loadPublicSettings()).settings);
   }
+});
+
+/**
+ * GET /public/reddit — the newest posts in CardPop's subreddit, for the forum
+ * page. Reddit can refuse server traffic; that case is an empty list (cached
+ * like any other answer so a blocked upstream is retried once a minute, not
+ * once per visitor) and the page hides the block.
+ */
+router.get('/reddit', async (req, res) => {
+  const posts = await publicReadCache.get('reddit', () => fetchSubredditPosts());
+  edgeCacheable(res);
+  return res.json({ posts });
 });
 
 // ── Embeddable price widget ────────────────────────────────────────────────
