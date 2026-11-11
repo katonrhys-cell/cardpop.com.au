@@ -9,7 +9,7 @@ const ID = '11111111-1111-4111-8111-111111111111';
 const human = { userAgent: 'Mozilla/5.0 (iPhone) Safari', webdriver: false };
 const memory = () => {
   const m = new Map();
-  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v) };
+  return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) };
 };
 const NOW = new Date('2026-11-11T02:00:00Z');
 
@@ -38,10 +38,20 @@ describe('recordEventView', () => {
     expect(rpc).not.toHaveBeenCalled();
   });
 
-  it('never throws, even if the call fails or storage is blocked', async () => {
-    rpc.mockRejectedValueOnce(new Error('offline'));
+  it('never throws when storage is blocked, and still counts the view', async () => {
     const blocked = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } };
-    await expect(recordEventView(ID, { storage: blocked, nav: human, now: NOW })).resolves.toBe(false);
+    await expect(recordEventView(ID, { storage: blocked, nav: human, now: NOW })).resolves.toBe(true);
+  });
+
+  it('does not use up the day’s slot when the send fails — the next visit retries', async () => {
+    const storage = memory();
+    rpc.mockResolvedValueOnce({ error: { message: 'down' } });
+    expect(await recordEventView(ID, { storage, nav: human, now: NOW })).toBe(false);
+    rpc.mockImplementationOnce(() => { throw new Error('network'); });
+    expect(await recordEventView(ID, { storage, nav: human, now: NOW })).toBe(false);
+    expect(await recordEventView(ID, { storage, nav: human, now: NOW })).toBe(true);   // third try succeeds
+    expect(await recordEventView(ID, { storage, nav: human, now: NOW })).toBe(false);  // and is then deduped
+    expect(rpc).toHaveBeenCalledTimes(3);
   });
 });
 

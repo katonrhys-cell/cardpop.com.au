@@ -20,7 +20,7 @@ vi.mock('../../src/utils/searchConsoleClient.js', () => ({
 }));
 
 import eventsRouter from '../../src/routes/events.js';
-import { searchWindow, eventPageUrl } from '../../src/services/eventSearchPerformance.js';
+import { searchWindow, eventPageUrl, getEventSearchPerformance, clearEventSearchCache } from '../../src/services/eventSearchPerformance.js';
 
 const app = express();
 app.use(express.json());
@@ -97,5 +97,39 @@ describe('window + url helpers', () => {
   });
   it('falls back to the id when an event has no slug', () => {
     expect(eventPageUrl({ id: ID })).toBe(`https://cardpop.com.au/events/${ID}`);
+  });
+});
+
+describe('caching', () => {
+  const ev = { id: ID, slug: 'oz-comic-con-2027' };
+  const NOW = new Date('2026-11-11T10:00:00Z');
+
+  it('asks Search Console once per page per window, not on every open', async () => {
+    process.env.EVENT_SEARCH_CACHE_TTL_MS = '60000';
+    clearEventSearchCache();
+    mockRun.mockResolvedValue({ rows: [{ keys: [], clicks: 1, impressions: 10, ctr: 0.1, position: 2 }] });
+    try {
+      await getEventSearchPerformance(ev, NOW);
+      await getEventSearchPerformance(ev, NOW);
+      expect(mockRun).toHaveBeenCalledTimes(2);                       // totals + queries, once
+      await getEventSearchPerformance({ id: 'other', slug: 'another-show' }, NOW);
+      expect(mockRun).toHaveBeenCalledTimes(4);                       // a different page is its own entry
+    } finally {
+      process.env.EVENT_SEARCH_CACHE_TTL_MS = '0';
+      clearEventSearchCache();
+    }
+  });
+
+  it('does not cache a failure', async () => {
+    process.env.EVENT_SEARCH_CACHE_TTL_MS = '60000';
+    clearEventSearchCache();
+    mockRun.mockRejectedValueOnce(new Error('google down')).mockResolvedValue({ rows: [] });
+    try {
+      await expect(getEventSearchPerformance(ev, NOW)).rejects.toThrow('google down');
+      await expect(getEventSearchPerformance(ev, NOW)).resolves.toMatchObject({ impressions: 0 });
+    } finally {
+      process.env.EVENT_SEARCH_CACHE_TTL_MS = '0';
+      clearEventSearchCache();
+    }
   });
 });
