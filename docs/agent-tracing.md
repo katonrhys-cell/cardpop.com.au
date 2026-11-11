@@ -56,9 +56,17 @@ calls.
   `gen_ai.*` root span at `SENTRY_AI_TRACES_SAMPLE_RATE` (default 1). If the
   request span an AI call runs under isn't sampled, the agent span starts its
   own trace so it isn't dropped along with that span.
-- **Serverless flush.** On Vercel, `traceAiAgent` awaits `Sentry.flush(2000)`
-  after a root agent span ends. Otherwise the instance can be frozen with the
-  transaction still in its queue. The VPS process skips the flush.
+- **Serverless flush.** On Vercel, when a root agent span ends,
+  `flushAfterResponse()` hands `Sentry.flush(2000)` to the platform's
+  `waitUntil` (the request-context hook that `@vercel/functions` wraps). The
+  flush then runs after the response, so a member never waits on Sentry's
+  ingest, and the instance isn't frozen with the transaction still queued. The
+  VPS process skips it because its transport sends on its own.
+- **One root per event-scan model call.** An event-scan run is deliberately
+  *not* one transaction. A run can extract dozens of pages, and nesting them
+  all would push a single transaction past Sentry's size limit, which would
+  drop the whole run. The run's calls share one conversation
+  (`event-scan-<run id>`) instead, which groups them in the Conversations view.
 
 ## Privacy
 
@@ -72,6 +80,12 @@ calls.
   and cost, set `SENTRY_AI_RECORD_CONTENT=false`; that takes effect on the next
   deploy.
 - Nothing is sent from the test suite (`enabled: !process.env.VITEST`).
+- **No `dataCollection` in `Sentry.init`.** In SDK 10.x, passing any
+  `dataCollection` object makes every field it leaves out default to full
+  collection (user info, cookies, all headers, request and response bodies).
+  That silently overrides `sendDefaultPii: false`. Content recording for these
+  spans is decided in `aiTracing.js` instead. `tests/backend/instrument.test.js`
+  checks this.
 
 ## Configuration
 

@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { CardDescriptionPrompt } from '../constants/prompts.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { recordAiUsage } from '../utils/aiUsage.js';
-import { withAiConversation, traceAiAgent, traceChat, recordChatResponse } from '../utils/aiTracing.js';
+import { withAiConversation, traceAiAgent, traceChat, recordChatResponse, markAgentFailed } from '../utils/aiTracing.js';
 import { requireAiAllowance } from '../middleware/aiAllowance.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import logger from '../utils/logger.js';
@@ -94,7 +94,7 @@ router.post('/generate', integratedAiRateLimit, requireAuth, requireAiAllowance(
 		// Sentry agent tracing: one agent run with one model call, tagged with
 		// the member (id only). Resolves with the parsed reply or the failed
 		// response, so the status handling below is unchanged.
-		const { apiRes, data } = await withAiConversation({ userId: req.userId }, () => traceAiAgent('Listing description writer', () => traceChat(
+		const { apiRes, data } = await withAiConversation({ userId: req.userId }, () => traceAiAgent('Listing description writer', (agentSpan) => traceChat(
 			{ model: DESCRIPTION_MODEL, system: CardDescriptionPrompt, messages, maxTokens: 512 },
 			async (span) => {
 				const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -115,8 +115,8 @@ router.post('/generate', integratedAiRateLimit, requireAuth, requireAiAllowance(
 					signal: AbortSignal.timeout(DESCRIPTION_TIMEOUT),
 				});
 				if (!response.ok) {
-					span.setStatus({ code: 2, message: `http_${response.status}` });
-					span.setAttribute('error.type', `http_${response.status}`);
+					markAgentFailed(span, `http_${response.status}`);
+					markAgentFailed(agentSpan, `http_${response.status}`);
 					return { apiRes: response, data: null };
 				}
 				const body = await response.json();

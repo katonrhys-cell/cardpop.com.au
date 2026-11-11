@@ -12,7 +12,7 @@
  */
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
-import { aiTracesSampler, AI_RECORD_CONTENT } from './utils/aiTracing.js';
+import { aiTracesSampler } from './utils/aiTracing.js';
 
 // The cardpop-australia-yr/javascript-react project. SENTRY_DSN overrides it.
 export const DEFAULT_SENTRY_DSN = 'https://fe32f5ea5d8c9f4196ec601fae47e046@o4511766283026432.ingest.us.sentry.io/4511767250141184';
@@ -41,27 +41,37 @@ function scrubRequest(event) {
 
 export function scrubSentryEvent(event) {
 	scrubRequest(event);
-	const scrub = (obj, depth = 0) => {
-		if (!obj || typeof obj !== 'object' || depth > 6) return;
-		for (const k of Object.keys(obj)) {
-			if (SENSITIVE_KEY.test(k)) obj[k] = '[Filtered]';
-			else scrub(obj[k], depth + 1);
-		}
-	};
-	scrub(event?.extra);
-	scrub(event?.contexts);
+	scrubKeys(event?.extra);
+	scrubKeys(event?.contexts);
 	if (event?.user) event.user = event.user.id ? { id: event.user.id } : undefined;
 	return event;
 }
 
+const scrubKeys = (obj, depth = 0) => {
+	if (!obj || typeof obj !== 'object' || depth > 6) return;
+	for (const k of Object.keys(obj)) {
+		if (SENSITIVE_KEY.test(k)) obj[k] = '[Filtered]';
+		else scrubKeys(obj[k], depth + 1);
+	}
+};
+
 /**
- * Transactions (the agent-tracing spans) get the request scrub and the
- * id-only user, but not the key scrub: span data is `gen_ai.usage.*_tokens`
- * and friends, which the key pattern would blank. What a span carries is
- * decided where it is built (src/utils/aiTracing.js — photos never leave).
+ * Transactions (the agent-tracing spans) get the same request scrub, id-only
+ * user and key scrub as errors, except on `contexts.trace`: that is the root
+ * span's own data (`gen_ai.usage.*_tokens` and friends), which the key
+ * pattern would blank, and what it carries is decided where it is built
+ * (src/utils/aiTracing.js — photos never leave).
  */
 export function scrubSentryTransaction(event) {
 	scrubRequest(event);
+	scrubKeys(event?.extra);
+	if (event?.contexts) {
+		for (const [name, ctx] of Object.entries(event.contexts)) {
+			if (name === 'trace') continue;
+			if (SENSITIVE_KEY.test(name)) event.contexts[name] = '[Filtered]';
+			else scrubKeys(ctx);
+		}
+	}
 	if (event?.user) event.user = event.user.id ? { id: event.user.id } : undefined;
 	return event;
 }
@@ -84,17 +94,20 @@ if (!Sentry.getClient()) {
 		// keeps at SENTRY_AI_TRACES_SAMPLE_RATE (default 1). That is a handful of
 		// spans per scan/estimate/nightly job, not per request.
 		tracesSampler: aiTracesSampler,
-		// Agent tracing records prompts and replies (never photos) so the
-		// Conversations view can replay them. SENTRY_AI_RECORD_CONTENT=false
-		// keeps tokens, latency and cost only.
-		dataCollection: { genAI: { inputs: AI_RECORD_CONTENT, outputs: AI_RECORD_CONTENT } },
+		// No `dataCollection` here, deliberately: passing ANY dataCollection
+		// object makes the SDK take its full defaults for every field it leaves
+		// out (user info, cookies, all headers, request/response bodies), which
+		// silently overrides `sendDefaultPii: false` below. Whether the agent
+		// spans carry prompts and replies is decided in src/utils/aiTracing.js
+		// (SENTRY_AI_RECORD_CONTENT), which builds those spans itself.
 		environment: process.env.NODE_ENV || 'production',
 		sendDefaultPii: false,
 		integrations: (defaults) => [
-			// The Anthropic clients are wrapped explicitly where they are built
-			// (instrumentAnthropic()), which works whether or not the module hook
-			// caught the SDK's dynamic import — so the auto integration would only
-			// double every span.
+			// Every Claude call is traced by hand through src/utils/aiTracing.js
+			// (traceMessagesCreate for SDK calls, traceChat for direct requests),
+			// so the auto integration — when its module hook catches the SDK's
+			// dynamic import at all — would only double every span. A new Claude
+			// call must go through those helpers or it is not traced.
 			...defaults.filter((i) => i.name !== 'Anthropic_AI' && i.name !== 'RequestData'),
 			Sentry.requestDataIntegration({
 				include: { cookies: false, data: false, headers: false, ip: false, query_string: true, url: true, user: false },

@@ -185,9 +185,13 @@ const isSampled = (span) => Boolean(span && (span.spanContext().traceFlags & 1) 
  * a sampled caller span; otherwise starts its own trace, so the unsampled
  * request span a route runs under (request tracing is off) can't drop it.
  *
+ * `fn` receives the agent span, so a caller that turns a failed model call
+ * into an ordinary return value can still mark the run failed
+ * (markAgentFailed).
+ *
  * @template T
  * @param {string} agent - human name shown in Sentry, e.g. 'Card identifier'
- * @param {() => Promise<T>} fn
+ * @param {(span: import('@sentry/node').Span) => Promise<T>} fn
  * @returns {Promise<T>}
  */
 export async function traceAiAgent(agent, fn) {
@@ -197,11 +201,34 @@ export async function traceAiAgent(agent, fn) {
 	try {
 		return await startAgentSpan(agent, nest, fn);
 	} finally {
-		// A serverless instance can be frozen as soon as the response ends, which
-		// would strand the queued transaction. A few hundred ms against a call
-		// that takes seconds; skipped on the long-lived VPS process.
-		if (process.env.VERCEL) await Sentry.flush(2000).catch(() => {});
+		flushAfterResponse();
 	}
+}
+
+/** Marks an agent span failed without throwing (e.g. the model answered 429). */
+export function markAgentFailed(span, errorType) {
+	try {
+		span?.setStatus?.({ code: 2, message: String(errorType) });
+		span?.setAttribute?.('error.type', String(errorType));
+	} catch { /* tracing must never fail the call */ }
+}
+
+const VERCEL_REQUEST_CONTEXT = Symbol.for('@vercel/request-context');
+
+/**
+ * A serverless instance can be frozen as soon as the response ends, which
+ * would strand the queued transaction. On Vercel the flush is handed to the
+ * platform's waitUntil (the hook @vercel/functions wraps), so it runs after
+ * the member has their answer instead of delaying it. Elsewhere — the
+ * long-lived VPS process, tests — the transport sends on its own and nothing
+ * waits.
+ */
+export function flushAfterResponse() {
+	if (!process.env.VERCEL) return;
+	const flushing = Sentry.flush(2000).catch(() => false);
+	try {
+		globalThis[VERCEL_REQUEST_CONTEXT]?.get?.()?.waitUntil?.(flushing);
+	} catch { /* no request context: the flush still runs, unawaited */ }
 }
 
 function startAgentSpan(agent, nest, fn) {
@@ -216,7 +243,7 @@ function startAgentSpan(agent, nest, fn) {
 			'gen_ai.provider.name': 'anthropic',
 			'gen_ai.system': 'anthropic',
 		},
-	}, () => fn());
+	}, (span) => fn(span));
 }
 
 /**
@@ -248,6 +275,17 @@ export function traceChat(request, fn) {
 }
 
 /**
+ * Sets the conversation id for the rest of the current isolation scope — for
+ * a job that only learns its id part-way (an event-scan run row). Call it
+ * inside withAiConversation() so it can't outlive the job.
+ *
+ * @param {string|null} conversationId
+ */
+export function setAiConversationId(conversationId) {
+	if (conversationId) Sentry.setConversationId(String(conversationId));
+}
+
+/**
  * Groups the AI work done inside `fn` into one Sentry conversation and names
  * the member it was for. Forks the isolation scope so neither leaks into the
  * rest of the request or the next job.
@@ -257,15 +295,6 @@ export function traceChat(request, fn) {
  * @param {() => Promise<T>} fn
  * @returns {Promise<T>}
  */
-/**
- * Sets the conversation id for the rest of the current isolation scope — for
- * a job that only learns its id part-way (an event-scan run row). Call it
- * inside withAiConversation() so it can't outlive the job.
- */
-export function setAiConversationId(conversationId) {
-	if (conversationId) Sentry.setConversationId(String(conversationId));
-}
-
 export function withAiConversation({ conversationId = null, userId = null } = {}, fn) {
 	return Sentry.withIsolationScope(() => {
 		if (conversationId) Sentry.setConversationId(String(conversationId));

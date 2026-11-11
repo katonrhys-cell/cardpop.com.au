@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import * as Sentry from '@sentry/node';
 import {
   aiTracesSampler,
@@ -12,6 +12,8 @@ import {
   recordChatResponse,
   withAiConversation,
   setAiConversationId,
+  markAgentFailed,
+  flushAfterResponse,
   PHOTO_PLACEHOLDER,
   MAX_RECORDED_CHARS,
 } from '../../src/utils/aiTracing.js';
@@ -172,4 +174,38 @@ describe('spans sent to Sentry', () => {
     expect(sent[0].contexts.trace.data['gen_ai.conversation.id']).toBe('event-scan-42');
     expect(sent[1].contexts.trace.data['gen_ai.conversation.id']).toBeUndefined();
   });
+
+  it('marks the agent run failed when a caller turns an API error into a return value', async () => {
+    await traceAiAgent('Listing description writer', (agentSpan) => traceChat({ model: 'claude-haiku-5-5', messages: [] }, async (span) => {
+      markAgentFailed(span, 'http_529');
+      markAgentFailed(agentSpan, 'http_529');
+      return { data: null };
+    }));
+    await Sentry.flush(1000);
+    expect(sent[0].contexts.trace.status).not.toBe('ok');
+    expect(sent[0].contexts.trace.data['error.type']).toBe('http_529');
+  });
 });
+
+describe('flushAfterResponse', () => {
+  const key = Symbol.for('@vercel/request-context');
+  afterAll(() => { vi.unstubAllEnvs(); delete globalThis[key]; });
+
+  it('hands the flush to Vercel waitUntil instead of making the request wait', () => {
+    vi.stubEnv('VERCEL', '1');
+    const waitUntil = vi.fn();
+    globalThis[key] = { get: () => ({ waitUntil }) };
+    expect(flushAfterResponse()).toBeUndefined();
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+    expect(typeof waitUntil.mock.calls[0][0].then).toBe('function');
+  });
+
+  it('does nothing off Vercel', () => {
+    vi.stubEnv('VERCEL', '');
+    const waitUntil = vi.fn();
+    globalThis[key] = { get: () => ({ waitUntil }) };
+    flushAfterResponse();
+    expect(waitUntil).not.toHaveBeenCalled();
+  });
+});
+
