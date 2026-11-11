@@ -130,12 +130,12 @@ with v(sku, title, description, price_aud, category, slug, family_sku, colour, c
 
   ('GGX10023ML',
    'Gamegenic Just Sleeves Board Game — Ruby – Mini European 50',
-   'Clear Gamegenic Just Sleeves for Mini European board game cards (size colour code ruby). 50 sleeves per pack, each 46 x 71 mm. Strong welded seams resist split corners and shuffling wear. Acid-free and PVC-free.',
+   'Clear Gamegenic Just Sleeves for Mini European board game cards (size colour code ruby). 50 sleeves per pack, each 46 x 71 mm, for cards up to 44 x 69 mm. Strong welded seams resist split corners and shuffling wear. Acid-free and PVC-free.',
    6.85, 'Penny Sleeves', 'gamegenic-just-sleeves-board-game-ruby-mini-european-50', 'GG-JS-BOARD-GAME', 'Ruby – Mini European 50', '#9B111E', null),
 
   (null,
    'Gamegenic Just Sleeves Board Game — Ruby – Mini European Value 150',
-   'A value pack of 150 clear Gamegenic Just Sleeves for Mini European board game cards (size colour code ruby), each 46 x 71 mm. Strong welded seams resist split corners and shuffling wear. Acid-free and PVC-free.',
+   'A value pack of 150 clear Gamegenic Just Sleeves for Mini European board game cards (size colour code ruby), each 46 x 71 mm, for cards up to 44 x 69 mm. A snug fit that keeps cards secure and looking as printed, with reinforced, smooth-shuffling sleeves and strong welded seams that guard against bent corners and surface scratches. Acid-free and PVC-free.',
    14.15, 'Penny Sleeves', 'gamegenic-just-sleeves-board-game-ruby-mini-european-value-150', 'GG-JS-BOARD-GAME', 'Ruby – Mini European Value 150', '#9B111E', null),
 
   ('GGX10021ML',
