@@ -58,6 +58,20 @@ approved as in `docs/event-submissions.md`.
 The page reads the new profile columns with a fallback to the original four
 (`BASE_ORGANISER_COLUMNS`), so the app is safe if it deploys before the migration.
 
+## What crawlers see
+
+The prerendered organiser page (`api/prerender.js` → `renderEventOrganiser`) mirrors
+the SPA, so a no-JS reader (and Google) gets what the owner wrote: an
+**About <name>** section, a **Follow <name>** list (http(s) links only, `rel="nofollow
+noopener ugc"` — they're member-supplied), `description` and `sameAs` on the
+Organization JSON-LD, and the organiser's own words as the meta description
+(`organiserMetaDescription()` in `utils/organiserPage.js`, shared with the SPA: whitespace
+collapsed, cut at a word boundary within 155 characters). With nothing written the
+generated summary is used unchanged. The sitemap needs no change: it already lists the
+page (gated on having public events) with the row's `updated_at`, which an owner's edit
+bumps, so `lastmod` follows their changes. If the profile columns aren't deployed yet
+the prerender falls back to the original four, like the SPA.
+
 ## Related: "verified organiser"
 
 `event_organiser_verifications` (Admin → an event → Organiser access) is a

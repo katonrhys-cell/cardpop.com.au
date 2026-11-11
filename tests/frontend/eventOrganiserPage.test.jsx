@@ -1,9 +1,10 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { vi, describe, it, expect } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 const db = vi.hoisted(() => ({ org: null, events: [], ilike: null }));
+const auth = vi.hoisted(() => ({ user: null, isAdmin: false }));
 vi.mock('@/lib/supabaseClient.js', () => {
   const builder = (table) => {
     const q = {
@@ -16,7 +17,8 @@ vi.mock('@/lib/supabaseClient.js', () => {
   };
   return { supabase: { from: builder } };
 });
-vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => ({ currentUser: null, isAdmin: false }) }));
+vi.mock('@/contexts/AuthContext.jsx', () => ({ useAuth: () => ({ currentUser: auth.user, isAdmin: auth.isAdmin }) }));
+vi.mock('@/components/events/OrganiserPageEditor.jsx', () => ({ default: () => <div role="dialog">editor</div> }));
 vi.mock('@/components/EventRsvp.jsx', () => ({ default: () => null }));
 vi.mock('@/components/SEOHead.jsx', () => ({ default: () => null }));
 
@@ -50,5 +52,48 @@ describe('EventOrganiserPage', () => {
     db.org = null;
     renderAt('/events/organisers/nobody');
     expect(await screen.findByText('Organiser not found')).toBeInTheDocument();
+  });
+});
+
+describe('EventOrganiserPage — profile and editing', () => {
+  const org = {
+    id: 'oz', name: 'Oz Comic-Con', slug: 'oz-comic-con', logo_url: null, owner_id: 'owner-1',
+    description: 'Australia’s biggest pop-culture show.',
+    website_url: 'https://ozcomiccon.com', instagram_url: 'https://instagram.com/ozcomiccon',
+    facebook_url: 'javascript:alert(1)', youtube_url: null,
+  };
+  beforeEach(() => { auth.user = null; auth.isAdmin = false; db.org = org; db.events = []; });
+
+  it('shows the description and only safe links', async () => {
+    renderAt('/events/organisers/oz-comic-con');
+    expect(await screen.findByText('Australia’s biggest pop-culture show.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Website/ })).toHaveAttribute('href', 'https://ozcomiccon.com');
+    expect(screen.getByRole('link', { name: /Instagram/ })).toHaveAttribute('rel', expect.stringContaining('nofollow'));
+    expect(screen.queryByRole('link', { name: /Facebook/ })).not.toBeInTheDocument();
+  });
+
+  it('offers Edit page to the owner and opens the editor', async () => {
+    auth.user = { id: 'owner-1' };
+    renderAt('/events/organisers/oz-comic-con');
+    fireEvent.click(await screen.findByRole('button', { name: /Edit page/ }));
+    expect(screen.getByRole('dialog')).toHaveTextContent('editor');
+  });
+
+  it('offers Edit page to an admin', async () => {
+    auth.user = { id: 'admin-1' };
+    auth.isAdmin = true;
+    renderAt('/events/organisers/oz-comic-con');
+    expect(await screen.findByRole('button', { name: /Edit page/ })).toBeInTheDocument();
+  });
+
+  it('does not offer Edit page to visitors or other members', async () => {
+    renderAt('/events/organisers/oz-comic-con');
+    await screen.findByText('Australia’s biggest pop-culture show.');
+    expect(screen.queryByRole('button', { name: /Edit page/ })).not.toBeInTheDocument();
+    auth.user = { id: 'someone-else' };
+    cleanup();
+    renderAt('/events/organisers/oz-comic-con');
+    await screen.findByText('Australia’s biggest pop-culture show.');
+    expect(screen.queryByRole('button', { name: /Edit page/ })).not.toBeInTheDocument();
   });
 });

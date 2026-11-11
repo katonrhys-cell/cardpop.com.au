@@ -19,6 +19,20 @@ export function organiserLinks(org) {
     .filter(({ url }) => typeof url === 'string' && /^https?:\/\/[^\s]+$/i.test(url));
 }
 
+/**
+ * The page's meta description: the organiser's own words (whitespace collapsed,
+ * cut to 155 characters at a word boundary) when they've written some, else
+ * `fallback`. One rule for the SPA (EventOrganiserPage) and the prerender.
+ */
+export function organiserMetaDescription(org, fallback = '') {
+  const text = String(org?.description ?? '').replace(/\s+/g, ' ').trim();
+  if (!text) return fallback;
+  if (text.length <= 155) return text;
+  const cut = text.slice(0, 155);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 100 ? cut.slice(0, space) : cut).replace(/[\s,;:.\-–—]+$/, '')}…`;
+}
+
 /** Can this viewer edit the page? Its owner, or an admin. */
 export function canEditOrganiserPage(org, userId, isAdmin) {
   if (!org) return false;
