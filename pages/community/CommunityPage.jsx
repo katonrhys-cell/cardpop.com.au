@@ -53,15 +53,15 @@ function EventThumb({ event, style }) {
         loading="lazy"
         decoding="async"
         onError={() => setSrc(src !== full ? full : null)}
-        className="w-11 h-11 rounded-xl object-cover shrink-0 bg-white/10 ring-2 ring-white/30 shadow-md"
+        className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-contain shrink-0 bg-white ring-2 ring-white/40 shadow-lg"
         data-testid="event-thumb"
       />
     );
   }
   if (!style) return null;
   return (
-    <span className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white/15 ring-2 ring-white/20 shrink-0 shadow-md backdrop-blur-sm">
-      <style.Icon className="w-5 h-5 text-white" />
+    <span className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/15 ring-2 ring-white/20 shrink-0 shadow-md backdrop-blur-sm">
+      <style.Icon className="w-7 h-7 sm:w-8 sm:h-8 text-white" />
     </span>
   );
 }
