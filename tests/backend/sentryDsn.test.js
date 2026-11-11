@@ -10,7 +10,7 @@ const dsnsIn = (file) => readFileSync(new URL(`../../${file}`, import.meta.url),
   .match(/https:\/\/[0-9a-f]{32}@o\d+\.ingest\.[a-z.]*sentry\.io\/\d+/g) || [];
 
 describe('Sentry DSNs', () => {
-  it.each(['main.jsx', 'src/app.js'])('%s falls back to a DSN in the current organisation', (file) => {
+  it.each(['main.jsx', 'src/instrument.js'])('%s falls back to a DSN in the current organisation', (file) => {
     const dsns = dsnsIn(file);
     expect(dsns.length).toBe(1);
     expect(dsns[0]).toContain(`@${SENTRY_ORG_ID}.`);

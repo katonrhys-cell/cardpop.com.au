@@ -1,3 +1,5 @@
+// Sentry (errors + agent tracing) before anything else — see src/instrument.js.
+import '../src/instrument.js';
 import crypto from 'node:crypto';
 import { runEventScan } from '../src/utils/eventScanner.js';
 import { runDueEventSourceScans, scanEventSource } from '../src/utils/eventSourceWatcher.js';

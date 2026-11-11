@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { CardDescriptionPrompt } from '../constants/prompts.js';
 import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js';
 import { recordAiUsage } from '../utils/aiUsage.js';
+import { withAiConversation, traceAiAgent, traceChat, recordChatResponse, markAgentFailed } from '../utils/aiTracing.js';
 import { requireAiAllowance } from '../middleware/aiAllowance.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import logger from '../utils/logger.js';
@@ -89,23 +90,40 @@ router.post('/generate', integratedAiRateLimit, requireAuth, requireAiAllowance(
 	const promptText = `Write the listing description for this trading card using only these details:\n\n${summary}`;
 
 	try {
-		const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'x-api-key': apiKey,
-				'anthropic-version': '2023-06-01',
+		const messages = [{ role: 'user', content: [{ type: 'text', text: promptText }] }];
+		// Sentry agent tracing: one agent run with one model call, tagged with
+		// the member (id only). Resolves with the parsed reply or the failed
+		// response, so the status handling below is unchanged.
+		const { apiRes, data } = await withAiConversation({ userId: req.userId }, () => traceAiAgent('Listing description writer', (agentSpan) => traceChat(
+			{ model: DESCRIPTION_MODEL, system: CardDescriptionPrompt, messages, maxTokens: 512 },
+			async (span) => {
+				const response = await fetch('https://api.anthropic.com/v1/messages', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-api-key': apiKey,
+						'anthropic-version': '2023-06-01',
+					},
+					body: JSON.stringify({
+						model: DESCRIPTION_MODEL,
+						max_tokens: 512,
+						thinking: { type: 'disabled' },
+						output_config: { effort: 'low' },
+						system: CardDescriptionPrompt,
+						messages,
+					}),
+					signal: AbortSignal.timeout(DESCRIPTION_TIMEOUT),
+				});
+				if (!response.ok) {
+					markAgentFailed(span, `http_${response.status}`);
+					markAgentFailed(agentSpan, `http_${response.status}`);
+					return { apiRes: response, data: null };
+				}
+				const body = await response.json();
+				recordChatResponse(span, body);
+				return { apiRes: response, data: body };
 			},
-			body: JSON.stringify({
-				model: DESCRIPTION_MODEL,
-				max_tokens: 512,
-				thinking: { type: 'disabled' },
-				output_config: { effort: 'low' },
-				system: CardDescriptionPrompt,
-				messages: [{ role: 'user', content: [{ type: 'text', text: promptText }] }],
-			}),
-			signal: AbortSignal.timeout(DESCRIPTION_TIMEOUT),
-		});
+		)));
 
 		if (!apiRes.ok) {
 			const errBody = await apiRes.text().catch(() => '');
@@ -124,7 +142,6 @@ router.post('/generate', integratedAiRateLimit, requireAuth, requireAiAllowance(
 			return res.status(502).json({ error: 'Could not generate a description right now. Please try again.' });
 		}
 
-		const data = await apiRes.json();
 		if (data.usage) await recordAiUsage({ feature: 'card_description', model: DESCRIPTION_MODEL, usage: data.usage, userId: req.userId });
 		const replyText = (Array.isArray(data.content) ? data.content : [])
 			.filter((block) => block?.type === 'text')

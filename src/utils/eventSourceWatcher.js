@@ -3,6 +3,7 @@ import supabase from './supabaseClient.js';
 import logger from './logger.js';
 import { fetchWebpageContent, extractTextFromHtml, isFetchableHttpUrl } from './safeFetch.js';
 import { extractEventFromPage } from './eventScanner.js';
+import { withAiConversation } from './aiTracing.js';
 
 // Weekly re-scan of the website an admin attached to an event.
 //
@@ -179,7 +180,12 @@ async function finishWatch(eventId, patch) {
  * Scan one event's source page now. `force` skips the unchanged-page shortcut —
  * used when an admin presses "Scan now" and wants a real answer.
  */
-export async function scanEventSource(eventId, { force = false } = {}) {
+export function scanEventSource(eventId, options) {
+  // Sentry: every re-scan of one event's page lands in one conversation.
+  return withAiConversation({ conversationId: `event-watch-${eventId}` }, () => scanEventSourceInScope(eventId, options));
+}
+
+async function scanEventSourceInScope(eventId, { force = false } = {}) {
   const watch = await claimWatch(eventId);
   if (!watch) {
     const { data: exists } = await supabase

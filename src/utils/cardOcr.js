@@ -9,6 +9,7 @@
 
 import { CardOCRPrompt } from '../constants/prompts.js';
 import { mapCollectionType } from '../../utils/ocrResult.js';
+import { traceAiAgent, traceChat, recordChatResponse } from './aiTracing.js';
 
 // Cheap model handles most scans; escalate to the stronger model only when the
 // cheap one left something out — keeps cost low while lifting accuracy on hard cards.
@@ -132,45 +133,49 @@ export function buildPromptText(imageCount) {
 }
 
 export async function requestOcr({ apiKey, model, system, promptText, imageBlocks, timeoutMs, onUsage }) {
-	const res = await fetch('https://api.anthropic.com/v1/messages', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			'x-api-key': apiKey,
-			'anthropic-version': '2023-06-01',
-		},
-		body: JSON.stringify({
-			model,
-			// Headroom over the ~15-field schema: `description` and `candidateSets`
-			// are open-ended, and a truncated reply reads as unparseable JSON —
-			// which costs a wasted escalation before failing.
-			max_tokens: 1500,
-			thinking: thinkingFor(model),
-			output_config: { effort: 'low' },
-			system,
-			messages: [{
-				role: 'user',
-				content: [
-					{ type: 'text', text: promptText },
-					...imageBlocks,
-				],
-			}],
-		}),
-		signal: AbortSignal.timeout(timeoutMs),
+	const messages = [{
+		role: 'user',
+		content: [
+			{ type: 'text', text: promptText },
+			...imageBlocks,
+		],
+	}];
+	return traceChat({ model, system, messages, maxTokens: 1500 }, async (span) => {
+		const res = await fetch('https://api.anthropic.com/v1/messages', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'x-api-key': apiKey,
+				'anthropic-version': '2023-06-01',
+			},
+			body: JSON.stringify({
+				model,
+				// Headroom over the ~15-field schema: `description` and `candidateSets`
+				// are open-ended, and a truncated reply reads as unparseable JSON —
+				// which costs a wasted escalation before failing.
+				max_tokens: 1500,
+				thinking: thinkingFor(model),
+				output_config: { effort: 'low' },
+				system,
+				messages,
+			}),
+			signal: AbortSignal.timeout(timeoutMs),
+		});
+
+		if (!res.ok) {
+			const errBody = await res.text().catch(() => '');
+			throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
+		}
+
+		const data = await res.json();
+		recordChatResponse(span, data);
+		// Billed whether or not the reply is usable, so report it first.
+		if (data.usage) await onUsage?.({ model, usage: data.usage });
+		if (data.stop_reason === 'refusal') {
+			throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
+		}
+		return textFromContent(data.content);
 	});
-
-	if (!res.ok) {
-		const errBody = await res.text().catch(() => '');
-		throw new Error(`Anthropic API error ${res.status}: ${errBody}`);
-	}
-
-	const data = await res.json();
-	// Billed whether or not the reply is usable, so report it first.
-	if (data.usage) await onUsage?.({ model, usage: data.usage });
-	if (data.stop_reason === 'refusal') {
-		throw new Error(`Anthropic API declined the request (${data.stop_details?.category || 'unknown'})`);
-	}
-	return textFromContent(data.content);
 }
 
 /**
@@ -186,7 +191,12 @@ export async function requestOcr({ apiKey, model, system, promptText, imageBlock
  * `onUsage({ model, usage, escalation })` is called after each billed call
  * (src/utils/aiUsage.js records it).
  */
-export async function runCardOcr({ apiKey, imageBlocks, log = () => {}, onUsage }) {
+export function runCardOcr(args) {
+	// One agent run in Sentry: the fast read and, when it happens, the escalation.
+	return traceAiAgent('Card identifier', () => runCardOcrPasses(args));
+}
+
+async function runCardOcrPasses({ apiKey, imageBlocks, log = () => {}, onUsage }) {
 	const ocrArgs = {
 		apiKey,
 		system: CardOCRPrompt,

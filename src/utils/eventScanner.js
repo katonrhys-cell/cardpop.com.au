@@ -2,6 +2,7 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
 import { recordAiUsage } from './aiUsage.js';
+import { traceMessagesCreate, withAiConversation, setAiConversationId } from './aiTracing.js';
 import { fetchWebpageContent, extractTextFromHtml, isFetchableHttpUrl } from './safeFetch.js';
 import { EventScraperPrompt } from '../constants/prompts.js';
 import {
@@ -253,7 +254,7 @@ async function markSourcesScanned(sourceIds) {
 export async function discoverCandidates(queries) {
   if (!queries.length) return [];
 
-  const message = await (await anthropic()).beta.messages.create({
+  const message = await traceMessagesCreate('Event discovery', {
     model: DISCOVERY_MODEL,
     max_tokens: 8000,
     // Event listings are unremarkable content, but a refusal returns 200 with
@@ -280,7 +281,7 @@ export async function discoverCandidates(queries) {
         content: `Today is ${todayIso()}. Search for each of these queries and find upcoming Australian trading card events:\n\n${queries.map((q, i) => `${i + 1}. ${q}`).join('\n')}`,
       },
     ],
-  });
+  }, async (params) => (await anthropic()).beta.messages.create(params));
   // Recorded before any check below: the call is billed either way.
   await recordAiUsage({ feature: 'event_discovery', model: message.model || DISCOVERY_MODEL, usage: message.usage });
 
@@ -376,7 +377,7 @@ async function updateCandidate(candidateId, patch) {
 
 /** Stage 2. Page text in, validated event draft out (or null if it isn't one). */
 export async function extractEventFromPage(pageText, sourceUrl) {
-  const message = await (await anthropic()).beta.messages.create({
+  const message = await traceMessagesCreate('Event extractor', {
     model: EXTRACTION_MODEL,
     max_tokens: 8000,
     betas: ['server-side-fallback-2026-07-01'],
@@ -406,7 +407,7 @@ Page content:
 ${pageText}`,
       },
     ],
-  });
+  }, async (params) => (await anthropic()).beta.messages.create(params));
   // Recorded before any check below: the call is billed either way.
   await recordAiUsage({ feature: 'event_extraction', model: message.model || EXTRACTION_MODEL, usage: message.usage });
 
@@ -507,7 +508,13 @@ async function insertDraft(eventData) {
  * it as `failed` and re-thrown, so a silent overnight failure is impossible to
  * miss in the admin panel.
  */
-export async function runEventScan({ trigger = 'cron', triggeredBy = null } = {}) {
+export function runEventScan(options) {
+  // Sentry: every model call in one run (the discovery search and each page
+  // extraction) is grouped as one conversation, keyed by the run row.
+  return withAiConversation({}, () => runEventScanInScope(options));
+}
+
+async function runEventScanInScope({ trigger = 'cron', triggeredBy = null } = {}) {
   const deadline = Date.now() + RUN_DEADLINE_MS;
   const warnings = [];
 
@@ -517,6 +524,7 @@ export async function runEventScan({ trigger = 'cron', triggeredBy = null } = {}
     .select('id')
     .single();
   if (runError) throw new Error(`Failed to open scan run: ${runError.message}`);
+  setAiConversationId(`event-scan-${run.id}`);
 
   const stats = {
     runId: run.id,

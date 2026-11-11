@@ -2,6 +2,7 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
 import { recordAiUsage } from './aiUsage.js';
+import { withAiConversation, traceAiAgent, traceChat, recordChatResponse } from './aiTracing.js';
 import { buildPriceContext, quotableFigures } from './blogPriceContext.js';
 import { checkDraft, BANNED_PHRASE_LIST } from './blogStyleGuard.js';
 
@@ -190,27 +191,34 @@ ${violations.map((v, i) => `${i + 1}. ${v}`).join('\n')}`);
 
 async function requestDraft(topic, priceContext, violations) {
   const client = await anthropic();
-  const stream = client.beta.messages.stream({
-    model: MODEL,
-    max_tokens: 32000,
-    // Blog copy will not trip the safety classifiers, but a refusal returns a
-    // 200 with empty content rather than an error, so the fallback keeps the
-    // cron from silently producing nothing.
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    thinking: { type: 'adaptive' },
-    output_config: {
-      effort: 'high',
-      format: { type: 'json_schema', schema: ARTICLE_SCHEMA },
-    },
-    // The ~13 KB house-style prompt is identical on every call; cache it so the
-    // style-guard retry a few seconds later (and any other draft within the
-    // five-minute window) reads it at a tenth of the price.
-    system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-    messages: [{ role: 'user', content: buildUserPrompt(topic, priceContext, violations) }],
+  // The ~13 KB house-style prompt is identical on every call; cache it so the
+  // style-guard retry a few seconds later (and any other draft within the
+  // five-minute window) reads it at a tenth of the price.
+  const system = [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }];
+  const messages = [{ role: 'user', content: buildUserPrompt(topic, priceContext, violations) }];
+  // Sentry agent tracing: a gen_ai.chat span per draft request (the SDK's own
+  // wrapper doesn't cover beta.messages.stream) — src/utils/aiTracing.js.
+  const message = await traceChat({ model: MODEL, system, messages, maxTokens: 32000, stream: true }, async (span) => {
+    const stream = client.beta.messages.stream({
+      model: MODEL,
+      max_tokens: 32000,
+      // Blog copy will not trip the safety classifiers, but a refusal returns a
+      // 200 with empty content rather than an error, so the fallback keeps the
+      // cron from silently producing nothing.
+      betas: ['server-side-fallback-2026-07-01'],
+      fallbacks: 'default',
+      thinking: { type: 'adaptive' },
+      output_config: {
+        effort: 'high',
+        format: { type: 'json_schema', schema: ARTICLE_SCHEMA },
+      },
+      system,
+      messages,
+    });
+    const final = await stream.finalMessage();
+    recordChatResponse(span, final);
+    return final;
   });
-
-  const message = await stream.finalMessage();
   await recordAiUsage({ feature: 'blog_draft', model: message.model || MODEL, usage: message.usage });
 
   if (message.stop_reason === 'refusal') {
@@ -253,23 +261,28 @@ export async function generateDraft(topic) {
   }
 
   const figures = quotableFigures(priceContext);
-  let violations = [];
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    const draft = await requestDraft(topic, priceContext, violations);
-    violations = checkDraft(draft, { figures });
+  // Sentry: one conversation per topic (a redraft, or a later night's retry of
+  // a deferred topic, lands in the same one), one agent run per draft.
+  return withAiConversation({ conversationId: `blog-topic-${topic.id}` }, () => traceAiAgent('Blog drafter', async () => {
+    let violations = [];
 
-    if (violations.length === 0) {
-      return { draft, priceContext, attempts: attempt };
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      const draft = await requestDraft(topic, priceContext, violations);
+      violations = checkDraft(draft, { figures });
+
+      if (violations.length === 0) {
+        return { draft, priceContext, attempts: attempt };
+      }
+      logger.warn(
+        `[BLOG_GEN] "${topic.slug}" attempt ${attempt} failed style checks: ${violations.join(' | ')}`,
+      );
     }
-    logger.warn(
-      `[BLOG_GEN] "${topic.slug}" attempt ${attempt} failed style checks: ${violations.join(' | ')}`,
-    );
-  }
 
-  const error = new Error(`Draft failed style checks after ${MAX_ATTEMPTS} attempts: ${violations.join(' | ')}`);
-  error.code = 'STYLE_REJECTED';
-  throw error;
+    const error = new Error(`Draft failed style checks after ${MAX_ATTEMPTS} attempts: ${violations.join(' | ')}`);
+    error.code = 'STYLE_REJECTED';
+    throw error;
+  }));
 }
 
 function clamp(value, max) {
