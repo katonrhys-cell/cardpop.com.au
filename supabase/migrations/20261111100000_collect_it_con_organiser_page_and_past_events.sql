@@ -21,7 +21,7 @@ values (
   || E'The shows started in Collingwood in late 2025, moved to Box Hill Town Hall for a sold-out run in May 2026, and the Trading Cards Edition lands in Glen Waverley in November 2026. Each one brings together local vendors, hobbyists and first-timers, with plenty of TCG, sports cards and one-off finds on the tables.\n\n'
   || E'Follow Collect-It Con for announcements on vendor tables, tickets and the next date, and check the events below for what is on now and what has already run.',
   'https://collectitcon.com.au',
-  'https://www.facebook.com/share/1Pi9wbtDMB/'
+  'https://www.facebook.com/collectitcon'
 )
 on conflict (lower(btrim(name))) do update set
   description  = coalesce(nullif(btrim(public.event_organisers.description), ''), excluded.description),
