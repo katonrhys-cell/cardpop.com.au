@@ -30,9 +30,23 @@ account → Link) is what makes them the owner who sees the numbers.
 | Migration | `supabase/migrations/20261111003031_event_page_views.sql` |
 | Recorder / reader | `lib/eventViews.js`, `hooks/useRecordEventView.js` (used by `pages/EventDetailPage.jsx` and `components/EventDetailModal.jsx`) |
 | Display | `pages/account/AccountEvents.jsx` |
-| Tests | `tests/frontend/eventViews.test.js`, `tests/db/run-event-views-migration.sh` |
+| Tests | `tests/frontend/eventViews.test.js`, `eventViewsChart.test.js`, `eventViewsDialog.test.jsx`, `accountEventsViews.test.jsx`, `tests/db/run-event-views-migration.sh` (both migrations) |
 
 Views counted before the migration reaches production are not backfilled.
+
+### Daily trend
+
+**See trend** (shown once an event has any views) opens a bar chart of views per day for
+the last 30 days (`components/events/EventViewsDialog.jsx`). It reads
+`event_view_series(event, days)` (`supabase/migrations/20261111032413_event_view_series.sql`):
+one row per day ending today (Australia/Sydney), **zero-filled**, oldest first, `days`
+clamped to 1–90 (null → 30). Like `event_view_stats()` it re-checks ownership itself — the
+organiser or an admin; anyone else, an unknown event, or a signed-out caller gets nothing.
+The chart is inline SVG with no chart library: geometry and wording live in the
+dependency-free `utils/eventViewsChart.js` (a "nice" axis top, a visible 2 px minimum for a
+day with views, no half-way gridline on scales of 5 or less), each bar has a `<title>`, and
+the whole chart carries a one-sentence `aria-label` (total and busiest day). With no views in
+the window the dialog says so instead of drawing an empty chart.
 
 ## Google search figures (Search Console)
 

@@ -8,6 +8,7 @@ import OrganiserAccessCard from '@/components/events/OrganiserAccessCard.jsx';
 import { useOrganiserAccess } from '@/hooks/useOrganiserAccess.js';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import EventSearchDialog from '@/components/events/EventSearchDialog.jsx';
+import EventViewsDialog from '@/components/events/EventViewsDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
 import FeatureUpsellCard from '@/components/events/FeatureUpsellCard.jsx';
@@ -53,6 +54,7 @@ const AccountEvents = () => {
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
   const [searchEvent, setSearchEvent] = useState(null);
+  const [viewsEvent, setViewsEvent] = useState(null);
   const [featureEvent, setFeatureEvent] = useState(null);
   const [featurePack, setFeaturePack] = useState(false);
   const today = todayInAustralia();
@@ -226,6 +228,11 @@ const AccountEvents = () => {
                 </span>
                 <span>{v.last7.toLocaleString('en-AU')} in the last 7 days</span>
                 <span>{v.last30.toLocaleString('en-AU')} in the last 30 days</span>
+                {v.total > 0 && (
+                  <button type="button" className="text-primary font-semibold hover:underline" onClick={() => setViewsEvent(event)} aria-label={`Daily views trend for ${event.title}`}>
+                    See trend
+                  </button>
+                )}
               </p>
             );
           })()}
@@ -446,6 +453,9 @@ const AccountEvents = () => {
 
       <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
       <EventBadgeDialog event={badgeEvent} onClose={() => setBadgeEvent(null)} />
+      {viewsEvent && (
+        <EventViewsDialog event={viewsEvent} open onOpenChange={(o) => { if (!o) setViewsEvent(null); }} />
+      )}
       {searchEvent && (
         <EventSearchDialog event={searchEvent} open onOpenChange={(o) => { if (!o) setSearchEvent(null); }} />
       )}

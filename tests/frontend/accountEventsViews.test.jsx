@@ -26,6 +26,9 @@ vi.mock('@/components/events/FeatureEventDialog.jsx', () => ({ default: () => nu
 vi.mock('@/components/events/OrganiserAccessCard.jsx', () => ({ default: () => null }));
 vi.mock('@/hooks/useOrganiserAccess.js', () => ({ useOrganiserAccess: () => ({ loading: false }) }));
 vi.mock('@/components/WorkspaceReferralCard.jsx', () => ({ default: () => null }));
+vi.mock('@/components/events/EventViewsDialog.jsx', () => ({
+  default: ({ event, open }) => (open ? <div role="dialog">Trend for {event.title}</div> : null),
+}));
 vi.mock('@/components/events/EventSearchDialog.jsx', () => ({
   default: ({ event, open }) => { state.searchOpen = open ? event.id : null; return open ? <div role="dialog">Search for {event.title}</div> : null; },
 }));
@@ -108,5 +111,17 @@ describe('My Events — Search button', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Google search figures for Live Show' }));
     expect(await screen.findByRole('dialog')).toHaveTextContent('Search for Live Show');
     expect(state.searchOpen).toBe(A1);
+  });
+});
+
+describe('My Events — views trend', () => {
+  it('offers "See trend" only on events that have views, and opens that event’s chart', async () => {
+    renderPage();
+    await screen.findByTestId(`event-views-${A1}`);
+    expect(screen.getByRole('button', { name: 'Daily views trend for Live Show' })).toBeInTheDocument();
+    // A live event with no views has nothing to chart.
+    expect(screen.queryByRole('button', { name: 'Daily views trend for Quiet Show' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Daily views trend for Live Show' }));
+    expect(await screen.findByRole('dialog')).toHaveTextContent('Trend for Live Show');
   });
 });
