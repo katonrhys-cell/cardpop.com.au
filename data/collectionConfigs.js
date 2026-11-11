@@ -35,7 +35,7 @@ export const COLLECTION_CONFIGS = {
     seoDescription:
       'Buy, sell and trade Pokémon TCG singles and sealed product from verified Australian sellers — vintage holos, PSA slabs and the latest sets, priced in AUD.',
     seoIntro:
-      'The Pokémon Trading Card Game has captivated collectors worldwide since 1999. From the iconic Base Set Charizard to the crown-jewels of modern Scarlet & Violet, Australian collectors have always been among the most passionate on the planet. CardPop is Australia\'s home for Pokémon cards — connecting buyers and sellers across every state with secure escrow trading, real-time market data, and a community of verified collectors who live and breathe the game. Whether you\'re hunting a PSA 10 Shadowless Blastoise or picking up the latest Paldea Evolved booster display, you\'ll find it here.',
+      'The Pokémon Trading Card Game has captivated collectors worldwide since 1999. From the iconic Base Set Charizard to the crown-jewels of modern Scarlet & Violet, Australian collectors have always been among the most passionate on the planet. CardPop connects Pokémon buyers and sellers across every state, with payments processed by Stripe, Buyer Protection on every order and Australian market prices in AUD. Whether you\'re hunting a PSA 10 Shadowless Blastoise or picking up the latest Paldea Evolved booster display, you\'ll find it here.',
     // Hero visual theme
     heroGradient: 'from-yellow-300 via-amber-300 to-yellow-500',
     heroTextDark: true,

@@ -594,6 +594,7 @@ describe('prerender AdSense readiness', () => {
       }
       expect(body, path).toContain('PO Box 1024, Ascot Vale');
       expect(body, path).not.toContain('View on CardPop');
+      expect(body, path).toContain('<meta name="google-adsense-account" content="ca-pub-8195080361704709" />');
     }
   });
 

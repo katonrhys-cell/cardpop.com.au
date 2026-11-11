@@ -124,7 +124,7 @@ const toText = (html = '', max = 300) => {
 // Plain-text paragraphs of a stored description (blank-line separated).
 const descriptionParagraphs = (text) => String(text || '')
   .split(/\n\s*\n/)
-  .map((p) => toText(p, 2000))
+  .map((p) => toText(p, 2000).replace(/(\*\*|__)(?=\S)(.+?)(?<=\S)\1/g, '$2'))
   .filter(Boolean);
 
 const isoDate = (d) => (d ? new Date(d).toISOString() : undefined);
@@ -272,6 +272,7 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <meta property="og:description" content="${esc(description)}" />
 <meta property="og:type" content="${esc(ogType)}" />
 <meta name="application-name" content="CardPop Australia™" />
+<meta name="google-adsense-account" content="ca-pub-8195080361704709" />
 <meta property="og:site_name" content="CardPop Australia™" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
@@ -2289,7 +2290,7 @@ const STATIC_CONTENT = {
 
   '/about': {
     title: "About CardPop™ | Australia's Trading Card Marketplace",
-    description: "Learn about CardPop Australia™ — Australia's premier platform for buying, selling and trading Pokemon, Magic and sports cards.",
+    description: "Learn about CardPop Australia™ — an Australian marketplace and collector resource for Pokémon, Magic and sports cards: who runs it, how it works and how to get in touch.",
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'About', path: '/about' }],
     h1: 'The card show that never closes.',
     intro: 'Every collector remembers the moment the hobby truly clicked. CardPop™ was built to recreate the trust, excitement and community of card shows — online, every day of the year.',
@@ -2603,10 +2604,10 @@ const STATIC_CONTENT = {
 
   '/australian-markets': {
     title: 'Australian Card Markets | CardPop',
-    description: 'Explore trading card markets across Australia. Find local card shops, events and trading communities near you.',
+    description: 'Australian trading card market data on CardPop: sales volume, average and median prices, price trends and recent eBay Australia activity across Pokémon, Magic, Yu-Gi-Oh! and NBA.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Australian Markets', path: '/australian-markets' }],
     h1: 'Market Intelligence',
-    intro: 'Professional-grade analytics, live sales data, and price trends aggregated from verified Australian marketplaces.',
+    intro: 'Sales data and price trends for trading cards in Australia, aggregated from eBay Australia listings and sales.',
     sections: [
       { h2: 'Market overview', paras: ['Track total sales volume, total sales value, average price, median price, and the highest and lowest sales across Pokémon, Magic: The Gathering, Yu-Gi-Oh! and NBA collections.'] },
       { h2: 'Price trends & condition breakdown', paras: ['See average daily sale prices across selected collections and a breakdown of sales volume by card condition.'] },
