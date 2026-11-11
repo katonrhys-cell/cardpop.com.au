@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen, Gift } from 'lucide-react';
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen, Gift, Megaphone } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -283,6 +283,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Finance & Tax" description="Profit on shop sales, GST by BAS quarter, stock valuation and accountant exports." icon={DollarSign} link="/admin/finance" />
           <ManagementBox title="Invoices" description="A tax invoice for every paid order and a credit note for every refund, with Xero exports and sync status." icon={FileText} link="/admin/invoices" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
+          <ManagementBox title="Organiser Requests" description="Confirm members who say they run events, so they can edit their organiser page." icon={Megaphone} link="/admin/organiser-requests" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
           <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />

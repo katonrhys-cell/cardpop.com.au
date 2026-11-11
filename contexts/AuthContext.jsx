@@ -252,7 +252,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, [session?.access_token, session?.user?.id]);
 
-  const signup = async (email, password, fullName, captchaToken, { next } = {}) => {
+  const signup = async (email, password, fullName, captchaToken, { next, organiserName } = {}) => {
     const username = email.split('@')[0].replace(/[^a-z0-9_]/gi, '').toLowerCase();
     // Optional app-internal path appended to the confirmation link, so a buyer
     // who signed up from checkout returns there after confirming (WelcomePage
@@ -262,7 +262,14 @@ export const AuthProvider = ({ children }) => {
       email,
       password,
       options: {
-        data: { full_name: fullName, username },
+        // `organiser_*` records the "I run events" choice from the sign-up form;
+        // the member has no session until they confirm their email, so the
+        // request is created on first sign-in (POST /organiser-requests/from-signup).
+        data: {
+          full_name: fullName,
+          username,
+          ...(organiserName ? { organiser_interest: true, organiser_name: organiserName } : {}),
+        },
         // Required when Cloudflare Turnstile CAPTCHA is enabled in Supabase.
         // Harmlessly ignored when it isn't.
         captchaToken,

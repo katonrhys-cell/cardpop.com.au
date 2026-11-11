@@ -12,6 +12,7 @@ import {
   launchWelcomeEmail,
   eventSubmittedEmail,
   eventReviewOutcomeEmail,
+  organiserRequestOutcomeEmail,
   eventChangesMadeEmail,
   eventFeaturePaidEmail,
   identityReviewNeededEmail,
@@ -295,6 +296,18 @@ export async function sendEventReviewOutcome({ to, name, eventTitle, approved, n
       ? `Your event ${eventTitle || ''} is live`.replace(/\s+/g, ' ')
       : `Your event ${eventTitle || ''} wasn’t approved`.replace(/\s+/g, ' '),
     html: eventReviewOutcomeEmail({ name, eventTitle, approved, note, eventUrl, feature }),
+  });
+}
+
+// The applicant: an admin approved or declined their request to manage an
+// organiser page (src/routes/organiser-requests.js).
+export async function sendOrganiserRequestOutcome({ to, name, organiserName, approved, note, pageUrl }) {
+  return send({
+    to,
+    subject: approved
+      ? `You're confirmed as the organiser of ${organiserName || 'your page'}`
+      : `Your organiser request wasn’t approved`,
+    html: organiserRequestOutcomeEmail({ name, organiserName, approved, note, pageUrl }),
   });
 }
 

@@ -10,6 +10,7 @@ import EventRsvp from '@/components/EventRsvp.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import EventEntryPrices from '@/components/events/EventEntryPrices.jsx';
+import { useRecordEventView } from '@/hooks/useRecordEventView.js';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
@@ -17,6 +18,7 @@ import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffe
 const EventDetailModal = ({ isOpen, onClose, event }) => {
   const past = event ? isPastEvent(event, toLocalDateStr(new Date())) : true;
   // Hooks run before the early return; only ask while the dialog is open.
+  useRecordEventView(event?.id, Boolean(isOpen && event));
   const ticketOffer = useEventTicketOffer(event?.id, { enabled: Boolean(isOpen && event && !past) });
   if (!event) return null;
 
