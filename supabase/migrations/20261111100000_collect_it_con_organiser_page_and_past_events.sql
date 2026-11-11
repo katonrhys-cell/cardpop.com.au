@@ -35,7 +35,7 @@ insert into public.events (
   venue_name, address, suburb, state, postcode,
   start_date, end_date, start_time, end_time,
   is_free, entry_fee_aud,
-  website_url, organizer_name,
+  website_url, organizer_name, organizer_email,
   tags
 )
 select
@@ -49,7 +49,7 @@ select
   'Box Hill Town Hall', '1022 Whitehorse Rd', 'Box Hill', 'VIC', '3128',
   '2026-05-16'::date, '2026-05-16'::date, '10:00'::time, '16:00'::time,
   false, 16.62,
-  'https://collectitcon.com.au', 'Collect-It Con',
+  'https://collectitcon.com.au', 'Collect-It Con', 'info@collectitcon.com.au',
   array['Card Show','Trading Cards','Sports Cards','TCG','Collectibles','Melbourne','Box Hill','Victoria']::text[]
 where not exists (select 1 from public.events where slug = 'collect-it-con-2026-05-16');
 
@@ -59,7 +59,7 @@ insert into public.events (
   venue_name, address, suburb, state, postcode,
   start_date, end_date, start_time, end_time,
   is_free, entry_fee_aud,
-  website_url, organizer_name,
+  website_url, organizer_name, organizer_email,
   tags
 )
 select
@@ -73,6 +73,6 @@ select
   'Collingwood Town Hall', '140 Hoddle St', 'Abbotsford', 'VIC', '3067',
   '2025-11-30'::date, '2025-11-30'::date, '10:00'::time, '17:00'::time,
   false, 12,
-  'https://collectitcon.com.au', 'Collect-It Con',
+  'https://collectitcon.com.au', 'Collect-It Con', 'info@collectitcon.com.au',
   array['Card Show','Trading Cards','Sports Cards','TCG','Collectibles','Melbourne','Collingwood','Victoria']::text[]
 where not exists (select 1 from public.events where slug = 'collect-it-con-2025-11-30');
