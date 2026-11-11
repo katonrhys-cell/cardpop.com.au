@@ -155,3 +155,24 @@ a minute or two later. Until the migration lands, the Player field shows
 empty, and saving a card still works — nothing selects `player_id` in a shared
 grid projection, by design. Confirm the **Supabase migrations** run is green
 after merging.
+
+## Player requests
+
+When the Player picker has no match, the dropdown ends with **"Can't find
+“<what they typed>”? Ask us to add them"** (`components/PlayerRequestDialog.jsx`:
+name, sport, optional team / confirming link / note). It posts to
+`POST /player-requests` (`src/routes/player-requests.js`, service role — the
+`player_requests` table has no browser write policy; migration
+`20261111050000_player_requests.sql`).
+
+* Needs a confirmed email; answers 409 (and the existing player) if the name is
+  already published, 429 past 5 pending requests per member.
+* **Every admin is belled (`player_request`) and emailed** (admin inbox + all
+  admins) through `alertAdminsToReview()`, linking to `/admin/players`.
+* Admin → Players shows the pending requests above the table
+  (`components/admin/PlayerRequestsPanel.jsx`). **Confirm & create draft**
+  inserts the player with `is_published = false` and opens it for editing —
+  write the page, then switch Published on. **Decline** needs a reason the
+  member sees. Nothing is ever published automatically.
+* The member gets a bell on the decision (`player_request_approved` /
+  `player_request_rejected`).

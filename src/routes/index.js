@@ -18,6 +18,7 @@ import eventScraperRouter from './event-scraper.js';
 import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
 import organiserRequestsRouter from './organiser-requests.js';
+import playerRequestsRouter from './player-requests.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
@@ -114,6 +115,10 @@ export default () => {
     // Event organiser access: member requests + admin confirmation — docs/event-organiser-access.md
     router.use('/organiser-requests', apiLimiter);
     router.use('/organiser-requests', organiserRequestsRouter);
+
+    // Member requests to add a player to the catalogue — docs/players.md
+    router.use('/player-requests', apiLimiter);
+    router.use('/player-requests', playerRequestsRouter);
     
     // Auth routes with endpoint-specific rate limiting
     router.use('/auth/login', loginLimiter);

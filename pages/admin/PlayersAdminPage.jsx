@@ -20,6 +20,7 @@ import { resetPlayersCache } from '@/hooks/usePlayers.js';
 import { SPORTS_COLLECTIONS } from '@/data/collections.js';
 import { cleanKeyCards, isValidBirthDate, matchPlayers, parseAliases, playerPath, playerSlug } from '@/utils/players.js';
 import { PlayerAvatar } from '@/components/PlayerPicker.jsx';
+import PlayerRequestsPanel from '@/components/admin/PlayerRequestsPanel.jsx';
 
 const EMPTY = {
   name: '', slug: '', sport: 'NBA', team: '', position: '', nationality: '', born_on: '', born_year: '', career_span: '',
@@ -170,6 +171,16 @@ const PlayersAdminPage = () => {
         <Button variant="outline" size="sm" onClick={() => load(true)}><RefreshCw className="mr-1.5 h-4 w-4" /> Refresh</Button>
         <Button size="sm" onClick={openNew}><Plus className="mr-1.5 h-4 w-4" /> Add player</Button>
       </AdminPageHeader>
+
+      {/* Members who couldn't find an athlete in the card form's Player picker. */}
+      <PlayerRequestsPanel
+        onApproved={async (player) => {
+          await load();
+          // Open the new draft so it can be written up and published straight away.
+          const { data } = await supabase.from('players').select(PLAYER_PAGE_COLUMNS).eq('id', player.id).maybeSingle();
+          if (data) openEdit(data);
+        }}
+      />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="relative w-full max-w-sm">
