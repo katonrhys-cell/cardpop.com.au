@@ -76,3 +76,12 @@ select
   'https://collectitcon.com.au', 'Collect-It Con', 'info@collectitcon.com.au',
   array['Card Show','Trading Cards','Sports Cards','TCG','Collectibles','Melbourne','Collingwood','Victoria']::text[]
 where not exists (select 1 from public.events where slug = 'collect-it-con-2025-11-30');
+
+-- Trading Cards Edition (14 Nov 2026): point "Get Tickets" at its Eventbrite
+-- page. The link is stored without the ?aff= / utm_ tracking parameters. Only
+-- fills a blank ticket link, so an admin's own edit is never overwritten.
+update public.events
+set ticket_url = 'https://www.eventbrite.com.au/e/collect-it-con-2026-trading-cards-edition-tickets-2002904395965',
+    updated_at = now()
+where id = '8b396d0f-a888-49a2-bd11-e527a765e977'
+  and nullif(btrim(ticket_url), '') is null;
