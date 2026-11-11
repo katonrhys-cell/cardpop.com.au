@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Eye, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
+import { CalendarDays, Eye, Search, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserAccessCard from '@/components/events/OrganiserAccessCard.jsx';
 import { useOrganiserAccess } from '@/hooks/useOrganiserAccess.js';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
+import EventSearchDialog from '@/components/events/EventSearchDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
 import FeatureUpsellCard from '@/components/events/FeatureUpsellCard.jsx';
@@ -51,6 +52,7 @@ const AccountEvents = () => {
   const organiserAccess = useOrganiserAccess(currentUser?.id);
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
+  const [searchEvent, setSearchEvent] = useState(null);
   const [featureEvent, setFeatureEvent] = useState(null);
   const [featurePack, setFeaturePack] = useState(false);
   const today = todayInAustralia();
@@ -271,6 +273,11 @@ const AccountEvents = () => {
               <Star className="w-3.5 h-3.5" aria-hidden="true" /> Feature
             </Button>
           )}
+          {(event.status === 'approved' || event.status === 'completed') && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setSearchEvent(event)} aria-label={`Google search figures for ${event.title}`}>
+              <Search className="w-3.5 h-3.5" aria-hidden="true" /> Search
+            </Button>
+          )}
           {event.status === 'approved' && (
             <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setBadgeEvent(event)} aria-label={`Website badge for ${event.title}`}>
               <BadgeCheck className="w-3.5 h-3.5" aria-hidden="true" /> Website badge
@@ -439,6 +446,9 @@ const AccountEvents = () => {
 
       <OrganiserVendorsDialog event={vendorsEvent} onClose={() => setVendorsEvent(null)} />
       <EventBadgeDialog event={badgeEvent} onClose={() => setBadgeEvent(null)} />
+      {searchEvent && (
+        <EventSearchDialog event={searchEvent} open onOpenChange={(o) => { if (!o) setSearchEvent(null); }} />
+      )}
       <FeatureEventDialog
         event={featureEvent}
         featurable={featurableEvents}

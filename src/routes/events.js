@@ -26,6 +26,8 @@ export function featureOffer(event, today = todayInAustralia()) {
 }
 import { sendEventSubmitted, sendEventReviewOutcome, sendEventChangesMade } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
+import { getEventSearchPerformance } from '../services/eventSearchPerformance.js';
+import { isSearchConsoleConfigured } from '../utils/searchConsoleClient.js';
 import { mergeChangeLog, changeRows, describeEventValue } from '../../utils/eventChangeLog.js';
 
 const router = Router();
@@ -104,6 +106,48 @@ router.post('/notify-submission', authMiddleware, async (req, res) => {
   } catch (err) {
     logger.error(`[EVENTS] notify-submission failed: ${err.message}`);
     res.status(500).json({ error: 'Failed to send notification' });
+  }
+});
+
+/**
+ * GET /events/:id/search-performance
+ *
+ * Google search performance (Search Console: impressions, clicks, CTR, average
+ * position and the top queries, last 28 days) of one event's page, for the
+ * event's own organiser — events.organiser_id must be the caller. Admins have
+ * Search Console itself, so there is deliberately no admin bypass here.
+ * Answers { available: false } for an event that isn't public yet (Google can't
+ * have shown it), 503 while Search Console isn't configured, 502 if Google
+ * fails. Cached per page for hours — services/eventSearchPerformance.js.
+ */
+router.get('/:id/search-performance', authMiddleware, async (req, res) => {
+  const eventId = req.params.id;
+  if (!UUID_RE.test(eventId)) return res.status(400).json({ error: 'Invalid event ID' });
+
+  try {
+    const { data: event, error } = await supabase
+      .from('events')
+      .select('id, slug, status, organiser_id')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (event.organiser_id !== req.user.id) {
+      return res.status(403).json({ error: 'Only the event organiser can see its search performance' });
+    }
+    if (event.status !== 'approved' && event.status !== 'completed') {
+      return res.json({ available: false, reason: 'not_live' });
+    }
+    if (!isSearchConsoleConfigured()) {
+      return res.status(503).json({ error: 'Search performance isn’t available right now', configured: false });
+    }
+
+    const performance = await getEventSearchPerformance(event);
+    res.set('Cache-Control', 'private, max-age=300');
+    res.json({ available: true, ...performance });
+  } catch (err) {
+    logger.error(`[EVENTS] search-performance failed: ${err.message}`);
+    res.status(502).json({ error: 'Could not load search performance right now' });
   }
 });
 
