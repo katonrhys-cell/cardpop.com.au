@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Applies the event-views migration to a throwaway Postgres database on top of
+# Applies the event-views migrations (page views + the daily series) to a throwaway Postgres database on top of
 # a stub of the Supabase pieces, then runs the behavioural checks.
 #
 #   PGHOST=/var/tmp PGPORT=55432 PGUSER=postgres tests/db/run-event-views-migration.sh
@@ -16,3 +16,6 @@ run supabase/migrations/20261111003031_event_page_views.sql
 # Re-applying must be a no-op (db push can re-run a straggler).
 run supabase/migrations/20261111003031_event_page_views.sql
 psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/event_views.test.sql
+run supabase/migrations/20261111032413_event_view_series.sql
+run supabase/migrations/20261111032413_event_view_series.sql
+psql -X -v ON_ERROR_STOP=1 -d "$DB" -f tests/db/event_view_series.test.sql

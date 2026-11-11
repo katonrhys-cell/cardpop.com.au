@@ -3,7 +3,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const rpc = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabaseClient.js', () => ({ supabase: { rpc: (...a) => rpc(...a) } }));
 
-import { recordEventView, fetchEventViewStats, formatViews, looksAutomated } from '@/lib/eventViews.js';
+import { recordEventView, fetchEventViewStats, fetchEventViewSeries, formatViews, looksAutomated } from '@/lib/eventViews.js';
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const human = { userAgent: 'Mozilla/5.0 (iPhone) Safari', webdriver: false };
@@ -79,5 +79,22 @@ describe('helpers', () => {
   });
   it('treats a missing navigator as automated', () => {
     expect(looksAutomated(null)).toBe(true);
+  });
+});
+
+describe('fetchEventViewSeries', () => {
+  it('returns the days as given, with numbers coerced', async () => {
+    rpc.mockResolvedValueOnce({ data: [{ day: '2026-11-10', views: '3' }, { day: '2026-11-11', views: 0 }], error: null });
+    expect(await fetchEventViewSeries(ID, 30)).toEqual([{ day: '2026-11-10', views: 3 }, { day: '2026-11-11', views: 0 }]);
+    expect(rpc).toHaveBeenCalledWith('event_view_series', { p_event_id: ID, p_days: 30 });
+  });
+
+  it('returns [] for a non-UUID id (without calling), an error, or a thrown failure', async () => {
+    expect(await fetchEventViewSeries('static-3')).toEqual([]);
+    expect(rpc).not.toHaveBeenCalled();
+    rpc.mockResolvedValueOnce({ data: null, error: { message: 'boom' } });
+    expect(await fetchEventViewSeries(ID)).toEqual([]);
+    rpc.mockImplementationOnce(() => { throw new Error('network'); });
+    expect(await fetchEventViewSeries(ID)).toEqual([]);
   });
 });
