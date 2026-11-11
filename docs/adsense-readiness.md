@@ -95,6 +95,57 @@ with a crawler that **does not execute JavaScript** and starts at the homepage:
    articles, the price pages show today's date, and the sitemap has no empty
    pages.
 
+## Second rejection — 2026-11-10
+
+AdSense rejected the site again on 2026-11-10 (the email gives no reason; the
+reason is on the AdSense **Sites** page). A no-JavaScript crawl of 62
+bot-facing pages that day found the homepage fixed but these still open:
+
+| Finding | Status |
+|---|---|
+| **Privacy policy had no advertising disclosure** — no mention of Google, AdSense, third-party ad cookies or an opt-out (an AdSense programme requirement), and its contact addresses were `@cardpop.com`, not `.com.au`. The bot copy was also two revisions behind the page. | Fixed in `pages/PrivacyPolicyPage.jsx` and `STATIC_CONTENT['/privacy-policy']`; tested |
+| **No navigation off the homepage.** Every other prerendered page ended in a single "View on CardPop" link — no menu, no About / Contact / Privacy. | Fixed: `htmlDoc()` wraps every page in `SITE_HEADER_HTML` / `SITE_FOOTER_HTML` (primary nav, footer links, postal address, support email) |
+| **Empty pages indexable and in the sitemap**: collections with 0 listings (golf, tennis, TMNT…), `/shop/sealed-boxes` with 0 products. | Fixed: `noindex, follow` while empty, listed in the sitemap only while they have a row |
+| **Visible template bugs**: "graded copies average about null", "Golf Cards Cards in Australia", "NBA Cards cards", `near_mint`, raw `2026-11-14` dates, "(1 listings)". | Fixed (`humanDate`, `cardsLabel`, `humanEnum`, graded-price guards) |
+| Article JSON-LD `wordCount` was the 300-character excerpt's (≈50 for a 3,500-word guide); a desk byline was typed `Person`. | Fixed |
+| The AI disclosure said "every dollar figure traces to a recorded sale" on articles that say their figures are listings. | Fixed: "recorded price snapshot" |
+
+Still open, and **not code** — these are what a "low value content" reviewer
+is most likely reacting to now:
+
+1. **The blog is batch-published and half machine-drafted.** 11 of 21 articles
+   are AI-assisted price checks on one skeleton ("Across the N days to …"),
+   four of them stamped the same second on 5 November, five on 6 August.
+   Publish one at a time, a few days apart, and write more first-hand pieces
+   (the show review is the model).
+2. **`/blog/nrl-rookie-cards-price-check-2026` should be unpublished or
+   rewritten.** It is 1,900 words about having no data, contradicts the NRL
+   price pages on set years and listing counts, and links a 404
+   (`/prices/nrl/joseph-suaalii-rookie`).
+3. **One article has a sentence in its author field** ("CardPop's angle on one
+   of Melbourne's Newest CardShows.") — fix in Admin → Event Reviews.
+4. **Price data has visible outliers** that make the price pages look
+   unreviewed: Stephen Curry Topps rookie raw $14,892 vs graded $7,551; Zoro
+   OP-06 raw $8,725 vs graded $6,275; Michael Jordan 1986 Fleer raw $160;
+   Leafeon VMAX alt art $458 on `/prices` vs $57.73 in the article about it.
+5. **Thin by nature**: 34 marketplace listing pages (15–20 words each: title,
+   price, set, condition), 49 organiser pages (a list of event links), 128
+   price pages whose unique content is four numbers and a blurb. Ask sellers
+   for descriptions; consider requiring one.
+6. **`/terms` is 150 words** — five two-sentence sections for a marketplace
+   that takes payments. Needs a real document (a legal task, not a code one).
+7. **`/about` names no legal entity or ABN**; `/contact` has no ABN either.
+8. **Copy that contradicts the FAQ**: `/pricing`, `/collections/pokemon` and
+   `/community/local-traders` promise trading / "secure escrow trading" while
+   the FAQ says card-for-card trading is switched off. Unverifiable
+   superlatives remain ("Australia's premier platform", "Australia's home for
+   Pokémon cards").
+9. **Finished events keep their pre-event copy** ("Vendor applications are now
+   open" under "This event has finished").
+
+Re-submit only after 1–4 are done and two or three weeks of spaced publishing
+are visible; a third rejection on an unchanged site lengthens the wait.
+
 ## Keeping it fixed
 
 - A new public route gets a prerender renderer and a sitemap entry **only if it

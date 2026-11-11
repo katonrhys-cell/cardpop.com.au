@@ -37,7 +37,7 @@ const PrivacyPolicyPage = () => {
           <div className="bg-muted p-4 rounded-xl border border-border mt-4">
             <ul className="space-y-2 text-sm text-muted-foreground font-medium">
               <li><strong>Effective Date:</strong> May 14, 2026</li>
-              <li><strong>Last Updated:</strong> May 14, 2026</li>
+              <li><strong>Last Updated:</strong> November 11, 2026</li>
             </ul>
           </div>
         </div>
@@ -82,7 +82,7 @@ const PrivacyPolicyPage = () => {
         <div className="space-y-4">
           <p>We do not sell your personal data. We only share your information in the following circumstances:</p>
           <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
-            <li><strong className="text-foreground">Service Providers:</strong> With trusted third-party vendors who perform services on our behalf (e.g., Stripe for payments, shipping carriers).</li>
+            <li><strong className="text-foreground">Service Providers:</strong> With trusted third-party vendors who perform services on our behalf (e.g., Stripe for payments, shipping carriers, Google for analytics and advertising).</li>
             <li><strong className="text-foreground">Legal Requirements:</strong> If required by law, court order, or government request to protect our legal rights or the safety of our users.</li>
             <li><strong className="text-foreground">Business Transfers:</strong> In connection with a merger, acquisition, or sale of company assets, where data is transferred as a business asset.</li>
             <li><strong className="text-foreground">User Consent:</strong> When you explicitly authorize us to share your information with a third party.</li>
@@ -117,7 +117,7 @@ const PrivacyPolicyPage = () => {
             <li><strong className="text-foreground">Opt-Out:</strong> The right to unsubscribe from marketing communications at any time.</li>
             <li><strong className="text-foreground">Data Portability:</strong> The right to request a copy of your data in a structured, machine-readable format.</li>
           </ul>
-          <p className="text-sm mt-4">To exercise any of these rights, please contact us at privacy@cardpop.com.</p>
+          <p className="text-sm mt-4">To exercise any of these rights, please contact us at privacy@cardpop.com.au.</p>
         </div>
       )
     },
@@ -132,6 +132,7 @@ const PrivacyPolicyPage = () => {
             <li><strong className="text-foreground">Analytical Cookies:</strong> Google Analytics 4 records page views and shopping events (product views, items added to the cart, checkouts started and completed) so we can see what works and fix what doesn't. The data is aggregated and never used for advertising unless you accept marketing cookies.</li>
             <li><strong className="text-foreground">Marketing Cookies (optional):</strong> With your consent we use Google Ads conversion tracking and the Meta (Facebook / Instagram) Pixel so we know which ads bring collectors to CardPop and can measure a purchase against the ad that led to it. These load only after you choose <em>Accept all</em> in the cookie bar. Choosing <em>Essentials only</em> keeps them off.</li>
             <li><strong className="text-foreground">Changing your mind:</strong> Use <em>Cookie settings</em> in the site footer to see the choice again, or clear this site's data in your browser.</li>
+            <li><strong className="text-foreground">Advertising (Google AdSense):</strong> Some content pages — articles, event pages and guides — may show advertising served by Google AdSense. Third-party vendors, including Google, use cookies to serve ads based on your prior visits to CardPop and other websites. Google's advertising cookies let it and its partners show ads based on those visits. You can opt out of personalised advertising at <a href="https://adssettings.google.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google Ads Settings</a>, or opt out of other vendors' cookies at <a href="https://www.aboutads.info/choices/" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">aboutads.info</a>. We never place ads on checkout, account, shop or marketplace pages.</li>
             <li><strong className="text-foreground">Management:</strong> You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent. However, some portions of our service may be inaccessible if you decline essential cookies.</li>
           </ul>
         </div>
@@ -204,8 +205,8 @@ const PrivacyPolicyPage = () => {
         <div className="space-y-4">
           <p>If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please reach out to us:</p>
           <div className="bg-muted p-6 rounded-xl border border-border space-y-3">
-            <p><strong className="text-foreground">Email:</strong> <a href="mailto:privacy@cardpop.com" className="text-primary hover:underline">privacy@cardpop.com</a></p>
-            <p><strong className="text-foreground">Support:</strong> <a href="mailto:support@cardpop.com" className="text-primary hover:underline">support@cardpop.com</a></p>
+            <p><strong className="text-foreground">Email:</strong> <a href="mailto:privacy@cardpop.com.au" className="text-primary hover:underline">privacy@cardpop.com.au</a></p>
+            <p><strong className="text-foreground">Support:</strong> <a href="mailto:support@cardpop.com.au" className="text-primary hover:underline">support@cardpop.com.au</a></p>
             <p><strong className="text-foreground">Mailing Address:</strong></p>
             <address className="text-muted-foreground not-italic pl-4 border-l-2 border-primary/30">
               CardPop Privacy Team<br />
@@ -240,7 +241,7 @@ const PrivacyPolicyPage = () => {
             Privacy Policy
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto text-balance leading-relaxed">
-            Your trust is our top priority. Learn how we handle your data with transparency, care, and industry-leading security.
+            Your trust is our top priority. Learn how we handle your data with transparency and care.
           </p>
           
           <div className="flex items-center justify-center gap-2 mt-8 text-sm font-medium text-muted-foreground">

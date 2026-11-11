@@ -574,6 +574,51 @@ describe('prerender landing pages', () => {
     expect(body).toContain('No items available right now.');
     expect(body).not.toContain('noindex');
   });
+
+  it('keeps an empty product-type section out of the index until it has stock', async () => {
+    state.listResult = { data: [] };
+    const { body } = await run('/shop/sealed-boxes');
+    expect(body).toContain('No items available right now.');
+    expect(body).toContain('<meta name="robots" content="noindex, follow" />');
+  });
+});
+
+describe('prerender AdSense readiness', () => {
+  it('wraps every page in the site navigation and identity footer', async () => {
+    for (const path of ['/privacy-policy', '/faq', '/collections/pokemon']) {
+      const { body } = await run(path);
+      expect(body, path).toContain('<nav aria-label="Primary">');
+      expect(body, path).toContain('<nav aria-label="Footer">');
+      for (const href of ['/about', '/contact', '/privacy-policy', '/terms', '/blog', '/events']) {
+        expect(body, `${path} → ${href}`).toContain(`href="https://cardpop.com.au${href}"`);
+      }
+      expect(body, path).toContain('PO Box 1024, Ascot Vale');
+      expect(body, path).not.toContain('View on CardPop');
+    }
+  });
+
+  it('discloses Google advertising cookies and the opt-out in the privacy policy', async () => {
+    const { body } = await run('/privacy-policy');
+    expect(body).toContain('Google AdSense');
+    expect(body).toContain('Third-party vendors, including Google, use cookies to serve ads');
+    expect(body).toContain('https://adssettings.google.com');
+    expect(body).toContain('privacy@cardpop.com.au');
+    expect(body).not.toMatch(/@cardpop\.com(?!\.au)/);
+  });
+
+  it('marks a collection with no listings noindex, and never doubles "Cards"', async () => {
+    state.listResult = { data: [] };
+    const { body } = await run('/collections/golf');
+    expect(body).toContain('<meta name="robots" content="noindex, follow" />');
+    expect(body).toContain('<h1>Golf Cards in Australia</h1>');
+    expect(body).not.toContain('Cards Cards');
+  });
+
+  it('does not noindex a collection because its listings read failed', async () => {
+    state.listResult = { data: null, error: { message: 'timeout' } };
+    const { body } = await run('/collections/pokemon');
+    expect(body).not.toContain('noindex');
+  });
 });
 
 describe('prerender events', () => {
@@ -595,7 +640,7 @@ describe('prerender events', () => {
     expect(body).toContain('"organizer":{"@type":"Organization","name":"CardPop"');
     expect(body).toContain('"performer":{"@type":"Organization"');
     expect(body).toContain('https://cardpop.com.au/og-image.jpg');
-    expect(body).toContain('"description":"Melbourne Card Expo at Royal Exhibition Building, Carlton, VIC on 2026-08-01');
+    expect(body).toContain('"description":"Melbourne Card Expo at Royal Exhibition Building, Carlton, VIC on 1 August 2026');
     // No event has a cover yet → the landing still carries the site tile as
     // its og:image, so Search Console / link previews show a thumbnail.
     expect(body).toContain('<meta property="og:image" content="https://cardpop.com.au/og-image.jpg" />');
@@ -886,7 +931,7 @@ describe('prerender events', () => {
     expect(body).toContain('"performer":{"@type":"Organization","name":"CardPop"}');
     expect(body).toContain('"image":["https://cardpop.com.au/og-image.jpg"]');
     expect(body).toContain('"endDate":"2026-09-05"');
-    expect(body).toContain('"description":"Tiny Meetup on 2026-09-05');
+    expect(body).toContain('"description":"Tiny Meetup on 5 September 2026');
   });
 
   it('returns a 404 noindex document for an unknown event', async () => {
@@ -1505,7 +1550,7 @@ describe('prerender homepage', () => {
     expect(body).toContain('href="https://cardpop.com.au/blog/nrl-rookie-cards-price-check-2026"');
     expect(body).toContain('<h2>Upcoming card shows and events</h2>');
     expect(body).toContain('href="https://cardpop.com.au/events/melbourne-card-show"');
-    expect(body).toContain('2099-01-10');
+    expect(body).toContain('10 January 2099');
     expect(body).toContain('href="https://cardpop.com.au/prices/pokemon"');
     // Main navigation + the pages a reviewer looks for.
     for (const path of ['/about', '/contact', '/faq', '/privacy-policy', '/terms', '/trust-safety', '/shop', '/events', '/blog']) {

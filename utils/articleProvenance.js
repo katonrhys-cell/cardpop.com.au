@@ -10,6 +10,6 @@
 // the process. Rendered by the article page and by api/prerender.js —
 // dependency-free so both can import it.
 export const AI_ASSISTED_DISCLOSURE =
-  'How this article was produced: drafted with AI assistance from CardPop’s own Australian market price snapshots — every dollar figure traces to a recorded sale — then checked and published by the CardPop team.';
+  'How this article was produced: drafted with AI assistance from CardPop’s own Australian market price snapshots — every dollar figure traces to a recorded price snapshot — then checked and published by the CardPop team.';
 
 export const articleDisclosure = (article) => (article?.auto_generated ? AI_ASSISTED_DISCLOSURE : null);
