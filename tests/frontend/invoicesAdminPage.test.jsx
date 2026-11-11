@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 
@@ -61,6 +62,8 @@ beforeEach(() => {
   mockFetch.mockImplementation(async (url, opts = {}) => {
     if (url === '/admin/invoices/mapping') return json(MAPPING);
     if (url.startsWith('/admin/invoices/export')) return json({}, true, {});
+    if (url === '/admin/invoices/supplier') return json({ supplier: { legalName: 'CardPop', abn: '' }, ready: false });
+    if (url === '/admin/invoices/i1/pdf') return json({}, true, { 'content-disposition': 'attachment; filename="CardPop-tax-invoice-INV-000001.pdf"' });
     if (url === '/admin/invoices/issue-missing') return json({ issued: 2 });
     if (url === '/admin/invoices/i1') return json(DETAIL);
     if (url.endsWith('/accounting') && opts.method === 'PATCH') return json({ invoice: { ...DETAIL.invoice, accounting_sync_status: 'synced', accounting_number: 'INV-0042' } });
@@ -70,9 +73,31 @@ beforeEach(() => {
 
 const listCalls = () => mockFetch.mock.calls.map(([u]) => u).filter((u) => u === '/admin/invoices' || u.startsWith('/admin/invoices?'));
 
+describe('InvoicesAdminPage — tax invoice PDF and order links', () => {
+  it('downloads a document as a PDF from its row and links the order back to Order Management', async () => {
+    const user = userEvent.setup();
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
+    const row = (await screen.findByText('INV-000001')).closest('tr');
+    expect(within(row).getByRole('link')).toHaveAttribute('href', '/admin/orders?order=cccccccc-cccc-cccc-cccc-cccccccccccc');
+    await user.click(within(row).getByRole('button', { name: /download INV-000001 as PDF/i }));
+    await waitFor(() => expect(mockFetch).toHaveBeenCalledWith('/admin/invoices/i1/pdf'));
+  });
+
+  it('warns until the supplier ABN is set', async () => {
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
+    expect(await screen.findByText(/ABN isn.t set/)).toBeInTheDocument();
+  });
+
+  it('opens on one order\'s documents when linked from Order Management', async () => {
+    render(<MemoryRouter initialEntries={['/admin/invoices?order=cccccccc-cccc-4ccc-8ccc-cccccccccccc']}><InvoicesAdminPage /></MemoryRouter>);
+    await screen.findByText('INV-000001');
+    expect(listCalls()[0]).toBe('/admin/invoices?q=cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  });
+});
+
 describe('InvoicesAdminPage', () => {
   it('lists every document with its number, customer, totals and Xero state', async () => {
-    render(<InvoicesAdminPage />);
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
     expect(await screen.findByText('INV-000001')).toBeInTheDocument();
     expect(mockFetch).toHaveBeenCalledWith('/admin/invoices');
     const row = screen.getByText('INV-000001').closest('tr');
@@ -90,7 +115,7 @@ describe('InvoicesAdminPage', () => {
 
   it('refetches with the chosen filters and search', async () => {
     const user = userEvent.setup();
-    render(<InvoicesAdminPage />);
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
     await screen.findByText('INV-000001');
     await user.type(screen.getByLabelText('Search invoices'), 'ash');
     await user.click(screen.getByRole('button', { name: 'Search' }));
@@ -102,7 +127,7 @@ describe('InvoicesAdminPage', () => {
 
   it('downloads the Xero import with the current filters', async () => {
     const user = userEvent.setup();
-    render(<InvoicesAdminPage />);
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
     await screen.findByText('INV-000001');
     await user.click(screen.getByRole('button', { name: /Export for Xero/ }));
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith('/admin/invoices/export?format=xero'));
@@ -112,7 +137,7 @@ describe('InvoicesAdminPage', () => {
 
   it('issues missing documents and reloads', async () => {
     const user = userEvent.setup();
-    render(<InvoicesAdminPage />);
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
     await screen.findByText('INV-000001');
     const before = listCalls().length;
     await user.click(screen.getByRole('button', { name: /Issue missing/ }));
@@ -123,7 +148,7 @@ describe('InvoicesAdminPage', () => {
 
   it('opens a document with its lines coded for Xero and records the Xero link', async () => {
     const user = userEvent.setup();
-    render(<InvoicesAdminPage />);
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
     await user.click(await screen.findByRole('button', { name: 'INV-000001' }));
     expect(await screen.findByText('Charizard Holo')).toBeInTheDocument();
     const dialog = screen.getByRole('dialog');
@@ -144,7 +169,7 @@ describe('InvoicesAdminPage', () => {
 
   it('reports a failed load', async () => {
     mockFetch.mockImplementation(async (url) => (url === '/admin/invoices/mapping' ? json(MAPPING) : json({}, false)));
-    render(<InvoicesAdminPage />);
+    render(<MemoryRouter><InvoicesAdminPage /></MemoryRouter>);
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to load invoices'));
     expect(screen.getByText('No invoices')).toBeInTheDocument();
   });

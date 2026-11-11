@@ -3,9 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Package, MapPin, Truck } from 'lucide-react';
+import { AlertCircle, Package, MapPin, Truck, Receipt } from 'lucide-react';
 import { carrierLabel, trackingUrl } from '@/utils/shipmentTracking.js';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
+import OrderInvoiceLinks from '@/components/admin/OrderInvoiceLinks.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient } from '@/lib/apiServerClient.js';
 import { format } from 'date-fns';
@@ -209,6 +210,14 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
                 <span className="font-semibold text-foreground">Total</span>
                 <span className="font-bold">{fmt(order.total_aud)}</span>
               </div>
+            </div>
+
+            {/* Tax invoice: the order's document in Admin → Invoices. */}
+            <div className="space-y-1.5">
+              <p className="font-semibold text-foreground flex items-center gap-1.5">
+                <Receipt className="w-3.5 h-3.5" /> Tax invoice
+              </p>
+              <OrderInvoiceLinks order={order} />
             </div>
 
             {/* Shipping address */}

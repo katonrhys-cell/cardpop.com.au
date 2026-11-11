@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, MoreHorizontal, Eye, RefreshCcw, ShoppingCart, ChevronLeft, AlertCircle, Download, RotateCcw, CheckCircle2, XCircle, Clock, Truck } from 'lucide-react';
+import { Search, MoreHorizontal, Eye, RefreshCcw, ShoppingCart, ChevronLeft, AlertCircle, Download, RotateCcw, CheckCircle2, XCircle, Clock, Truck, Receipt, FileDown } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,6 +23,7 @@ import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
 import ShipOrderDialog from '@/components/admin/ShipOrderDialog.jsx';
 import { orderPreorderLines, isAwaitingPreorderStock } from '@/utils/shopStock.js';
 import { toCsv } from '@/utils/finance.js';
+import { downloadOrderInvoicePdf, invoicesPathForOrder, orderHasInvoice } from '@/utils/invoiceDownload.js';
 
 /**
  * The refund to show for an order. A rejected request can sit alongside a
@@ -251,7 +252,10 @@ const RefundDetailDialog = ({ order, refund, onClose, onUpdate }) => {
 
 const OrderManagementPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [orders, setOrders] = useState([]);
+  // order id → { number, credit_note } for the Invoice column.
+  const [invoiceByOrder, setInvoiceByOrder] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -273,6 +277,17 @@ const OrderManagementPage = () => {
         .limit(200);
       if (error) throw error;
       if (isMounted.current) setOrders(data ?? []);
+      // Which orders already carry a tax invoice (best-effort: the column just
+      // stays empty if this fails, the download still issues it on demand).
+      try {
+        const paidIds = (data ?? []).filter(orderHasInvoice).map((o) => o.id);
+        if (paidIds.length) {
+          const res = await apiClient.fetch('/admin/invoices/by-orders', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ orderIds: paidIds }),
+          });
+          if (res.ok && isMounted.current) setInvoiceByOrder((await res.json()).invoices || {});
+        }
+      } catch { /* invoice numbers are decoration */ }
     } catch (err) {
       if (isMounted.current) setError(err.message);
       toast.error('Failed to load orders.');
@@ -286,6 +301,26 @@ const OrderManagementPage = () => {
     fetchOrders();
     return () => { isMounted.current = false; };
   }, [fetchOrders]);
+
+  // Deep link from Admin → Invoices: /admin/orders?order=<id> opens that order.
+  useEffect(() => {
+    const id = searchParams.get('order');
+    if (id) {
+      setViewOrderId(id);
+      const next = new URLSearchParams(searchParams);
+      next.delete('order');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const downloadInvoice = async (order) => {
+    try {
+      await downloadOrderInvoicePdf(order.id);
+      toast.success('Tax invoice downloaded');
+    } catch (err) {
+      toast.error(err.message || 'Could not build the tax invoice.');
+    }
+  };
 
   const openRefundDialog = async (order) => {
     // Not .maybeSingle(): a rejected request plus a newer active one is two
@@ -403,6 +438,7 @@ const OrderManagementPage = () => {
                 <TableHead className="font-semibold">Total</TableHead>
                 <TableHead className="font-semibold">Fee</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
+                <TableHead className="font-semibold">Invoice</TableHead>
                 <TableHead className="font-semibold">Refund</TableHead>
                 <TableHead className="w-[60px]" />
               </TableRow>
@@ -411,12 +447,12 @@ const OrderManagementPage = () => {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
-                    {Array(8).fill(0).map((__, j) => <TableCell key={j}><Skeleton className="h-5 w-full rounded" /></TableCell>)}
+                    {Array(9).fill(0).map((__, j) => <TableCell key={j}><Skeleton className="h-5 w-full rounded" /></TableCell>)}
                   </TableRow>
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
                     <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
                     <p>Failed to load orders</p>
                     {error && <p className="text-xs mt-1 opacity-70">{error}</p>}
@@ -424,7 +460,7 @@ const OrderManagementPage = () => {
                 </TableRow>
               ) : filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
                     <ShoppingCart className="w-10 h-10 mb-3 mx-auto opacity-40" />
                     <p>No orders found</p>
                   </TableCell>
@@ -469,6 +505,27 @@ const OrderManagementPage = () => {
                       </p>
                     )}
                   </TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {orderHasInvoice(order) ? (
+                      <div className="flex items-center gap-1">
+                        <Link
+                          to={invoicesPathForOrder(order.id)}
+                          className="font-mono text-xs text-primary hover:underline underline-offset-2"
+                          title="Open in Admin → Invoices"
+                        >
+                          {invoiceByOrder[order.id]?.number || 'View'}
+                        </Link>
+                        <Button
+                          variant="ghost" size="icon" className="h-7 w-7"
+                          aria-label={`Download tax invoice for order ${order.order_number || order.id.slice(0, 8).toUpperCase()}`}
+                          title="Download tax invoice (PDF)"
+                          onClick={() => downloadInvoice(order)}
+                        >
+                          <FileDown className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    ) : <span className="text-xs text-muted-foreground">—</span>}
+                  </TableCell>
                   <TableCell>
                     {order.refund_status && REFUND_BADGE[order.refund_status] ? (
                       <Badge variant="outline" className={`text-xs font-bold ${REFUND_BADGE[order.refund_status].cls}`}>
@@ -487,6 +544,16 @@ const OrderManagementPage = () => {
                         <DropdownMenuItem onClick={() => setViewOrderId(order.id)} className="cursor-pointer gap-2 font-medium">
                           <Eye className="w-4 h-4" /> View Details
                         </DropdownMenuItem>
+                        {orderHasInvoice(order) && (
+                          <>
+                            <DropdownMenuItem onClick={() => downloadInvoice(order)} className="cursor-pointer gap-2 font-medium">
+                              <FileDown className="w-4 h-4" /> Download Tax Invoice
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => navigate(invoicesPathForOrder(order.id))} className="cursor-pointer gap-2 font-medium">
+                              <Receipt className="w-4 h-4" /> View in Invoices
+                            </DropdownMenuItem>
+                          </>
+                        )}
                         <DropdownMenuSeparator />
                         {['payment_confirmed', 'shipped'].includes(order.status) && (
                           <DropdownMenuItem onClick={() => setShipOrder(order)} className="cursor-pointer gap-2 font-medium">

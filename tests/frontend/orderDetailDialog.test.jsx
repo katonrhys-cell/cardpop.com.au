@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom';
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
@@ -71,7 +72,7 @@ describe('OrderDetailDialog', () => {
   // embedding it fails the entire select with a permission error and the dialog
   // renders nothing but that error — for every order.
   it('never asks the browser client for profiles.email', async () => {
-    render(<OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} />);
+    render(<MemoryRouter><OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} /></MemoryRouter>);
     await waitFor(() => expect(selectSpy).toHaveBeenCalled());
 
     const cols = selectSpy.mock.calls[0][0];
@@ -80,7 +81,7 @@ describe('OrderDetailDialog', () => {
   });
 
   it('shows the order once it loads', async () => {
-    render(<OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} />);
+    render(<MemoryRouter><OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} /></MemoryRouter>);
 
     expect(await screen.findByText('Charizard VMAX')).toBeInTheDocument();
     expect(screen.getByText('payment confirmed')).toBeInTheDocument();
@@ -90,17 +91,18 @@ describe('OrderDetailDialog', () => {
 
   it('surfaces a permission error instead of an empty dialog', async () => {
     maybeSingle.mockResolvedValue({ data: null, error: { message: 'permission denied for column email' } });
-    render(<OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} />);
+    render(<MemoryRouter><OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} /></MemoryRouter>);
 
     expect(await screen.findByText(/permission denied for column email/)).toBeInTheDocument();
   });
 
   it("reads a guest buyer's email off the order row, without calling the backend", async () => {
-    render(<OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} />);
+    render(<MemoryRouter><OrderDetailDialog orderId={GUEST_ORDER.id} onClose={vi.fn()} /></MemoryRouter>);
 
     expect(await screen.findByText('jordan@example.com')).toBeInTheDocument();
     expect(screen.getByText('Guest checkout')).toBeInTheDocument();
-    expect(apiFetch).not.toHaveBeenCalled();
+    // Only the invoice lookup runs; the email endpoint is never hit for a guest.
+    expect(apiFetch).not.toHaveBeenCalledWith('/admin/user-emails', expect.anything());
   });
 
   it("fetches a registered buyer's email from the admin-only endpoint", async () => {
@@ -110,7 +112,7 @@ describe('OrderDetailDialog', () => {
       json: async () => ({ emails: { '239faa6f': 'ryan@example.com' } }),
     });
 
-    render(<OrderDetailDialog orderId={MEMBER_ORDER.id} onClose={vi.fn()} />);
+    render(<MemoryRouter><OrderDetailDialog orderId={MEMBER_ORDER.id} onClose={vi.fn()} /></MemoryRouter>);
 
     expect(await screen.findByText('Ryan Conway')).toBeInTheDocument();
     expect(await screen.findByText('ryan@example.com')).toBeInTheDocument();
@@ -122,7 +124,7 @@ describe('OrderDetailDialog', () => {
     maybeSingle.mockResolvedValue({ data: MEMBER_ORDER, error: null });
     apiFetch.mockRejectedValue(new Error('network down'));
 
-    render(<OrderDetailDialog orderId={MEMBER_ORDER.id} onClose={vi.fn()} />);
+    render(<MemoryRouter><OrderDetailDialog orderId={MEMBER_ORDER.id} onClose={vi.fn()} /></MemoryRouter>);
 
     expect(await screen.findByText('Ryan Conway')).toBeInTheDocument();
     expect(screen.getByText('Charizard VMAX')).toBeInTheDocument();
