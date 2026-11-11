@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { ImagePlus, Loader2 } from 'lucide-react';
+import { ImagePlus, Loader2, X } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,9 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
-import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError } from '@/utils/eventOrganiserLogo.js';
+import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { normalizeEventUrl, isValidHttpUrl } from '@/utils/eventFormValidation.js';
-import { ORGANISER_PAGE_COLUMNS } from '@/utils/organiserPage.js';
+import { ORGANISER_PAGE_COLUMNS, MAX_EXTRA_LOGOS } from '@/utils/organiserPage.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // The organiser's own edit of their public page. RLS lets the page's owner (or
 // an admin) update it; the guard trigger in 20261110224209 pins the name, slug
@@ -32,6 +33,10 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     youtube_url: org.youtube_url || '',
   }));
   const [logoFile, setLogoFile] = useState(null);
+  // Joint organisers: more logos beside the main one. Each item is a saved URL
+  // or a newly picked file, kept in display order.
+  const savedExtras = Array.isArray(org.extra_logo_urls) ? org.extra_logo_urls : [];
+  const [extras, setExtras] = useState(() => savedExtras.map((url) => ({ key: url, url })));
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -42,6 +47,21 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     if (problem) { toast.error(problem); e.target.value = ''; return; }
     setLogoFile(file);
   };
+
+  const addExtra = (e) => {
+    const picked = Array.from(e.target.files || []);
+    e.target.value = '';
+    const room = MAX_EXTRA_LOGOS - extras.length;
+    const next = [];
+    for (const file of picked.slice(0, Math.max(room, 0))) {
+      const problem = logoFileError(file);
+      if (problem) { toast.error(problem); continue; }
+      next.push({ key: `${file.name}-${file.size}-${Math.random().toString(36).slice(2, 8)}`, file });
+    }
+    if (picked.length > room) toast.error(`A page can show up to ${MAX_EXTRA_LOGOS + 1} logos in all.`);
+    if (next.length) setExtras((list) => [...list, ...next]);
+  };
+  const removeExtra = (key) => setExtras((list) => list.filter((item) => item.key !== key));
 
   const save = async (e) => {
     e.preventDefault();
@@ -54,6 +74,13 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     setBusy(true);
     try {
       if (logoFile) row.logo_url = await uploadEventOrganiserLogo(logoFile);
+      // Only touch the column when the list changed, so a page saved before
+      // the migration lands still works.
+      const extrasChanged = extras.some((item) => item.file) || extras.length !== savedExtras.length
+        || extras.some((item, i) => item.url !== savedExtras[i]);
+      if (extrasChanged) {
+        row.extra_logo_urls = await Promise.all(extras.map((item) => (item.file ? uploadEventOrganiserLogo(item.file) : item.url)));
+      }
       const { data, error } = await supabase
         .from('event_organisers').update(row).eq('id', org.id).select(ORGANISER_PAGE_COLUMNS).maybeSingle();
       if (error) throw error;
@@ -83,10 +110,38 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
             <Label htmlFor="org-logo" className="text-xs font-bold uppercase tracking-wide">Logo</Label>
             <label htmlFor="org-logo" className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border border-dashed border-border px-3 py-2.5 hover:bg-muted">
               <ImagePlus className="w-4 h-4 shrink-0" aria-hidden="true" />
-              <span className="truncate">{logoFile ? logoFile.name : 'Choose a new logo'}</span>
+              <span className="truncate">{logoFile ? logoFile.name : 'Choose a new main logo'}</span>
             </label>
             <input id="org-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" onChange={pickLogo} disabled={busy} />
             <p className="text-xs text-muted-foreground">JPG, PNG, WebP, GIF or a short MP4/WebM loop, up to {LOGO_MAX_LABEL}.</p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="org-extra-logos" className="text-xs font-bold uppercase tracking-wide">More logos (joint organisers)</Label>
+            {extras.length > 0 && (
+              <ul className="space-y-1.5">
+                {extras.map((item) => (
+                  <li key={item.key} className="flex items-center gap-2 rounded-xl border border-border px-2 py-1.5 text-sm">
+                    {item.url && !isVideoLogoUrl(item.url) ? (
+                      <img src={publicImageUrl(item.url)} alt="" className="w-9 h-9 rounded-md bg-white object-contain border border-border shrink-0" />
+                    ) : (
+                      <ImagePlus className="w-5 h-5 mx-2 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    )}
+                    <span className="truncate flex-1">{item.file ? item.file.name : 'Saved logo'}</span>
+                    <Button type="button" variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => removeExtra(item.key)} disabled={busy} aria-label="Remove logo">
+                      <X className="w-4 h-4" aria-hidden="true" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {extras.length < MAX_EXTRA_LOGOS && (
+              <label htmlFor="org-extra-logos" className="flex items-center gap-2 text-sm cursor-pointer rounded-xl border border-dashed border-border px-3 py-2.5 hover:bg-muted">
+                <ImagePlus className="w-4 h-4 shrink-0" aria-hidden="true" />
+                <span>Add another logo</span>
+              </label>
+            )}
+            <input id="org-extra-logos" type="file" multiple accept={LOGO_ACCEPT} className="sr-only" onChange={addExtra} disabled={busy} />
+            <p className="text-xs text-muted-foreground">Running it with a partner? Add their logo too — each shows beside yours on the page.</p>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="org-desc" className="text-xs font-bold uppercase tracking-wide">About your events</Label>

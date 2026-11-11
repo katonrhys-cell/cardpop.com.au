@@ -259,14 +259,18 @@ const AddEditCardPage = () => {
   // clean exact hit that agrees with what OCR read off the card is shown as a
   // suggestion, because it was NOT applied to the form — the fields on screen
   // came from the OCR pass instead.
+  // The seller can settle a disputed match themselves: 'catalog' applies the
+  // catalog record, 'photo' re-applies what was read off the photos.
+  const [csChoice, setCsChoice] = useState(null);
   const csNeedsReview = Boolean(
     cardSightResult?.identified &&
+    csChoice !== 'catalog' &&
     !assessCardSightMatch(cardSightResult, scanResult).trustworthy
   );
   // Which identity fields the catalog match contradicts the photo read on —
   // drives the panel copy, since "disagrees with your card" is a different
   // situation from "too uncertain".
-  const csDisagreements = cardSightResult?.identified
+  const csDisagreements = cardSightResult?.identified && csChoice !== 'catalog'
     ? cardSightDisagreements(scanResult, cardSightResult.card)
     : [];
 
@@ -892,6 +896,81 @@ const AddEditCardPage = () => {
     setAdjusting(null);
   };
 
+  // Writes what was read off the photo into the form. Shared by the identify
+  // run and the "Use photo read" button, so re-applying it later is identical.
+  const applyOcrFields = (ocrResult) => {
+    const conditionMap = {
+      'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
+      'Good': 'good', 'Fair': 'light_played',
+    };
+    const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
+    // Resolved against the collection OCR just read, falling back to whatever
+    // the seller had picked — a chip that doesn't exist for the game is dropped.
+    const variantCollection = ocrResult.collectionType || formData.collection;
+    const identifiedChips = resolveVariantChips(
+      [...(ocrResult.attributes ?? []), ...(ocrResult.serialNumber ? ['Numbered'] : [])],
+      variantCollection,
+    );
+    // The printed serial ("097/199") is also the Numbering Details answer —
+    // position 97 of a 199 print run — so both panel fields fill from it.
+    const serialParts = parseSerialNumber(ocrResult.serialNumber);
+    // A coloured chromium finish on a product that IS the finish (Topps
+    // Chrome, Prizm…) identifies a colour parallel — base chrome is silver —
+    // so the Refractor Details panel can be pre-filled from the observation.
+    const isChromeProduct = productFinishNames(ocrResult.cardSetName || formData.setName).includes('Chrome');
+    const observedColor = refractorColorValue(ocrResult.parallelColor);
+    setFormData(prev => ({
+      ...prev,
+      cardName:       ocrResult.name          || prev.cardName,
+      collection:     ocrResult.collectionType || prev.collection,
+      setName:        ocrResult.cardSetName   || prev.setName,
+      cardNumber:     ocrResult.cardNumber    || prev.cardNumber,
+      year:           ocrResult.releaseYear   || prev.year,
+      manufacturerName: ocrResult.brand       || prev.manufacturerName,
+      teamName:       ocrResult.team          || prev.teamName,
+      // Only a parallel name actually printed on the card — the prompt
+      // forbids naming one from appearance, so this is usually null.
+      parallelName:   ocrResult.parallel      || prev.parallelName,
+      serialPosition: prev.serialPosition || serialParts?.position || '',
+      serialPrintRun: prev.serialPrintRun || serialParts?.printRun || '',
+      ...(observedColor && isChromeProduct && !prev.refractorColor ? {
+        refractorType:  prev.refractorType || 'base',
+        refractorColor: observedColor,
+      } : {}),
+      condition:      conditionMap[ocrResult.condition] || prev.condition,
+      grade:          ocrResult.gradeScore    || prev.grade,
+      gradingCompany: ocrResult.gradingService !== 'None'
+        ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
+        : prev.gradingCompany,
+      certNumber:     ocrResult.certificationNumber || prev.certNumber,
+      // Tick the chips for what the card actually shows — rookie marking,
+      // autograph, patch, foil treatment, serial numbering. Additive: it can
+      // add a designation the seller hasn't picked, never remove one, and
+      // only ever selects chips that exist for this collection.
+      ...(() => {
+        // A finish is reported by name ("Reverse Holo"), so it is routed into
+        // the Foil / Holo Details panel exactly as a saved listing is loaded —
+        // it must never come back as a loose chip.
+        const merged = mergeIdentifiedVariants(
+          expandFoilFinishes(prev.variant, prev.foilFinishes),
+          ocrResult,
+          variantCollection,
+        );
+        const split = splitFoilFinishes(merged, variantCollection);
+        return { variant: split.variants, foilFinishes: split.foilFinishes };
+      })(),
+      // Dedicated flags that mirror some of those chips.
+      isFoil:         prev.isFoil || impliesFoil(identifiedChips),
+      isAuto:         prev.isAuto || identifiedChips.includes('Auto'),
+      serialNumber:   ocrResult.serialNumber || prev.serialNumber,
+      notes: prev.notes || [
+        ocrResult.description,
+        ocrResult.rarity   ? `Rarity: ${ocrResult.rarity}` : '',
+        ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
+      ].filter(Boolean).join('\n') || '',
+    }));
+  };
+
   // ─── Unified AI analysis ──────────────────────────────────────────────────
   // Only ever invoked by the Identify button, so it reads committed state: the
   // main photo plus whatever extra angles the seller has loaded by now. That
@@ -901,16 +980,11 @@ const AddEditCardPage = () => {
     if (!frontImage) return;
     clearScan();
     clearCardSight();
+    setCsChoice(null);
 
     const controller = new AbortController();
     scanAbortRef.current = controller;
     const { signal } = controller;
-
-    const conditionMap = {
-      'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
-      'Good': 'good', 'Fair': 'light_played',
-    };
-    const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
 
     // ── 0. Rectify the card out of the photo ────────────────────────────────
     // Both models downscale what they're sent, so the card's share of that
@@ -944,73 +1018,7 @@ const AddEditCardPage = () => {
     const ocrResult = await scanCard(analysisImages, { signal });
     if (signal.aborted) return;
 
-    if (ocrResult) {
-      // Resolved against the collection OCR just read, falling back to whatever
-      // the seller had picked — a chip that doesn't exist for the game is dropped.
-      const variantCollection = ocrResult.collectionType || formData.collection;
-      const identifiedChips = resolveVariantChips(
-        [...(ocrResult.attributes ?? []), ...(ocrResult.serialNumber ? ['Numbered'] : [])],
-        variantCollection,
-      );
-      // The printed serial ("097/199") is also the Numbering Details answer —
-      // position 97 of a 199 print run — so both panel fields fill from it.
-      const serialParts = parseSerialNumber(ocrResult.serialNumber);
-      // A coloured chromium finish on a product that IS the finish (Topps
-      // Chrome, Prizm…) identifies a colour parallel — base chrome is silver —
-      // so the Refractor Details panel can be pre-filled from the observation.
-      const isChromeProduct = productFinishNames(ocrResult.cardSetName || formData.setName).includes('Chrome');
-      const observedColor = refractorColorValue(ocrResult.parallelColor);
-      setFormData(prev => ({
-        ...prev,
-        cardName:       ocrResult.name          || prev.cardName,
-        collection:     ocrResult.collectionType || prev.collection,
-        setName:        ocrResult.cardSetName   || prev.setName,
-        cardNumber:     ocrResult.cardNumber    || prev.cardNumber,
-        year:           ocrResult.releaseYear   || prev.year,
-        manufacturerName: ocrResult.brand       || prev.manufacturerName,
-        teamName:       ocrResult.team          || prev.teamName,
-        // Only a parallel name actually printed on the card — the prompt
-        // forbids naming one from appearance, so this is usually null.
-        parallelName:   ocrResult.parallel      || prev.parallelName,
-        serialPosition: prev.serialPosition || serialParts?.position || '',
-        serialPrintRun: prev.serialPrintRun || serialParts?.printRun || '',
-        ...(observedColor && isChromeProduct && !prev.refractorColor ? {
-          refractorType:  prev.refractorType || 'base',
-          refractorColor: observedColor,
-        } : {}),
-        condition:      conditionMap[ocrResult.condition] || prev.condition,
-        grade:          ocrResult.gradeScore    || prev.grade,
-        gradingCompany: ocrResult.gradingService !== 'None'
-          ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
-          : prev.gradingCompany,
-        certNumber:     ocrResult.certificationNumber || prev.certNumber,
-        // Tick the chips for what the card actually shows — rookie marking,
-        // autograph, patch, foil treatment, serial numbering. Additive: it can
-        // add a designation the seller hasn't picked, never remove one, and
-        // only ever selects chips that exist for this collection.
-        ...(() => {
-          // A finish is reported by name ("Reverse Holo"), so it is routed into
-          // the Foil / Holo Details panel exactly as a saved listing is loaded —
-          // it must never come back as a loose chip.
-          const merged = mergeIdentifiedVariants(
-            expandFoilFinishes(prev.variant, prev.foilFinishes),
-            ocrResult,
-            variantCollection,
-          );
-          const split = splitFoilFinishes(merged, variantCollection);
-          return { variant: split.variants, foilFinishes: split.foilFinishes };
-        })(),
-        // Dedicated flags that mirror some of those chips.
-        isFoil:         prev.isFoil || impliesFoil(identifiedChips),
-        isAuto:         prev.isAuto || identifiedChips.includes('Auto'),
-        serialNumber:   ocrResult.serialNumber || prev.serialNumber,
-        notes: prev.notes || [
-          ocrResult.description,
-          ocrResult.rarity   ? `Rarity: ${ocrResult.rarity}` : '',
-          ocrResult.cardType ? `Type: ${ocrResult.cardType}` : '',
-        ].filter(Boolean).join('\n') || '',
-      }));
-    }
+    if (ocrResult) applyOcrFields(ocrResult);
 
     // ── 2. CardSight, narrowed to the category OCR read ─────────────────────
     // A collection the seller picked themselves always wins over OCR's guess.
@@ -1111,6 +1119,34 @@ const AddEditCardPage = () => {
     if (alt.id) fetchPricingById(alt.id);
     else if (alt.name) fetchPricingByName(alt.name);
     toast.success(`Switched to ${alt.name ?? 'the selected card'}.`);
+  };
+
+  // The seller reviewed a disputed match and picked the catalog record.
+  const applyCardSightMatch = () => {
+    if (!cardSightResult?.identified) return;
+    const fields = mapCardSightToFormFields(cardSightResult);
+    setFormData(prev => {
+      const next = { ...fields };
+      if (prev.setName && isGenericSetName(next.setName)) delete next.setName;
+      return { ...prev, ...next };
+    });
+    if (cardSightResult.pricing?.avgPrice) {
+      set('estimatedValue', String(cardSightResult.pricing.avgPrice.toFixed(2)));
+    }
+    if (cardSightResult.card?.id) fetchPricingById(cardSightResult.card.id);
+    else if (cardSightResult.card?.name) fetchPricingByName(cardSightResult.card.name);
+    setCsChoice('catalog');
+    toast.success('Catalog match applied.');
+  };
+
+  // ...or kept what was read from their photos (re-applied, in case they had
+  // switched to the catalog match or edited fields in between).
+  const applyPhotoRead = () => {
+    if (!scanResult) return;
+    applyOcrFields(scanResult);
+    if (scanResult.name) fetchPricingByName(scanResult.name);
+    setCsChoice('photo');
+    toast.success('Photo read applied.');
   };
 
   // ─── On-demand price estimate ─────────────────────────────────────────────
@@ -2233,13 +2269,29 @@ const AddEditCardPage = () => {
                         </div>
                       )}
 
+                      {cardSightResult?.identified && scanResult && (csNeedsReview || csChoice) && (
+                        <div className="mb-2">
+                          <p className="text-[10px] font-semibold text-muted-foreground mb-1">
+                            Two results — which one is your card?
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <Button type="button" size="sm" variant={csChoice === 'catalog' ? 'default' : 'outline'} className="text-xs" onClick={applyCardSightMatch}>
+                              {csChoice === 'catalog' ? '✓ Catalog match applied' : 'Use catalog match'}
+                            </Button>
+                            <Button type="button" size="sm" variant={csChoice === 'photo' ? 'default' : 'outline'} className="text-xs" onClick={applyPhotoRead}>
+                              {csChoice === 'photo' ? '✓ Photo read applied' : 'Use photo read'}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="pt-2 border-t border-border/50">
                         <Button
                           type="button"
                           size="sm"
                           variant="outline"
                           className="text-xs w-full"
-                          onClick={() => { clearScan(); clearCardSight(); }}
+                          onClick={() => { clearScan(); clearCardSight(); setCsChoice(null); }}
                         >
                           Dismiss
                         </Button>

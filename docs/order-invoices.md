@@ -127,6 +127,45 @@ inside the coded lines. **Confirm this treatment with your accountant** before
 the first import; change the two settings rows (not the code) to match the
 chart of accounts they want.
 
+## PDF tax invoice and the order link
+
+Every document can be downloaded as a **PDF tax invoice** (credit notes as a
+**credit note**), and Order Management links straight to it:
+
+- **Order Management** (`/admin/orders`): an **Invoice** column shows the
+  order's number (a link to that order's documents in Admin → Invoices) with a
+  PDF download button, and the row menu has **Download Tax Invoice** and **View
+  in Invoices**. The order detail dialog has a **Tax invoice** block listing the
+  invoice (and credit note, once refunded) with **PDF** / **Open**.
+- **Admin → Invoices**: each row has a PDF button, its Order id links back to
+  `/admin/orders?order=<id>` (which opens that order), and the document dialog
+  has **Download tax invoice (PDF)** and **View order**. `/admin/invoices?order=<id>`
+  opens filtered to one order's documents.
+- Routes (all admin + MFA gated, registered before `/:id`):
+  `GET /admin/invoices/by-order/:orderId/pdf?kind=tax_invoice|credit_note`,
+  `GET /admin/invoices/:id/pdf`, `GET /admin/invoices/by-order/:orderId`,
+  `POST /admin/invoices/by-orders { orderIds }` (numbers for the list column).
+  A paid order that has no invoice (the issuing trigger is fail-safe, so it can
+  miss) gets one issued on the spot by `issue_invoice_for_order()` when its PDF
+  is requested — never from JavaScript, and a credit note is never issued on
+  demand.
+- The PDF is **pure presentation** of the stored row (`src/utils/invoicePdf.js`,
+  pdfkit, dynamic-imported so it stays off the cold start): supplier block,
+  bill-to (business name + ABN when the buyer gave one), payment reference,
+  every line with its GST, the total and "Total includes GST of", a note that
+  marketplace cards / seller postage are the seller's supply with GST remitted
+  by CardPop on their behalf, a `VOID` watermark for voided documents, and
+  automatic page breaks. Helvetica only: characters outside Latin-1 (e.g. a
+  Japanese card name) print as `?`.
+- **Supplier details** (name, **ABN**, address, email, phone, footer note) are
+  the `invoice_supplier_details` platform setting
+  (`20261111040000_invoice_supplier_details.sql`), edited from **Admin →
+  Invoices → Invoice details** (`GET/PUT /admin/invoices/supplier`, ABN
+  checksum-validated, stored as digits). It is seeded without an ABN: the page
+  shows a warning and the PDF says so until it is filled in. **Set CardPop's
+  ABN before sending an invoice to a customer** — an invoice without the
+  supplier's ABN is not a valid tax invoice.
+
 ## Access
 
 - Admin routes: `authMiddleware` + `isAdminUser` + `requireAal2` (inherited
@@ -147,7 +186,10 @@ chart of accounts they want.
   mapping, issue-missing, detail, sync record, auth).
 - `tests/backend/invoiceExport.test.js` — the mapping and the three export
   shapes.
-- `tests/frontend/invoicesAdminPage.test.jsx` — the admin page.
+- `tests/backend/invoicePdf.test.js` — the PDF renderer and its helpers.
+- `tests/frontend/invoicesAdminPage.test.jsx` — the admin page (PDF button,
+  order links, ABN warning). `tests/frontend/orderManagementPage.test.jsx`
+  covers the Invoice column.
 
 ## Other exports
 

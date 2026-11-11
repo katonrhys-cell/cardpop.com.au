@@ -264,3 +264,103 @@ describe('PATCH /admin/invoices/:id/accounting', () => {
     expect((await request(app).patch(`/admin/invoices/${INVOICE.id}/accounting`).send({ status: 'skipped' })).status).toBe(404);
   });
 });
+
+const ORDER_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+
+describe('order → invoice link and PDF tax invoice', () => {
+  it('downloads the order\'s tax invoice as a PDF attachment', async () => {
+    queue({ data: INVOICE, error: null });
+    const res = await request(app).get(`/admin/invoices/by-order/${ORDER_ID}/pdf`).buffer(true).parse((r, cb) => {
+      const chunks = []; r.on('data', (c) => chunks.push(c)); r.on('end', () => cb(null, Buffer.concat(chunks)));
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/pdf');
+    expect(res.headers['content-disposition']).toBe('attachment; filename="CardPop-tax-invoice-INV-000001.pdf"');
+    expect(res.headers['cache-control']).toMatch(/no-store/);
+    expect(res.body.subarray(0, 5).toString()).toBe('%PDF-');
+    expect(builders[0].calls).toContainEqual(['eq', 'order_id', ORDER_ID]);
+    expect(builders[0].calls).toContainEqual(['eq', 'kind', 'tax_invoice']);
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it('issues the invoice on demand for a paid order that is missing one', async () => {
+    queue({ data: null, error: null }, { data: INVOICE, error: null });
+    mockSupabase.rpc.mockResolvedValue({ data: INVOICE.id, error: null });
+    const res = await request(app).get(`/admin/invoices/by-order/${ORDER_ID}/pdf`);
+    expect(res.status).toBe(200);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('issue_invoice_for_order', { p_order_id: ORDER_ID });
+  });
+
+  it('404s with a reason when the order has no invoice, or no credit note', async () => {
+    queue({ data: null, error: null });
+    mockSupabase.rpc.mockResolvedValue({ data: null, error: { message: 'order not paid' } });
+    const none = await request(app).get(`/admin/invoices/by-order/${ORDER_ID}/pdf`);
+    expect(none.status).toBe(404);
+    expect(none.body.error).toMatch(/paid/);
+
+    queue({ data: null, error: null });
+    const credit = await request(app).get(`/admin/invoices/by-order/${ORDER_ID}/pdf?kind=credit_note`);
+    expect(credit.status).toBe(404);
+    expect(credit.body.error).toMatch(/not been refunded/);
+    // A credit note is never issued on demand from a download.
+    expect(mockSupabase.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('downloads any stored document by its own id', async () => {
+    queue({ data: { ...INVOICE, kind: 'credit_note', number: 'CN-000001' }, error: null });
+    const res = await request(app).get(`/admin/invoices/${INVOICE.id}/pdf`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-disposition']).toMatch(/CardPop-credit-note-CN-000001\.pdf/);
+  });
+
+  it('400s a non-uuid order id and rejects non-admins', async () => {
+    expect((await request(app).get('/admin/invoices/by-order/nope/pdf')).status).toBe(400);
+    mockIsAdminUser.mockResolvedValue(false);
+    expect((await request(app).get(`/admin/invoices/by-order/${ORDER_ID}/pdf`)).status).toBe(403);
+  });
+
+  it('lists the documents issued for an order', async () => {
+    queue({ data: [{ id: INVOICE.id, kind: 'tax_invoice', number: 'INV-000001' }], error: null });
+    const res = await request(app).get(`/admin/invoices/by-order/${ORDER_ID}`);
+    expect(res.status).toBe(200);
+    expect(res.body.invoices[0].number).toBe('INV-000001');
+    expect(builders[0].calls).toContainEqual(['eq', 'order_id', ORDER_ID]);
+  });
+
+  it('maps invoice numbers onto many orders for the Order Management column', async () => {
+    queue({ data: [
+      { order_id: ORDER_ID, kind: 'tax_invoice', number: 'INV-000001', status: 'credited' },
+      { order_id: ORDER_ID, kind: 'credit_note', number: 'CN-000001', status: 'issued' },
+    ], error: null });
+    const res = await request(app).post('/admin/invoices/by-orders').send({ orderIds: [ORDER_ID] });
+    expect(res.status).toBe(200);
+    expect(res.body.invoices[ORDER_ID]).toEqual({ number: 'INV-000001', credit_note: 'CN-000001', status: 'credited' });
+    expect(builders[0].calls).toContainEqual(['in', 'order_id', [ORDER_ID]]);
+  });
+});
+
+describe('supplier details', () => {
+  it('reports not ready until an ABN is set', async () => {
+    const res = await request(app).get('/admin/invoices/supplier');
+    expect(res.status).toBe(200);
+    expect(res.body.ready).toBe(false);
+    expect(res.body.supplier.legalName).toBe('CardPop');
+  });
+
+  it('saves a valid ABN as digits and clears the settings cache', async () => {
+    queue({ data: null, error: null });
+    const res = await request(app).put('/admin/invoices/supplier').send({ legal_name: 'CardPop Pty Ltd', abn: '51 824 753 556', address: '1 Example St', email: 'admin@cardpop.com.au' });
+    expect(res.status).toBe(200);
+    expect(res.body.ready).toBe(true);
+    const upsert = builders[0].calls.find(([m]) => m === 'upsert')[1];
+    expect(upsert).toMatchObject({ key: 'invoice_supplier_details', value: { legal_name: 'CardPop Pty Ltd', abn: '51824753556' } });
+  });
+
+  it('rejects an ABN that fails the checksum, and a missing name', async () => {
+    const bad = await request(app).put('/admin/invoices/supplier').send({ legal_name: 'CardPop', abn: '12 345 678 901' });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toMatch(/ABN/);
+    expect((await request(app).put('/admin/invoices/supplier').send({ legal_name: '' })).status).toBe(400);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+  });
+});

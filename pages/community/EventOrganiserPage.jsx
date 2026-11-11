@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import OrganiserPageEditor from '@/components/events/OrganiserPageEditor.jsx';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -22,21 +22,33 @@ import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrgan
 // they co-hosted. Reached from the organiser name / logo on an event page.
 const EVENT_LIMIT = 200;
 
-const OrganiserLogo = ({ org }) => {
-  const url = safeLogoUrl(org?.logo_url);
-  const [failed, setFailed] = useState(false);
-  const box = 'w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
-  if (!url || failed) {
+const LOGO_BOX = 'w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
+
+const LogoTile = ({ url, name, onFail }) => (
+  isVideoLogoUrl(url) ? (
+    <video src={publicVideoUrl(url)} autoPlay muted loop playsInline aria-label={`${name} logo`} onError={onFail} className={LOGO_BOX} />
+  ) : (
+    <img src={publicImageUrl(url)} alt={`${name} logo`} onError={onFail} className={LOGO_BOX} />
+  )
+);
+
+// One tile per logo — a joint organiser shows each partner's mark side by side.
+const OrganiserLogos = ({ org }) => {
+  const [failed, setFailed] = useState(() => new Set());
+  const urls = organiserLogos(org).filter((u) => !failed.has(u));
+  if (urls.length === 0) {
     return (
-      <div className={`${box} flex items-center justify-center bg-primary/10`}>
+      <div className={`${LOGO_BOX} flex items-center justify-center bg-primary/10`}>
         <Users className="w-10 h-10 text-primary" aria-hidden="true" />
       </div>
     );
   }
-  return isVideoLogoUrl(url) ? (
-    <video src={publicVideoUrl(url)} autoPlay muted loop playsInline aria-label={`${org.name} logo`} onError={() => setFailed(true)} className={box} />
-  ) : (
-    <img src={publicImageUrl(url)} alt={`${org.name} logo`} onError={() => setFailed(true)} className={box} />
+  return (
+    <div className="flex flex-wrap items-center gap-3 sm:max-w-[26rem]">
+      {urls.map((url) => (
+        <LogoTile key={url} url={url} name={org.name} onFail={() => setFailed((prev) => new Set(prev).add(url))} />
+      ))}
+    </div>
   );
 };
 
@@ -64,6 +76,7 @@ export default function EventOrganiserPage() {
         let { data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
         // The profile columns ship in a migration; fall back to the original
         // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(BASE_ORGANISER_COLUMNS));
         if (orgError) throw orgError;
         if (!found) { if (!cancelled) setStatus('missing'); return; }
@@ -143,10 +156,10 @@ export default function EventOrganiserPage() {
             </div>
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-              <OrganiserLogo org={org} />
-              <div>
+              <OrganiserLogos org={org} />
+              <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Event organiser</p>
-                <h1 className="font-serif text-3xl md:text-5xl font-extrabold text-foreground leading-tight">{name}</h1>
+                <h1 className={`font-serif font-extrabold text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`}>{name}</h1>
                 <p className="text-muted-foreground mt-2">
                   {total === 0
                     ? 'No public events listed yet.'

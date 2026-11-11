@@ -28,7 +28,11 @@ const supabaseFrom = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/supabaseClient.js', () => ({ supabase: { from: supabaseFrom } }));
 vi.mock('@/lib/apiServerClient.js', () => ({ apiServerClient: { fetch: vi.fn() }, default: { fetch: vi.fn() } }));
 vi.mock('react-helmet-async', () => ({ Helmet: ({ children }) => <>{children}</> }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  useSearchParams: () => [new URLSearchParams(), vi.fn()],
+  Link: ({ to, children, ...rest }) => <a href={to} {...rest}>{children}</a>,
+}));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/components/admin/AdminPageHeader.jsx', () => ({ default: ({ title, children }) => <div><h1>{title}</h1>{children}</div> }));
 vi.mock('@/components/admin/OrderDetailDialog.jsx', () => ({ default: () => null }));
@@ -47,6 +51,19 @@ beforeEach(() => {
   supabaseFrom.mockImplementation(() => ({
     select: () => ({ order: () => ({ limit: () => Promise.resolve({ data: ORDERS, error: null }) }) }),
   }));
+});
+
+describe('OrderManagementPage — tax invoices', () => {
+  it('links a paid order to its invoice and offers the PDF; unpaid orders get neither', async () => {
+    const { apiServerClient } = await import('@/lib/apiServerClient.js');
+    apiServerClient.fetch.mockResolvedValue({ ok: true, json: async () => ({ invoices: { [ORDERS[0].id]: { number: 'INV-000007' } } }) });
+    render(<OrderManagementPage />);
+    await screen.findByText('Jordan Carnelley');
+    const link = await screen.findByRole('link', { name: 'INV-000007' });
+    expect(link).toHaveAttribute('href', `/admin/invoices?order=${ORDERS[0].id}`);
+    expect(screen.getAllByRole('button', { name: /download tax invoice/i })).toHaveLength(1);
+    expect(apiServerClient.fetch).toHaveBeenCalledWith('/admin/invoices/by-orders', expect.objectContaining({ method: 'POST' }));
+  });
 });
 
 describe('OrderManagementPage', () => {
