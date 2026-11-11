@@ -163,7 +163,7 @@ When the Player picker has no match, the dropdown ends with **"Can't find
 name, sport, optional team / confirming link / note). It posts to
 `POST /player-requests` (`src/routes/player-requests.js`, service role — the
 `player_requests` table has no browser write policy; migration
-`20261111050000_player_requests.sql`).
+`20261111092900_player_requests.sql`).
 
 * Needs a confirmed email; answers 409 (and the existing player) if the name is
   already published, 429 past 5 pending requests per member.
