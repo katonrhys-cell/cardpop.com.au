@@ -1,0 +1,48 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "CardPop",
+    "identifier": "did:web:cardpop.com.au",
+    "documentationUrl": "https://cardpop.com.au/llms.txt",
+    "logoUrl": "https://cardpop.com.au/pwa-icon-512.png"
+  },
+  "entries": [
+    {
+      "identifier": "urn:air:cardpop.com.au:mcp:cardpop",
+      "displayName": "CardPop MCP server",
+      "type": "application/mcp-server-card+json",
+      "url": "https://cardpop.com.au/.well-known/mcp/server-card.json",
+      "description": "Read-only MCP tools for CardPop, Australia's trading card marketplace: search buyable listings and look up live AUD card prices.",
+      "tags": ["trading cards", "marketplace", "australia", "pricing"],
+      "representativeQueries": [
+        "Find Pokémon cards for sale in Australia",
+        "What is this trading card worth in AUD?",
+        "Search CardPop listings for a Charizard"
+      ]
+    },
+    {
+      "identifier": "urn:air:cardpop.com.au:skills:check-card-prices",
+      "displayName": "Check card prices",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://cardpop.com.au/.well-known/agent-skills/check-card-prices/SKILL.md",
+      "description": "Look up live Australian-dollar market prices and recent-sales trends for trading cards on CardPop.",
+      "tags": ["trading cards", "pricing", "australia"],
+      "representativeQueries": [
+        "How much is a PSA 10 Pikachu worth in Australia?",
+        "Recent sale prices for a Magic: The Gathering card in AUD"
+      ]
+    },
+    {
+      "identifier": "urn:air:cardpop.com.au:skills:search-cardpop",
+      "displayName": "Search CardPop",
+      "type": "text/markdown; profile=\"urn:air:agent-skills\"",
+      "url": "https://cardpop.com.au/.well-known/agent-skills/search-cardpop/SKILL.md",
+      "description": "Search CardPop, Australia's trading card marketplace, for listings of a specific card (Pokémon, Magic, Yu-Gi-Oh, sports) and read the results.",
+      "tags": ["trading cards", "marketplace", "search"],
+      "representativeQueries": [
+        "Find a Yu-Gi-Oh Blue-Eyes White Dragon for sale on CardPop",
+        "Search CardPop for sports cards listings"
+      ]
+    }
+  ]
+}

@@ -12,6 +12,10 @@ const PUBLIC = path.resolve(__dirname, '../../public');
 const catalog = JSON.parse(
   fs.readFileSync(path.join(PUBLIC, '.well-known/ai-catalog.json'), 'utf8'),
 );
+// ARD v0.91 moved the manifest to /.well-known/ard.json, which is where the
+// audit looks first; without a file there the SPA fallback answers with HTML
+// ("Unexpected token '<'"). ai-catalog.json stays as the earlier-path alias.
+const ard = fs.readFileSync(path.join(PUBLIC, '.well-known/ard.json'), 'utf8');
 
 const URN = /^urn:air:[a-zA-Z0-9.-]+(:[a-zA-Z0-9._-]+)+$/;
 const DISCOVERY_TYPES = [
@@ -53,12 +57,19 @@ describe('ai-catalog.json (ARD manifest)', () => {
     }
   });
 
-  it('is served with its own media type rather than the SPA fallback', () => {
-    const vercel = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../vercel.json'), 'utf8'));
-    const rule = vercel.headers.find((h) => h.source === '/.well-known/ai-catalog.json');
-    expect(rule.headers).toContainEqual({
-      key: 'Content-Type',
-      value: 'application/ai-catalog+json; charset=utf-8',
-    });
+  it('is served at /.well-known/ard.json with the same content', () => {
+    expect(JSON.parse(ard)).toEqual(catalog);
   });
+
+  it.each(['/.well-known/ai-catalog.json', '/.well-known/ard.json'])(
+    '%s is served with its own media type rather than the SPA fallback',
+    (source) => {
+      const vercel = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../../vercel.json'), 'utf8'));
+      const rule = vercel.headers.find((h) => h.source === source);
+      expect(rule.headers).toContainEqual({
+        key: 'Content-Type',
+        value: 'application/ai-catalog+json; charset=utf-8',
+      });
+    },
+  );
 });
