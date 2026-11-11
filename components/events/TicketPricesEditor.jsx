@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { TICKET_PRICE_TYPES, MAX_GROUP_PRICES, MAX_GROUP_SIZE } from '@/utils/eventTicketPrices.js';
+import { TICKET_PRICE_TYPES, MAX_GROUP_PRICES, MAX_GROUP_SIZE, CUSTOM_TICKET_TYPE, MAX_CUSTOM_TICKETS, MAX_CUSTOM_LABEL } from '@/utils/eventTicketPrices.js';
 
 const inputCls = 'bg-background h-11 rounded-xl';
 
@@ -16,6 +16,7 @@ const inputCls = 'bg-background h-11 rounded-xl';
 const TicketPricesEditor = ({ value = [], onChange, disabled = false }) => {
   const single = TICKET_PRICE_TYPES.filter(t => t.type !== 'group');
   const groups = value.map((row, i) => ({ row, i })).filter(({ row }) => row.type === 'group');
+  const customs = value.map((row, i) => ({ row, i })).filter(({ row }) => row.type === CUSTOM_TICKET_TYPE);
   const hasGroup = groups.length > 0;
 
   const rowFor = (type) => value.find(r => r.type === type);
@@ -86,6 +87,57 @@ const TicketPricesEditor = ({ value = [], onChange, disabled = false }) => {
         {hasGroup && groups.length < MAX_GROUP_PRICES && (
           <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => onChange([...value, { type: 'group', group_size: '', price_aud: '' }])} disabled={disabled}>
             <Plus className="w-4 h-4 mr-1" /> Add another group price
+          </Button>
+        )}
+      </div>
+
+      <div className="p-3 bg-muted/20 rounded-xl border border-border space-y-3">
+        <div>
+          <p className="font-semibold text-sm">Your own ticket types</p>
+          <p className="text-xs text-muted-foreground">Name a ticket yourself — e.g. "Player Entry" or "Spectator Pass". You can mark one sold out and link its waitlist.</p>
+        </div>
+        {customs.map(({ row, i }, n) => (
+          <div key={i} className="space-y-3 rounded-xl border border-border bg-background p-3">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="space-y-1 flex-1 min-w-[12rem]">
+                <Label htmlFor={`custom_label_${n}`} className="text-xs text-muted-foreground">Ticket name</Label>
+                <Input
+                  id={`custom_label_${n}`} maxLength={MAX_CUSTOM_LABEL}
+                  value={row.label || ''} onChange={e => update(i, { label: e.target.value })}
+                  className={inputCls} placeholder="Player Entry" disabled={disabled}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor={`custom_price_${n}`} className="text-xs text-muted-foreground">Price (AUD)</Label>
+                <Input
+                  id={`custom_price_${n}`} type="number" min="0" step="0.01" inputMode="decimal"
+                  value={row.price_aud} onChange={e => update(i, { price_aud: e.target.value })}
+                  className={`${inputCls} w-32`} placeholder="0.00" disabled={disabled}
+                />
+              </div>
+              <Button type="button" variant="ghost" size="icon" className="h-11 w-11" onClick={() => removeAt(i)} disabled={disabled} aria-label={`Remove custom ticket ${n + 1}`}>
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch id={`custom_sold_out_${n}`} checked={row.sold_out === true} onCheckedChange={on => update(i, { sold_out: on })} disabled={disabled} aria-label={`Custom ticket ${n + 1} sold out`} />
+              <Label htmlFor={`custom_sold_out_${n}`} className="text-sm font-semibold cursor-pointer">Sold out</Label>
+            </div>
+            {row.sold_out === true && (
+              <div className="space-y-1">
+                <Label htmlFor={`custom_waitlist_${n}`} className="text-xs text-muted-foreground">Join the waitlist URL (optional)</Label>
+                <Input
+                  id={`custom_waitlist_${n}`} type="url"
+                  value={row.waitlist_url || ''} onChange={e => update(i, { waitlist_url: e.target.value })}
+                  className={inputCls} placeholder="https://" disabled={disabled}
+                />
+              </div>
+            )}
+          </div>
+        ))}
+        {customs.length < MAX_CUSTOM_TICKETS && (
+          <Button type="button" variant="outline" size="sm" className="rounded-xl" onClick={() => onChange([...value, { type: CUSTOM_TICKET_TYPE, label: '', price_aud: '', sold_out: false, waitlist_url: '' }])} disabled={disabled}>
+            <Plus className="w-4 h-4 mr-1" /> Add a ticket type
           </Button>
         )}
       </div>

@@ -163,7 +163,7 @@ describe('EventFormModal — ticket prices', () => {
     renderForm('user');
     openOrganiser();
     expect(screen.queryByText('Other Ticket Prices')).not.toBeInTheDocument();
-    fireEvent.click(screen.getAllByRole('switch')[0]); // Free Entry off
+    fireEvent.click(screen.getByRole('switch', { name: 'Free Entry' })); // Free Entry off
     for (const name of ['Child ticket', 'VIP ticket', 'GA Early Access ticket', 'GA Late Access ticket', 'Group tickets']) {
       expect(screen.getByRole('switch', { name })).toBeInTheDocument();
     }

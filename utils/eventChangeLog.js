@@ -17,7 +17,7 @@ export const EVENT_LOGGED_FIELDS = [
   'venue_name', 'address', 'suburb', 'state', 'postcode',
   'start_date', 'end_date', 'start_time', 'end_time',
   'organizer_name', 'organizer_logo_url', 'organizer_email', 'organizer_phone',
-  'website_url', 'ticket_url', 'vendor_application_url',
+  'website_url', 'ticket_url', 'vendor_application_url', 'tickets_sold_out', 'waitlist_url', 'booking_fee_aud',
   'instagram_url', 'facebook_url', 'youtube_url', 'youtube_channel_url', 'tiktok_url', 'x_url', 'discord_url',
   'facebook_video_url',
   'entry_fee_aud', 'presale_fee_aud', 'ticket_prices', 'is_free', 'capacity', 'registration_required',
@@ -55,6 +55,9 @@ export const EVENT_CHANGE_LABELS = {
   website_url: 'Event website',
   ticket_url: 'Tickets URL',
   vendor_application_url: 'Trader applications URL',
+  tickets_sold_out: 'Tickets sold out',
+  waitlist_url: 'Waitlist URL',
+  booking_fee_aud: 'Booking fee',
   instagram_url: 'Instagram',
   facebook_url: 'Facebook',
   youtube_url: 'First video',
@@ -83,7 +86,7 @@ export const EVENT_CHANGE_LABELS = {
 export const changeLabel = (field) => EVENT_CHANGE_LABELS[field] || field;
 
 const TIME_FIELDS = new Set(['start_time', 'end_time']);
-const NUMBER_FIELDS = new Set(['entry_fee_aud', 'presale_fee_aud', 'capacity']);
+const NUMBER_FIELDS = new Set(['entry_fee_aud', 'presale_fee_aud', 'booking_fee_aud', 'capacity']);
 
 // One canonical shape per value: '' / [] / {} / undefined → null,
 // "10:00:00" → "10:00", "12.50" → 12.5.
@@ -108,7 +111,7 @@ export function describeEventValue(field, value) {
   const v = normaliseEventValue(field, value);
   if (v === null) return '—';
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
-  if (field === 'entry_fee_aud' || field === 'presale_fee_aud') {
+  if (field === 'entry_fee_aud' || field === 'presale_fee_aud' || field === 'booking_fee_aud') {
     return Number.isFinite(Number(v)) ? `$${Number(v).toFixed(2)}` : String(v);
   }
   if (field === 'gallery_albums' && Array.isArray(v)) {
@@ -120,7 +123,7 @@ export function describeEventValue(field, value) {
     return v.map((x) => x?.title || x?.url).filter(Boolean).join('\n') || plural(v.length, 'video');
   }
   if (field === 'ticket_prices' && Array.isArray(v)) {
-    return ticketPriceLines(v).map((t) => `${t.label}: ${t.price}`).join('\n') || '—';
+    return ticketPriceLines(v).map((t) => `${t.label}: ${t.price}${t.soldOut ? ' (sold out)' : ''}`).join('\n') || '—';
   }
   if (Array.isArray(v)) return v.join(', ');
   if (typeof v === 'object') return JSON.stringify(v);

@@ -96,8 +96,11 @@ const INITIAL_STATE = {
   discord_url: '',
   // Where traders book a table.
   vendor_application_url: '',
+  tickets_sold_out: false,
+  waitlist_url: '',
   facebook_video_url: '',
   entry_fee_aud: '',
+  booking_fee_aud: '',
   presale_fee_aud: '',
   // Child / VIP / GA early & late access / group prices (utils/eventTicketPrices.js),
   // held as { type, price_aud, group_size } with string inputs.
@@ -157,13 +160,14 @@ const TagInput = ({ id, value = [], onChange, placeholder, disabled }) => {
   );
 };
 
-const NUMBER_FIELDS = ['entry_fee_aud', 'presale_fee_aud', 'capacity'];
+const NUMBER_FIELDS = ['entry_fee_aud', 'presale_fee_aud', 'booking_fee_aud', 'capacity'];
 
 // Saved ticket prices → the editor's string inputs.
 const ticketPricesToForm = (rows) => cleanTicketPrices(rows).map(r => ({
   type: r.type,
   price_aud: String(r.price_aud),
   ...(r.type === 'group' ? { group_size: String(r.group_size) } : {}),
+  ...(r.type === 'custom' ? { label: r.label, sold_out: r.sold_out === true, waitlist_url: r.waitlist_url || '' } : {}),
 }));
 const isBlankFormValue = (v) => v === '' || v === null || v === undefined || (Array.isArray(v) && v.length === 0);
 
@@ -391,8 +395,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         x_url:               event.x_url || '',
         discord_url:         event.discord_url || '',
         vendor_application_url: event.vendor_application_url || '',
+        tickets_sold_out:    event.tickets_sold_out || false,
+        waitlist_url:        event.waitlist_url || '',
         facebook_video_url:  event.facebook_video_url || '',
         entry_fee_aud:       event.entry_fee_aud != null ? String(event.entry_fee_aud) : '',
+        booking_fee_aud:     event.booking_fee_aud != null ? String(event.booking_fee_aud) : '',
         presale_fee_aud:     event.presale_fee_aud != null ? String(event.presale_fee_aud) : '',
         ticket_prices:       ticketPricesToForm(event.ticket_prices),
         is_free:             event.is_free ?? true,
@@ -689,9 +696,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         x_url:               urls.x_url || null,
         discord_url:         urls.discord_url || null,
         vendor_application_url: urls.vendor_application_url || null,
+        tickets_sold_out:    formData.tickets_sold_out === true,
+        waitlist_url:        urls.waitlist_url || null,
         facebook_video_url:  urls.facebook_video_url || null,
         entry_fee_aud:       formData.is_free ? 0 : (parseFloat(formData.entry_fee_aud) || 0),
         presale_fee_aud:     formData.is_free ? null : (parseFloat(formData.presale_fee_aud) || null),
+        booking_fee_aud:     formData.is_free ? null : (parseFloat(formData.booking_fee_aud) || null),
         ticket_prices:       formData.is_free ? [] : cleanTicketPrices(formData.ticket_prices),
         is_free:             formData.is_free,
         capacity:            formData.capacity ? parseInt(formData.capacity, 10) : null,
@@ -1194,6 +1204,20 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                     <Label htmlFor="ticket_url" className="font-bold">Tickets / Registration URL</Label>
                     <Input id="ticket_url" name="ticket_url" type="url" value={formData.ticket_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
                   </div>
+                  <div className="sm:col-span-2 space-y-3 rounded-xl border border-border p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <Label htmlFor="tickets_sold_out" className="font-bold">Tickets sold out</Label>
+                        <p id="tickets_sold_out_hint" className="text-xs text-muted-foreground">Replaces "Get Tickets" on the event page with a "Sold Out" badge. Switch it off if more tickets are released.</p>
+                      </div>
+                      <Switch id="tickets_sold_out" checked={formData.tickets_sold_out === true} onCheckedChange={v => set('tickets_sold_out', v)} disabled={loading} aria-describedby="tickets_sold_out_hint" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="waitlist_url" className="font-bold">Join the waitlist URL</Label>
+                      <Input id="waitlist_url" name="waitlist_url" type="url" value={formData.waitlist_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                      <p className="text-xs text-muted-foreground">Where collectors can join the waitlist. Shown as "Join the waitlist" while the event is sold out.</p>
+                    </div>
+                  </div>
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
                     <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
@@ -1234,7 +1258,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                 <div className="pt-2 border-t border-border space-y-5">
                   <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider">Entry & Capacity</p>
                   <div className="flex items-center gap-3 p-3 bg-muted/20 rounded-xl border border-border">
-                    <Switch id="is_free" checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} aria-describedby="is_free_hint" />
+                    <Switch id="is_free" checked={formData.is_free} onCheckedChange={v => { set('is_free', v); if (v) { set('entry_fee_aud', ''); set('presale_fee_aud', ''); set('booking_fee_aud', ''); set('ticket_prices', []); } }} disabled={loading} aria-describedby="is_free_hint" />
                     <div>
                       <Label htmlFor="is_free" className="text-sm font-semibold cursor-pointer">Free Entry</Label>
                       <p id="is_free_hint" className="text-xs text-muted-foreground">Toggle off to set an entry fee</p>
@@ -1250,6 +1274,13 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                         <Label htmlFor="presale_fee_aud" className="font-bold">Presale / Early Bird (AUD)</Label>
                         <Input id="presale_fee_aud" name="presale_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.presale_fee_aud} onChange={handleChange} className={inputCls} placeholder="Optional" disabled={loading} />
                       </div>
+                    </div>
+                  )}
+                  {!formData.is_free && (
+                    <div className="space-y-2">
+                      <Label htmlFor="booking_fee_aud" className="font-bold">Booking / Service Fee per ticket (AUD)</Label>
+                      <Input id="booking_fee_aud" name="booking_fee_aud" type="number" min="0" step="0.01" inputMode="decimal" value={formData.booking_fee_aud} onChange={handleChange} className={inputCls} placeholder="e.g. 3.95 — leave blank if none" disabled={loading} />
+                      <p className="text-xs text-muted-foreground">The fee your ticketing site adds on top of each ticket (Humanitix, Eventbrite…). It is shown next to the prices so collectors know the real cost.</p>
                     </div>
                   )}
                   {!formData.is_free && (
