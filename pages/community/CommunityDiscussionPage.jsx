@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
+import RedditIcon from '@/components/RedditIcon.jsx';
+import { redditShareUrl } from '@/utils/redditLinks.js';
 import { toast } from 'sonner';
 import { MessageSquare, CalendarDays, Trash2, Loader2 } from 'lucide-react';
 
@@ -176,6 +178,17 @@ const CommunityDiscussionPage = () => {
         </div>
         <div className="prose prose-slate dark:prose-invert max-w-none">
           <p className="whitespace-pre-line">{discussion.body || 'No content provided.'}</p>
+        </div>
+        <div className="mt-6 pt-4 border-t border-border">
+          <Button asChild variant="outline" size="sm" className="rounded-xl font-bold gap-2">
+            <a
+              href={redditShareUrl(`${window.location.origin}/community/discussion/${discussion.id}`, discussion.title)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <RedditIcon className="w-4 h-4 text-[#FF4500]" /> Share to Reddit
+            </a>
+          </Button>
         </div>
       </div>
 

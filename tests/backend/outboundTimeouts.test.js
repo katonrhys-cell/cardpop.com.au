@@ -27,6 +27,7 @@ const FETCH_SITES = [
   'src/utils/psaApiClient.js',
   'src/utils/psaScraper.js',
   'src/utils/recaptcha.js',
+  'src/utils/redditFeed.js',
   'src/utils/searchConsoleClient.js',
   'src/utils/turnstile.js',
 ];

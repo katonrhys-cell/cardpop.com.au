@@ -13,12 +13,16 @@ const DiscordIcon = ({ className }) => (
   </svg>
 );
 
+import RedditIcon from '@/components/RedditIcon.jsx';
+import { REDDIT_SUBREDDIT_URL } from '@/utils/redditLinks.js';
+
 const SOCIAL_LINKS = [
   { label: 'Discord', href: 'https://discord.gg/cardpop', Icon: DiscordIcon },
   { label: 'Twitter / X', href: 'https://twitter.com/cardpopau', Icon: Twitter },
   { label: 'Instagram', href: 'https://www.instagram.com/cardpop_aus/', Icon: Instagram },
   { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591488466915', Icon: Facebook },
   { label: 'YouTube', href: 'https://youtube.com/@cardpopau', Icon: Youtube },
+  { label: 'Reddit', href: REDDIT_SUBREDDIT_URL, Icon: RedditIcon },
 ];
 
 const GITHUB_URL = 'https://github.com/katonrhys-cell';

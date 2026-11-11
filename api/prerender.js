@@ -4564,6 +4564,8 @@ async function renderHome(supabase) {
       'https://twitter.com/cardpopau',
       'https://www.instagram.com/cardpop_aus/',
       'https://www.facebook.com/profile.php?id=61591488466915',
+      'https://www.reddit.com/user/cardpop_aus/',
+      'https://www.reddit.com/r/cardpop_aus_forum/',
     ],
   };
 

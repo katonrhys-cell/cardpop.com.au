@@ -39,6 +39,8 @@ export const OUTBOUND_TIMEOUT_MS = Object.freeze({
   anthropicDraft: 240_000, // blog draft stream, 300 s function
   // OpenStreetMap Nominatim, for the Local Map's shared geocode cache.
   nominatim: 4_000,
+  // Reddit's public subreddit listing for the forum page (cached a minute).
+  reddit: 4_000,
   // Stripe SDK (`new Stripe(key, { timeout })`); Stripe's default is 80 s.
   stripe: 20_000,
 });
