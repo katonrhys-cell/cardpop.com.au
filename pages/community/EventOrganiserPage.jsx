@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import OrganiserPageEditor from '@/components/events/OrganiserPageEditor.jsx';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, canEditOrganiserPage } from '@/utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -124,7 +124,7 @@ export default function EventOrganiserPage() {
       {status === 'ready' && (
         <SEOHead
           title={`${name} — Card Shows & Events | CardPop`}
-          description={org.description ? `${org.description.replace(/\s+/g, ' ').slice(0, 155)}` : description}
+          description={organiserMetaDescription(org, description)}
           canonicalUrl={`${SITE_URL}${organiserPath(org)}`}
           ogImage={safeLogoUrl(org.logo_url) && !isVideoLogoUrl(org.logo_url) ? publicImageUrl(org.logo_url) : undefined}
           noindex={total === 0}

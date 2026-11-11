@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // The prerender function builds its own Supabase client from @supabase/supabase-js,
 // so we mock that module and feed per-table results through a chainable builder.
-const state = vi.hoisted(() => ({ result: { data: null }, listResult: { data: [] }, listResultByTable: null, rpcResult: null, publicUrl: 'https://cdn.test/img.jpg' }));
+const state = vi.hoisted(() => ({ resultQueue: null, result: { data: null }, listResult: { data: [] }, listResultByTable: null, rpcResult: null, publicUrl: 'https://cdn.test/img.jpg' }));
 
 vi.mock('@supabase/supabase-js', () => {
   const builder = (table) => {
@@ -22,7 +22,8 @@ vi.mock('@supabase/supabase-js', () => {
       not: vi.fn(() => b),
       order: vi.fn(() => b),
       limit: vi.fn(() => b),
-      maybeSingle: vi.fn(() => Promise.resolve(state.result)),
+      // A queue lets one test answer successive single-row reads differently.
+      maybeSingle: vi.fn(() => Promise.resolve(state.resultQueue?.length ? state.resultQueue.shift() : state.result)),
       single: vi.fn(() => Promise.resolve(state.result)),
       then: (resolve, reject) => Promise.resolve(state.listResultByTable?.[table] ?? state.listResult).then(resolve, reject),
     };
@@ -58,7 +59,7 @@ function run(path, query = {}) {
 
 const UUID = '11111111-2222-3333-4444-555555555555';
 
-beforeEach(() => { state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; state.rpcResult = null; });
+beforeEach(() => { state.resultQueue = null; state.result = { data: null }; state.listResult = { data: [] }; state.listResultByTable = null; state.rpcResult = null; });
 
 describe('prerender blog articles', () => {
   it('renders an article with its title, description and featured image', async () => {
@@ -1072,6 +1073,57 @@ describe('prerender event organiser pages', () => {
     expect(body).not.toContain('Other Show');
     expect(body).toContain('"@type":"Organization"');
     expect(body).not.toContain('noindex');
+  });
+
+  it('shows what the organiser wrote: about text, links, and a description that leads the meta', async () => {
+    state.result = { data: {
+      id: 'o3', name: 'Oz Comic-Con', slug: 'oz-comic-con', logo_url: null,
+      description: 'Australia’s biggest pop-culture show.\nRunning since 2012 in Adelaide & Perth.',
+      website_url: 'https://ozcomiccon.com', instagram_url: 'https://instagram.com/ozcomiccon',
+      facebook_url: 'javascript:alert(1)', youtube_url: null,
+    } };
+    state.listResult = { data: [
+      { id: 'e1', slug: 'oz-2999', title: 'Oz 2999', status: 'approved', start_date: '2999-01-01', organizer_name: 'Oz Comic-Con' },
+    ] };
+    const { status, body } = await run('/events/organisers/oz-comic-con');
+    expect(status).toBe(200);
+    expect(body).toContain('<h2>About Oz Comic-Con</h2>');
+    expect(body).toContain('Running since 2012 in Adelaide &amp; Perth.');
+    expect(body).toContain('<br />');
+    expect(body).toContain('<h2>Follow Oz Comic-Con</h2>');
+    expect(body).toContain('href="https://ozcomiccon.com"');
+    expect(body).toContain('href="https://instagram.com/ozcomiccon"');
+    expect(body).toContain('rel="nofollow noopener ugc"');
+    expect(body).not.toContain('javascript:');
+    // The organiser's own words are the meta description; JSON-LD carries them and sameAs.
+    expect(body).toMatch(/<meta name="description" content="Australia’s biggest pop-culture show\./);
+    expect(body).toContain('"sameAs":["https://ozcomiccon.com","https://instagram.com/ozcomiccon"]');
+    expect(body).toContain('"description":"Australia’s biggest pop-culture show. Running since 2012');
+  });
+
+  it('keeps the generated summary and adds no about/follow sections when the organiser wrote nothing', async () => {
+    state.result = { data: { id: 'o4', name: 'Plain Org', slug: 'plain-org', logo_url: null, description: null, website_url: null } };
+    state.listResult = { data: [
+      { id: 'e1', slug: 'plain-2999', title: 'Plain 2999', status: 'approved', start_date: '2999-01-01', organizer_name: 'Plain Org' },
+    ] };
+    const { body } = await run('/events/organisers/plain-org');
+    expect(body).not.toContain('<h2>About');
+    expect(body).not.toContain('<h2>Follow Plain Org');
+    expect(body).not.toContain('"sameAs"');
+    expect(body).toMatch(/<meta name="description" content="Card shows and trading card events hosted by Plain Org/);
+  });
+
+  it('still renders when the profile columns are not there yet (app deployed before the migration)', async () => {
+    state.resultQueue = [
+      { data: null, error: { message: 'column event_organisers.description does not exist' } },
+      { data: { id: 'o5', name: 'Old Schema Org', slug: 'old-schema-org', logo_url: null } },
+    ];
+    state.listResult = { data: [
+      { id: 'e1', slug: 'old-2999', title: 'Old 2999', status: 'approved', start_date: '2999-01-01', organizer_name: 'Old Schema Org' },
+    ] };
+    const { status, body } = await run('/events/organisers/old-schema-org');
+    expect(status).toBe(200);
+    expect(body).toContain('<h1>Old Schema Org</h1>');
   });
 
   it('marks an organiser with no events noindex and 404s an unknown slug', async () => {

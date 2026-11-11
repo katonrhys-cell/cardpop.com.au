@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { organiserLinks, canEditOrganiserPage } from '@/utils/organiserPage.js';
+import { organiserLinks, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 
 describe('organiserLinks', () => {
   it('keeps present http(s) links in display order and drops the rest', () => {
@@ -27,5 +27,24 @@ describe('canEditOrganiserPage', () => {
     expect(canEditOrganiserPage(org, null, false)).toBe(false);
     expect(canEditOrganiserPage({ owner_id: null }, null, false)).toBe(false);
     expect(canEditOrganiserPage(null, 'u1', true)).toBe(false);
+  });
+});
+
+describe('organiserMetaDescription', () => {
+  const fallback = 'Generated summary.';
+  it('uses the fallback until the organiser has written something', () => {
+    expect(organiserMetaDescription({ description: null }, fallback)).toBe(fallback);
+    expect(organiserMetaDescription({ description: '  \n ' }, fallback)).toBe(fallback);
+    expect(organiserMetaDescription(null, fallback)).toBe(fallback);
+  });
+  it('collapses whitespace and keeps short text whole', () => {
+    expect(organiserMetaDescription({ description: 'Line one.\n\nLine   two.' }, fallback)).toBe('Line one. Line two.');
+  });
+  it('cuts long text at a word boundary within 155 characters, with an ellipsis', () => {
+    const long = 'word '.repeat(80).trim();
+    const out = organiserMetaDescription({ description: long }, fallback);
+    expect(out.length).toBeLessThanOrEqual(156);
+    expect(out.endsWith('…')).toBe(true);
+    expect(out).not.toMatch(/wor…$/);
   });
 });
