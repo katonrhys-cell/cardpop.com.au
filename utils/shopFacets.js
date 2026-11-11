@@ -17,6 +17,7 @@
  * the brand prefix and the " — <colour>" suffix the colour split appended.
  */
 import { sortFamily } from '@/utils/shopFamily.js';
+import { isStyleName } from '@/utils/shopVariants.js';
 import { isSoldOut, PUBLIC_SHOP_STATUSES } from '@/utils/shopStock.js';
 import { SHOP_CARD_COLUMNS, SHOP_FACET_COLUMNS } from '@/utils/shopColumns.js';
 import { binderCapacity } from '@/utils/binderCapacity.js';
@@ -138,7 +139,9 @@ export const FACETS = {
   colour: {
     label: 'Colour',
     swatch: true,
-    value: (p) => norm(p.colour) || null,
+    // A style ("Green – Standard American 50") isn't a colour to filter by;
+    // its line still shows under Type.
+    value: (p) => (isStyleName(p.colour) ? null : norm(p.colour) || null),
     optionLabel: (p) => String(p.colour).trim(),
     order: (o) => sortFamily(o.map((x) => ({ ...x, colour: x.label }))).map(({ colour: _c, ...x }) => x),
   },
