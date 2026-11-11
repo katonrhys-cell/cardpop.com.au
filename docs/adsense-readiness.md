@@ -110,6 +110,15 @@ bot-facing pages that day found the homepage fixed but these still open:
 | Article JSON-LD `wordCount` was the 300-character excerpt's (≈50 for a 3,500-word guide); a desk byline was typed `Person`. | Fixed |
 | The AI disclosure said "every dollar figure traces to a recorded sale" on articles that say their figures are listings. | Fixed: "recorded price snapshot" |
 
+Follow-up the next day: every page (SPA `index.html` and the prerender) now
+carries `<meta name="google-adsense-account" content="ca-pub-…">`, the
+ownership declaration that needs no ad script — the AdSense loader itself never
+runs on `/` (a no-ad surface), so the homepage previously showed the reviewer
+no sign of the account beyond `ads.txt`. "Secure escrow trading", "Australia's
+premier platform" and the `/australian-markets` description that described a
+different page were rewritten, and stored product descriptions no longer show
+raw `**markdown**`.
+
 Still open, and **not code** — these are what a "low value content" reviewer
 is most likely reacting to now:
 
