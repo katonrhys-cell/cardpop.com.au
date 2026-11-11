@@ -10,6 +10,7 @@ import NextEditionBanner from '@/components/events/NextEditionBanner.jsx';
 import EventReviewTeaser from '@/components/reviews/EventReviewTeaser.jsx';
 import EventAttendeeReviews from '@/components/events/EventAttendeeReviews.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { useRecordEventView } from '@/hooks/useRecordEventView.js';
 import { isPastEvent } from '@/utils/eventPast.js';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,6 +60,9 @@ const EventDetailPage = () => {
     fetchEvent();
     return () => { isMounted = false; };
   }, [eventId]);
+
+  // A view of a public event (events_public only returns public ones).
+  useRecordEventView(event?.id, Boolean(event));
 
   if (isLoading) {
     return (

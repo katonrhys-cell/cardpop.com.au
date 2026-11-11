@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
+import { CalendarDays, Eye, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import { fetchEventViewStats, formatViews } from '@/lib/eventViews.js';
 import { eventPath, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
 
 const STATUS_BADGES = {
@@ -45,6 +46,8 @@ const AccountEvents = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [isVerifiedOrganiser, setIsVerifiedOrganiser] = useState(false);
+  // { [eventId]: { total, last7, last30 } } — other people's views of live events.
+  const [viewStats, setViewStats] = useState({});
   const organiserAccess = useOrganiserAccess(currentUser?.id);
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
@@ -72,6 +75,9 @@ const AccountEvents = () => {
         .order('start_date', { ascending: false });
       if (error) throw error;
       setEvents(data || []);
+      // Best-effort: view counts never block the list.
+      const liveIds = (data || []).filter((ev) => ev.status === 'approved' || ev.status === 'completed').map((ev) => ev.id);
+      fetchEventViewStats(liveIds).then(setViewStats);
     } catch (err) {
       console.error('Failed to load your events:', err);
       if (silent) {
@@ -209,6 +215,18 @@ const AccountEvents = () => {
               <MapPin className="w-4 h-4 shrink-0" aria-hidden="true" /> <span className="truncate">{formatEventLocation(event)}</span>
             </span>
           </div>
+          {(event.status === 'approved' || event.status === 'completed') && (() => {
+            const v = viewStats[event.id] || { total: 0, last7: 0, last30: 0 };
+            return (
+              <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground" data-testid={`event-views-${event.id}`}>
+                <span className="flex items-center gap-1.5 font-semibold text-foreground">
+                  <Eye className="w-4 h-4 shrink-0" aria-hidden="true" /> {formatViews(v.total)}
+                </span>
+                <span>{v.last7.toLocaleString('en-AU')} in the last 7 days</span>
+                <span>{v.last30.toLocaleString('en-AU')} in the last 30 days</span>
+              </p>
+            );
+          })()}
           {event.status === 'pending_review' && (
             <p className="mt-2 text-sm text-muted-foreground">
               With the CardPop team for review — you can keep editing it in the meantime.
