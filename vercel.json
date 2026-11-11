@@ -6,7 +6,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 40,
-      "includeFiles": "node_modules/@img/sharp-*linux-x64/**"
+      "includeFiles": "node_modules/{@img/sharp-*linux-x64,pdfkit/js/data}/**"
     },
     "api/sitemap.js": {
       "maxDuration": 10
@@ -25,7 +25,7 @@
     },
     "api/grade-estimate.js": {
       "maxDuration": 300,
-      "includeFiles": "node_modules/@img/sharp-*linux-x64/**"
+      "includeFiles": "node_modules/{@img/sharp-*linux-x64,pdfkit/js/data}/**"
     }
   },
   "redirects": [

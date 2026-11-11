@@ -6,9 +6,10 @@
 
 import supabase from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
-import { getPlatformSettings } from '../utils/platformSettings.js';
+import { getPlatformSettings, invalidatePlatformSettings } from '../utils/platformSettings.js';
 import { resolveAccountMapping } from '../utils/invoiceAccounting.js';
 import { invoicesToCsv, invoicesToXeroCsv, toXeroDocument } from '../utils/invoiceExport.js';
+import { renderInvoicePdf, invoicePdfFilename, normaliseSupplier } from '../utils/invoicePdf.js';
 
 export const INVOICE_LIST_COLUMNS = [
   'id', 'order_id', 'kind', 'number', 'sequence', 'status', 'invoice_date', 'issued_at', 'due_date',
@@ -148,3 +149,95 @@ export async function exportInvoices(filters = {}, format = 'csv') {
 }
 
 export const xeroPreview = (invoice, mapping) => toXeroDocument(invoice, mapping);
+
+// ─── Order → invoice link and the PDF tax invoice ────────────────────────────
+
+const ORDER_INVOICE_SUMMARY = 'id, order_id, kind, number, status, invoice_date, total_aud, gst_aud, credits_invoice_id';
+
+/** Every document issued for an order: the tax invoice, then any credit note. */
+export async function getInvoicesForOrder(orderId) {
+  const { data, error } = await supabase
+    .from('invoices')
+    .select(ORDER_INVOICE_SUMMARY)
+    .eq('order_id', orderId)
+    .order('sequence', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+/** Invoice summaries for many orders at once (the Order Management list). */
+export async function getInvoiceSummariesForOrders(orderIds) {
+  const ids = [...new Set((orderIds || []).filter(Boolean))].slice(0, 500);
+  if (!ids.length) return [];
+  const { data, error } = await supabase
+    .from('invoices')
+    .select('order_id, kind, number, status')
+    .in('order_id', ids);
+  if (error) throw error;
+  return data || [];
+}
+
+/**
+ * The full document of `kind` for an order. A paid order that somehow has no
+ * invoice yet (the issuing trigger is fail-safe, so it can miss) gets one issued
+ * on the spot by the same database function the trigger uses — never from JS.
+ * Returns null when the order has no such document (unpaid, or never refunded).
+ */
+export async function getOrderInvoice(orderId, kind = 'tax_invoice') {
+  const find = async () => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(`${INVOICE_LIST_COLUMNS}, ${CREDITS_EMBED}`)
+      .eq('order_id', orderId)
+      .eq('kind', kind)
+      .maybeSingle();
+    if (error) throw error;
+    return flattenCredits(data);
+  };
+  let invoice = await find();
+  if (!invoice && kind === 'tax_invoice') {
+    const { error } = await supabase.rpc('issue_invoice_for_order', { p_order_id: orderId });
+    if (error) {
+      logger.warn(`[INVOICES] on-demand issue for order ${orderId} failed: ${error.message}`);
+      return null;
+    }
+    invoice = await find();
+  }
+  return invoice;
+}
+
+/** The supplier details printed on the PDF (platform_settings over defaults). */
+export async function getSupplierDetails() {
+  const settings = await getPlatformSettings(['invoice_supplier_details']);
+  return settings?.invoice_supplier_details && typeof settings.invoice_supplier_details === 'object'
+    ? settings.invoice_supplier_details
+    : {};
+}
+
+export async function saveSupplierDetails(details) {
+  const value = {
+    legal_name: details.legal_name,
+    abn: details.abn || '',
+    address: details.address || '',
+    email: details.email || '',
+    phone: details.phone || '',
+    footer_note: details.footer_note || '',
+  };
+  const { error } = await supabase
+    .from('platform_settings')
+    .upsert(
+      { key: 'invoice_supplier_details', value, label: 'Tax invoice: supplier details', group_name: 'accounting' },
+      { onConflict: 'key' },
+    );
+  if (error) throw error;
+  invalidatePlatformSettings('invoice_supplier_details');
+  return value;
+}
+
+/** `{ buffer, filename }` for a stored invoice row. */
+export async function buildInvoicePdf(invoice) {
+  const supplier = await getSupplierDetails();
+  return { buffer: await renderInvoicePdf(invoice, supplier), filename: invoicePdfFilename(invoice) };
+}
+
+export { normaliseSupplier };

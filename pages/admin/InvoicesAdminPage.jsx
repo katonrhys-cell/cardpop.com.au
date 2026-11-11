@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
-  FileText, RefreshCw, Download, CloudUpload, Receipt, AlertTriangle, CheckCircle, Undo2, Search, FilePlus2,
+  FileText, RefreshCw, Download, CloudUpload, Receipt, AlertTriangle, CheckCircle, Undo2, Search, FilePlus2, FileDown, ExternalLink, Building2,
 } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
@@ -14,7 +15,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { downloadInvoicePdf, orderPathForInvoice } from '@/utils/invoiceDownload.js';
 import { format } from 'date-fns';
 
 // Admin → Invoices. One tax invoice per paid order and one credit note per
@@ -79,6 +82,12 @@ const InvoiceDialog = ({ invoiceId, mapping, onClose, onUpdated }) => {
   const [loading, setLoading] = useState(true);
   const [form, setForm] = useState({ status: 'synced', number: '', url: '', error: '' });
   const [saving, setSaving] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+
+  const downloadPdf = async () => {
+    setPdfBusy(true);
+    try { await downloadInvoicePdf(invoiceId); } catch (err) { toast.error(err.message || 'Could not build the PDF'); } finally { setPdfBusy(false); }
+  };
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -151,6 +160,14 @@ const InvoiceDialog = ({ invoiceId, mapping, onClose, onUpdated }) => {
           <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-10 rounded-xl" />)}</div>
         ) : (
           <div className="space-y-6">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" className="rounded-xl gap-1.5" onClick={downloadPdf} disabled={pdfBusy}>
+                <FileDown className="w-4 h-4" /> {pdfBusy ? 'Building…' : `Download ${inv.kind === 'credit_note' ? 'credit note' : 'tax invoice'} (PDF)`}
+              </Button>
+              <Button asChild size="sm" variant="outline" className="rounded-xl gap-1.5">
+                <Link to={orderPathForInvoice(inv.order_id)}><ExternalLink className="w-4 h-4" /> View order</Link>
+              </Button>
+            </div>
             <div className="grid sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Bill to</p>
@@ -257,6 +274,73 @@ const InvoiceDialog = ({ invoiceId, mapping, onClose, onUpdated }) => {
   );
 };
 
+/** Who the PDF says issued the invoice. A valid tax invoice must show the supplier's ABN. */
+const SupplierDialog = ({ open, onClose, onSaved }) => {
+  const [form, setForm] = useState({ legal_name: '', abn: '', address: '', email: '', phone: '', footer_note: '' });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    setLoading(true);
+    apiClient.fetch('/admin/invoices/supplier')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        const s = d.supplier;
+        setForm({ legal_name: s.legalName, abn: s.abn, address: s.address, email: s.email, phone: s.phone, footer_note: s.footerNote });
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  const field = (key) => ({ value: form[key], onChange: (e) => setForm((f) => ({ ...f, [key]: e.target.value })) });
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await apiClient.fetch('/admin/invoices/supplier', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Failed to save');
+      toast.success('Invoice details saved');
+      onSaved?.(data);
+      onClose();
+    } catch (err) {
+      toast.error(err.message || 'Failed to save the invoice details');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" /> Invoice details</DialogTitle>
+          <DialogDescription>Printed at the top of every PDF tax invoice and credit note. The ABN is required for a valid tax invoice.</DialogDescription>
+        </DialogHeader>
+        {loading ? <Skeleton className="h-48 rounded-xl" /> : (
+          <div className="space-y-3">
+            <div className="space-y-1"><Label htmlFor="sup-name" className="text-xs">Legal / trading name</Label><Input id="sup-name" className="h-9" {...field('legal_name')} /></div>
+            <div className="space-y-1"><Label htmlFor="sup-abn" className="text-xs">ABN</Label><Input id="sup-abn" className="h-9" placeholder="11 digits" maxLength={14} {...field('abn')} /></div>
+            <div className="space-y-1"><Label htmlFor="sup-address" className="text-xs">Business address</Label><Input id="sup-address" className="h-9" {...field('address')} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><Label htmlFor="sup-email" className="text-xs">Email</Label><Input id="sup-email" className="h-9" {...field('email')} /></div>
+              <div className="space-y-1"><Label htmlFor="sup-phone" className="text-xs">Phone</Label><Input id="sup-phone" className="h-9" {...field('phone')} /></div>
+            </div>
+            <div className="space-y-1"><Label htmlFor="sup-note" className="text-xs">Footer note (optional)</Label><Textarea id="sup-note" rows={2} {...field('footer_note')} /></div>
+            <div className="flex justify-end"><Button onClick={save} disabled={saving || !form.legal_name.trim()} className="rounded-xl">{saving ? 'Saving…' : 'Save'}</Button></div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const InvoicesAdminPage = () => {
   const [invoices, setInvoices] = useState([]);
   const [total, setTotal] = useState(0);
@@ -268,9 +352,14 @@ const InvoicesAdminPage = () => {
   const [sync, setSync] = useState('all');
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  // Order Management links here with ?order=<id> — an exact order match.
+  const [searchParams] = useSearchParams();
+  const initialOrder = searchParams.get('order') || '';
+  const [q, setQ] = useState(initialOrder);
+  const [search, setSearch] = useState(initialOrder);
   const [openId, setOpenId] = useState(null);
+  const [supplierOpen, setSupplierOpen] = useState(false);
+  const [supplierReady, setSupplierReady] = useState(true);
   const fetchRef = useRef(null);
 
   const queryString = useCallback(() => {
@@ -307,6 +396,15 @@ const InvoicesAdminPage = () => {
     apiClient.fetch('/admin/invoices/mapping')
       .then((r) => (r.ok ? r.json() : null))
       .then((m) => { if (!cancelled && m) setMapping(m); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.fetch('/admin/invoices/supplier')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d) setSupplierReady(Boolean(d.ready)); })
       .catch(() => {});
     return () => { cancelled = true; };
   }, []);
@@ -354,6 +452,10 @@ const InvoicesAdminPage = () => {
         subtitle={`${counts.issued} tax invoice${counts.issued === 1 ? '' : 's'} · ${counts.pending_sync} not yet in Xero`}
       >
         <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setSupplierOpen(true)} disabled={!!busy}
+            className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+            <Building2 className="w-4 h-4 mr-2" /> Invoice details
+          </Button>
           <Button variant="outline" onClick={issueMissing} disabled={!!busy}
             className="rounded-xl h-10 px-4 border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
             <FilePlus2 className="w-4 h-4 mr-2" /> Issue missing
@@ -372,6 +474,16 @@ const InvoicesAdminPage = () => {
           </Button>
         </div>
       </AdminPageHeader>
+
+      {!supplierReady && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-300 bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-400">
+          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+          <p className="flex-1">
+            CardPop&apos;s ABN isn&apos;t set, so PDF tax invoices don&apos;t show the supplier&apos;s ABN and aren&apos;t valid tax invoices yet.{' '}
+            <button type="button" className="font-bold underline underline-offset-2" onClick={() => setSupplierOpen(true)}>Add it now</button>
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Receipt} label="Tax invoices" value={counts.issued} accent="bg-primary/10 text-primary" loading={loading} />
@@ -419,7 +531,8 @@ const InvoicesAdminPage = () => {
                   <TableHead className="py-4 text-xs font-bold uppercase tracking-wider text-right">Total</TableHead>
                   <TableHead className="py-4 text-xs font-bold uppercase tracking-wider text-right">GST</TableHead>
                   <TableHead className="py-4 text-xs font-bold uppercase tracking-wider">Status</TableHead>
-                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider">Xero</TableHead>
+                  <TableHead className="py-4 text-xs font-bold uppercase tracking-wider">Xero</TableHead>
+                  <TableHead className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-right">PDF</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -438,18 +551,32 @@ const InvoicesAdminPage = () => {
                       <p className="font-medium">{inv.buyer_name || 'Customer'}</p>
                       {inv.buyer_email && <p className="text-xs text-muted-foreground">{inv.buyer_email}</p>}
                     </TableCell>
-                    <TableCell className="py-4 text-xs font-mono text-muted-foreground" title={inv.order_id}>{shortId(inv.order_id)}</TableCell>
+                    <TableCell className="py-4 text-xs font-mono" title={inv.order_id}>
+                      <Link to={orderPathForInvoice(inv.order_id)} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline underline-offset-2">{shortId(inv.order_id)}</Link>
+                    </TableCell>
                     <TableCell className="py-4 text-right font-bold tabular-nums">{inv.kind === 'credit_note' ? `−${fmtMoney(inv.total_aud)}` : fmtMoney(inv.total_aud)}</TableCell>
                     <TableCell className="py-4 text-right tabular-nums text-muted-foreground">{fmtMoney(inv.gst_aud)}</TableCell>
                     <TableCell className="py-4">
                       <Badge variant="outline" className={`font-bold text-xs capitalize ${STATUS_STYLE[inv.status] || ''}`}>{inv.status}</Badge>
                     </TableCell>
-                    <TableCell className="px-6 py-4">
+                    <TableCell className="py-4">
                       <Badge variant="outline" className={`font-bold text-xs ${SYNC_STYLE[inv.accounting_sync_status] || ''}`}>
                         {inv.accounting_sync_status === 'synced' && <CheckCircle className="w-3 h-3 mr-1" />}
                         {SYNC_LABEL[inv.accounting_sync_status] || inv.accounting_sync_status}
                       </Badge>
                       {inv.accounting_number && <p className="text-xs text-muted-foreground mt-1">{inv.accounting_number}</p>}
+                    </TableCell>
+                    <TableCell className="px-6 py-4 text-right">
+                      <Button
+                        variant="ghost" size="icon" className="h-8 w-8"
+                        aria-label={`Download ${inv.number} as PDF`} title="Download PDF"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try { await downloadInvoicePdf(inv.id); } catch (err) { toast.error(err.message || 'Could not build the PDF'); }
+                        }}
+                      >
+                        <FileDown className="w-4 h-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -461,6 +588,8 @@ const InvoicesAdminPage = () => {
           </div>
         )}
       </Card>
+
+      <SupplierDialog open={supplierOpen} onClose={() => setSupplierOpen(false)} onSaved={(d) => setSupplierReady(Boolean(d?.ready))} />
 
       {openId && (
         <InvoiceDialog invoiceId={openId} mapping={mapping} onClose={() => setOpenId(null)} onUpdated={() => fetchRef.current?.()} />
