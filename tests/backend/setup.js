@@ -22,3 +22,4 @@ process.env.AUTH_TOKEN_NEGATIVE_TTL_MS = '0';
 process.env.ADMIN_FLAG_CACHE_TTL_MS = '0';
 process.env.MFA_FACTORS_CACHE_TTL_MS = '0';
 process.env.PLATFORM_SETTINGS_TTL_MS = '0';
+process.env.EVENT_SEARCH_CACHE_TTL_MS = '0';
