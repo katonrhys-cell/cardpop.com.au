@@ -44,12 +44,23 @@ const SIZE_NAMES = new Set([
 export const isSizeName = (name) => SIZE_NAMES.has(String(name || '').trim().toLowerCase());
 
 /**
- * 'Size' when every active variant is named for a size, else 'Colour' (also
- * for a product with no variants embedded, e.g. a grid row).
+ * True when an option name is a STYLE rather than a plain colour: a colour
+ * code and a size/pack joined by a spaced dash, the way a sleeve line is sold
+ * ("Green – Standard American 50", "Ruby – Mini European Value 150"). The
+ * name still rides in `colour`, with the colour code's hex for the dot.
+ */
+export const isStyleName = (name) => /\s[-–—]\s\S/.test(String(name || '').trim());
+
+/**
+ * 'Size' when every active variant is named for a size, 'Style' when every
+ * one is a style name (isStyleName), else 'Colour' (also for a product with
+ * no variants embedded, e.g. a grid row).
  */
 export const variantKind = (product) => {
   const list = activeVariants(product);
-  return list.length > 0 && list.every((v) => isSizeName(v.colour)) ? 'Size' : 'Colour';
+  if (list.length > 0 && list.every((v) => isSizeName(v.colour))) return 'Size';
+  if (list.length > 0 && list.every((v) => isStyleName(v.colour))) return 'Style';
+  return 'Colour';
 };
 
 /**

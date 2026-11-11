@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
-import { activeVariants, chooseVariantLabel, hasVariants, isSizeName, pickDefaultVariant, toCartVariant, variantKind, variantPrice } from '@/utils/shopVariants.js';
+import { activeVariants, chooseVariantLabel, hasVariants, isSizeName, isStyleName, pickDefaultVariant, toCartVariant, variantKind, variantPrice } from '@/utils/shopVariants.js';
 
 const product = {
   id: 'p1', price_aud: '44.95', stock_quantity: 3, has_variants: true,
@@ -56,6 +56,17 @@ describe('size variants', () => {
     // A mix is still a colour choice, and a grid row (no rows embedded) stays neutral.
     expect(variantKind({ variants: [{ id: 'a', colour: 'Small' }, { id: 'b', colour: 'Black' }] })).toBe('Colour');
     expect(variantKind({ has_variants: true })).toBe('Colour');
+    const sleeves = { variants: [
+      { id: 'a', colour: 'Green – Standard American 50' },
+      { id: 'b', colour: 'Ruby – Mini European Value 150' },
+    ] };
+    expect(variantKind(sleeves)).toBe('Style');
+    expect(chooseVariantLabel(sleeves)).toBe('Choose style');
+    // A mix of styles and plain colours stays a colour picker.
+    expect(variantKind({ variants: [...sleeves.variants, { id: 'c', colour: 'Black' }] })).toBe('Colour');
+    expect(isStyleName('Green – Standard American 50')).toBe(true);
+    expect(isStyleName('Rose Gold')).toBe(false);
+    expect(isStyleName('Black-Red')).toBe(false);
     expect(chooseVariantLabel(gloves)).toBe('Choose size');
     expect(chooseVariantLabel(product)).toBe('Choose colour');
     expect(chooseVariantLabel({ has_variants: true })).toBe('Choose options');
