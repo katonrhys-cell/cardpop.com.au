@@ -239,7 +239,11 @@ const LoginPage = () => {
                 <form onSubmit={handleLogin}>
                   <CardHeader className="space-y-1 pb-6">
                     <CardTitle className="text-xl">Sign In</CardTitle>
-                    <CardDescription>Enter your email and password to continue</CardDescription>
+                    <CardDescription>
+                      {/^\/account\/events\?(.*&)?feature=/.test(from)
+                        ? 'Sign in to choose the event you want to feature.'
+                        : 'Enter your email and password to continue'}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">

@@ -11,6 +11,7 @@ import EventSearchDialog from '@/components/events/EventSearchDialog.jsx';
 import EventViewsDialog from '@/components/events/EventViewsDialog.jsx';
 import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
+import FeatureEventChooser from '@/components/events/FeatureEventChooser.jsx';
 import FeatureUpsellCard from '@/components/events/FeatureUpsellCard.jsx';
 import {
   BUNDLE, FEATURED_PACKAGES, bundleCents, featureEligibility, formatAud, todayInAustralia,
@@ -57,6 +58,11 @@ const AccountEvents = () => {
   const [viewsEvent, setViewsEvent] = useState(null);
   const [featureEvent, setFeatureEvent] = useState(null);
   const [featurePack, setFeaturePack] = useState(false);
+  // "Feature Now": the event chooser, and the intent to go straight to the
+  // package picker + Stripe once the event being submitted is saved.
+  const [chooserOpen, setChooserOpen] = useState(false);
+  const [featureIntent, setFeatureIntent] = useState(false);
+  const [pendingFeatureId, setPendingFeatureId] = useState(null);
   const today = todayInAustralia();
   // Soonest first: the pack picker ticks the next shows by default.
   const featurableEvents = useMemo(
@@ -132,9 +138,10 @@ const AccountEvents = () => {
     return () => clearTimeout(t);
   }, [searchParams, setSearchParams, fetchMyEvents]);
 
-  // `?feature=1` ("Feature Now" on /list-your-event): open the package picker
-  // for the one event that can be featured, point at the buttons if there are
-  // several, or open the submit form when there's nothing to feature yet.
+  // `?feature=1` ("Feature Now" on /list-your-event; a signed-out visitor
+  // signs in first and lands back here): ask which of their events to
+  // feature, or — with nothing to feature yet — open the submit form, and
+  // submitting it goes straight to the package picker and Stripe checkout.
   // `?feature=<event id>` (the "your event is live" email) opens that event's
   // picker when it can still be featured.
   useEffect(() => {
@@ -150,13 +157,29 @@ const AccountEvents = () => {
       else if (target) toast.info(featureEligibility(target, today).reason);
       return;
     }
-    if (featurable.length === 1) setFeatureEvent(featurable[0]);
-    else if (featurable.length > 1) toast.info('Press "Feature" next to the event you want to promote.');
+    if (featurable.length > 0) setChooserOpen(true);
     else {
-      toast.info('Submit your event first. You can feature it straight after.');
+      toast.info('Submit your event first. You’ll go straight to checkout to feature it.');
+      setFeatureIntent(true);
       openSubmit();
     }
   }, [isLoading, events, searchParams, setSearchParams, today]);
+
+  // The event just submitted under a "Feature Now" intent: once it's in the
+  // refreshed list, open its package picker (which leads to Stripe).
+  useEffect(() => {
+    if (!pendingFeatureId) return;
+    const ev = events.find((e) => e.id === pendingFeatureId);
+    if (!ev) return;
+    setPendingFeatureId(null);
+    if (featureEligibility(ev, today).ok) setFeatureEvent(ev);
+    else setJustSubmittedId(ev.id);
+  }, [pendingFeatureId, events, today]);
+
+  const handleSubmitted = (id) => {
+    if (featureIntent) { setFeatureIntent(false); setPendingFeatureId(id); }
+    else setJustSubmittedId(id);
+  };
 
   useEffect(() => {
     if (searchParams.get('new') !== '1') return;
@@ -466,13 +489,21 @@ const AccountEvents = () => {
         onClose={() => { setFeatureEvent(null); setFeaturePack(false); }}
       />
 
+      <FeatureEventChooser
+        open={chooserOpen}
+        events={featurableEvents}
+        onClose={() => setChooserOpen(false)}
+        onChoose={(ev) => { setChooserOpen(false); setFeatureEvent(ev); }}
+        onSubmitNew={() => { setChooserOpen(false); setFeatureIntent(true); openSubmit(); }}
+      />
+
       <EventFormModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={() => { setIsModalOpen(false); setFeatureIntent(false); }}
         event={editingEvent}
         mode="user"
         onSaved={refreshAfterSave}
-        onSubmitted={setJustSubmittedId}
+        onSubmitted={handleSubmitted}
       />
     </AccountPageShell>
   );
