@@ -232,7 +232,7 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
 const LIST_EVENT_SIGNED_IN = '/account/events?new=1';
 const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGNED_IN)}`;
 
-const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testId }) => {
+const StatPanel = ({ icon: Icon, iconSrc, eyebrow, title, note, stats, inView, cta, testId }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
   const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
@@ -244,7 +244,9 @@ const StatPanel = ({ icon: Icon, eyebrow, title, note, stats, inView, cta, testI
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <Icon className="h-5 w-5" aria-hidden="true" />
+            {iconSrc
+              ? <img src={iconSrc} alt="" width="216" height="256" className="h-6 w-auto" loading="lazy" decoding="async" aria-hidden="true" />
+              : <Icon className="h-5 w-5" aria-hidden="true" />}
           </span>
           <div className="leading-tight">
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
@@ -717,7 +719,7 @@ const HomePage = () => {
               )}
               <StatPanel
                 testId="stats-community"
-                icon={Users}
+                iconSrc="/images/cardpop-icon.png"
                 eyebrow="The CardPop community"
                 title="Australia's collectors, in one place"
                 note={isAuthenticated ? 'Live counts across CardPop' : 'Free to join · list your first card in minutes'}
