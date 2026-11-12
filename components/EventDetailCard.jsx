@@ -89,7 +89,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
   return (
     <div className="w-full">
       {/* Breadcrumbs */}
-      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6 font-medium">
+      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-3 md:mb-6 font-medium">
         <Link to="/" className="hover:text-primary transition-colors">Home</Link>
         <ChevronRight className="w-4 h-4" />
         <Link to="/events" className="hover:text-primary transition-colors">Events</Link>
