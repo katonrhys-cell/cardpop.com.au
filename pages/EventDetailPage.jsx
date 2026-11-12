@@ -130,11 +130,11 @@ const EventDetailPage = () => {
         structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event), ...buildVideoJsonLds(event)].filter(Boolean)}
       />
 
-      <div className="flex-1 container-default py-12 w-full">
+      <div className="flex-1 container-default py-4 md:py-12 w-full">
         <Button
           variant="ghost"
           asChild
-          className="mb-8 -ml-4 text-muted-foreground hover:bg-card hover:text-primary transition-colors rounded-xl"
+          className="mb-1 md:mb-8 -ml-4 text-muted-foreground hover:bg-card hover:text-primary transition-colors rounded-xl"
         >
           <Link to="/events">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Calendar
