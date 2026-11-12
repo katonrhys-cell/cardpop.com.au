@@ -6,12 +6,12 @@ import SellerTierBadge from '@/components/SellerTierBadge.jsx';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import AccountPlanBanner from '@/components/AccountPlanBanner.jsx';
+import ConditionGradeBadge from '@/components/vault/ConditionGradeBadge.jsx';
 import P2PTradingNotice from '@/components/P2PTradingNotice.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { uniqueTopic } from '@/lib/realtimeTopic.js';
@@ -481,15 +481,11 @@ const AccountDashboard = () => {
                         <TableCell className="font-medium">{item.card_name}</TableCell>
                         <TableCell className="text-muted-foreground text-sm">{item.set_name || '—'}</TableCell>
                         <TableCell>
-                          {item.grading_company && item.grade ? (
-                            <Badge variant="outline" className="whitespace-nowrap uppercase">
-                              {`${item.grading_company} ${item.grade}`}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="whitespace-nowrap capitalize">
-                              {item.condition?.replace(/_/g, ' ') || 'Unknown'}
-                            </Badge>
-                          )}
+                          <ConditionGradeBadge
+                            gradingCompany={item.grading_company}
+                            grade={item.grade}
+                            condition={item.condition}
+                          />
                         </TableCell>
                         <TableCell className="text-right font-medium">
                           {item.estimated_value_aud != null ? `$${Number(item.estimated_value_aud).toFixed(2)}` : '—'}
