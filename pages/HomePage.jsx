@@ -245,7 +245,7 @@ const StatPanel = ({ icon: Icon, iconSrc, eyebrow, title, note, stats, inView, c
         <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
             {iconSrc
-              ? <img src={iconSrc} alt="" width="216" height="256" className="h-6 w-auto" loading="lazy" decoding="async" aria-hidden="true" />
+              ? <img src={iconSrc} alt="" className="h-6 w-auto max-w-6 object-contain" loading="lazy" decoding="async" aria-hidden="true" />
               : <Icon className="h-5 w-5" aria-hidden="true" />}
           </span>
           <div className="leading-tight">
@@ -709,7 +709,7 @@ const HomePage = () => {
               {googleStats.length > 0 && (
                 <StatPanel
                   testId="stats-google"
-                  icon={Search}
+                  iconSrc="/images/google-g.png"
                   eyebrow="Found on Google"
                   title="Collectors find CardPop on Google"
                   note="Last 30 days · Google Search Console and Google Analytics, updated nightly"
