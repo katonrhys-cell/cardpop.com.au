@@ -23,11 +23,7 @@ import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import { normalizeStyle, DEFAULT_STYLE } from '@/lib/displayStyles.js';
 import { ROOKIE_VARIANT } from '@/lib/cardVariants.js';
 import RookiePill from '@/components/RookiePill.jsx';
-
-const CONDITION_LABELS = {
-  mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',
-  good: 'Good', light_played: 'Light Played', played: 'Played', poor: 'Poor',
-};
+import ConditionGradeBadge from '@/components/vault/ConditionGradeBadge.jsx';
 
 const getListingBadge = (card) => {
   const { label, className, icon: Icon } = getVaultListingBadge(card.listing_type);
@@ -224,9 +220,10 @@ const AccountVault = () => {
             {card.variant && card.variant.split(',').map(v => v.trim()).filter(v => v && v !== ROOKIE_VARIANT).map(v => (
               <Badge key={v} variant="secondary" className="text-[10px] font-medium bg-violet-500/10 text-violet-700 border border-violet-200/50">{v}</Badge>
             ))}
-            {card.condition && <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground">{CONDITION_LABELS[card.condition] || card.condition}</Badge>}
-            {card.grading_company && card.grading_company !== 'raw' && (
-              <Badge variant="secondary" className="text-[10px] font-medium bg-muted/50 text-muted-foreground uppercase">{card.grading_company} {card.grade || ''}</Badge>
+            {card.grading_company && card.grading_company !== 'raw' && card.grade ? (
+              <ConditionGradeBadge gradingCompany={card.grading_company} grade={card.grade} className="text-[10px]" />
+            ) : card.condition && (
+              <ConditionGradeBadge condition={card.condition} className="text-[10px]" />
             )}
             <PSAPopPanel rawData={psaRaw} compact />
           </div>

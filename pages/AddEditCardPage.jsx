@@ -3909,7 +3909,7 @@ const AddEditCardPage = () => {
                         <Input
                           value={formData.grade}
                           onChange={e => set('grade', e.target.value)}
-                          placeholder="e.g. 9.5 or Authentic"
+                          placeholder="e.g. 9.5, Pristine 10, Black Label 10 or Authentic"
                           className="h-11 bg-background"
                         />
                       </div>
