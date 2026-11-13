@@ -24,7 +24,8 @@ import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { Badge } from '@/components/ui/badge';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
-import { isPurchasableStatus, isPreorder, preorderEta } from '@/utils/shopStock.js';
+import { isPurchasableStatus, isPreorder, preorderEta, lowStockCount } from '@/utils/shopStock.js';
+import LowStockMeter from '@/components/shop/LowStockMeter.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
@@ -358,6 +359,8 @@ const ShopProductPage = () => {
                 </>
               ) : isPurchasable && anyVariantInStock ? (
                 <>
+                  {/* Real scarcity only: the chosen colour's own stock, at 5 or fewer. */}
+                  <LowStockMeter count={lowStockCount(row, chosenVariant, { hasVariants: variants.length > 0 })} className="mb-4" />
                   <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
                     <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
                   </Button>
