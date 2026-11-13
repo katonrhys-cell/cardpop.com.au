@@ -232,7 +232,7 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
 const LIST_EVENT_SIGNED_IN = '/account/events?new=1';
 const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGNED_IN)}`;
 
-const StatPanel = ({ icon: Icon, iconSrc, eyebrow, title, note, stats, inView, cta, testId }) => {
+const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title, note, stats, inView, cta, testId }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
   const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
@@ -243,7 +243,7 @@ const StatPanel = ({ icon: Icon, iconSrc, eyebrow, title, note, stats, inView, c
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
-          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconSrc ? 'bg-black' : 'bg-primary/10'} text-primary`}>
+          <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconSrc ? iconTile : 'bg-primary/10'} text-primary`}>
             {iconSrc
               ? <img src={iconSrc} alt="" className="h-6 w-auto max-w-6 object-contain" loading="lazy" decoding="async" aria-hidden="true" />
               : <Icon className="h-5 w-5" aria-hidden="true" />}
@@ -709,7 +709,8 @@ const HomePage = () => {
               {googleStats.length > 0 && (
                 <StatPanel
                   testId="stats-google"
-                  iconSrc="/images/google-g-red.png"
+                  iconSrc="/images/google-g.png"
+                  iconTile="bg-white border border-border"
                   eyebrow="Found on Google"
                   title="Collectors find CardPop on Google"
                   note="Last 30 days · Google Search Console and Google Analytics, updated nightly"
