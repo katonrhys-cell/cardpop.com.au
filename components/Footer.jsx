@@ -14,6 +14,8 @@ const DiscordIcon = ({ className }) => (
 );
 
 import RedditIcon from '@/components/RedditIcon.jsx';
+import WhatsAppIcon from '@/components/WhatsAppIcon.jsx';
+import WhatsAppChatLink from '@/components/WhatsAppChatLink.jsx';
 import { REDDIT_SUBREDDIT_URL } from '@/utils/redditLinks.js';
 
 const SOCIAL_LINKS = [
@@ -77,6 +79,14 @@ const Footer = () => {
                   <Icon className="w-4 h-4" />
                 </a>
               ))}
+              {/* WhatsApp Business chat — opens a conversation with CardPop */}
+              <WhatsAppChatLink
+                placement="footer_icon"
+                aria-label="Chat with us on WhatsApp"
+                className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-muted/70 transition-colors"
+              >
+                <WhatsAppIcon className="w-4 h-4" />
+              </WhatsAppChatLink>
             </div>
           </div>
 
@@ -142,7 +152,15 @@ const Footer = () => {
           <p className="text-muted-foreground text-sm font-medium">
             © {new Date().getFullYear()} CardPop Australia™. All Rights Reserved.
           </p>
-          <p className="text-muted-foreground text-sm flex items-center gap-4">
+          <p className="text-muted-foreground text-sm flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <WhatsAppChatLink
+              placement="footer_bar"
+              aria-label="Chat with us on WhatsApp"
+              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+            >
+              <WhatsAppIcon className="w-4 h-4" />
+              WhatsApp
+            </WhatsAppChatLink>
             <a
               href={GITHUB_URL}
               target="_blank"
