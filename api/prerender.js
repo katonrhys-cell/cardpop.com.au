@@ -45,6 +45,7 @@ import {
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
 } from '../utils/players.js';
 import { brandedTitle, SHORT_BRAND_SUFFIXES } from '../utils/seoTitle.js';
+import { WHATSAPP_CHAT_URL, WHATSAPP_NUMBER_LOCAL } from '../utils/whatsapp.js';
 
 // Dynamic rendering for crawlers / link unfurlers. The site is a client-rendered
 // SPA, so bots that don't execute JS would otherwise see an empty shell. Vercel
@@ -2388,6 +2389,7 @@ const STATIC_CONTENT = {
         'Whether you have a question about an order, need help with your vault, or just want to share feedback, our team is ready to assist you.',
       ], items: [
         { text: 'Email support: support@cardpop.com.au' },
+        { text: `Chat with us on WhatsApp: ${WHATSAPP_NUMBER_LOCAL}`, href: WHATSAPP_CHAT_URL },
         { text: 'Admin: admin@cardpop.com.au' },
         { text: 'Mailing address: PO Box 1024, Ascot Vale, Victoria 3032' },
         { text: 'Business hours: Monday to Friday, 9am – 5pm AEST' },

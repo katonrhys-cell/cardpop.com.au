@@ -9,6 +9,9 @@ import InfoPageLayout from '@/components/InfoPageLayout.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
+import WhatsAppIcon from '@/components/WhatsAppIcon.jsx';
+import WhatsAppChatLink from '@/components/WhatsAppChatLink.jsx';
+import { WHATSAPP_NUMBER_LOCAL } from '@/utils/whatsapp.js';
 
 const validate = ({ name, email, subject, message }) => {
   const errors = {};
@@ -115,6 +118,20 @@ const ContactPage = () => {
               <div>
                 <strong className="text-sm font-semibold">Email Support</strong>
                 <p className="text-muted-foreground text-sm mt-1">support@cardpop.com.au</p>
+              </div>
+              <div>
+                <strong className="text-sm font-semibold">WhatsApp</strong>
+                <p className="text-muted-foreground text-sm mt-1">
+                  <WhatsAppChatLink
+                    placement="contact_page"
+                    className="inline-flex items-center gap-1.5 text-primary font-semibold hover:underline"
+                  >
+                    <WhatsAppIcon className="w-4 h-4" />
+                    Chat with us on WhatsApp
+                  </WhatsAppChatLink>
+                  <br />
+                  {WHATSAPP_NUMBER_LOCAL} · we reply during business hours
+                </p>
               </div>
               <div>
                 <strong className="text-sm font-semibold">Admin Email</strong>
