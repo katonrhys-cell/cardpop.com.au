@@ -265,6 +265,17 @@ const SignupPage = () => {
 
           {/* ── Signup form ─────────────────────────────────────────────── */}
           <div className="order-2 lg:order-none w-full bg-card p-6 sm:p-8 border border-border rounded-2xl shadow-lg lg:col-start-2 lg:row-start-1 lg:row-span-2">
+            {/* One-tap sign-up first, the email form after it. */}
+            <div className="mb-6">
+              <p className="text-sm font-semibold text-foreground text-center mb-4">Join instantly with</p>
+              <OAuthButtons
+                variant="icons"
+                dividerLabel="Or sign up with email"
+                redirectTo={`${window.location.origin}${nextPath || '/account'}`}
+                disabled={loading}
+              />
+            </div>
+
             <form onSubmit={handleAccountSubmit} className="space-y-5">
               <div className="space-y-2">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -422,10 +433,6 @@ const SignupPage = () => {
                 {loading ? 'Creating Account...' : 'Create Secure Account'}
               </Button>
             </form>
-
-            <div className="mt-6">
-              <OAuthButtons redirectTo={`${window.location.origin}${nextPath || '/account'}`} disabled={loading} />
-            </div>
 
             <div className="mt-8 text-center text-sm text-muted-foreground pt-6 border-t border-border">
               Already have an account? <Link to="/login" className="text-primary hover:underline font-bold ml-1">Sign In</Link>
