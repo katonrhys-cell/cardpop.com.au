@@ -56,6 +56,7 @@ import SellerRatingDisplay from '@/components/SellerRatingDisplay.jsx';
 import MoreFromSeller from '@/components/MoreFromSeller.jsx';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import { brandedTitle, SHORT_BRAND_SUFFIXES } from '@/utils/seoTitle.js';
+import { useBottomBarInset } from '@/lib/bottomBarInset.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -116,6 +117,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
   // repeats the price and the primary action.
   const ctaRef = useRef(null);
   const [ctaOffscreen, setCtaOffscreen] = useState(false);
+  // Lifts the floating chat button above the phone buy bar while it shows.
+  const stickyBuyBarRef = useBottomBarInset('sticky-buy-bar');
   useEffect(() => {
     const el = ctaRef.current;
     if (!el || typeof IntersectionObserver === 'undefined') return undefined;
@@ -1117,7 +1120,7 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
 
       {/* Sticky buy bar — phones only, once the in-page buttons have scrolled away. */}
       {ctaOffscreen && !isSold && source !== 'vault' && product.listing_type !== 'Private' && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 shadow-[0_-8px_30px_-12px_rgba(0,0,0,0.25)] backdrop-blur lg:hidden" data-testid="sticky-buy-bar">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 p-3 shadow-[0_-8px_30px_-12px_rgba(0,0,0,0.25)] backdrop-blur lg:hidden" data-testid="sticky-buy-bar" ref={stickyBuyBarRef}>
           <div className="mx-auto flex max-w-lg items-center gap-3">
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-muted-foreground">{product.name}</p>

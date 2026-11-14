@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { CONSENT_ALL, CONSENT_ESSENTIAL, getConsent, onConsentChange, setConsent } from '@/lib/consent.js';
+import { useBottomBarInset } from '@/lib/bottomBarInset.js';
 
 // Routes where a sticky bar would get in the way of the thing the visitor is
 // doing (paying, scanning a card) — the banner waits for the next page.
@@ -14,6 +15,8 @@ export const QUIET_PREFIXES = ['/checkout', '/checkout-success', '/success', '/s
 const CookieConsentBanner = () => {
   const { pathname } = useLocation();
   const [decided, setDecided] = useState(() => getConsent() !== null);
+  // Tells the floating chat button how tall the banner is, so it sits above it.
+  const barRef = useBottomBarInset('cookie-banner');
 
   useEffect(() => onConsentChange((v) => setDecided(v !== null)), []);
 
@@ -22,6 +25,7 @@ const CookieConsentBanner = () => {
 
   return (
     <div
+      ref={barRef}
       role="region"
       aria-label="Cookie preferences"
       className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-[0_-8px_30px_-12px_rgba(0,0,0,0.25)]"
