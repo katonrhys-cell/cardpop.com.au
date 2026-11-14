@@ -325,14 +325,14 @@ const AccountProfile = () => {
                   <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">Social Links</h3>
 
                   <div className="space-y-2">
-                    <Label htmlFor="social_twitter" className="font-bold text-foreground">Twitter URL</Label>
+                    <Label htmlFor="social_twitter" className="font-bold text-foreground">X URL</Label>
                     <Input
                       id="social_twitter"
                       name="social_twitter"
                       value={formData.social_twitter}
                       onChange={handleChange}
                       className="h-12 rounded-xl font-medium shadow-sm"
-                      placeholder="https://twitter.com/yourhandle"
+                      placeholder="https://x.com/yourhandle"
                     />
                   </div>
 

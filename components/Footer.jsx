@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Twitter, Instagram, Facebook, Youtube, ShieldCheck, Github, Heart } from 'lucide-react';
+import { Instagram, Facebook, Youtube, ShieldCheck, Github, Heart } from 'lucide-react';
 import CardPopLogo from '@/components/CardPopLogo.jsx';
 import NewsletterSignup from '@/components/NewsletterSignup.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
@@ -13,14 +13,17 @@ const DiscordIcon = ({ className }) => (
   </svg>
 );
 
+import XIcon from '@/components/XIcon.jsx';
 import RedditIcon from '@/components/RedditIcon.jsx';
 import WhatsAppIcon from '@/components/WhatsAppIcon.jsx';
 import WhatsAppChatLink from '@/components/WhatsAppChatLink.jsx';
 import { REDDIT_SUBREDDIT_URL } from '@/utils/redditLinks.js';
 
+const X_URL = 'https://x.com/cardpopaus';
+
 const SOCIAL_LINKS = [
   { label: 'Discord', href: 'https://discord.gg/cardpop', Icon: DiscordIcon },
-  { label: 'Twitter / X', href: 'https://twitter.com/cardpopau', Icon: Twitter },
+  { label: 'X', href: X_URL, Icon: XIcon },
   { label: 'Instagram', href: 'https://www.instagram.com/cardpop_aus/', Icon: Instagram },
   { label: 'Facebook', href: 'https://www.facebook.com/profile.php?id=61591488466915', Icon: Facebook },
   { label: 'YouTube', href: 'https://youtube.com/@cardpopau', Icon: Youtube },
@@ -30,7 +33,6 @@ const SOCIAL_LINKS = [
 const GITHUB_URL = 'https://github.com/katonrhys-cell';
 // Support / donation link. VITE_DONATE_URL overrides it at build time; set it to an empty string to hide the link.
 const DONATE_URL = import.meta.env.VITE_DONATE_URL ?? 'https://patreon.com/cardpopaustralia';
-const X_URL = 'https://x.com/conway33167';
 
 const Footer = () => {
   const { settings } = usePlatformSettings();
@@ -187,7 +189,7 @@ const Footer = () => {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
             >
-              <Twitter className="w-4 h-4" aria-hidden="true" />
+              <XIcon className="w-4 h-4" />
               X
             </a>
           </p>
