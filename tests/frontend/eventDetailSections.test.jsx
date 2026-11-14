@@ -380,7 +380,7 @@ describe('EventDetailCard — organiser links', () => {
     expect(screen.getByText('Follow the Organiser')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /YouTube/ })).toHaveAttribute('href', 'https://youtube.com/@collectitcon');
     expect(screen.getByRole('link', { name: /TikTok/ })).toHaveAttribute('href', 'https://tiktok.com/@collectitcon');
-    expect(screen.getByRole('link', { name: /X \(Twitter\)/ })).toHaveAttribute('href', 'https://x.com/collectitcon');
+    expect(screen.getByRole('link', { name: /^X$/ })).toHaveAttribute('href', 'https://x.com/collectitcon');
     expect(screen.getByRole('link', { name: /Discord/ })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
     expect(screen.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
   });
