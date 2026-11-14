@@ -212,7 +212,9 @@ router.get('/admin', authMiddleware, requireAdmin, async (req, res) => {
   try {
     const { data, error } = await supabase
       .from('local_game_stores')
-      .select('id, slug, name, suburb, city, state, website, categories, description, status, submitter_email, created_at')
+      // Whole row: the editor needs every page column (address, hours, photos,
+      // videos…) and this list is admin-only and bounded.
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(300);
     if (error) throw new Error(error.message);
