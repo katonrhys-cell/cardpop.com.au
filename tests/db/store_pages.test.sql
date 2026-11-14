@@ -23,7 +23,7 @@ end $$;
 
 -- The public reads the new columns but still not the submitter's email.
 set role anon;
-select opening_hours, instagram_url, photos, videos from public.local_game_stores where slug = 'swap-itt-melbourne';
+select opening_hours, instagram_url, logo_url, photos, videos from public.local_game_stores where slug = 'swap-itt-melbourne';
 do $$ begin
   begin
     perform submitter_email from public.local_game_stores;

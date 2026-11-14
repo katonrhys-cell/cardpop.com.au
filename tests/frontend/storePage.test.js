@@ -8,6 +8,7 @@ import {
   storeHoursLines,
   storeIsIndexable,
   storeJsonLd,
+  storeLogoUrl,
   storePageDescription,
   storePageTitle,
   storePath,
@@ -100,6 +101,17 @@ describe('store pages', () => {
     expect(() => normalizeStoreInput({ ...swapItt, website: 'javascript:alert(1)' })).toThrow(/Website/);
     expect(() => normalizeStoreInput({ ...swapItt, website: '/relative' })).toThrow(/Website/);
     expect(() => normalizeStoreInput({ ...swapItt, name: ' ' })).toThrow(/name/i);
+  });
+
+  it('uses a safe logo link only, and puts it on the Store markup', () => {
+    const withLogo = { ...swapItt, logo_url: 'https://x.supabase.co/storage/v1/object/public/media/stores/swap-itt-melbourne/logo/1.webp' };
+    expect(storeLogoUrl(withLogo)).toBe(withLogo.logo_url);
+    expect(storeJsonLd(withLogo).logo).toBe(withLogo.logo_url);
+    expect(storeLogoUrl({ logo_url: 'javascript:alert(1)' })).toBeNull();
+    expect(storeLogoUrl(swapItt)).toBeNull();
+    expect(storeJsonLd(swapItt)).not.toHaveProperty('logo');
+    expect(normalizeStoreInput(withLogo).logo_url).toBe(withLogo.logo_url);
+    expect(normalizeStoreInput({ ...swapItt, logo_url: '' }).logo_url).toBeNull();
   });
 
   it('derives a new store slug the way the public form does', () => {

@@ -20,14 +20,14 @@ const stem = (slug, kind, file, fallback) =>
   `stores/${safeSegment(slug, 'store')}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${safeSegment((file.name || '').replace(/\.[^/.]+$/, ''), fallback)}`;
 
 /** One photo, compressed in the browser first. Returns its public URL. */
-export const uploadStorePhoto = async (file, slug) => {
+export const uploadStorePhoto = async (file, slug, { kind = 'photos', maxDimension = 2000 } = {}) => {
   if (!file) throw new Error('No file selected');
   if (!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
     throw new Error('Photos must be JPG, PNG or WebP — on an iPhone, choose "Most Compatible" or share the photo as JPG.');
   }
-  const compressed = await compressImage(file, { maxDimension: 2000, quality: 0.84 });
+  const compressed = await compressImage(file, { maxDimension, quality: 0.84 });
   const ext = ((compressed.name || file.name).split('.').pop() || 'webp').toLowerCase().replace(/[^a-z0-9]/g, '') || 'webp';
-  const path = `${stem(slug, 'photos', file, 'photo')}.${ext}`;
+  const path = `${stem(slug, kind, file, 'photo')}.${ext}`;
   const { error } = await supabase.storage.from('media').upload(path, compressed, {
     cacheControl: '31536000',
     contentType: compressed.type || file.type,
@@ -35,6 +35,9 @@ export const uploadStorePhoto = async (file, slug) => {
   if (error) throw error;
   return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
 };
+
+/** The shop's logo: a small image (WebP keeps a PNG's transparency). */
+export const uploadStoreLogo = (file, slug) => uploadStorePhoto(file, slug, { kind: 'logo', maxDimension: 600 });
 
 /**
  * One video clip (MP4 / MOV / WebM, 50 MB bucket cap — longer goes up as a

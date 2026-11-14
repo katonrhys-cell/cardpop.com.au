@@ -12,11 +12,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS } from '@/lib/storeDirectory.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { REVIEW_VIDEO_ACCEPT, videoKind } from '@/utils/eventReview.js';
-import { uploadStorePhoto, uploadStoreVideo } from '@/utils/uploadStoreMedia.js';
+import { uploadStoreLogo, uploadStorePhoto, uploadStoreVideo } from '@/utils/uploadStoreMedia.js';
 import { MAX_STORE_PHOTOS, MAX_STORE_VIDEOS, normalizeStoreInput, storeSlug } from '@/utils/storePage.js';
 
 const blank = () => ({
-  name: '', suburb: '', city: '', address: '', phone: '', website: '', instagram_url: '',
+  name: '', suburb: '', city: '', address: '', phone: '', website: '', instagram_url: '', logo_url: '',
   description: '', opening_hours: '', categories: [], photos: [], videos: [],
 });
 
@@ -44,8 +44,9 @@ const move = (list, i, dir) => {
 const StoreEditorDialog = ({ open, store, takenSlugs = [], onClose, onSaved }) => {
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState(null); // 'photos' | 'video' | null
+  const [uploading, setUploading] = useState(null); // 'logo' | 'photos' | 'video' | null
   const [videoLink, setVideoLink] = useState('');
+  const logoInput = useRef(null);
   const photoInput = useRef(null);
   const videoInput = useRef(null);
 
@@ -57,6 +58,20 @@ const StoreEditorDialog = ({ open, store, takenSlugs = [], onClose, onSaved }) =
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const uploadSlug = store?.slug || storeSlug(form.name, form.suburb || form.city);
+
+  const onLogoFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading('logo');
+    try {
+      set({ logo_url: await uploadStoreLogo(file, uploadSlug) });
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploading(null);
+    }
+  };
 
   const onPhotoFiles = async (e) => {
     const files = Array.from(e.target.files || []);
@@ -225,6 +240,26 @@ const StoreEditorDialog = ({ open, store, takenSlugs = [], onClose, onSaved }) =
               </div>
             </div>
           </div>
+
+          <section className="space-y-3">
+            <h3 className="font-semibold">Logo</h3>
+            <div className="flex flex-wrap items-center gap-3">
+              {form.logo_url
+                ? <img src={toCdnUrl(form.logo_url)} alt="" className="w-16 h-16 rounded-xl object-contain bg-white border border-border p-1.5 shrink-0" />
+                : <div className="w-16 h-16 rounded-xl border border-dashed border-border shrink-0" />}
+              <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => logoInput.current?.click()}>
+                {uploading === 'logo' ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <ImagePlus className="w-4 h-4 mr-1.5" />}
+                {form.logo_url ? 'Replace logo' : 'Upload logo'}
+              </Button>
+              {form.logo_url && (
+                <Button type="button" variant="ghost" size="sm" className="text-destructive" onClick={() => set({ logo_url: '' })}>
+                  Remove
+                </Button>
+              )}
+              <span className="text-xs text-muted-foreground">Shown on the shop&apos;s card in the directory and on its page. A square PNG works best.</span>
+              <input ref={logoInput} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={onLogoFile} />
+            </div>
+          </section>
 
           <section className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">

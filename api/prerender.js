@@ -38,7 +38,7 @@ import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
 import {
   STORE_PAGE_COLUMNS, absoluteMediaUrl, cleanStorePhotos, cleanStoreVideos, storeHoursLines, storeIsIndexable,
-  storeJsonLd, storeLocationLine, storePageDescription, storePageTitle, storePath, storeExternalLink,
+  storeJsonLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storeExternalLink,
 } from '../utils/storePage.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
@@ -4510,6 +4510,7 @@ async function renderStore(supabase, citySlug, storeSlugParam) {
     bodyHtml: `<main>
 <nav><a href="${BASE_URL}/card-shops">Card Shops</a> / <a href="${cityUrl}">${esc(cityInfo.label)}</a></nav>
 <h1>${esc(store.name)}</h1>
+${storeLogoUrl(store) ? `<img src="${esc(absoluteMediaUrl(storeLogoUrl(store)))}" alt="${esc(store.name)} logo" />` : ''}
 ${location ? `<p>${esc(location)}</p>` : ''}
 ${store.phone ? `<p>Phone: ${esc(store.phone)}</p>` : ''}
 ${links ? `<p>${links}</p>` : ''}

@@ -14,6 +14,7 @@ Everything comes from the store's `local_game_stores` row:
 | Street address (with an "Open in Google Maps" link), phone | `address`, `phone` |
 | Opening hours | `opening_hours` — plain text, one line per row, written `Day: hours` |
 | Instagram | `instagram_url` |
+| Logo — on the shop's card in the city list (instead of the cover photo) and beside the name on its page | `logo_url` |
 | Photo gallery | `photos` — `[{ url, caption }]`, in display order; the first is the cover |
 | Videos | `videos` — `[{ url, poster_url, caption }]`; an uploaded clip or a YouTube / Vimeo link |
 
@@ -30,6 +31,9 @@ page (`pages/stores/StorePage.jsx`), the admin editor, `api/prerender.js`
 - **Edit** on any store opens the editor (`components/admin/StoreEditorDialog.jsx`):
   details, opening hours, photos and videos. Signed-in admins also get an
   **Edit this page** button on the public page itself.
+- **Upload logo** — one image, shown on the shop's card in the directory and
+  on its page. A square PNG works best; without a logo the card shows the
+  cover photo.
 - **Add photos** — pick several at once; they are compressed in the browser.
   Add a caption, reorder with the arrows, remove with the bin. Up to 24.
 - **Upload a clip** — MP4, MOV or WebM up to 50 MB — or paste a YouTube / Vimeo
@@ -50,7 +54,7 @@ plays. If a clip shows as a black box for some visitors, export it as MP4
 
 ## Database
 
-`supabase/migrations/20261114212757_store_pages_media.sql` adds the four
+`supabase/migrations/20261114212757_store_pages_media.sql` adds the five
 columns, grants `SELECT` on them (the table's SELECT is granted column by
 column so `submitter_email` stays private), adds the admin-only INSERT policy
 and seeds Swap Itt Melbourne. Admin edits are browser writes under the existing

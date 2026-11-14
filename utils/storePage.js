@@ -23,11 +23,11 @@ const SITE_ORIGIN = 'https://cardpop.com.au';
 // Everything a store page reads. Never `select('*')`: submitter_email and
 // submitted_by sit outside the public column grant, so a star select fails.
 export const STORE_PAGE_COLUMNS =
-  'id, slug, name, suburb, city, state, address, website, phone, categories, description, status, opening_hours, instagram_url, photos, videos, updated_at';
+  'id, slug, name, suburb, city, state, address, website, phone, categories, description, status, opening_hours, instagram_url, logo_url, photos, videos, updated_at';
 
 // What a directory list row reads (city page, hub, local map).
 export const STORE_LIST_COLUMNS =
-  'slug, name, suburb, city, state, website, categories, description, photos';
+  'slug, name, suburb, city, state, website, categories, description, logo_url, photos';
 
 const trimOrNull = (v) => {
   if (v == null) return null;
@@ -74,6 +74,11 @@ export function storeHoursLines(openingHours) {
 /** The first photo's URL — the tile on the city page and the og:image. */
 export function storeCoverPhoto(store) {
   return cleanStorePhotos(store?.photos)[0]?.url || null;
+}
+
+/** The shop's logo URL (http(s) or a bundled site-relative file), or null. */
+export function storeLogoUrl(store) {
+  return safeLink(store?.logo_url);
 }
 
 /** An http(s) link for the store's website / Instagram, or null. */
@@ -136,6 +141,7 @@ export function storeJsonLd(store) {
     name: store?.name,
     ...(path ? { url: `${SITE_ORIGIN}${path}` } : {}),
     ...(trimOrNull(store?.description) ? { description: trimOrNull(store.description) } : {}),
+    ...(storeLogoUrl(store) ? { logo: absoluteMediaUrl(storeLogoUrl(store)) } : {}),
     ...(photos.length ? { image: photos.slice(0, 8) } : {}),
     ...(trimOrNull(store?.phone) ? { telephone: trimOrNull(store.phone) } : {}),
     ...(sameAs.length ? { sameAs } : {}),
@@ -190,6 +196,7 @@ export function normalizeStoreInput(input = {}) {
     phone: trimOrNull(input.phone)?.slice(0, 40) || null,
     website: link(input.website, 'Website'),
     instagram_url: link(input.instagram_url, 'Instagram'),
+    logo_url: safeLink(input.logo_url),
     description: trimOrNull(input.description)?.slice(0, 1200) || null,
     opening_hours: storeHoursLines(input.opening_hours).join('\n') || null,
     categories: Array.isArray(input.categories) ? input.categories.filter((c) => typeof c === 'string') : [],

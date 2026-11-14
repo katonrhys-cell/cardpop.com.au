@@ -2,6 +2,7 @@
 -- (/card-shops/<city>/<slug>) that an admin can fill in — street address,
 -- phone, opening hours, Instagram, a photo gallery and videos.
 --
+--   logo_url  the shop's logo, shown on its directory card and its page
 --   photos  [{ "url": "...", "caption": "..." }]                    display order
 --   videos  [{ "url": "...", "poster_url": "...", "caption": "..." }]
 --
@@ -19,6 +20,7 @@
 alter table public.local_game_stores
   add column if not exists opening_hours text,
   add column if not exists instagram_url text,
+  add column if not exists logo_url text,
   add column if not exists photos jsonb not null default '[]'::jsonb,
   add column if not exists videos jsonb not null default '[]'::jsonb;
 
@@ -44,7 +46,7 @@ end $$;
 
 -- The table's SELECT is granted column by column (submitter_email and
 -- submitted_by stay private — 20260715230000); the new columns are public.
-grant select (opening_hours, instagram_url, photos, videos)
+grant select (opening_hours, instagram_url, logo_url, photos, videos)
   on public.local_game_stores to anon, authenticated;
 
 -- Admins add stores from the dashboard. Same admin test as the existing

@@ -6,6 +6,7 @@ import BackButton from '@/components/BackButton.jsx';
 import { EventPhotoGrid } from '@/components/reviews/EventReviewGallery.jsx';
 import { ReviewVideoPlayer } from '@/components/reviews/EventReviewVideo.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS, fetchStore } from '@/lib/storeDirectory.js';
 import {
   cleanStorePhotos,
@@ -16,6 +17,7 @@ import {
   storeIsIndexable,
   storeJsonLd,
   storeLocationLine,
+  storeLogoUrl,
   storePageDescription,
   storePageTitle,
   storePath,
@@ -107,7 +109,16 @@ const StorePage = () => {
             <Link to={`/card-shops/${city}`} className="hover:text-foreground">{cityInfo.label}</Link>
           </nav>
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
+            <div className="flex items-center gap-4 min-w-0">
+              {storeLogoUrl(store) && (
+                <img
+                  src={toCdnUrl(storeLogoUrl(store))}
+                  alt={`${store.name} logo`}
+                  className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl object-contain bg-white border border-border p-1.5"
+                />
+              )}
+              <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
+            </div>
             {isAdmin && (
               <Link
                 to={`/admin/store-directory?edit=${encodeURIComponent(store.slug)}`}
