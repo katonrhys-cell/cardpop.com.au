@@ -76,6 +76,10 @@ describe('HomePage stats strip', () => {
     expect(labels[1]).toContain('Clicks from Google');
     expect(labels[2]).toContain('Visitors');
     expect(google).toHaveTextContent('61k since May 2026');
+    // Feature my event: My Events' feature picker (login first when signed out).
+    const featureLinks = screen.getAllByRole('link', { name: /feature my event/i });
+    expect(featureLinks.length).toBeGreaterThan(0);
+    for (const link of featureLinks) expect(link).toHaveAttribute('href', '/account/events?feature=1');
 
     const community = screen.getByTestId('stats-community');
     expect(community).toHaveTextContent('Cards in Member Vaults');
