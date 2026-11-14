@@ -47,9 +47,6 @@ const SignupPage = () => {
   // Unticked by default: a pre-ticked box isn't consent under the Spam Act.
   const [newsletterOptIn, setNewsletterOptIn] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
-  // "I run events": asks to be confirmed as an event organiser after sign-up.
-  const [isOrganiser, setIsOrganiser] = useState(false);
-  const [organiserName, setOrganiserName] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [captchaToken, setCaptchaToken] = useState('');
@@ -76,7 +73,7 @@ const SignupPage = () => {
   // Strength meter: length-based, so it still rewards a longer passphrase.
   const score = Math.min(5, Math.floor(formData.password.length / 3));
   const isPasswordValid = passwordValidation.length;
-  const isFormValid = formData.firstName.trim() !== '' && formData.lastName.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!isOrganiser || organiserName.trim().length >= 2) && (!TURNSTILE_ENABLED || Boolean(captchaToken));
+  const isFormValid = formData.firstName.trim() !== '' && formData.lastName.trim() !== '' && formData.email.trim() !== '' && isPasswordValid && termsAccepted && (!TURNSTILE_ENABLED || Boolean(captchaToken));
 
   const handleAccountSubmit = async (e) => {
     e.preventDefault();
@@ -96,10 +93,7 @@ const SignupPage = () => {
 
       // Turnstile token (when enabled) is verified server-side by Supabase Auth.
       const fullName = `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
-      const result = await signup(formData.email, formData.password, fullName, captchaToken, {
-        next: nextPath,
-        organiserName: isOrganiser ? organiserName.trim().slice(0, 120) : undefined,
-      });
+      const result = await signup(formData.email, formData.password, fullName, captchaToken, { next: nextPath });
       const user = result?.user;
       const session = result?.session;
 
@@ -196,13 +190,6 @@ const SignupPage = () => {
               trade completes. Want more monthly listings, your own store page and premium display
               styles? Upgrade to <span className="text-foreground font-bold">Pro</span> or higher anytime.
             </p>
-            {isOrganiser && (
-              <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-                You asked to be an <span className="text-foreground font-bold">event organiser</span>. Once you&apos;ve
-                confirmed your email and signed in, we&apos;ll send your request to the CardPop team to confirm with you —
-                then you can edit your organiser page.
-              </p>
-            )}
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate
               email — it gives you <span className="text-foreground font-bold">10% off your first order</span> at
@@ -363,38 +350,6 @@ const SignupPage = () => {
                   Subscribe to the CardPop newsletter for market insights, new card releases, and community news.
                 </span>
               </label>
-
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={isOrganiser}
-                    onChange={(e) => setIsOrganiser(e.target.checked)}
-                    disabled={loading}
-                    className="mt-0.5 w-4 h-4 rounded border-border accent-primary"
-                  />
-                  <span className="text-sm text-muted-foreground leading-snug">
-                    <span className="font-semibold text-foreground">I run card shows or events</span> — I&apos;d like to be an event organiser.
-                    We&apos;ll confirm it with you, then you can edit your own organiser page.
-                  </span>
-                </label>
-                {isOrganiser && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="organiserName" className="font-bold text-xs uppercase tracking-wide">Organiser or business name</Label>
-                    <Input
-                      id="organiserName"
-                      required
-                      minLength={2}
-                      maxLength={120}
-                      value={organiserName}
-                      onChange={(e) => setOrganiserName(e.target.value)}
-                      className="bg-background h-11"
-                      placeholder="e.g. Oz Comic-Con"
-                      disabled={loading}
-                    />
-                  </div>
-                )}
-              </div>
 
               <label className="flex items-start gap-3 cursor-pointer select-none">
                 <input
