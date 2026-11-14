@@ -231,6 +231,10 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
 // (SignupPage carries ?next= through, validated by lib/safeInternalPath.js).
 const LIST_EVENT_SIGNED_IN = '/account/events?new=1';
 const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGNED_IN)}`;
+// "Feature my event" in the Google panel: My Events opens the feature picker
+// (event → package → Stripe) for `?feature=1`. A signed-out visitor is sent
+// to /login by ProtectedRoute and returned to the same URL afterwards.
+const FEATURE_EVENT_PATH = '/account/events?feature=1';
 
 const StatPanel = ({ icon: Icon, iconSrc, eyebrow, title, note, stats, inView, cta, testId }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
@@ -715,6 +719,7 @@ const HomePage = () => {
                   note="Last 30 days · Google Search Console and Google Analytics, updated nightly"
                   stats={googleStats}
                   inView={statsInView}
+                  cta={{ to: FEATURE_EVENT_PATH, label: 'Feature my event' }}
                 />
               )}
               <StatPanel
