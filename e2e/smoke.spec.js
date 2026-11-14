@@ -59,3 +59,21 @@ test('cart drawer lazy-loads and opens when the cart button is clicked', async (
   await expect(page.getByRole('heading', { name: 'Your Cart', exact: true })).toBeVisible();
   expect(errors, `Uncaught page errors:\n${errors.join('\n')}`).toEqual([]);
 });
+
+test('floating WhatsApp chat button is on public pages and clear of the cookie banner', async ({ page }) => {
+  await page.goto('/shop', { waitUntil: 'domcontentloaded' });
+
+  const button = page.getByTestId('whatsapp-floating-button');
+  await expect(button).toBeVisible();
+  await expect(button).toHaveAttribute('href', /^https:\/\/wa\.me\/61406378473\?text=/);
+
+  // A first visit shows the cookie banner along the bottom edge; the button
+  // must sit wholly above it rather than half under it.
+  const banner = page.getByRole('region', { name: 'Cookie preferences' }).last();
+  await expect(banner).toBeVisible();
+  await expect.poll(async () => {
+    const [b, c] = await Promise.all([button.boundingBox(), banner.boundingBox()]);
+    return b && c ? b.y + b.height <= c.y : false;
+  }).toBe(true);
+});
+
