@@ -31,13 +31,28 @@ const fetchSellerRatings = (sellerId) => {
   return promise;
 };
 
-const SellerRatingDisplay = ({ sellerId, compact = false, showPerformance = false }) => {
+// The compact line needs only an average and a count, and every listing grid
+// already carries both on its seller embed (`profiles.rating` /
+// `profiles.reviews_count`, kept in step with seller_ratings by the ratings
+// route — see LISTING_SELLER_EMBED). Given that `summary`, nothing is fetched:
+// a marketplace page of cards from thirty sellers used to fire thirty
+// /api/seller-ratings requests (Sentry: "N+1 API Call").
+export const ratingsFromSummary = (summary) => {
+  if (!summary || summary.reviews_count === undefined || summary.reviews_count === null) return null;
+  const total = Number(summary.reviews_count) || 0;
+  const average = Number(summary.rating) || 0;
+  return { stats: { total, average: average.toFixed(1) } };
+};
+
+const SellerRatingDisplay = ({ sellerId, compact = false, showPerformance = false, summary = null }) => {
+  const fromSummary = compact ? ratingsFromSummary(summary) : null;
+  const skipFetch = !!fromSummary;
   // Seed from cache so repeat sellers render instantly without a loading flash.
-  const [ratings, setRatings] = useState(() => (sellerId ? ratingsCache.get(sellerId) ?? null : null));
-  const [loading, setLoading] = useState(() => (sellerId ? !ratingsCache.has(sellerId) : false));
+  const [fetched, setRatings] = useState(() => (sellerId ? ratingsCache.get(sellerId) ?? null : null));
+  const [loading, setLoading] = useState(() => (sellerId && !skipFetch ? !ratingsCache.has(sellerId) : false));
 
   useEffect(() => {
-    if (!sellerId) return;
+    if (!sellerId || skipFetch) return;
 
     if (ratingsCache.has(sellerId)) {
       setRatings(ratingsCache.get(sellerId));
@@ -62,9 +77,11 @@ const SellerRatingDisplay = ({ sellerId, compact = false, showPerformance = fals
     return () => {
       cancelled = true;
     };
-  }, [sellerId]);
+  }, [sellerId, skipFetch]);
 
-  if (loading) {
+  const ratings = fromSummary || fetched;
+
+  if (loading && !skipFetch) {
     return <div className="animate-pulse bg-muted h-6 w-24 rounded" />;
   }
 

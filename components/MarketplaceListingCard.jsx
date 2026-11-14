@@ -280,7 +280,7 @@ const MarketplaceListingCard = ({ listing, priority = false }) => {
                     <SellerTierBadge tier={sellerObj.seller_tier} size="xs" />
                   )}
                 </div>
-                <SellerRatingDisplay sellerId={sellerId} compact={true} />
+                <SellerRatingDisplay sellerId={sellerId} compact={true} summary={sellerObj} />
               </div>
             </Link>
           )}

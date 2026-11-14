@@ -49,7 +49,6 @@ describe('GET / (search suggestions)', () => {
     queueFrom(
       makeBuilder({ data: [{ card_name: 'Charizard' }, { card_name: 'Charizard' }], error: null }), // vault_items
       makeBuilder({ data: [{ title: 'Charizard GX' }], error: null }),                               // shop_products
-      makeBuilder({ data: [], error: null }), // popular fallback (size < 5)
     );
     const res = await request(app).get('/?q=charizard');
     expect(res.status).toBe(200);
@@ -73,7 +72,6 @@ describe('GET / (search suggestions)', () => {
     queueFrom(
       makeBuilder({ data: [], error: null }),                       // vault_items
       makeBuilder({ data: [], error: null }),                       // shop_products
-      makeBuilder({ data: [], error: null }),                       // popular fallback
       makeBuilder({ data: [{ card_name: 'Charizard' }], error: null }), // all cards for fuzzy
     );
     const res = await request(app).get('/?q=charizrd');
@@ -82,8 +80,39 @@ describe('GET / (search suggestions)', () => {
     expect(mockGetDidYouMean).toHaveBeenCalledWith('charizrd', ['Charizard'], 0.6);
   });
 
+  it('reads cards and shop titles together, with no third backfill query', async () => {
+    queueFrom(
+      makeBuilder({ data: [{ card_name: 'Pikachu' }], error: null }),
+      makeBuilder({ data: [], error: null }),
+    );
+    const res = await request(app).get('/?q=pika');
+    expect(res.body.suggestions).toEqual(['Pikachu']);
+    expect(mockSupabase.from.mock.calls.map(([t]) => t)).toEqual(['vault_items', 'shop_products']);
+  });
+
+  it('keeps the "did you mean" pool between requests when the cache is on', async () => {
+    process.env.SEARCH_FUZZY_POOL_TTL_MS = '60000';
+    try {
+      mockGetDidYouMean.mockReturnValue('Charizard');
+      queueFrom(
+        makeBuilder(), makeBuilder(),
+        makeBuilder({ data: [{ card_name: 'Charizard' }], error: null }), // pool, read once
+        makeBuilder(), makeBuilder(),
+      );
+      await request(app).get('/?q=charizrd');
+      const res = await request(app).get('/?q=charzard');
+      expect(res.body.didYouMean).toBe('Charizard');
+      expect(mockSupabase.from).toHaveBeenCalledTimes(5);
+    } finally {
+      process.env.SEARCH_FUZZY_POOL_TTL_MS = '0';
+    }
+  });
+
   it('returns 500 when a query errors', async () => {
-    queueFrom(makeBuilder({ data: null, error: new Error('db down') }));
+    queueFrom(
+      makeBuilder({ data: null, error: new Error('db down') }),
+      makeBuilder({ data: [], error: null }),
+    );
     const res = await request(app).get('/?q=charizard');
     expect(res.status).toBe(500);
   });

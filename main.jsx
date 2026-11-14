@@ -249,6 +249,10 @@ if (typeof window !== 'undefined') {
   });
   window.addEventListener('unhandledrejection', (event) => {
     const reason = event?.reason;
+    // A rejection with no reason has no message and no stack — it reached
+    // Sentry as "Error: undefined", which nobody can act on. Skip it here; the
+    // SDK's own copy is dropped by dropRecoveredErrors.
+    if (reason === undefined || reason === null) return;
     bufferPreInitError(reason instanceof Error ? reason : new Error(String(reason)));
   });
   onFirstInteractionOrLoad(initSentry);
