@@ -35,7 +35,8 @@ import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 import PlayerLinkChip from '@/components/PlayerLinkChip.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
-import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta } from '@/utils/shopStock.js';
+import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta, lowStockCount } from '@/utils/shopStock.js';
+import LowStockMeter from '@/components/shop/LowStockMeter.jsx';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
@@ -950,11 +951,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                 </Button>
                 {/* Scarcity only when it's real: "500 available" removes urgency,
                     "Only 3 left" creates it. Nothing is said above 5. */}
-                {!preorder && product.stockQuantity !== null && product.stockQuantity > 0 && product.stockQuantity <= 5 && (
-                  <p className="text-sm text-center font-semibold text-brand-red">
-                    Only {product.stockQuantity} left in stock
-                  </p>
-                )}
+                <LowStockMeter
+                  count={lowStockCount(product, activeVariants(product).find((v) => v.id === selectedVariantId) || null, { hasVariants: activeVariants(product).length > 0 })}
+                  className="mx-auto"
+                />
               </div>
             ) : isSold ? (
               <div className="flex flex-col gap-3 mb-8">
