@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
@@ -42,6 +42,26 @@ const OAUTH_PROVIDERS = [
   { key: 'facebook', label: 'Continue with Facebook', Icon: FacebookIcon },
 ];
 
+// Which of the providers above are actually switched on in Supabase. Asked once
+// per page load from the public auth settings endpoint, so a provider that is
+// not enabled (its button would land the visitor on a raw JSON error page) is
+// hidden, and appears by itself the day it is enabled — no deploy needed.
+// Fails open: any problem shows every button, as before.
+let enabledProvidersPromise = null;
+const fetchEnabledProviders = () => {
+  if (!enabledProvidersPromise) {
+    const url = supabase?.supabaseUrl;
+    const key = supabase?.supabaseKey;
+    enabledProvidersPromise = (!url || !key || typeof fetch !== 'function')
+      ? Promise.resolve(null)
+      : fetch(`${url}/auth/v1/settings`, { headers: { apikey: key }, signal: AbortSignal.timeout(5000) })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((body) => (body?.external && typeof body.external === 'object' ? body.external : null))
+          .catch(() => null);
+  }
+  return enabledProvidersPromise;
+};
+
 /**
  * Renders an "or continue with" divider and a button per OAuth provider.
  * On click it kicks off Supabase's OAuth redirect flow; the session is picked
@@ -58,6 +78,32 @@ const OAUTH_PROVIDERS = [
  */
 const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continue with', variant = 'buttons' }) => {
   const [oauthLoading, setOauthLoading] = useState(null);
+  const [external, setExternal] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchEnabledProviders().then((map) => { if (alive && map) setExternal(map); });
+    return () => { alive = false; };
+  }, []);
+
+  // Coming BACK from the provider (browser Back, or cancelling there) restores
+  // this page from the back/forward cache with its state frozen as it was at
+  // the redirect — the spinner still turning and every button disabled. Clear
+  // it whenever the page is shown again.
+  useEffect(() => {
+    const reset = () => setOauthLoading(null);
+    const onVisible = () => { if (document.visibilityState === 'visible') reset(); };
+    window.addEventListener('pageshow', reset);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('pageshow', reset);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
+
+  const providers = external
+    ? OAUTH_PROVIDERS.filter(({ key }) => external[key] !== false)
+    : OAUTH_PROVIDERS;
 
   const handleOAuthLogin = async (provider) => {
     setOauthLoading(provider);
@@ -74,7 +120,7 @@ const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continu
     }
   };
 
-  if (OAUTH_PROVIDERS.length === 0) return null;
+  if (providers.length === 0) return null;
 
   const divider = (
     <div className="relative">
@@ -92,13 +138,13 @@ const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continu
   if (variant === 'icons') {
     return (
       <div className="w-full space-y-5">
-        <div className="grid grid-cols-3 gap-3">
-          {OAUTH_PROVIDERS.map(({ key, label, Icon }) => (
+        <div className="flex gap-3">
+          {providers.map(({ key, label, Icon }) => (
             <Button
               key={key}
               type="button"
               variant="outline"
-              className="w-full h-14 rounded-xl [&_svg]:size-7"
+              className="flex-1 h-14 rounded-xl [&_svg]:size-7"
               aria-label={label}
               title={label}
               onClick={() => handleOAuthLogin(key)}
@@ -120,7 +166,7 @@ const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continu
   return (
     <div className="w-full space-y-4">
       {divider}
-      {OAUTH_PROVIDERS.map(({ key, label, Icon }) => (
+      {providers.map(({ key, label, Icon }) => (
         <Button
           key={key}
           type="button"

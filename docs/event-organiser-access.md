@@ -6,14 +6,15 @@ an admin confirms every request.
 
 ## The flow
 
-1. **Ask.** Either tick **"I run card shows or events"** (plus an organiser name) on
-   the sign-up form, or use **Become an organiser** on Account → My Events
-   (existing members, social sign-ups). The sign-up choice is kept in the
-   account's auth metadata (`organiser_interest`, `organiser_name`) because the
-   member has no session until they confirm their email; on their first signed-in
-   visit to My Events the SPA calls `POST /organiser-requests/from-signup`, which
-   turns it into a request — once, and never again after any decision.
-   A request needs a **confirmed email** so an admin has a real address.
+1. **Ask.** A signed-in member uses **Become an organiser** on Account → My Events
+   and fills in the organiser name, a website/social link and an optional note.
+   A request needs a **confirmed email** so an admin has a real address — the
+   route refuses one without it. The sign-up form no longer asks: the
+   "I run card shows or events" tick was removed from `/signup` (2026-11) so
+   organiser access is only ever requested from inside a verified account.
+   `POST /organiser-requests/from-signup` stays for accounts created while the
+   tick existed (their choice sits in auth metadata, `organiser_interest` /
+   `organiser_name`) and is a no-op for everyone else.
 2. **Admins are told.** Every admin gets a bell (`organiser_request`) and one
    email (via `alertAdminsToReview`) with the member's name, email, organiser
    name, website/social link and message.
