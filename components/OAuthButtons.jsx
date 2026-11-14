@@ -51,8 +51,12 @@ const OAUTH_PROVIDERS = [
  *                               the Supabase Auth "Redirect URLs" allow-list.
  * @param {boolean} disabled     Disable the buttons (e.g. while a parent form submits).
  * @param {string}  dividerLabel Text shown in the divider.
+ * @param {'buttons'|'icons'} variant 'buttons' (default): divider, then a full-width
+ *                               labelled button per provider — goes below a form.
+ *                               'icons': a row of icon-only buttons, then the
+ *                               divider — goes above a form.
  */
-const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continue with' }) => {
+const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continue with', variant = 'buttons' }) => {
   const [oauthLoading, setOauthLoading] = useState(null);
 
   const handleOAuthLogin = async (provider) => {
@@ -72,16 +76,50 @@ const OAuthButtons = ({ redirectTo, disabled = false, dividerLabel = 'Or continu
 
   if (OAUTH_PROVIDERS.length === 0) return null;
 
+  const divider = (
+    <div className="relative">
+      <div className="absolute inset-0 flex items-center">
+        <span className="w-full border-t border-border" />
+      </div>
+      <div className="relative flex justify-center text-xs uppercase">
+        <span className="bg-card px-2 text-muted-foreground">{dividerLabel}</span>
+      </div>
+    </div>
+  );
+
+  // Icon row: sits ABOVE a form, so the one-tap options are the first thing a
+  // visitor sees; the divider then introduces the email form underneath.
+  if (variant === 'icons') {
+    return (
+      <div className="w-full space-y-5">
+        <div className="grid grid-cols-3 gap-3">
+          {OAUTH_PROVIDERS.map(({ key, label, Icon }) => (
+            <Button
+              key={key}
+              type="button"
+              variant="outline"
+              className="w-full h-14 rounded-xl [&_svg]:size-7"
+              aria-label={label}
+              title={label}
+              onClick={() => handleOAuthLogin(key)}
+              disabled={disabled || oauthLoading !== null}
+            >
+              {oauthLoading === key ? (
+                <Loader2 className="w-6 h-6 animate-spin" />
+              ) : (
+                <Icon className="w-7 h-7" />
+              )}
+            </Button>
+          ))}
+        </div>
+        {divider}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full space-y-4">
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">{dividerLabel}</span>
-        </div>
-      </div>
+      {divider}
       {OAUTH_PROVIDERS.map(({ key, label, Icon }) => (
         <Button
           key={key}
