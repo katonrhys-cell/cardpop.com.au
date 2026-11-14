@@ -1,11 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Twitter, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
+import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
 import { eventTypeStyle, facebookEmbedUrl, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
+import XIcon from '@/components/XIcon.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
@@ -70,7 +71,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
     const shareUrls = {
       Facebook: `https://www.facebook.com/sharer/sharer.php?u=${url}`,
-      Twitter: `https://twitter.com/intent/tweet?text=${text}&url=${url}`,
+      Twitter: `https://x.com/intent/post?text=${text}&url=${url}`,
       LinkedIn: `https://www.linkedin.com/sharing/share-offsite/?url=${url}`,
     };
 
@@ -419,7 +420,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
                   {event.x_url && (
                     <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
                       <a href={event.x_url} target="_blank" rel="noopener noreferrer">
-                        <Twitter className="w-4 h-4 mr-2" /> X (Twitter)
+                        <XIcon className="w-4 h-4 mr-2" /> X
                       </a>
                     </Button>
                   )}
@@ -449,8 +450,8 @@ const EventDetailCard = ({ event, isPast = false }) => {
                   <span className="sr-only">Share on Facebook</span>
                 </Button>
                 <Button variant="outline" size="icon" onClick={() => handleShare('Twitter')} className="rounded-full w-10 h-10 hover:text-sky-500 hover:border-sky-500">
-                  <Twitter className="w-4 h-4" />
-                  <span className="sr-only">Share on Twitter</span>
+                  <XIcon className="w-4 h-4" />
+                  <span className="sr-only">Share on X</span>
                 </Button>
                 <Button variant="outline" size="icon" onClick={() => handleShare('LinkedIn')} className="rounded-full w-10 h-10 hover:text-blue-700 hover:border-blue-700">
                   <Linkedin className="w-4 h-4" />
