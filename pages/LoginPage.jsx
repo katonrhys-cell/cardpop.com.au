@@ -237,15 +237,24 @@ const LoginPage = () => {
             >
               <Card className="border-border shadow-lg rounded-2xl overflow-hidden">
                 <form onSubmit={handleLogin}>
-                  <CardHeader className="space-y-1 pb-6">
+                  <CardHeader className="space-y-1 pb-4">
                     <CardTitle className="text-xl">Sign In</CardTitle>
                     <CardDescription>
                       {/^\/account\/events\?(.*&)?feature=/.test(from)
                         ? 'Sign in to choose the event you want to feature.'
-                        : 'Enter your email and password to continue'}
+                        : 'Sign in instantly with'}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {/* One-tap sign-in first, the email form after it — same order as the sign-up page. */}
+                    <div className="pb-2">
+                      <OAuthButtons
+                        variant="icons"
+                        dividerLabel="Or sign in with email"
+                        redirectTo={`${window.location.origin}${from}`}
+                        disabled={loading}
+                      />
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">Email Address</Label>
                       <Input
@@ -299,8 +308,6 @@ const LoginPage = () => {
                         <>Sign In <ArrowRight className="w-5 h-5 ml-2" /></>
                       )}
                     </Button>
-
-                    <OAuthButtons redirectTo={`${window.location.origin}${from}`} disabled={loading} />
 
                     <div className="text-center text-sm text-muted-foreground">
                       Don't have an account?{' '}
