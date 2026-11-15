@@ -14,7 +14,7 @@ import HomepageFeaturedEvents from '@/components/home/HomepageFeaturedEvents.jsx
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
-import { publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
+import { TRAFFIC_WINDOW_LABEL, formatCount, publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import { HeroSearchForm } from '@/components/HeroSection.jsx';
@@ -199,10 +199,19 @@ const statFigure = ({ value, suffix, isDecimal }) =>
 const statWidthEm = (text) =>
   [...text].reduce((em, ch) => em + (/[0-9]/.test(ch) ? 1.03 : /[,.]/.test(ch) ? 0.32 : 0.95), 0);
 
-const StatItem = ({ value, suffix, label, sub, isDecimal, inView, fitEm }) => {
+//
+// A tile with an all-time figure (the Google panel) reads top to bottom as two
+// periods: the window eyebrow + headline for the recent figure, then a tinted
+// "All time" block pinned to the tile's foot so the three blocks line up even
+// when one label wraps to a second line.
+const StatItem = ({ value, suffix, label, sub, period, allTime, since, isDecimal, inView, fitEm }) => {
   const count = useCountUp(value, inView, isDecimal);
+  const hasAllTime = allTime > 0;
   return (
-    <div className="px-1 text-center sm:px-3 [container-type:inline-size]">
+    <div className="flex h-full flex-col px-1 text-center sm:px-3 [container-type:inline-size]">
+      {period && (
+        <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-primary sm:text-[11px]">{period}</div>
+      )}
       <div className="text-3xl md:text-4xl font-extrabold font-serif text-foreground tabular-nums tracking-tight">
         <span
           className="whitespace-nowrap"
@@ -212,7 +221,17 @@ const StatItem = ({ value, suffix, label, sub, isDecimal, inView, fitEm }) => {
         </span>
       </div>
       <div className="mt-1 text-xs font-semibold leading-snug text-muted-foreground sm:text-sm">{label}</div>
-      {sub && <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums sm:text-xs">{sub}</div>}
+      {hasAllTime ? (
+        <div className="mt-auto pt-4">
+          <div className="rounded-xl bg-muted/60 px-1.5 py-2.5 sm:px-3" data-testid="stat-all-time">
+            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:text-[11px]">All time</div>
+            <div className="mt-0.5 text-base font-extrabold tabular-nums tracking-tight text-foreground sm:text-xl">{formatCount(allTime)}</div>
+            {since && <div className="text-[10px] text-muted-foreground sm:text-[11px]">since {since}</div>}
+          </div>
+        </div>
+      ) : (
+        sub && <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums sm:text-xs">{sub}</div>
+      )}
     </div>
   );
 };
@@ -236,7 +255,7 @@ const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGN
 // to /login by ProtectedRoute and returned to the same URL afterwards.
 const FEATURE_EVENT_PATH = '/account/events?feature=1';
 
-const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title, note, stats, inView, cta, testId }) => {
+const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title, note, period, stats, inView, cta, testId }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
   const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
@@ -267,9 +286,9 @@ const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title,
           </div>
         )}
       </div>
-      <div className={`mt-6 grid flex-1 items-start divide-x divide-border ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
+      <div className={`mt-6 grid flex-1 divide-x divide-border ${period ? 'items-stretch' : 'items-start'} ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
         {stats.map((stat) => (
-          <StatItem key={stat.key} {...stat} inView={inView} fitEm={fitEm} />
+          <StatItem key={stat.key} {...stat} period={period} inView={inView} fitEm={fitEm} />
         ))}
       </div>
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground sm:text-xs">
@@ -351,7 +370,7 @@ const HomePage = () => {
 
   // Stats strip — two panels, real counts only.
   //   "Found on Google": Search Console impressions → clicks → GA4 visitors,
-  //   each last-30-days with the since-launch figure underneath; every tile
+  //   each last-28-days with the all-time figure underneath; every tile
   //   hides itself below its floor or when its sync is stale (utils/siteTraffic.js).
   //   "The CardPop community": cards in vaults, members, events — zero counts skipped.
   const googleStats = [
@@ -717,7 +736,8 @@ const HomePage = () => {
                   iconTile="bg-white border border-border"
                   eyebrow="Found on Google"
                   title="Collectors find CardPop on Google"
-                  note="Last 30 days · Google Search Console and Google Analytics, updated nightly"
+                  period={TRAFFIC_WINDOW_LABEL}
+                  note="Google Search Console and Google Analytics, updated nightly"
                   stats={googleStats}
                   inView={statsInView}
                   cta={{ to: FEATURE_EVENT_PATH, label: 'Feature my event' }}

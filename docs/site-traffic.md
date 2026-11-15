@@ -5,13 +5,13 @@ CardPop shows how people find and land on the site in two places:
 - **Home page stats strip** (`pages/HomePage.jsx`) — two panels side by side.
   **Found on Google**: Search Console *impressions* (times a CardPop page
   appeared in Google results), *clicks* (searchers who came through) and GA4
-  *visitors*, each over the last 30 days with the since-launch total
+  *visitors*, each over the last 28 days with the since-launch total
   underneath. **The CardPop community**: Cards in Member Vaults / Active
   Members / Events Listed, with a "Join free" nudge for signed-out visitors.
   (Live Listings is no longer a tile — the ticker underneath already shows
   what's live.)
 - **Admin → Dashboard → Visitors card** (`components/admin/SiteTrafficCard.jsx`)
-  — the visitor figures plus 30-day page views, the Search Console line, a
+  — the visitor figures plus 28-day page views, the Search Console line, a
   daily-visitors sparkline (hover for a day's count) and a **Sync now** button.
 
 The numbers are **Google Analytics 4**'s, not something the app counts itself.
@@ -29,7 +29,7 @@ Cloudflare Worker  cloudflare/scheduler/worker.js (daily run)  05:23 AEST daily
         └─ src/services/siteTrafficService.js
              ├─ GA4 Data API runReport ×2  (src/utils/ga4Client.js, service account)
              ├─ upsert site_traffic_daily    one row per day: users, sessions, pageviews
-             └─ upsert site_traffic_summary  single row: 30-day + all-time totals
+             └─ upsert site_traffic_summary  single row: 28-day + all-time totals
 Home page / admin  ← plain Supabase reads (public SELECT; aggregate numbers only)
 ```
 
@@ -40,12 +40,12 @@ Console** below:
 1. **All days since `GA4_START_DATE`** → refreshes every daily row (GA4
    finalises a day up to ~48 h late, so re-pulling the whole history each
    night self-heals; it's a few hundred rows) and gives the all-time totals.
-2. **`30daysAgo` → `yesterday`** → the last-30-days totals and the window
+2. **`28daysAgo` → `yesterday`** → the last-28-days totals and the window
    dates shown in admin.
 
 **Why not sum the daily rows?** `activeUsers` is de-duplicated *within a
 report's date range*. Someone who visits on five days is one visitor in the
-30-day total but would be five if the daily rows were added up. The `TOTAL`
+28-day total but would be five if the daily rows were added up. The `TOTAL`
 row is the honest figure; the daily rows are for the sparkline.
 
 `since_date` is the first day GA4 recorded a session, so "since launch" is
@@ -82,7 +82,7 @@ backend writes them.
    | `GA4_START_DATE` | *(optional)* `YYYY-MM-DD` launch date; default `2025-01-01`. GA4 returns nothing for days before the property existed, so early is harmless |
 
 5. Redeploy (env changes need one), then **Admin → Dashboard → Visitors →
-   Sync now**. A green toast with a 30-day number means the credentials work.
+   Sync now**. A green toast with a 28-day number means the credentials work.
    The nightly job takes over from there.
 
 The `CRON_SECRET` on the Cloudflare scheduler Worker is shared with the other
@@ -106,13 +106,13 @@ per scope) and access to the property:
    Console names it: `sc-domain:cardpop.com.au` for a Domain property, or
    `https://cardpop.com.au/` for a URL-prefix property (the trailing slash
    is added if missing). Redeploy, then **Sync now** on the admin card; the
-   toast now also reports the 30-day clicks.
+   toast now also reports the 28-day clicks.
 
 How it's read: one query by `date`, from the later of `GA4_START_DATE` and
 16 months ago (Search Console keeps 16 months), `dataState: 'all'` so the
 last two or three not-yet-final days are included and simply overwritten
 the next night. Clicks and impressions are additive across days, so the
-totals are sums of the daily rows; "last 30 days" is the 30 days ending
+totals are sums of the daily rows; "last 28 days" is the 28 days ending
 yesterday regardless of how many of them Google has reported yet. Each
 source writes **only its own columns**, in its own upsert, GA4 first — a
 Search Console failure never costs the visitor figures (it is thrown after
@@ -132,9 +132,9 @@ Search Console knows it.
   panel), clicks `MIN_PUBLIC_SEARCH_CLICKS_30D` (50; shown alongside once
   reached) — and whenever that source's sync (`synced_at` /
   `search_synced_at`) is older than 14 days: a tiny or stale number is a
-  worse signal than none. Every headline is last-30-days; the small line is
+  worse signal than none. Every headline is last-28-days; the small line is
   "`<all-time>` since `<launch month>`", and the all-time figure is never
-  shown below the 30-day one (possible if `GA4_START_DATE` is after the
+  shown below the 28-day one (possible if `GA4_START_DATE` is after the
   launch). With no Google figures at all the community panel stands alone.
 - The admin card shows everything regardless and explains what to set when
   there's no summary row yet.
@@ -157,7 +157,7 @@ Search Console knows it.
 | 502, logs show `runReport failed (403)` | the service account isn't a Viewer on the property, or the Analytics Data API isn't enabled in the Cloud project |
 | 502, `runReport failed (429)` | GA4 Data API quota — the job makes 2 requests a night, so this is another consumer |
 | 502, logs show `searchAnalytics.query failed (403)` | the service account isn't a user on the Search Console property, the Search Console API isn't enabled in its Cloud project, or `GSC_SITE_URL` doesn't match the property name exactly (`sc-domain:` vs URL-prefix) |
-| Google panel missing from the home page | impressions under 1,000 for the 30 days, or `search_synced_at` older than 14 days — check the admin card's Search line |
+| Google panel missing from the home page | impressions under 1,000 for the 28 days, or `search_synced_at` older than 14 days — check the admin card's Search line |
 | numbers lower than Search Console clicks | GA4 is blocked by ad-blockers for some visitors; Search Console counts the click, GA4 can't see the visit. Expected gap of 10–30% |
 | yesterday looks low | GA4 hasn't finalised it yet; tomorrow's run overwrites it |
 

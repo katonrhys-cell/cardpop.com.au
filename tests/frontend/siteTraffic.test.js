@@ -20,6 +20,8 @@ describe('publicTrafficStat', () => {
       value: 4210,
       label: 'Visitors',
       sub: '15.3k since Jun 2026',
+      allTime: 15300,
+      since: 'Jun 2026',
     });
   });
 
@@ -52,8 +54,8 @@ const freshSearch = (over = {}) => ({
 describe('publicSearchStats', () => {
   it('leads with impressions, then clicks, each with its since-launch line', () => {
     expect(publicSearchStats(freshSearch(), { now: NOW })).toEqual([
-      { key: 'impressions', value: 18400, label: 'Google Search impressions', sub: '61k since May 2026' },
-      { key: 'clicks', value: 620, label: 'Clicks from Google', sub: '2,100 since May 2026' },
+      { key: 'impressions', value: 18400, label: 'Google Search impressions', sub: '61k since May 2026', allTime: 61000, since: 'May 2026' },
+      { key: 'clicks', value: 620, label: 'Clicks from Google', sub: '2,100 since May 2026', allTime: 2100, since: 'May 2026' },
     ]);
   });
 
