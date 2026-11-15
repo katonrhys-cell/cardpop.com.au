@@ -292,7 +292,7 @@ const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGN
 // to /login by ProtectedRoute and returned to the same URL afterwards.
 const FEATURE_EVENT_PATH = '/account/events?feature=1';
 
-const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title, note, period, stats, inView, cta, testId }) => {
+const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-white border border-border', eyebrow, title, note, period, stats, inView, cta, testId }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
   const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
