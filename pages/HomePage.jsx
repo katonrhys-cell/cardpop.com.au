@@ -10,7 +10,7 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellersCarousel from '@/components/FeaturedSellersCarousel.jsx';
-import HomepageFeaturedEvents from '@/components/home/HomepageFeaturedEvents.jsx';
+import HomepageFeaturedEvents, { FEATURE_EVENT_PATH } from '@/components/home/HomepageFeaturedEvents.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
@@ -226,15 +226,6 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
  * count-up tiles separated by hairlines, a footnote, and (community panel,
  * signed-out visitors) a "Join free" call to action.
  */
-// "List event" in the community panel: straight to the submit form when signed
-// in; otherwise sign up first, and the confirmation link brings them back to it
-// (SignupPage carries ?next= through, validated by lib/safeInternalPath.js).
-const LIST_EVENT_SIGNED_IN = '/account/events?new=1';
-const LIST_EVENT_SIGNED_OUT = `/signup?next=${encodeURIComponent(LIST_EVENT_SIGNED_IN)}`;
-// "Feature my event" in the Google panel: My Events opens the feature picker
-// (event → package → Stripe) for `?feature=1`. A signed-out visitor is sent
-// to /login by ProtectedRoute and returned to the same URL afterwards.
-const FEATURE_EVENT_PATH = '/account/events?feature=1';
 
 const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title, note, stats, inView, cta, testId }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
@@ -731,16 +722,15 @@ const HomePage = () => {
                 note={isAuthenticated ? 'Live counts across CardPop' : 'Free to join · list your first card in minutes'}
                 stats={communityStats}
                 inView={statsInView}
-                cta={isAuthenticated
-                  ? [{ to: LIST_EVENT_SIGNED_IN, label: 'List event' }]
-                  : [{ to: '/signup', label: 'Join free' }, { to: LIST_EVENT_SIGNED_OUT, label: 'List event' }]}
+                cta={isAuthenticated ? null : { to: '/signup', label: 'Join free' }}
               />
             </div>
           </div>
         </section>
       )}
 
-      {/* ── Featured events — the Full Feature package's homepage spot ──── */}
+      {/* ── Featured events — the Full Feature package's homepage spot, and
+          where "List event" lives ─────────────────────────────────────── */}
       <HomepageFeaturedEvents />
 
       {/* ── Live activity — just listed / just sold, realtime ────────────── */}

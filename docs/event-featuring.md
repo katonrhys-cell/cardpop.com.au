@@ -92,7 +92,12 @@ Full Feature also sets `events.homepage_featured`
 (`components/home/HomepageFeaturedEvents.jsx`, gold like the calendar cards):
 up to 3 approved events that haven't ended, soonest first, read through the
 edge-cached homepage bundle (`queryHomepageEvents` in
-`lib/homepageQueries.js`). The section hides itself when there are none.
+`lib/homepageQueries.js`). Each card carries the event's type, short
+description, date, times, venue, entry fee and organiser. The section sits
+directly under the stats strip and is always shown: with no featured event it
+says the spot is open. The **List event** button (submit form, via sign-up
+when signed out) and **Feature it here** sit under the cards — List event is
+no longer in the community stats panel.
 Admins can switch it either way in the event form ("Show on the homepage",
 next to "Featured on the calendar"); organisers can't write the column (a
 BEFORE trigger pins it, like `is_featured`).
