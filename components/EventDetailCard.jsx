@@ -120,8 +120,8 @@ const EventDetailCard = ({ event, isPast = false }) => {
             With an organiser logo the row splits like the content below it: the
             title stops at the divider between About This Event and Event Details,
             and the logo sits in the sidebar column above Event Details. */}
-        <div className={hasLogo ? 'grid lg:grid-cols-3 gap-0' : ''}>
-        <div className={hasLogo ? 'lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
+        <div className={hasLogo ? 'grid grid-cols-1 lg:grid-cols-3 gap-0' : ''}>
+        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
           <div className="flex flex-wrap items-center gap-2">
           {(() => {
             const style = eventTypeStyle(event);
@@ -151,7 +151,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
           </h1>
         </div>
         {hasLogo && (
-          <div className="px-5 pt-5 md:px-10 md:pt-8 lg:bg-muted/20 flex items-center justify-center lg:justify-center">
+          <div className="min-w-0 px-5 pt-5 md:px-10 md:pt-8 lg:bg-muted/20 flex items-center justify-center lg:justify-center">
             <div className="flex flex-wrap items-center justify-center gap-6">
               {titleLogos.map(({ key, event: logoEvent, org }) => {
                 const logo = <EventOrganiserLogo event={logoEvent} caption={titleLogos.length === 1} />;
@@ -168,12 +168,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
         </div>
 
         {/* Content Split */}
-        <div className="grid lg:grid-cols-3 gap-0">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-0">
           
           {/* Main Description */}
-          <div className="lg:col-span-2 p-6 md:p-10 border-r border-border">
+          <div className="min-w-0 lg:col-span-2 p-6 md:p-10 lg:border-r border-border">
             <h2 className="font-serif text-2xl font-bold mb-4">About This Event</h2>
-            <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
+            <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap break-words">
               {event.description}
             </p>
 
@@ -231,7 +231,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
           </div>
 
           {/* Sidebar Details */}
-          <div className="p-6 md:p-10 bg-muted/20 flex flex-col gap-8">
+          <div className="min-w-0 p-6 md:p-10 bg-muted/20 flex flex-col gap-8">
             
             <div className="space-y-5">
               <h3 className="font-bold text-lg uppercase tracking-wider text-muted-foreground border-b border-border pb-2">Event Details</h3>
