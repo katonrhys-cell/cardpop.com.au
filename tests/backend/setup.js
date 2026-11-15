@@ -23,3 +23,4 @@ process.env.ADMIN_FLAG_CACHE_TTL_MS = '0';
 process.env.MFA_FACTORS_CACHE_TTL_MS = '0';
 process.env.PLATFORM_SETTINGS_TTL_MS = '0';
 process.env.EVENT_SEARCH_CACHE_TTL_MS = '0';
+process.env.SEARCH_FUZZY_POOL_TTL_MS = '0';

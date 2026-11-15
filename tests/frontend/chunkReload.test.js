@@ -43,6 +43,24 @@ describe('chunkReload — Sentry beforeSend filter (dropRecoveredErrors)', () =>
     expect(dropRecoveredErrors(eventWithValue(''), swLoad)).toBeNull();
   });
 
+  it('drops rejections raised by link scanners and reason-less rejections', () => {
+    expect(dropRecoveredErrors(eventWithValue(
+      'Non-Error promise rejection captured with value: Object Not Found Matching Id:2, MethodName:update, ParamCount:4',
+    ), {})).toBeNull();
+    expect(dropRecoveredErrors(eventWithValue('Non-Error promise rejection captured with value: undefined'), {})).toBeNull();
+    expect(dropRecoveredErrors(eventWithValue('undefined'), { originalException: new Error('undefined') })).toBeNull();
+    // A rejection that carries a reason is still reported.
+    const real = eventWithValue('Non-Error promise rejection captured with value: Payment failed');
+    expect(dropRecoveredErrors(real, {})).toBe(real);
+  });
+
+  it('drops an extension eval refused by the Trusted Types policy, keeps a JSON-LD refusal', () => {
+    const prefix = 'Blocked eval-like script by Trusted Types default policy: ';
+    expect(dropRecoveredErrors(eventWithValue(`${prefix}\n   (function () {\n try {`), {})).toBeNull();
+    const ours = eventWithValue(`${prefix}{"@context":"https://schema.org",`);
+    expect(dropRecoveredErrors(ours, {})).toBe(ours);
+  });
+
   it('keeps real application errors', () => {
     const event = eventWithValue("TypeError: Cannot read properties of undefined (reading 'total')");
     expect(dropRecoveredErrors(event, {})).toBe(event);
