@@ -75,7 +75,15 @@ describe('HomePage stats strip', () => {
     expect(labels[0]).toContain('Google Search impressions');
     expect(labels[1]).toContain('Clicks from Google');
     expect(labels[2]).toContain('Visitors');
-    expect(google).toHaveTextContent('61k since May 2026');
+    // Each tile: the 28-day headline, then the all-time figure in its own block.
+    expect(google).toHaveTextContent('Last 28 days');
+    const allTime = [...google.querySelectorAll('[data-testid="stat-all-time"]')];
+    expect(allTime).toHaveLength(3);
+    expect(allTime[0]).toHaveAttribute('data-value', '61000');
+    expect(allTime[0]).toHaveTextContent('All time');
+    expect(allTime[0]).toHaveTextContent('since May 2026');
+    // Momentum: 18,400 of 61,000 impressions came in the window.
+    expect(allTime[0]).toHaveTextContent('30% in the last 28 days');
     // Feature my event: My Events' feature picker (login first when signed out).
     const featureLinks = screen.getAllByRole('link', { name: /feature my event/i });
     expect(featureLinks.length).toBeGreaterThan(0);

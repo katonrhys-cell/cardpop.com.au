@@ -26,7 +26,7 @@ const fmtSynced = (iso) => {
 /**
  * Admin → Dashboard "Visitors" card: GA4 visitor counts synced nightly into
  * site_traffic_summary / site_traffic_daily (docs/site-traffic.md). Shows the
- * last-30-days and since-launch figures, a 30-day sparkline of daily visitors
+ * last-28-days and since-launch figures, a sparkline of daily visitors
  * with hover read-out, and a "Sync now" button that runs the same pull the
  * cron does. Self-contained so it can sit on any admin page.
  */
@@ -61,7 +61,7 @@ const SiteTrafficCard = () => {
       const parts = [];
       if (body.visitors_30d != null) parts.push(`${formatCount(body.visitors_30d)} visitors`);
       if (body.search_clicks_30d != null) parts.push(`${formatCount(body.search_clicks_30d)} Google clicks`);
-      toast.success(`Synced — ${parts.join(', ') || 'no figures'} in the last 30 days`);
+      toast.success(`Synced — ${parts.join(', ') || 'no figures'} in the last 28 days`);
       await load();
     } catch (err) {
       toast.error(err.message || 'Sync failed');
@@ -102,7 +102,7 @@ const SiteTrafficCard = () => {
           <>
             <div className="flex items-baseline gap-2 flex-wrap">
               <div className="text-3xl font-extrabold tabular-nums tracking-tight text-foreground">{formatCount(summary.visitors_30d)}</div>
-              <span className="text-xs font-medium text-muted-foreground">last 30 days</span>
+              <span className="text-xs font-medium text-muted-foreground">last 28 days</span>
             </div>
             <p className="text-xs font-medium text-muted-foreground mt-1 tabular-nums">
               {formatCount(summary.visitors_all_time)} since launch
@@ -111,7 +111,7 @@ const SiteTrafficCard = () => {
             </p>
             {hasSearch ? (
               <p className="text-xs font-medium text-muted-foreground mt-1 tabular-nums" data-testid="site-traffic-search">
-                Google Search · {formatCount(summary.search_impressions_30d)} impressions, {formatCount(summary.search_clicks_30d)} clicks (30 days)
+                Google Search · {formatCount(summary.search_impressions_30d)} impressions, {formatCount(summary.search_clicks_30d)} clicks (28 days)
                 {' · '}{formatCount(summary.search_impressions_all_time)} / {formatCount(summary.search_clicks_all_time)} since {fmtDay(summary.search_since_date) || 'launch'}
               </p>
             ) : (

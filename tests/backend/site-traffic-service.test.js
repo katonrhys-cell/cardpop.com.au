@@ -80,17 +80,17 @@ describe('parseDailyReport', () => {
 describe('parseSearchReport', () => {
   const today = '2026-10-31';
 
-  it('sums clicks and impressions over the whole range and over the last 30 reportable days', () => {
+  it('sums clicks and impressions over the whole range and over the last 28 reportable days', () => {
     const { days, totals, last30 } = parseSearchReport({ rows: [
       searchRow('2026-10-29', 4, 120),      // inside the window (lags two days, still counts)
-      searchRow('2026-10-01', 2, 60),       // window start
-      searchRow('2026-09-30', 10, 1000),    // the day before the window
+      searchRow('2026-10-03', 2, 60),       // window start
+      searchRow('2026-10-02', 10, 1000),    // the day before the window
       { keys: ['(other)'], clicks: 99, impressions: 99 },
     ] }, { today });
-    expect(days.map((d) => d.day)).toEqual(['2026-09-30', '2026-10-01', '2026-10-29']);
-    expect(days[0]).toEqual({ day: '2026-09-30', search_clicks: 10, search_impressions: 1000 });
+    expect(days.map((d) => d.day)).toEqual(['2026-10-02', '2026-10-03', '2026-10-29']);
+    expect(days[0]).toEqual({ day: '2026-10-02', search_clicks: 10, search_impressions: 1000 });
     expect(totals).toEqual({ clicks: 16, impressions: 1180 });
-    expect(last30).toEqual({ clicks: 6, impressions: 180, window_start: '2026-10-01', window_end: '2026-10-30' });
+    expect(last30).toEqual({ clicks: 6, impressions: 180, window_start: '2026-10-03', window_end: '2026-10-30' });
   });
 
   it('handles an empty report', () => {
@@ -206,7 +206,7 @@ describe('syncSiteTraffic', () => {
         // All-time: the first two days are empty (keepEmptyRows), launch is the 3rd.
         return report([row('20260601', 0, 0, 0), row('20260602', 0, 0, 0), row('20260603', 12, 15, 40), row('20260903', 50, 60, 200)], [55, 75, 240]);
       }
-      if (range.startDate === '30daysAgo') {
+      if (range.startDate === '28daysAgo') {
         return report([row('20260804', 1, 1, 1), row('20260903', 50, 60, 200)], [48, 61, 201]);
       }
       throw new Error(`unexpected range ${JSON.stringify(range)}`);
@@ -246,7 +246,7 @@ describe('syncSiteTraffic', () => {
     process.env.GA4_START_DATE = 'yesterday-ish';
     ga4.runReport.mockResolvedValue(report([], [0, 0, 0]));
     await syncSiteTraffic();
-    const allTimeCall = ga4.runReport.mock.calls.find((c) => c[0].dateRanges[0].startDate !== '30daysAgo');
+    const allTimeCall = ga4.runReport.mock.calls.find((c) => c[0].dateRanges[0].startDate !== '28daysAgo');
     expect(allTimeCall[0].dateRanges[0].startDate).toBe('2025-01-01');
   });
 });

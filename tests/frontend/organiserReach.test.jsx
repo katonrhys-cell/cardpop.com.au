@@ -25,7 +25,7 @@ describe('organiser reach', () => {
     }, null);
     render(<OrganiserReachSection stats={stats} />);
     expect(screen.getByText('5,758')).toBeInTheDocument();
-    expect(screen.getByText('Page views in the last 30 days')).toBeInTheDocument();
+    expect(screen.getByText('Page views in the last 28 days')).toBeInTheDocument();
     expect(screen.getByText('99,962')).toBeInTheDocument();
     expect(screen.getByText('1,377')).toBeInTheDocument();
   });
@@ -34,7 +34,7 @@ describe('organiser reach', () => {
     const event = { id: 'e1', title: 'Sydney Card Show', status: 'approved', start_date: '2099-01-01' };
     render(<FeatureEventDialog event={event} onClose={() => {}} />);
     expect(await screen.findByText('5,758')).toBeInTheDocument();
-    expect(screen.getByText('CardPop in the last 30 days')).toBeInTheDocument();
+    expect(screen.getByText('CardPop in the last 28 days')).toBeInTheDocument();
     expect(screen.getByText('Page views')).toBeInTheDocument();
     expect(screen.getByText('Clicks from Google')).toBeInTheDocument();
     expect(screen.getByText('Full Feature')).toBeInTheDocument();

@@ -8,7 +8,17 @@
  * Runbook: docs/site-traffic.md.
  */
 
-// The public tile stays hidden until the site has a 30-day visitor count worth
+// The "recent" window every headline figure covers. 28 days — four whole
+// weeks, so the figure doesn't wobble with how many weekends the window holds,
+// and the same window Search Console and GA4 show by default. The nightly sync
+// (src/services/siteTrafficService.js) imports this, so the label and the
+// numbers can't drift apart. The summary columns are still named `*_30d` from
+// when the window was 30 days; renaming them would need a migration for no
+// visible gain.
+export const TRAFFIC_WINDOW_DAYS = 28;
+export const TRAFFIC_WINDOW_LABEL = `Last ${TRAFFIC_WINDOW_DAYS} days`;
+
+// The public tile stays hidden until the site has a 28-day visitor count worth
 // showing: a tiny number is a worse signal to a buyer than no number at all.
 // (The rest of the strip already hides zero counts for the same reason.)
 export const MIN_PUBLIC_VISITORS_30D = 100;
@@ -62,7 +72,7 @@ const ageInDays = (iso, now) => {
  * Turn a site_traffic_summary row into the home page stat tile, or null when
  * there's nothing honest to show (no row, too few visitors, stale sync).
  *
- * Headline = visitors in the last 30 days (that's what "how many people are
+ * Headline = visitors in the last 28 days (that's what "how many people are
  * landing on the site" means today); the secondary line carries the all-time
  * figure so the tile shows both.
  */
@@ -74,7 +84,7 @@ export const publicTrafficStat = (summary, { now = Date.now() } = {}) => {
   if (ageInDays(summary.synced_at, now) > MAX_PUBLIC_SUMMARY_AGE_DAYS) return null;
 
   const since = formatSinceMonth(summary.since_date);
-  // All-time can't honestly be lower than the last 30 days; if GA4's start
+  // All-time can't honestly be lower than the last 28 days; if GA4's start
   // date was set after the launch it would be, so show the larger figure.
   const allTimeShown = Math.max(allTime, visitors30d);
   return {
@@ -82,6 +92,8 @@ export const publicTrafficStat = (summary, { now = Date.now() } = {}) => {
     value: visitors30d,
     label: 'Visitors',
     sub: `${formatCompact(allTimeShown)} since ${since ? `${since}` : 'launch'}`,
+    allTime: allTimeShown,
+    since,
   };
 };
 
@@ -90,7 +102,7 @@ export const publicTrafficStat = (summary, { now = Date.now() } = {}) => {
 export const MIN_PUBLIC_PAGEVIEWS_30D = 500;
 
 /**
- * Page views in the last 30 days (GA4, same nightly sync and staleness rule
+ * Page views in the last 28 days (GA4, same nightly sync and staleness rule
  * as visitors), with the since-launch total underneath. null below the floor.
  */
 export const publicPageviewStat = (summary, { now = Date.now() } = {}) => {
@@ -103,11 +115,19 @@ export const publicPageviewStat = (summary, { now = Date.now() } = {}) => {
     value: views30d,
     label: 'Page views',
     sub: sinceLine(summary.pageviews_all_time, views30d, summary.since_date),
+    ...allTimeParts(summary.pageviews_all_time, views30d, summary.since_date),
   };
 };
 
+// The same figure as sinceLine(), as parts: the home page shows the all-time
+// number as its own figure under the headline rather than as a caption.
+const allTimeParts = (allTime, recent, sinceDate) => ({
+  allTime: Math.max(int(allTime), int(recent)),
+  since: formatSinceMonth(sinceDate),
+});
+
 const sinceLine = (allTime, last30, sinceDate) => {
-  // All-time can't honestly be lower than the last 30 days; show the larger.
+  // All-time can't honestly be lower than the last 28 days; show the larger.
   const shown = Math.max(int(allTime), int(last30));
   const since = formatSinceMonth(sinceDate);
   return `${formatCompact(shown)} since ${since || 'launch'}`;
@@ -116,7 +136,7 @@ const sinceLine = (allTime, last30, sinceDate) => {
 /**
  * Turn a site_traffic_summary row into the home page's Google Search tiles
  * — impressions (times a CardPop page showed in Google results) and clicks
- * (searchers who came through) over the last 30 days, each with the
+ * (searchers who came through) over the last 28 days, each with the
  * since-launch total underneath. Returns [] when there's nothing honest to
  * show (no row, too few impressions, stale search sync); clicks are left out
  * on their own while they're below their floor.
@@ -133,6 +153,7 @@ export const publicSearchStats = (summary, { now = Date.now() } = {}) => {
     value: impressions30d,
     label: 'Google Search impressions',
     sub: sinceLine(summary.search_impressions_all_time, impressions30d, summary.search_since_date),
+    ...allTimeParts(summary.search_impressions_all_time, impressions30d, summary.search_since_date),
   }];
   if (clicks30d >= MIN_PUBLIC_SEARCH_CLICKS_30D) {
     stats.push({
@@ -140,6 +161,7 @@ export const publicSearchStats = (summary, { now = Date.now() } = {}) => {
       value: clicks30d,
       label: 'Clicks from Google',
       sub: sinceLine(summary.search_clicks_all_time, clicks30d, summary.search_since_date),
+      ...allTimeParts(summary.search_clicks_all_time, clicks30d, summary.search_since_date),
     });
   }
   return stats;

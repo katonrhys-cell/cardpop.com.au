@@ -15,12 +15,12 @@
  *      all-time figures, and
  *      GA4 de-duplicates activeUsers across the range — summing the daily
  *      rows would count a returning visitor once per day instead.
- *   2. The trailing 30 days (30daysAgo → yesterday), by date, with a TOTAL
- *      aggregation, for the "last 30 days" figures and the window it covers.
+ *   2. The trailing 28 days (28daysAgo → yesterday), by date, with a TOTAL
+ *      aggregation, for the "last 28 days" figures and the window it covers.
  *
  * Then, when GSC_SITE_URL is set, one Search Console query (by date, as far
  * back as Search Console keeps data — 16 months) for the home page's "Found
- * on Google" tiles: clicks and impressions over the last 30 days plus the
+ * on Google" tiles: clicks and impressions over the last 28 days plus the
  * since-launch totals. Clicks and impressions are additive across days, so
  * the totals are sums of the daily rows (unlike GA4's users). Each source
  * writes only its own columns, so one being unconfigured or failing never
@@ -36,6 +36,7 @@ import {
 } from '../utils/ga4Client.js';
 import { describeSiteUrlProblem, isSearchConsoleConfigured, runSearchAnalytics } from '../utils/searchConsoleClient.js';
 import logger from '../utils/logger.js';
+import { TRAFFIC_WINDOW_DAYS } from '../../utils/siteTraffic.js';
 
 // Earliest day to ask GA4 for. GA4 returns nothing for days before the
 // property existed, so a generous default is harmless; set GA4_START_DATE to
@@ -47,7 +48,7 @@ const UPSERT_CHUNK = 500;
 // but pointless, so the all-time query starts at the later of this and
 // GA4_START_DATE.
 const SEARCH_CONSOLE_RETENTION_DAYS = 480;
-const SEARCH_WINDOW_DAYS = 30;
+const SEARCH_WINDOW_DAYS = TRAFFIC_WINDOW_DAYS;
 
 export class Ga4NotConfiguredError extends Error {
   constructor(detail) {
@@ -179,7 +180,7 @@ const addDays = (iso, n) => {
 
 /**
  * Normalise a by-date Search Console response into { days, totals } and the
- * last-30-days slice. `today` is injectable for tests. Exported for tests.
+ * last-28-days slice. `today` is injectable for tests. Exported for tests.
  */
 export const parseSearchReport = (report, { today = isoDate(new Date()) } = {}) => {
   const days = [];
@@ -193,8 +194,8 @@ export const parseSearchReport = (report, { today = isoDate(new Date()) } = {}) 
     clicks: acc.clicks + d.search_clicks,
     impressions: acc.impressions + d.search_impressions,
   }), { clicks: 0, impressions: 0 });
-  // Search Console lags two or three days, so the window is the last 30 days
-  // it could have reported, not the last 30 rows: a quiet day still counts.
+  // Search Console lags two or three days, so the window is the last 28 days
+  // it could have reported, not the last 28 rows: a quiet day still counts.
   const windowEnd = addDays(today, -1);
   const windowStart = addDays(windowEnd, -(SEARCH_WINDOW_DAYS - 1));
   const window = days.filter((d) => d.day >= windowStart && d.day <= windowEnd);
@@ -273,7 +274,7 @@ export const syncSiteTraffic = async () => {
   if (ga4) {
     const [allTime, last30] = await Promise.all([
       byDateReport({ startDate: startDate(), endDate: 'yesterday' }).then(parseDailyReport),
-      byDateReport({ startDate: '30daysAgo', endDate: 'yesterday' }).then(parseDailyReport),
+      byDateReport({ startDate: `${TRAFFIC_WINDOW_DAYS}daysAgo`, endDate: 'yesterday' }).then(parseDailyReport),
     ]);
 
     await upsertDaily(allTime.days, syncedAt);
@@ -301,7 +302,7 @@ export const syncSiteTraffic = async () => {
     const { error } = await supabase.from('site_traffic_summary').upsert(summary, { onConflict: 'id' });
     if (error) throw new Error(`site_traffic_summary upsert failed: ${error.message}`);
 
-    logger.info(`[SITE_TRAFFIC] Synced ${allTime.days.length} days · 30d visitors ${summary.visitors_30d} · all-time ${summary.visitors_all_time}`);
+    logger.info(`[SITE_TRAFFIC] Synced ${allTime.days.length} days · 28d visitors ${summary.visitors_30d} · all-time ${summary.visitors_all_time}`);
     Object.assign(result, {
       days: allTime.days.length,
       visitors_30d: summary.visitors_30d,
@@ -319,7 +320,7 @@ export const syncSiteTraffic = async () => {
     const { error } = await supabase.from('site_traffic_summary').upsert({ id: true, ...search }, { onConflict: 'id' });
     if (error) throw new Error(`site_traffic_summary (search) upsert failed: ${error.message}`);
 
-    logger.info(`[SITE_TRAFFIC] Search Console: ${_days} days · 30d clicks ${search.search_clicks_30d} · impressions ${search.search_impressions_30d}`);
+    logger.info(`[SITE_TRAFFIC] Search Console: ${_days} days · 28d clicks ${search.search_clicks_30d} · impressions ${search.search_impressions_30d}`);
     Object.assign(result, {
       search_days: _days,
       search_clicks_30d: search.search_clicks_30d,
