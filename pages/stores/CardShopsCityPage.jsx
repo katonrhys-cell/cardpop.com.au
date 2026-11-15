@@ -11,6 +11,8 @@ import {
 } from '@/lib/storeDirectory.js';
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '@/utils/cardShopSeo.js';
 import { eventRegionByState, eventRegionPath } from '@/data/eventRegions.js';
+import { storeCoverPhoto, storeLogoUrl, storePath } from '@/utils/storePage.js';
+import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -126,8 +128,24 @@ const CardShopsCityPage = () => {
               {stores.map((store) => (
                 <li key={store.slug} className="bg-card border border-border rounded-2xl p-5">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <h2 className="text-lg font-semibold">{store.name}</h2>
+                    {/* The shop's logo when it has one, else its cover photo. */}
+                    {(storeLogoUrl(store) || storeCoverPhoto(store)) && (
+                      <Link to={storePath(store)} className="flex-shrink-0" aria-hidden="true" tabIndex={-1}>
+                        <img
+                          src={toCdnUrl(storeLogoUrl(store) || storeCoverPhoto(store))}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className={storeLogoUrl(store)
+                            ? 'w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-contain bg-white border border-border p-1.5'
+                            : 'w-16 h-16 sm:w-20 sm:h-20 rounded-xl object-cover bg-muted'}
+                        />
+                      </Link>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <h2 className="text-lg font-semibold">
+                        <Link to={storePath(store)} className="hover:text-primary transition-colors">{store.name}</Link>
+                      </h2>
                       <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                         <MapPin className="w-3.5 h-3.5" />
                         {[store.suburb, store.state].filter(Boolean).join(', ')}
@@ -145,16 +163,21 @@ const CardShopsCityPage = () => {
                         </div>
                       )}
                     </div>
-                    {store.website && (
-                      <a
-                        href={store.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-shrink-0 inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                      >
-                        Website <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    )}
+                    <div className="flex-shrink-0 flex flex-col items-end gap-1.5 text-sm">
+                      <Link to={storePath(store)} className="text-primary font-semibold hover:underline">
+                        View shop
+                      </Link>
+                      {store.website && (
+                        <a
+                          href={store.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline"
+                        >
+                          Website <ExternalLink className="w-3.5 h-3.5" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 </li>
               ))}

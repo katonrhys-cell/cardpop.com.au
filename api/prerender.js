@@ -36,6 +36,10 @@ import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
 import { EVENT_REGIONS, eventRegionBySlug, eventRegionByState, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
 import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '../utils/eventNextEdition.js';
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
+import {
+  STORE_PAGE_COLUMNS, absoluteMediaUrl, cleanStorePhotos, cleanStoreVideos, storeHoursLines, storeIsIndexable,
+  storeJsonLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storeExternalLink,
+} from '../utils/storePage.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
@@ -4381,7 +4385,9 @@ async function renderStoresCity(supabase, citySlug) {
 
   const storeItems = (stores || []).map((store) => {
     const line = [store.suburb, store.state].filter(Boolean).join(', ');
-    return `<li><strong>${esc(store.name)}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
+    const page = storePath(store);
+    const name = page ? `<a href="${BASE_URL}${esc(page)}">${esc(store.name)}</a>` : esc(store.name);
+    return `<li><strong>${name}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
   }).join('\n');
 
   const jsonLd = [
@@ -4434,6 +4440,85 @@ async function renderStoresCity(supabase, citySlug) {
 ${eventItems ? `<h2>Upcoming card events in ${esc(cityInfo.state)}</h2>\n<ul>\n${eventItems}\n</ul>\n` : ''}<p>${showsLink}<a href="${BASE_URL}/events">Card events calendar</a> · <a href="${BASE_URL}/card-shops/add">Add your store — free listing</a></p>
 <h2>Frequently asked questions</h2>
 ${faqs.map(({ q, a }) => `<h3>${esc(q)}</h3>\n<p>${esc(a)}</p>`).join('\n')}
+</main>`,
+  });
+}
+
+// One store's own page (/card-shops/<city>/<slug>) — the same row and the same
+// helpers as pages/stores/StorePage.jsx (utils/storePage.js). A store with
+// nothing beyond its directory line is `noindex, follow`: the city page already
+// says all of it.
+async function renderStore(supabase, citySlug, storeSlugParam) {
+  const cityInfo = DIRECTORY_CITIES[citySlug];
+  const store = rowOrThrow(await supabase
+    .from('local_game_stores')
+    .select(STORE_PAGE_COLUMNS)
+    .eq('slug', storeSlugParam)
+    .eq('status', 'approved')
+    .maybeSingle(), 'store');
+  const cityUrl = `${BASE_URL}/card-shops/${citySlug}`;
+  if (!store) {
+    return notFound({
+      title: 'Card Shop Not Found | CardPop',
+      description: `This card shop isn't listed on CardPop. See every card shop in ${cityInfo.label}.`,
+      canonical: cityUrl,
+      bodyHtml: `<main><h1>Card shop not found</h1><p><a href="${cityUrl}">Card shops in ${esc(cityInfo.label)}</a></p></main>`,
+    });
+  }
+  const path = storePath(store);
+  if (store.city !== citySlug) return { status: 301, location: `${BASE_URL}${path}` };
+
+  const title = storePageTitle(store, cityInfo.label);
+  const description = storePageDescription(store, cityInfo.label);
+  const photos = cleanStorePhotos(store.photos);
+  const videos = cleanStoreVideos(store.videos);
+  const hours = storeHoursLines(store.opening_hours);
+  const location = storeLocationLine(store);
+  const website = storeExternalLink(store.website);
+  const instagram = storeExternalLink(store.instagram_url);
+  const cover = photos[0] ? absoluteMediaUrl(photos[0].url) : `${BASE_URL}/og-image.jpg`;
+
+  const photoHtml = photos.map((p, i) => {
+    const alt = p.caption ? `${store.name} — ${p.caption}` : `Inside ${store.name} (${i + 1} of ${photos.length})`;
+    return `<figure><img src="${esc(absoluteMediaUrl(p.url))}" alt="${esc(alt)}" loading="lazy" />${p.caption ? `<figcaption>${esc(p.caption)}</figcaption>` : ''}</figure>`;
+  }).join('\n');
+  const videoHtml = videos.map((v) =>
+    `<li><a href="${esc(absoluteMediaUrl(v.url))}">${esc(v.caption || `${store.name} video`)}</a></li>`).join('\n');
+  const links = [
+    website ? `<a href="${esc(website)}" rel="noopener">Website</a>` : '',
+    instagram ? `<a href="${esc(instagram)}" rel="noopener">Instagram</a>` : '',
+  ].filter(Boolean).join(' · ');
+
+  return htmlDoc({
+    title,
+    description,
+    canonical: `${BASE_URL}${path}`,
+    ogImage: cover,
+    robots: storeIsIndexable(store) ? undefined : 'noindex, follow',
+    jsonLdItems: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Card Shops', item: `${BASE_URL}/card-shops` },
+          { '@type': 'ListItem', position: 2, name: cityInfo.label, item: cityUrl },
+          { '@type': 'ListItem', position: 3, name: store.name, item: `${BASE_URL}${path}` },
+        ],
+      },
+      storeJsonLd(store),
+    ],
+    bodyHtml: `<main>
+<nav><a href="${BASE_URL}/card-shops">Card Shops</a> / <a href="${cityUrl}">${esc(cityInfo.label)}</a></nav>
+<h1>${esc(store.name)}</h1>
+${storeLogoUrl(store) ? `<img src="${esc(absoluteMediaUrl(storeLogoUrl(store)))}" alt="${esc(store.name)} logo" />` : ''}
+${location ? `<p>${esc(location)}</p>` : ''}
+${store.phone ? `<p>Phone: ${esc(store.phone)}</p>` : ''}
+${links ? `<p>${links}</p>` : ''}
+${store.description ? `<h2>About ${esc(store.name)}</h2>\n<p>${esc(store.description)}</p>` : ''}
+${hours.length ? `<h2>Opening hours</h2>\n<ul>${hours.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
+${photoHtml ? `<h2>Photos</h2>\n${photoHtml}` : ''}
+${videoHtml ? `<h2>Videos</h2>\n<ul>${videoHtml}</ul>` : ''}
+<p><a href="${cityUrl}">More card shops in ${esc(cityInfo.label)}</a></p>
 </main>`,
   });
 }
@@ -4859,9 +4944,12 @@ export default async function handler(req, res) {
       return res.status(200).send(await renderStoresHub(supabase));
     }
 
-    const storesCityMatch = rawPath.match(/^\/card-shops\/([^/?#]+)/);
+    const storesCityMatch = rawPath.match(/^\/card-shops\/([^/?#]+)(?:\/([^/?#]+))?/);
     if (storesCityMatch) {
       const citySlug = safeDecode(storesCityMatch[1]);
+      if (DIRECTORY_CITIES[citySlug] && storesCityMatch[2]) {
+        return sendDoc(res, await renderStore(supabase, citySlug, safeDecode(storesCityMatch[2])));
+      }
       if (DIRECTORY_CITIES[citySlug]) {
         return res.status(200).send(await renderStoresCity(supabase, citySlug));
       }

@@ -176,6 +176,7 @@ const AccountPartner = lazy(() => import('@/pages/account/AccountPartner.jsx'));
 const CardShopsHubPage = lazy(() => import('@/pages/stores/CardShopsHubPage.jsx'));
 const CardShopsCityPage = lazy(() => import('@/pages/stores/CardShopsCityPage.jsx'));
 const AddStorePage = lazy(() => import('@/pages/stores/AddStorePage.jsx'));
+const StorePage = lazy(() => import('@/pages/stores/StorePage.jsx'));
 
 // Grading
 const GradingPage = lazy(() => import('@/pages/grading/GradingPage.jsx'));
@@ -472,6 +473,7 @@ const App = () => {
                         <Route path="/card-shops" element={<CardShopsHubPage />} />
                         <Route path="/card-shops/add" element={<AddStorePage />} />
                         <Route path="/card-shops/:city" element={<CardShopsCityPage />} />
+                        <Route path="/card-shops/:city/:slug" element={<StorePage />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
                         {/* Legacy route: the old CategoryPage queried a listings.category
                             column that doesn't exist, so it always rendered empty — the

@@ -785,6 +785,41 @@ describe('prerender events', () => {
     expect(body).toContain('<h3>Where can I buy Pokémon or sports cards in Melbourne?</h3>');
   });
 
+  it("renders a card shop's own page with its address, hours, photos and Store markup", async () => {
+    const store = {
+      slug: 'swap-itt-melbourne', name: 'Swap Itt', suburb: 'Melbourne', city: 'melbourne', state: 'VIC', status: 'approved',
+      address: '488 La Trobe St, Melbourne VIC', website: 'https://swapitt.com.au/', description: 'Buy, sell and trade.',
+      opening_hours: 'Monday: Closed\nSunday: 11am – 5pm',
+      photos: [{ url: '/stores/swap-itt-melbourne/storefront.webp', caption: 'The entrance' }],
+      videos: [{ url: '/stores/swap-itt-melbourne/street.mp4', caption: 'From the street' }],
+    };
+    state.result = { data: store };
+    let { status, body } = await run('/card-shops/melbourne/swap-itt-melbourne');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Swap Itt — Card Shop in Melbourne | CardPop</title>');
+    expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/card-shops/melbourne/swap-itt-melbourne" />');
+    expect(body).toContain('<p>488 La Trobe St, Melbourne VIC</p>');
+    expect(body).toContain('<li>Sunday: 11am – 5pm</li>');
+    expect(body).toContain('<img src="https://cardpop.com.au/stores/swap-itt-melbourne/storefront.webp" alt="Swap Itt — The entrance" loading="lazy" />');
+    expect(body).toContain('<a href="https://cardpop.com.au/stores/swap-itt-melbourne/street.mp4">From the street</a>');
+    expect(body).toContain('"@type":"Store"');
+    expect(body).not.toContain('noindex');
+
+    // Nothing beyond the directory line: served, but not indexed.
+    state.result = { data: { ...store, photos: [], videos: [], opening_hours: null } };
+    ({ body } = await run('/card-shops/melbourne/swap-itt-melbourne'));
+    expect(body).toContain('<meta name="robots" content="noindex, follow" />');
+
+    // Reached under the wrong city: permanent redirect to its real URL.
+    state.result = { data: store };
+    ({ status } = await run('/card-shops/sydney/swap-itt-melbourne'));
+    expect(status).toBe(301);
+
+    state.result = { data: null };
+    ({ status } = await run('/card-shops/melbourne/nope'));
+    expect(status).toBe(404);
+  });
+
   it('keeps the plain card-shop title when a city lists only a couple of stores', async () => {
     state.listResultByTable = { local_game_stores: { data: [{ slug: 's', name: 'Only Shop', state: 'NT', city: 'darwin' }] }, events: { data: [] } };
     const { body } = await run('/card-shops/darwin');

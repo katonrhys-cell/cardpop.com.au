@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { storeIsIndexable, storePath } from '../utils/storePage.js';
 import { COLLECTION_SEO } from '../data/collectionSeo.js';
 import { SHOP_COLLECTION_SEO } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES } from '../data/blogCategories.js';
@@ -327,6 +328,14 @@ export default async function handler(req, res) {
         .in('status', ['approved', 'completed'])
         .not('organizer_name', 'is', null)
         .order('id'), MAX_ROWS.organiserEvents),
+      // Card shop pages (/card-shops/<city>/<slug>). Its own query, so a
+      // problem with the page columns can't take the city pages (the query
+      // above) out of the sitemap with it.
+      fetchAll(() => supabase
+        .from('local_game_stores')
+        .select('id, slug, city, status, updated_at, opening_hours, photos, videos')
+        .eq('status', 'approved')
+        .order('id'), MAX_ROWS.stores),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -347,6 +356,7 @@ export default async function handler(req, res) {
     const players = rows(10);
     const organisers = rows(11);
     const organiserEvents = rows(12);
+    const storePageRows = rows(13);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -516,6 +526,16 @@ export default async function handler(req, res) {
       parts.push(xmlUrl(`${BASE_URL}/card-shops`, newestUpdate, 'weekly', '0.8'));
       for (const city of cities) {
         parts.push(xmlUrl(`${BASE_URL}/card-shops/${city}`, cityLastmod[city], 'weekly', '0.7'));
+      }
+      // A store's own page is listed only once it carries more than its
+      // directory line (photos, a video or opening hours) — the rest are
+      // noindex (utils/storePage.js → storeIsIndexable).
+      const storePages = storePageRows.filter((store) => storeIsIndexable(store) && storePath(store));
+      if (storePages.length > 0) {
+        parts.push('', `  <!-- Card shop pages (${storePages.length}) -->`);
+        for (const store of storePages) {
+          parts.push(xmlUrl(`${BASE_URL}${storePath(store)}`, (store.updated_at || TODAY).split('T')[0], 'monthly', '0.6'));
+        }
       }
     }
 
