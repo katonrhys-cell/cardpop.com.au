@@ -14,7 +14,7 @@ import HomepageFeaturedEvents from '@/components/home/HomepageFeaturedEvents.jsx
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
 import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
-import { TRAFFIC_WINDOW_LABEL, formatCount, publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
+import { TRAFFIC_WINDOW_DAYS, TRAFFIC_WINDOW_LABEL, formatCount, publicSearchStats, publicTrafficStat } from '@/utils/siteTraffic.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import { HeroSearchForm } from '@/components/HeroSection.jsx';
@@ -201,12 +201,19 @@ const statWidthEm = (text) =>
 
 //
 // A tile with an all-time figure (the Google panel) reads top to bottom as two
-// periods: the window eyebrow + headline for the recent figure, then a tinted
-// "All time" block pinned to the tile's foot so the three blocks line up even
-// when one label wraps to a second line.
-const StatItem = ({ value, suffix, label, sub, period, allTime, since, isDecimal, inView, fitEm }) => {
+// periods: the window eyebrow + headline for the recent figure, then the
+// "All time" block — the reach figure, so it is the loudest thing in the tile:
+// a charcoal card under a red rule, the total counting up in the display face,
+// and a momentum bar showing how much of that total came in the recent window.
+// It is pinned to the tile's foot so the three line up even when one label
+// wraps to a second line.
+const StatItem = ({ value, suffix, label, sub, period, allTime, since, isDecimal, inView, fitEm, allTimeFitEm }) => {
   const count = useCountUp(value, inView, isDecimal);
+  const allTimeCount = useCountUp(allTime || 0, inView);
   const hasAllTime = allTime > 0;
+  // Share of the all-time total that arrived in the recent window (≤ 100:
+  // utils/siteTraffic.js never reports an all-time figure below the recent one).
+  const recentShare = hasAllTime ? Math.min(100, Math.round((Number(value) / allTime) * 100)) : 0;
   return (
     <div className="flex h-full flex-col px-1 text-center sm:px-3 [container-type:inline-size]">
       {period && (
@@ -223,10 +230,35 @@ const StatItem = ({ value, suffix, label, sub, period, allTime, since, isDecimal
       <div className="mt-1 text-xs font-semibold leading-snug text-muted-foreground sm:text-sm">{label}</div>
       {hasAllTime ? (
         <div className="mt-auto pt-4">
-          <div className="rounded-xl bg-muted/60 px-1.5 py-2.5 sm:px-3" data-testid="stat-all-time">
-            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground sm:text-[11px]">All time</div>
-            <div className="mt-0.5 text-base font-extrabold tabular-nums tracking-tight text-foreground sm:text-xl">{formatCount(allTime)}</div>
-            {since && <div className="text-[10px] text-muted-foreground sm:text-[11px]">since {since}</div>}
+          <div
+            className="relative overflow-hidden rounded-xl bg-brand-charcoal px-2 pb-3 pt-3.5 text-white shadow-md ring-1 ring-white/10 sm:px-3 sm:pb-4 sm:pt-4"
+            data-testid="stat-all-time"
+            data-value={allTime}
+          >
+            <span className="absolute inset-x-0 top-0 h-1 bg-brand-red" aria-hidden="true" />
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand-silver sm:text-[11px]">All time</div>
+            <div className="mt-1 text-2xl font-extrabold font-serif tabular-nums tracking-tight md:text-3xl">
+              <span
+                className="whitespace-nowrap"
+                style={allTimeFitEm ? { fontSize: `min(1em, ${(ALL_TIME_FIT_CQW / allTimeFitEm).toFixed(2)}cqw)` } : undefined}
+              >
+                {formatCount(allTimeCount)}
+              </span>
+            </div>
+            {since && <div className="mt-0.5 text-[10px] text-white/60 sm:text-xs">since {since}</div>}
+            {recentShare > 0 && recentShare < 100 && (
+              <div className="mt-2.5 sm:mt-3">
+                <div className="h-1 overflow-hidden rounded-full bg-white/15" aria-hidden="true">
+                  <div
+                    className="h-full rounded-full bg-brand-red transition-[width] duration-1000 ease-out motion-reduce:transition-none"
+                    style={{ width: inView ? `${recentShare}%` : '0%' }}
+                  />
+                </div>
+                <div className="mt-1.5 text-[10px] leading-tight text-white/70 sm:text-[11px]">
+                  <span className="font-bold text-white">{recentShare}%</span> in the last {TRAFFIC_WINDOW_DAYS} days
+                </div>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -235,6 +267,11 @@ const StatItem = ({ value, suffix, label, sub, period, allTime, since, isDecimal
     </div>
   );
 };
+
+// The all-time number sits inside the charcoal card, which is narrower than
+// the tile (the tile's and the card's side padding), so it fits to this share
+// of the tile's width rather than all 100cqw.
+const ALL_TIME_FIT_CQW = 74;
 
 // Tailwind only ships classes it can see, so the tile column count is a
 // lookup rather than a template string.
@@ -259,6 +296,7 @@ const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title,
   // `cta` is one { to, label } or a list of them, all in the same style.
   const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
+  const allTimeFitEm = Math.max(0, ...stats.map((stat) => (stat.allTime > 0 ? statWidthEm(formatCount(stat.allTime)) : 0)));
   return (
     <div
       className="relative flex flex-col rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6 md:p-7"
@@ -288,7 +326,7 @@ const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-black', eyebrow, title,
       </div>
       <div className={`mt-6 grid flex-1 divide-x divide-border ${period ? 'items-stretch' : 'items-start'} ${PANEL_COLS[stats.length] || 'grid-cols-3'}`}>
         {stats.map((stat) => (
-          <StatItem key={stat.key} {...stat} period={period} inView={inView} fitEm={fitEm} />
+          <StatItem key={stat.key} {...stat} period={period} inView={inView} fitEm={fitEm} allTimeFitEm={allTimeFitEm} />
         ))}
       </div>
       <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-3 text-[11px] text-muted-foreground sm:text-xs">
