@@ -543,15 +543,19 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
           </div>
           <nav aria-labelledby="card-shows-by-city" className="md:col-span-2 order-last">
             <h2 id="card-shows-by-city" className="text-lg font-bold mb-3">Card shows by city</h2>
-            <ul className="flex flex-wrap gap-2">
+            {/* One row of equal brand-charcoal buttons on desktop (4 × 2 on
+                phones). The visible label is just the city — the heading
+                already says "Card shows by city" — and the full "Card shows
+                in <city>" stays in the link text for screen readers and SEO. */}
+            <ul className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
               {EVENT_REGIONS.map(r => (
                 <li key={r.slug}>
                   <Link
                     to={eventRegionPath(r)}
                     aria-current={region?.slug === r.slug ? 'page' : undefined}
-                    className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${region?.slug === r.slug ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary hover:text-primary'}`}
+                    className={`flex h-full items-center justify-center rounded-lg border px-3 py-2.5 text-sm font-semibold text-white text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 ${region?.slug === r.slug ? 'border-brand-red bg-brand-red hover:bg-brand-red/90' : 'border-brand-charcoal dark:border-white/15 bg-brand-charcoal hover:bg-brand-red hover:border-brand-red'}`}
                   >
-                    Card shows in {r.city}
+                    <span className="sr-only">Card shows in </span>{r.city}
                   </Link>
                 </li>
               ))}
