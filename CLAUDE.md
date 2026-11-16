@@ -45,6 +45,8 @@ All pages are lazy-loaded in `App.jsx` via React Router v7. The provider wrappin
 
 **Styling**: Tailwind CSS with CSS variable-based theming. The brand palette (see `tailwind.config.js`) is `brand-red` (#CE1126), `brand-charcoal`, `brand-silver`, `brand-lightgrey` and `brand-white` — **there is no blue in the branding guide**; don't introduce `brand-blue` or blue accents. Dark mode is class-based via `next-themes`.
 
+**Header dropdown icons are admin-editable.** Every item in the header's dropdown menus (desktop + mobile) and the Community Hub's directory tiles renders its icon through `components/NavIconTile.jsx`, keyed by `navIconKey` (`utils/navMenuIcons.js`). Admin → Menu Icons (`/admin/menu-icons`) replaces any of them with an uploaded picture (256 px WebP in `media/nav-icons/`, via `utils/uploadNavIcon.js`) or another icon from the lazy-loaded library `lib/navIconLibrary.js`; the overrides are one JSON object in `platform_settings` (`nav_menu_icons`), published by the public settings endpoint and cleaned by `cleanNavMenuIcons()` on both sides. Add a new dropdown item with `<NavIconTile iconKey={…}>` (never a hand-written icon `<span>`), and never rename a library icon. See `docs/menu-icons.md`.
+
 **Toasts**: Use `sonner` via `import { toast } from 'sonner'`.
 
 **Forms**: `react-hook-form` + `zod` for validation.

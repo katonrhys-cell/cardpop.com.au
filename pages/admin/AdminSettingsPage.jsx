@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
+import { NAV_MENU_ICONS_KEY } from '@/utils/navMenuIcons.js';
 
 const DEFAULT_SETTINGS = {
   site_name: 'CardPop',
@@ -38,6 +39,9 @@ const DEFAULT_SETTINGS = {
   google_workspace_referral_url: WORKSPACE_REFERRAL_DEFAULT_URL,
 };
 
+// Structured settings edited on their own admin page (Admin → Menu Icons).
+const KEYS_OWNED_ELSEWHERE = new Set([NAV_MENU_ICONS_KEY]);
+
 const AdminSettingsPage = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
@@ -55,7 +59,10 @@ const AdminSettingsPage = () => {
       if (cancelled) return;
       if (fetchErr) { setError(fetchErr.message || 'Failed to load settings.'); setLoading(false); return; }
       const merged = { ...DEFAULT_SETTINGS };
-      (data ?? []).forEach(({ key, value }) => { merged[key] = value; });
+      // Save writes back every key loaded here, so a setting another admin
+      // page owns must stay out — or saving this page would put back the
+      // value it held when this tab opened.
+      (data ?? []).forEach(({ key, value }) => { if (!KEYS_OWNED_ELSEWHERE.has(key)) merged[key] = value; });
       setSettings(merged);
       setLoading(false);
     }).catch(err => {

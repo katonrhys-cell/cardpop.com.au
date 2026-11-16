@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { fetchPublicJson, PUBLIC_SETTINGS_URL } from '@/lib/publicApi.js';
 
@@ -24,6 +24,8 @@ const DEFAULTS = {
   default_shipping_rate_aud: 15,
   google_workspace_referral_enabled: true,
   google_workspace_referral_url: 'https://sharegoogleworkspace.advocate.impact.com/mQZonNp',
+  // Admin-chosen icons for the header's dropdown items (utils/navMenuIcons.js).
+  nav_menu_icons: {},
 };
 
 // The last settings this browser fetched, used as the starting point on the
@@ -42,7 +44,7 @@ const readCachedSettings = () => {
   return DEFAULTS;
 };
 
-const PlatformSettingsContext = createContext({ settings: DEFAULTS, loading: true });
+const PlatformSettingsContext = createContext({ settings: DEFAULTS, loading: true, patchSettings: () => {} });
 
 export const PlatformSettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState(readCachedSettings);
@@ -64,8 +66,21 @@ export const PlatformSettingsProvider = ({ children }) => {
     return () => { cancelled = true; };
   }, []);
 
+  // An admin page that has just saved a public setting applies it to this tab
+  // straight away (and to the cached copy the next load starts from) instead
+  // of waiting out the endpoint's edge cache. Other visitors still get it from
+  // the fetch above.
+  const patchSettings = useCallback((partial) => {
+    if (!partial || typeof partial !== 'object') return;
+    setSettings((prev) => {
+      const next = { ...prev, ...partial };
+      try { window.localStorage.setItem(CACHE_KEY, JSON.stringify(next)); } catch { /* best-effort */ }
+      return next;
+    });
+  }, []);
+
   // Memoized so provider re-renders don't hand consumers a fresh reference.
-  const value = useMemo(() => ({ settings, loading }), [settings, loading]);
+  const value = useMemo(() => ({ settings, loading, patchSettings }), [settings, loading, patchSettings]);
 
   return (
     <PlatformSettingsContext.Provider value={value}>
