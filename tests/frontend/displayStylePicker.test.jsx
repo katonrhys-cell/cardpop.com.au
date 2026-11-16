@@ -13,17 +13,19 @@ describe('DisplayStylePicker', () => {
 
   it('locks styles above the user tier and marks accessible ones', () => {
     render(<DisplayStylePicker value="classic" userTier="pro" onChange={() => {}} />);
-    // Pro can use classic/stand/floating; the rest require a higher tier.
+    // Pro has the old Pro and Premium styles; the rest require Ultimate.
     expect(screen.getByLabelText('Classic Flat')).toBeInTheDocument();
     expect(screen.getByLabelText('Premium Stand')).toBeInTheDocument();
-    expect(screen.getByLabelText(/Glass Museum \(requires Premium\)/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Rotating Premium \(requires Elite\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Glass Museum')).toBeInTheDocument();
+    expect(screen.getByLabelText(/Rotating Premium \(requires Ultimate\)/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Holographic \(requires Ultimate\)/)).toBeInTheDocument();
+    // No pill ever names a retired tier.
+    expect(screen.queryByLabelText(/requires (Premium|Elite)/)).toBeNull();
   });
 
   it('selects an unlocked style via onChange', () => {
     const onChange = vi.fn();
-    render(<DisplayStylePicker value="classic" userTier="premium" onChange={onChange} />);
+    render(<DisplayStylePicker value="classic" userTier="pro" onChange={onChange} />);
     fireEvent.click(screen.getByLabelText('Slab Display'));
     expect(onChange).toHaveBeenCalledWith('slab');
   });

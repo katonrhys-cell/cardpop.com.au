@@ -38,7 +38,12 @@ describe('tierRank', () => {
   it('ranks tiers cumulatively by position', () => {
     expect(tierRank('free')).toBe(0);
     expect(tierRank('pro')).toBe(1);
-    expect(tierRank('ultimate')).toBe(4);
+    expect(tierRank('ultimate')).toBe(2);
+  });
+
+  it('ranks the retired tiers as the plan that absorbed them', () => {
+    expect(tierRank('premium')).toBe(tierRank('pro'));
+    expect(tierRank('elite')).toBe(tierRank('ultimate'));
   });
 
   it('treats unknown/missing tiers as the lowest rank', () => {
@@ -50,8 +55,14 @@ describe('tierRank', () => {
 
 describe('normalizeTier / normalizeStyle', () => {
   it('passes through known values', () => {
-    expect(normalizeTier('elite')).toBe('elite');
+    expect(normalizeTier('ultimate')).toBe('ultimate');
+    expect(normalizeTier('pro')).toBe('pro');
     expect(normalizeStyle('slab')).toBe('slab');
+  });
+
+  it('folds the retired tier names onto the current ones', () => {
+    expect(normalizeTier('premium')).toBe('pro');
+    expect(normalizeTier('elite')).toBe('ultimate');
   });
 
   it('coerces unknown values to the safe default', () => {
@@ -69,13 +80,15 @@ describe('canUseStyle', () => {
   });
 
   it('gates a higher style behind its minimum tier', () => {
-    expect(canUseStyle('rotating', 'premium')).toBe(false); // rotating needs elite
-    expect(canUseStyle('rotating', 'elite')).toBe(true);
-    expect(canUseStyle('rotating', 'ultimate')).toBe(true);  // higher tier still allowed
+    expect(canUseStyle('rotating', 'pro')).toBe(false); // rotating needs ultimate
+    expect(canUseStyle('rotating', 'ultimate')).toBe(true);
+    expect(canUseStyle('glass', 'free')).toBe(false);   // glass needs pro
+    expect(canUseStyle('glass', 'pro')).toBe(true);
+    expect(canUseStyle('glass', 'ultimate')).toBe(true); // higher tier still allowed
   });
 
   it('locks the top style to ultimate only', () => {
-    expect(canUseStyle('holographic', 'elite')).toBe(false);
+    expect(canUseStyle('holographic', 'pro')).toBe(false);
     expect(canUseStyle('holographic', 'ultimate')).toBe(true);
   });
 
@@ -89,22 +102,15 @@ describe('getAccessibleStyles', () => {
     expect(getAccessibleStyles('free').map(s => s.key)).toEqual(['classic']);
   });
 
-  it('pro users add Stand, Floating and Neon', () => {
-    expect(getAccessibleStyles('pro').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'neon',
-    ]);
+  it('pro users add Stand, Floating, Neon, Glass, Slab and Spotlight (Pro absorbed Premium)', () => {
+    const pro = ['classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight'];
+    expect(getAccessibleStyles('pro').map(s => s.key)).toEqual(pro);
+    expect(getAccessibleStyles('premium').map(s => s.key)).toEqual(pro);
   });
 
-  it('premium users add Glass, Slab and Spotlight', () => {
-    expect(getAccessibleStyles('premium').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight',
-    ]);
-  });
-
-  it('elite users add Rotating, Spinning and Prism', () => {
-    expect(getAccessibleStyles('elite').map(s => s.key)).toEqual([
-      'classic', 'stand', 'floating', 'neon', 'glass', 'slab', 'spotlight', 'rotating', 'spinning', 'prism',
-    ]);
+  it('every style is gated on a current tier', () => {
+    DISPLAY_STYLES.forEach((s) => expect(['free', 'pro', 'ultimate']).toContain(s.minTier));
+    expect(getAccessibleStyles('elite').map(s => s.key)).toEqual(DISPLAY_STYLES.map(s => s.key));
   });
 
   it('ultimate users unlock everything', () => {

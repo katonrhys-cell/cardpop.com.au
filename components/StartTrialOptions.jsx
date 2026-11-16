@@ -8,14 +8,14 @@ import { PLANS } from '@/config/plans.js';
 import { getReferralCode } from '@/lib/referral.js';
 
 /**
- * Payment-method capture that starts a CardPop membership free trial via
- * Stripe or PayPal. `tier` picks which paid plan is bought ('pro' | 'premium'
- * | 'elite' | 'ultimate'); the server bills the matching Stripe price /
- * PayPal plan.
+ * The "Join" step of a CardPop membership. `tier` picks which paid plan is
+ * bought ('pro' | 'ultimate'); the server bills the matching yearly Stripe
+ * price. (The component keeps its name from the trial era.)
  *
- * Both providers redirect off-site (Stripe Checkout / PayPal approval) so no
- * card data ever touches CardPop. The card is stored but not charged until the
- * trial ends. `returnPath` is where the provider sends the user back to.
+ * The provider redirects off-site (Stripe Checkout) so no card data ever
+ * touches CardPop. With TRIAL_DAYS = 0 the year is charged at checkout; a
+ * non-zero TRIAL_DAYS brings the "free, then charged" copy back.
+ * `returnPath` is where the provider sends the user back to.
  */
 const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' }) => {
   const [busy, setBusy] = useState(null); // 'stripe' | 'paypal' | null
@@ -69,11 +69,12 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
       <div className="rounded-card border border-border bg-muted/30 p-4 text-sm">
         <div className="flex items-center gap-2 font-bold text-foreground">
           <ShieldCheck className="h-4 w-4 text-brand-red" />
-          {TRIAL_DAYS} days free, then ${priceAud}/month
+          {TRIAL_DAYS > 0 ? `${TRIAL_DAYS} days free, then $${priceAud} a year` : `$${priceAud} a year, GST included`}
         </div>
         <p className="mt-1 text-muted-foreground">
-          Add a payment method to unlock CardPop {tierName}. You won't be charged until your trial
-          ends, and you can cancel anytime before then from Account → Membership — we email you 3 days before the first charge.
+          {TRIAL_DAYS > 0
+            ? `Add a payment method to unlock CardPop ${tierName}. You won't be charged until your trial ends, and you can cancel anytime before then from Account → Membership.`
+            : `You pay $${priceAud} today for 12 months of CardPop ${tierName} — that is the whole price, nothing is added at checkout. It renews each year until you cancel from Account → Membership, and we email you before every renewal.`}
         </p>
       </div>
 
@@ -84,7 +85,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
           className="h-12 w-full bg-brand-red font-bold hover:bg-brand-red/90"
         >
           {busy === 'stripe' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-          Start {tierName} trial with card
+          {TRIAL_DAYS > 0 ? `Start ${tierName} trial with card` : `Join ${tierName} — pay $${priceAud}`}
         </Button>
       )}
 
@@ -98,7 +99,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
           {busy === 'paypal'
             ? <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             : <span className="mr-1 font-heading font-extrabold"><span className="text-[#003087]">Pay</span><span className="text-[#009cde]">Pal</span></span>}
-          Start trial with PayPal
+          {TRIAL_DAYS > 0 ? 'Start trial with PayPal' : `Join ${tierName} with PayPal`}
         </Button>
       )}
 

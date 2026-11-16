@@ -81,13 +81,13 @@ describe('createPaypalSubscription', () => {
   });
 
   it('bills the requested tier against its own plan id', async () => {
-    process.env.PAYPAL_SUBSCRIPTION_PLAN_ID_ELITE = 'P-ELITE';
+    process.env.PAYPAL_SUBSCRIPTION_PLAN_ID_ULTIMATE = 'P-ULTIMATE';
     fetch
       .mockResolvedValueOnce(tokenResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'I-SUB3', status: 'APPROVAL_PENDING', links: [] }));
-    await createPaypalSubscription({ userId: 'u1', tier: 'elite' });
+    await createPaypalSubscription({ userId: 'u1', tier: 'ultimate' });
     const [, subCall] = fetch.mock.calls;
-    expect(JSON.parse(subCall[1].body).plan_id).toBe('P-ELITE');
+    expect(JSON.parse(subCall[1].body).plan_id).toBe('P-ULTIMATE');
   });
 
   it('coerces an unknown tier back onto the Pro plan', async () => {

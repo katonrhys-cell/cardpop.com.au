@@ -187,10 +187,11 @@ const Footer = () => {
               href={X_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
+              aria-label="X"
+              title="X"
+              className="inline-flex items-center hover:text-foreground transition-colors"
             >
               <XIcon className="w-4 h-4" />
-              X
             </a>
           </p>
           <p className="text-muted-foreground text-sm">

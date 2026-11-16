@@ -4,9 +4,11 @@ import logger from '../utils/logger.js';
 import { markTrialRedeemed } from './welcomeOfferService.js';
 import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 import { recordSubscriptionReferral } from './partnerService.js';
-import { ENV, PAID_TIER_ORDER, TIER_PRICES_AUD } from '../../config/subscription.js';
+import {
+  ENV, PAID_TIER_ORDER, TIER_PRICES_AUD, SUBSCRIPTION_INTERVAL, SUBSCRIPTION_CURRENCY, canonicalTier,
+} from '../../config/subscription.js';
 import { PLANS } from '../../config/plans.js';
-import { sendMembershipTrialEnding } from '../utils/emailService.js';
+import { sendMembershipTrialEnding, sendMembershipRenewalReminder } from '../utils/emailService.js';
 
 /** A subscription status that maps to a paid tier. */
 const isEntitledStatus = (status) => ['trialing', 'active'].includes(status);
@@ -28,14 +30,47 @@ export const COMPLIMENTARY_STATUS = 'grandfathered';
 export const ADMIN_COMPLIMENTARY_TIER = 'ultimate';
 
 /**
- * Which paid tier a Stripe subscription buys. The tier is stamped into the
- * subscription metadata at checkout; for subscriptions created before the
- * multi-tier ladder (or with missing metadata) fall back to matching the
- * billed price id against the per-tier price env vars, then to 'pro' (every
- * legacy subscription was Pro).
+ * The Stripe price a paid plan bills against, checked before anything is
+ * charged to it: it must be an active AUD price for exactly the plan's
+ * advertised amount, billed once a year. A stale or mistyped price id (a
+ * retired monthly price, a test-mode id, the other plan's price) would
+ * otherwise bill members something other than what the page told them — and
+ * Ultimate's variable keeps its pre-yearly name, so the check is what stands
+ * between an un-updated value and a $150-a-month charge. Used by sign-up
+ * checkout and by plan changes. Throws 503 for an unset or unsuitable price.
+ * @returns {Promise<{ priceId: string, price: object }>}
+ */
+export async function resolveMembershipPrice(tier) {
+  const envName = ENV.stripePriceIds[tier];
+  const priceId = envName ? process.env[envName] : null;
+  if (!priceId) {
+    logger.error(`[SUB] ${envName} not configured`);
+    throw httpError(503, `The ${tier} plan is not available yet.`);
+  }
+  const price = await stripe.prices.retrieve(priceId);
+  const expectedCents = Math.round(TIER_PRICES_AUD[tier] * 100);
+  if (
+    price?.active === false
+    || price?.currency !== SUBSCRIPTION_CURRENCY
+    || price?.recurring?.interval !== SUBSCRIPTION_INTERVAL
+    || (price?.recurring?.interval_count ?? 1) !== 1
+    || price?.unit_amount !== expectedCents
+  ) {
+    logger.error(`[SUB] ${envName} (${priceId}) is not an active ${SUBSCRIPTION_CURRENCY.toUpperCase()} ${expectedCents}c/${SUBSCRIPTION_INTERVAL} price — refusing to bill it`);
+    throw httpError(503, `The ${tier} plan is not available yet.`);
+  }
+  return { priceId, price };
+}
+
+/**
+ * Which paid plan a Stripe subscription buys. The plan is stamped into the
+ * subscription metadata at checkout (a retired 'premium' / 'elite' stamp
+ * resolves to the plan that absorbed it); with missing metadata fall back to
+ * matching the billed price id against the per-plan price env vars, then to
+ * 'pro' (the entry plan).
  */
 export function tierFromStripeSubscription(subscription) {
-  const metaTier = subscription?.metadata?.tier;
+  const metaTier = canonicalTier(subscription?.metadata?.tier);
   if (PAID_TIER_ORDER.includes(metaTier)) return metaTier;
   const priceId = subscription?.items?.data?.[0]?.price?.id;
   if (priceId) {
@@ -305,6 +340,42 @@ export async function sendTrialEndingReminder(subscription) {
   });
 }
 
+/**
+ * Webhook `invoice.upcoming` (Stripe sends it a set number of days before a
+ * subscription renews — Dashboard → Billing → Subscriptions and emails →
+ * "Upcoming renewal events"): email the member the date and amount of the
+ * yearly renewal and where to cancel. A yearly charge nobody was reminded of
+ * is the one that gets disputed. Skipped for a membership that is already
+ * cancelled, still on a trial (trial_will_end covers that), or complimentary.
+ */
+export async function sendRenewalReminder(invoice) {
+  const subscriptionId = invoiceSubscriptionId(invoice);
+  if (!subscriptionId) return;
+  let subscription;
+  try {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (err) {
+    if (isStripeObjectMissing(err)) return;
+    throw err;
+  }
+  if (subscription?.status !== 'active' || subscription.cancel_at_period_end || subscription.cancel_at) return;
+  const userId = subscription.metadata?.userId;
+  const query = supabase.from('profiles').select('email, display_name, username, subscription_status');
+  const { data: profile } = await (userId ? query.eq('id', userId) : query.eq('stripe_customer_id', subscription.customer)).maybeSingle();
+  if (!profile?.email || profile.subscription_status === COMPLIMENTARY_STATUS) return;
+  const tier = tierFromStripeSubscription(subscription);
+  const { amountAud, periodEndsAt } = describeStripeMembership(subscription);
+  if (!periodEndsAt) return;
+  await sendMembershipRenewalReminder({
+    to: profile.email,
+    name: profile.display_name || profile.username,
+    planName: PLANS[tier]?.name || 'Pro',
+    // What this renewal will actually take (credits from a downgrade included).
+    amountAud: invoice.amount_due != null ? invoice.amount_due / 100 : (amountAud ?? TIER_PRICES_AUD[tier] ?? null),
+    chargeDate: periodEndsAt,
+  });
+}
+
 /** Load the member's own Stripe subscription, refusing complimentary / PayPal / Hobby accounts. */
 async function loadOwnStripeSubscription(userId) {
   const { data: profile, error } = await supabase
@@ -538,12 +609,22 @@ export function mapPaypalStatus(paypalStatus) {
 
 
 /**
- * Move a member's existing Stripe subscription to another paid tier, up or
+ * Move a member's existing Stripe subscription to the other paid plan, up or
  * down (Account → Membership → "Change your plan"). The subscription's single
- * item is re-priced in place with prorations — an upgrade bills the
- * difference on the next invoice, a downgrade credits the unused part of the
- * dearer plan against it — so the member keeps their billing anchor, trial and
- * payment method: no second subscription, no second trial. Dropping to Hobby
+ * item is re-priced in place, keeping the member's renewal date and payment
+ * method — no second subscription:
+ *
+ *   • UPGRADE (Pro → Ultimate): the pro-rated difference for the rest of the
+ *     year is invoiced and charged NOW (`always_invoice`). On a yearly plan
+ *     "the next invoice" is up to twelve months away — leaving the difference
+ *     there would hand out Ultimate for the price of Pro until renewal. A
+ *     declined card refuses the upgrade (`error_if_incomplete`, relayed as
+ *     402) and leaves the membership exactly as it was.
+ *   • DOWNGRADE (Ultimate → Pro): the unused part of the dearer plan becomes
+ *     a credit against the next renewal (`create_prorations`); nothing is
+ *     refunded to the card.
+ *
+ * Dropping to Hobby
  * is a cancellation (cancelStripeMembership), not a tier change. The webhook
  * mirrors the change too, but the profile is updated here as well so the UI
  * reflects the new tier straight away.
@@ -555,11 +636,7 @@ export function mapPaypalStatus(paypalStatus) {
  */
 export async function changeStripeSubscriptionTier(userId, tier) {
   if (!PAID_TIER_ORDER.includes(tier)) throw httpError(400, 'Choose a paid plan to switch to.');
-  const priceId = process.env[ENV.stripePriceIds[tier]];
-  if (!priceId) {
-    logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
-    throw httpError(503, `The ${tier} plan is not available yet.`);
-  }
+  const { priceId } = await resolveMembershipPrice(tier);
 
   const { data: profile, error } = await supabase
     .from('profiles')
@@ -589,16 +666,27 @@ export async function changeStripeSubscriptionTier(userId, tier) {
   const item = current.items?.data?.[0];
   if (!item?.id) throw new Error(`Stripe subscription ${current.id} has no item to re-price`);
 
-  const updated = await stripe.subscriptions.update(current.id, {
-    items: [{ id: item.id, price: priceId }],
-    proration_behavior: 'create_prorations',
-    // `tier` in the metadata is what applyStripeSubscription mirrors onto
-    // profiles.subscription_tier.
-    metadata: { ...(current.metadata || {}), userId, tier },
-  });
+  const upgrading = PAID_TIER_ORDER.indexOf(tier) > PAID_TIER_ORDER.indexOf(canonicalTier(profile.subscription_tier));
+  let updated;
+  try {
+    updated = await stripe.subscriptions.update(current.id, {
+      items: [{ id: item.id, price: priceId }],
+      ...(upgrading
+        ? { proration_behavior: 'always_invoice', payment_behavior: 'error_if_incomplete' }
+        : { proration_behavior: 'create_prorations' }),
+      // `tier` in the metadata is what applyStripeSubscription mirrors onto
+      // profiles.subscription_tier.
+      metadata: { ...(current.metadata || {}), userId, tier },
+    });
+  } catch (err) {
+    if (upgrading && (err?.type === 'StripeCardError' || err?.code === 'card_declined' || err?.statusCode === 402)) {
+      throw httpError(402, 'Your card was declined, so your plan was not changed. Update your card above and try again.');
+    }
+    throw err;
+  }
 
   await applyStripeSubscription(updated);
-  const direction = PAID_TIER_ORDER.indexOf(tier) > PAID_TIER_ORDER.indexOf(profile.subscription_tier) ? 'upgraded' : 'downgraded';
+  const direction = upgrading ? 'upgraded' : 'downgraded';
   logger.info(`[SUB] ${userId} ${direction} ${profile.subscription_tier} → ${tier} (stripe ${updated.id})`);
   return { tier: tierFromStripeSubscription(updated), status: mapStripeStatus(updated.status) };
 }

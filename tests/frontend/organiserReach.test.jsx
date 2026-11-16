@@ -37,6 +37,9 @@ describe('organiser reach', () => {
     expect(screen.getByText('CardPop in the last 28 days')).toBeInTheDocument();
     expect(screen.getByText('Page views')).toBeInTheDocument();
     expect(screen.getByText('Clicks from Google')).toBeInTheDocument();
-    expect(screen.getByText('Full Feature')).toBeInTheDocument();
+    expect(screen.getByText('Calendar Spotlight')).toBeInTheDocument();
+    // Instagram and the event review are the separate extras, not featuring packages.
+    expect(screen.queryByText('Full Feature')).toBeNull();
+    expect(screen.queryByText('Spotlight + Instagram')).toBeNull();
   });
 });

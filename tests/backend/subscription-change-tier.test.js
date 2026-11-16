@@ -16,7 +16,16 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('../../src/utils/stripeClient.js', () => ({
-  default: { subscriptions: { retrieve: mockRetrieve, update: mockUpdate } },
+  default: {
+    subscriptions: { retrieve: mockRetrieve, update: mockUpdate },
+    // resolveMembershipPrice(): the configured price is checked before a plan change.
+    prices: {
+      retrieve: vi.fn(async (id) => ({
+        id, active: true, currency: 'aud', recurring: { interval: 'year', interval_count: 1 },
+        unit_amount: id === 'price_ultimate' ? 19900 : 9900,
+      })),
+    },
+  },
 }));
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   supabase: {
@@ -64,10 +73,8 @@ const proProfile = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.STRIPE_SUBSCRIPTION_PRICE_ID = 'price_pro';
-  process.env.STRIPE_SUBSCRIPTION_PRICE_ID_PREMIUM = 'price_premium';
-  process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ELITE = 'price_elite';
-  delete process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE;
+  process.env.STRIPE_MEMBERSHIP_PRICE_ID_PRO = 'price_pro';
+  process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE = 'price_ultimate';
   mockMaybeSingle.mockResolvedValue({ data: proProfile, error: null });
   mockRetrieve.mockResolvedValue({
     id: 'sub_123',
@@ -94,24 +101,41 @@ beforeEach(() => {
 
 describe('POST /subscription/stripe/change-tier', () => {
   it('re-prices the existing subscription in place and mirrors the new tier', async () => {
-    const res = await change('premium');
+    const res = await change('ultimate');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ tier: 'premium', status: 'active' });
+    expect(res.body).toEqual({ tier: 'ultimate', status: 'active' });
 
     expect(mockUpdate).toHaveBeenCalledTimes(1);
     const [id, params] = mockUpdate.mock.calls[0];
     expect(id).toBe('sub_123');
-    expect(params.items).toEqual([{ id: 'si_1', price: 'price_premium' }]);
-    expect(params.proration_behavior).toBe('create_prorations');
-    expect(params.metadata).toEqual(expect.objectContaining({ userId: 'user-1', tier: 'premium' }));
+    expect(params.items).toEqual([{ id: 'si_1', price: 'price_ultimate' }]);
+    // An upgrade on a yearly plan is charged now, not at a renewal up to a
+    // year away — and a declined card must refuse it.
+    expect(params.proration_behavior).toBe('always_invoice');
+    expect(params.payment_behavior).toBe('error_if_incomplete');
+    expect(params.metadata).toEqual(expect.objectContaining({ userId: 'user-1', tier: 'ultimate' }));
     // No trial is ever re-granted on an upgrade.
     expect(params.trial_period_days).toBeUndefined();
     expect(params.trial_end).toBeUndefined();
 
     expect(mockProfileUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      subscription_tier: 'premium',
+      subscription_tier: 'ultimate',
       stripe_subscription_id: 'sub_123',
     }));
+  });
+
+  it('answers 402 and leaves the plan alone when the card declines the upgrade charge', async () => {
+    mockUpdate.mockRejectedValue(Object.assign(new Error('Your card was declined.'), { type: 'StripeCardError', code: 'card_declined' }));
+    const res = await change('ultimate');
+    expect(res.status).toBe(402);
+    expect(res.body.error).toMatch(/declined/i);
+    expect(mockProfileUpdate).not.toHaveBeenCalled();
+  });
+
+  it('refuses the retired tier names', async () => {
+    expect((await change('premium')).status).toBe(400);
+    expect((await change('elite')).status).toBe(400);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('refuses a move to the plan the member is already on', async () => {
@@ -120,19 +144,20 @@ describe('POST /subscription/stripe/change-tier', () => {
   });
 
   it('downgrades in place with prorations, crediting the unused part of the dearer plan', async () => {
-    mockMaybeSingle.mockResolvedValue({ data: { ...proProfile, subscription_tier: 'elite' }, error: null });
+    mockMaybeSingle.mockResolvedValue({ data: { ...proProfile, subscription_tier: 'ultimate' }, error: null });
     mockRetrieve.mockResolvedValue({
       id: 'sub_123', status: 'active', customer: 'cus_1',
-      metadata: { userId: 'user-1', tier: 'elite' },
-      items: { data: [{ id: 'si_1', price: { id: 'price_elite' } }] },
+      metadata: { userId: 'user-1', tier: 'ultimate' },
+      items: { data: [{ id: 'si_1', price: { id: 'price_ultimate' } }] },
     });
-    const res = await change('premium');
+    const res = await change('pro');
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ tier: 'premium', status: 'active' });
+    expect(res.body).toEqual({ tier: 'pro', status: 'active' });
     const [, params] = mockUpdate.mock.calls[0];
-    expect(params.items).toEqual([{ id: 'si_1', price: 'price_premium' }]);
+    expect(params.items).toEqual([{ id: 'si_1', price: 'price_pro' }]);
     expect(params.proration_behavior).toBe('create_prorations');
-    expect(mockProfileUpdate).toHaveBeenCalledWith(expect.objectContaining({ subscription_tier: 'premium' }));
+    expect(params.payment_behavior).toBeUndefined();
+    expect(mockProfileUpdate).toHaveBeenCalledWith(expect.objectContaining({ subscription_tier: 'pro' }));
   });
 
   it('refuses an unknown tier', async () => {
@@ -142,6 +167,7 @@ describe('POST /subscription/stripe/change-tier', () => {
   });
 
   it('answers 503 when the target tier has no Stripe price configured', async () => {
+    delete process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE;
     const res = await change('ultimate');
     expect(res.status).toBe(503);
     expect(mockUpdate).not.toHaveBeenCalled();
@@ -152,28 +178,28 @@ describe('POST /subscription/stripe/change-tier', () => {
       data: { subscription_status: 'none', subscription_provider: null, subscription_tier: 'free', stripe_subscription_id: null },
       error: null,
     });
-    const res = await change('premium');
+    const res = await change('ultimate');
     expect(res.status).toBe(409);
     expect(mockRetrieve).not.toHaveBeenCalled();
   });
 
   it('answers 409 for a complimentary or PayPal-billed membership', async () => {
     mockMaybeSingle.mockResolvedValue({ data: { ...proProfile, subscription_status: 'grandfathered' }, error: null });
-    expect((await change('premium')).status).toBe(409);
+    expect((await change('ultimate')).status).toBe(409);
     mockMaybeSingle.mockResolvedValue({ data: { ...proProfile, subscription_provider: 'paypal' }, error: null });
-    expect((await change('premium')).status).toBe(409);
+    expect((await change('ultimate')).status).toBe(409);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('answers 409 when the Stripe subscription is no longer active', async () => {
     mockRetrieve.mockResolvedValue({ id: 'sub_123', status: 'canceled', items: { data: [{ id: 'si_1' }] } });
-    expect((await change('premium')).status).toBe(409);
+    expect((await change('ultimate')).status).toBe(409);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('answers 500 (not a leak) when Stripe throws', async () => {
     mockUpdate.mockRejectedValue(new Error('boom'));
-    const res = await change('premium');
+    const res = await change('ultimate');
     expect(res.status).toBe(500);
     expect(res.body.error).toBe('Could not change your plan');
   });

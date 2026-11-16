@@ -21,7 +21,7 @@ const AccountMembership = (await import('@/pages/account/AccountMembership.jsx')
 
 const membership = (overrides = {}) => ({
   status: 'trialing', tier: 'pro', cancelAtPeriodEnd: false,
-  periodEndsAt: '2026-11-14T12:00:00.000Z', amountAud: 20, ...overrides,
+  periodEndsAt: '2027-11-14T12:00:00.000Z', amountAud: 99, ...overrides,
 });
 const setAuth = (overrides) => {
   auth.value = {
@@ -44,7 +44,7 @@ describe('MembershipBillingCard', () => {
     routeApi(membership(), { '/subscription/stripe/cancel': json({ membership: membership({ cancelAtPeriodEnd: true }) }) });
     renderPage();
     expect(await screen.findByText(/your free trial ends on/i)).toBeInTheDocument();
-    expect(screen.getByText(/charged \$20\.00\/month unless you cancel/i)).toBeInTheDocument();
+    expect(screen.getByText(/charged \$99\.00 a year unless you cancel/i)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Cancel membership' }));
     expect(await screen.findByText(/your card is never charged/i)).toBeInTheDocument();
@@ -73,15 +73,44 @@ describe('MembershipBillingCard', () => {
     expect(mockApiFetch).not.toHaveBeenCalledWith('/subscription/stripe/details');
   });
 
-  it('offers a paid member every other tier, up and down', async () => {
-    setAuth({ subscriptionStatus: 'active', subscriptionTier: 'premium' });
-    routeApi(membership({ status: 'active', tier: 'premium' }));
+  it('tells an active member the yearly price and renewal date', async () => {
+    setAuth({ subscriptionStatus: 'active', trialDaysLeft: null });
+    routeApi(membership({ status: 'active' }));
+    renderPage();
+    expect(await screen.findByText(/\$99\.00 a year · renews 1[45] November 2027/i)).toBeInTheDocument();
+    expect(screen.queryByText(/\/month|billed monthly/i)).toBeNull();
+  });
+
+  it('offers a Pro member the upgrade to Ultimate at the yearly price', async () => {
+    setAuth({ subscriptionStatus: 'active', subscriptionTier: 'pro' });
+    routeApi(membership({ status: 'active', tier: 'pro' }));
+    renderPage();
+    expect(await screen.findByText('Change your plan')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upgrade to Ultimate' })).toBeInTheDocument();
+    expect(screen.getByText('$199/yr')).toBeInTheDocument();
+    expect(screen.getByText(/charges your card today for the difference/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /to (Pro|Premium|Elite)$/ })).toBeNull();
+  });
+
+  it('offers an Ultimate member the downgrade to Pro', async () => {
+    setAuth({ subscriptionStatus: 'active', subscriptionTier: 'ultimate' });
+    routeApi(membership({ status: 'active', tier: 'ultimate', amountAud: 199 }));
     renderPage();
     expect(await screen.findByText('Change your plan')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Downgrade to Pro' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upgrade to Elite' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upgrade to Ultimate' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /to Premium/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /to Ultimate$/ })).toBeNull();
+  });
+
+  it('no longer asks a Hobby member for a welcome code to start a trial', async () => {
+    setAuth({ isPro: false, subscriptionStatus: 'none', subscriptionTier: 'free', trialDaysLeft: null });
+    routeApi(null);
+    renderPage();
+    expect(screen.getByText('Choose your membership')).toBeInTheDocument();
+    expect(screen.getByText(/\$99 a year/)).toBeInTheDocument();
+    expect(screen.getByText(/\$199 a year/)).toBeInTheDocument();
+    expect(screen.queryByText(/welcome code/i)).toBeNull();
+    expect(screen.queryByText(/free trial/i)).toBeNull();
+    expect(mockApiFetch).not.toHaveBeenCalledWith('/welcome-offer/mine');
   });
 
   it('sends Update card through our API, never a Stripe portal', async () => {
