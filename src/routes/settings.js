@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { NAV_MENU_ICONS_KEY, cleanNavMenuIcons } from '../../utils/navMenuIcons.js';
 
 const router = Router();
 
@@ -36,6 +37,17 @@ const PUBLIC_SETTINGS = {
   // deploy; the browser only renders an https URL (utils/workspaceReferral.js).
   google_workspace_referral_enabled: true,
   google_workspace_referral_url: 'https://sharegoogleworkspace.advocate.impact.com/mQZonNp',
+  // Admin-chosen icons for the header's dropdown menu items (Admin → Menu
+  // Icons): `{ "<item key>": { image, fit } | { icon } }`. Published here so the
+  // menus read them from the settings request every page already makes.
+  [NAV_MENU_ICONS_KEY]: {},
+};
+
+// Settings whose value is a structure rather than a boolean/number/string:
+// each names the function that turns the stored jsonb into the published
+// shape (dropping anything malformed) instead of going through coerce().
+const PUBLIC_SETTING_CLEANERS = {
+  [NAV_MENU_ICONS_KEY]: cleanNavMenuIcons,
 };
 
 // platform_settings.value is jsonb: booleans store as real JSON booleans, but
@@ -66,7 +78,9 @@ export async function loadPublicSettings() {
       .in('key', Object.keys(PUBLIC_SETTINGS));
     if (error) throw error;
     for (const row of data || []) {
-      if (row.key in settings) settings[row.key] = coerce(PUBLIC_SETTINGS[row.key], row.value);
+      if (!(row.key in settings)) continue;
+      const clean = PUBLIC_SETTING_CLEANERS[row.key];
+      settings[row.key] = clean ? clean(row.value) : coerce(PUBLIC_SETTINGS[row.key], row.value);
     }
     return { settings, ok: true };
   } catch (err) {

@@ -248,6 +248,7 @@ const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManageme
 const PromoCodesAdminPage = lazy(() => import('@/pages/admin/PromoCodesAdminPage.jsx'));
 const PlayersAdminPage = lazy(() => import('@/pages/admin/PlayersAdminPage.jsx'));
 const GradingPartnersAdminPage = lazy(() => import('@/pages/admin/GradingPartnersAdminPage.jsx'));
+const MenuIconsAdminPage = lazy(() => import('@/pages/admin/MenuIconsAdminPage.jsx'));
 const ProductReviewsAdminPage = lazy(() => import('@/pages/admin/ProductReviewsAdminPage.jsx'));
 const EventReviewsAdminPage = lazy(() => import('@/pages/admin/EventReviewsAdminPage.jsx'));
 const EventReviewEditorPage = lazy(() => import('@/pages/admin/EventReviewEditorPage.jsx'));
@@ -588,6 +589,7 @@ const App = () => {
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
                           <Route path="players" element={<PlayersAdminPage />} />
                           <Route path="grading-partners" element={<GradingPartnersAdminPage />} />
+                          <Route path="menu-icons" element={<MenuIconsAdminPage />} />
                           <Route path="product-reviews" element={<ProductReviewsAdminPage />} />
                           <Route path="event-reviews" element={<EventReviewsAdminPage />} />
                           <Route path="event-reviews/new" element={<EventReviewEditorPage />} />

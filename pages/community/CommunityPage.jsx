@@ -10,6 +10,8 @@ import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import { PROFILE_CARD_COLUMNS } from '@/lib/profileColumns.js';
 import { COMMUNITY_ITEMS, EVENT_ITEMS, READS_ITEM, badgeStyle } from '@/lib/communityNav.js';
+import NavIconTile from '@/components/NavIconTile.jsx';
+import { navIconKey } from '@/utils/navMenuIcons.js';
 import { EVENT_CARD_COLUMNS } from '@/pages/community/CommunityEventsPage.jsx';
 import { BLOG_CARD_COLUMNS } from '@/pages/blog/BlogPage.jsx';
 import { eventPath, formatEventDate, formatEventLocation, eventTypeLabel, eventTypeStyle, toLocalDateStr, parseDate } from '@/lib/eventSeo.js';
@@ -145,12 +147,16 @@ const AreaTile = ({ item, compact = false }) => {
       to={item.href}
       className={`group flex items-center gap-3 rounded-2xl border border-border bg-card ${compact ? 'p-3.5' : 'p-4'} hover:shadow-md hover:-translate-y-0.5 hover:border-primary/40 transition-all`}
     >
-      <span
-        className={`inline-flex items-center justify-center ${compact ? 'w-9 h-9' : 'w-11 h-11'} rounded-xl shrink-0 shadow-sm overflow-hidden ${badge.className}`}
+      {/* Same tile as the header menu, so an icon changed in Admin → Menu
+          Icons changes here too. */}
+      <NavIconTile
+        iconKey={navIconKey.link(item.href)}
+        Icon={item.Icon}
+        className={`${compact ? 'w-9 h-9' : 'w-11 h-11'} rounded-xl shadow-sm`}
+        bgClassName={badge.className}
         style={badge.style}
-      >
-        <item.Icon className={`${compact ? 'w-4 h-4' : 'w-5 h-5'} text-white`} />
-      </span>
+        iconClassName={`${compact ? 'w-4 h-4' : 'w-5 h-5'} text-white`}
+      />
       <div className="min-w-0 flex-1">
         <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">{item.label}</p>
         <p className="text-xs text-muted-foreground truncate">{item.desc}</p>

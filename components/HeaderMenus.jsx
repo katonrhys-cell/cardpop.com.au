@@ -27,6 +27,15 @@ import SearchBar from '@/components/SearchBar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { COMMUNITY_ITEMS, EVENT_ITEMS, READS_ITEM, badgeStyle } from '@/lib/communityNav.js';
+import NavIconTile from '@/components/NavIconTile.jsx';
+import { navIconKey } from '@/utils/navMenuIcons.js';
+
+// Every dropdown item's icon renders through NavIconTile, keyed by navIconKey,
+// so an admin can swap it for an uploaded picture or another built-in icon
+// (Admin → Menu Icons). The desktop dropdowns use a 28px tile, the mobile
+// sheet a 24px one.
+const DESKTOP_TILE = 'w-7 h-7 rounded-lg shadow-sm';
+const MOBILE_TILE = 'w-6 h-6 rounded-lg';
 
 export const NAV_LINKS = [
   // `icon` (where present) matches the lucide icon in that page's own hero/heading,
@@ -47,7 +56,7 @@ export const NAV_LINKS = [
 // Secondary / informational links, grouped under the "More" dropdown so the
 // primary nav stays focused on shopping & discovery. Add future secondary
 // items here and they appear in both the desktop dropdown and mobile section.
-const MORE_ITEMS = [
+export const MORE_ITEMS = [
   { href: '/card-shops',                       label: 'Card Shop Directory',    desc: 'Find local card shops city by city',   Icon: Store,    gradient: 'from-amber-500 to-orange-500' },
   { href: '/community/building-your-business', label: 'Building Your Business', desc: 'Tools we use to grow a card business', Icon: Rocket,   gradient: 'from-rose-500 to-orange-500'  },
   { href: '/pricing',                          label: 'Pricing',                desc: 'Membership plans & seller fees',       Icon: Sparkles, gradient: 'from-amber-500 to-orange-500' },
@@ -74,14 +83,14 @@ const ADMIN_LINKS = [
 // The Community / Events / Reads lists live in lib/communityNav.js, shared
 // with the Community Hub page so the hub always mirrors this menu.
 
-const ANALYTICS_ITEMS = [
+export const ANALYTICS_ITEMS = [
   { href: '/scan',                     label: 'Card Scanner',     desc: 'Scan any card for an instant price check', Icon: ScanLine, gradient: 'from-red-500 to-rose-600' },
   { href: '/analytics',                label: 'Market Analytics', desc: 'Live prices, movers and trends',   Icon: LineChart,  gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/prices',                   label: 'Card Prices',      desc: 'What cards are worth in AUD',       Icon: TrendingUp, gradient: 'from-green-500 to-emerald-600' },
   { href: '/analytics/buying-guides',  label: 'Buying Guides',    desc: 'New releases & chase cards',        Icon: Sparkles,   gradient: 'from-amber-500 to-orange-500' },
 ];
 
-const GRADING_ITEMS = [
+export const GRADING_ITEMS = [
   { href: '/grading/estimator',          label: 'CardPop Grade Estimator',  desc: 'Estimate your card grade instantly',      Icon: Calculator,    gradient: 'from-blue-500 to-indigo-600'   },
   { href: '/grading/roi-calculator',     label: 'Grading ROI Calculator',   desc: 'See if grading a card is worth it',       Icon: TrendingUp,    gradient: 'from-green-500 to-emerald-600' },
   { href: '/grading/scales',             label: 'Grade Scale',              desc: 'Understand grading scales and standards', Icon: ClipboardList, gradient: 'from-violet-500 to-purple-600' },
@@ -107,10 +116,8 @@ export const isNavLinkActive = (link, pathname) => {
 };
 
 // ─── Category badge used inside the dropdown ──────────────────────────────────
-const CategoryBadge = ({ gradient, Icon }) => (
-  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${gradient} shrink-0 shadow-sm`}>
-    <Icon className="w-4 h-4" />
-  </span>
+const CategoryBadge = ({ iconKey, gradient, Icon }) => (
+  <NavIconTile iconKey={iconKey} Icon={Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${gradient}`} iconClassName="w-4 h-4" />
 );
 
 // ─── Mobile browse section (expandable) ──────────────────────────────────────
@@ -162,9 +169,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
                 onClick={() => handleCollectionNav(cat.slug)}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
-                  <cat.Icon className="w-3.5 h-3.5" />
-                </span>
+                <NavIconTile iconKey={navIconKey.collection(cat.slug)} Icon={cat.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${cat.gradient}`} iconClassName="w-3.5 h-3.5" />
                 <span className="text-xs font-semibold text-foreground leading-tight">{cat.name}</span>
               </button>
             </SheetClose>
@@ -191,9 +196,7 @@ const MobileBrowseSection = ({ onNavigate }) => {
                 onClick={() => handleCollectionNav(cat.slug)}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors text-left"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${cat.gradient} shrink-0`}>
-                  <cat.Icon className="w-3.5 h-3.5" />
-                </span>
+                <NavIconTile iconKey={navIconKey.collection(cat.slug)} Icon={cat.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${cat.gradient}`} iconClassName="w-3.5 h-3.5" />
                 <span className="text-xs font-semibold text-foreground leading-tight">{cat.name}</span>
               </button>
             </SheetClose>
@@ -326,7 +329,7 @@ const BrowseDropdown = ({ onNavigate }) => {
                     onClick={() => { setOpen(false); onNavigate?.(); }}
                     className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                   >
-                    <CategoryBadge gradient={cat.gradient} Icon={cat.Icon} />
+                    <CategoryBadge iconKey={navIconKey.collection(cat.slug)} gradient={cat.gradient} Icon={cat.Icon} />
                     <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight">
                       {cat.name}
                     </span>
@@ -351,7 +354,7 @@ const BrowseDropdown = ({ onNavigate }) => {
                     onClick={() => { setOpen(false); onNavigate?.(); }}
                     className="flex items-center gap-2.5 px-2 py-2 rounded-xl hover:bg-muted transition-colors group"
                   >
-                    <CategoryBadge gradient={cat.gradient} Icon={cat.Icon} />
+                    <CategoryBadge iconKey={navIconKey.collection(cat.slug)} gradient={cat.gradient} Icon={cat.Icon} />
                     <span className="text-[13px] font-medium text-foreground group-hover:text-primary transition-colors leading-tight">
                       {cat.name}
                     </span>
@@ -452,9 +455,7 @@ const ShopDropdown = ({ onNavigate }) => {
                       isActive ? 'bg-muted' : 'hover:bg-muted'
                     }`}
                   >
-                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0 shadow-sm`}>
-                      <group.Icon className="w-4 h-4 text-white" />
-                    </span>
+                    <NavIconTile iconKey={navIconKey.shopGroup(group.slug)} Icon={group.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${group.gradient}`} />
                     <div className="min-w-0">
                       <p className={`text-[13px] font-semibold transition-colors ${isActive ? 'text-primary' : 'text-foreground'}`}>
                         {group.label}
@@ -491,9 +492,7 @@ const ShopDropdown = ({ onNavigate }) => {
                       onClick={() => { setOpen(false); onNavigate?.(); }}
                       className="flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-muted transition-colors group"
                     >
-                      <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${activeGroup.gradient} shrink-0 shadow-sm`}>
-                        <item.Icon className="w-4 h-4 text-white" />
-                      </span>
+                      <NavIconTile iconKey={navIconKey.shopCategory(item.slug)} Icon={item.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${activeGroup.gradient}`} />
                       <div className="min-w-0">
                         <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.name}</p>
                         <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
@@ -573,12 +572,7 @@ const CommunityDropdown = ({ onNavigate }) => {
                   onClick={() => { setOpen(false); onNavigate?.(); }}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                 >
-                  <span
-                    className={`inline-flex items-center justify-center w-7 h-7 rounded-lg shrink-0 shadow-sm overflow-hidden ${badgeStyle(item).className}`}
-                    style={badgeStyle(item).style}
-                  >
-                    <item.Icon className="w-4 h-4 text-white" />
-                  </span>
+                  <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={DESKTOP_TILE} bgClassName={badgeStyle(item).className} style={badgeStyle(item).style} />
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
@@ -595,9 +589,7 @@ const CommunityDropdown = ({ onNavigate }) => {
                   onClick={() => { setOpen(false); onNavigate?.(); }}
                   className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                 >
-                  <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
-                    <item.Icon className="w-4 h-4 text-white" />
-                  </span>
+                  <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} />
                   <div className="min-w-0">
                     <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
                     <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
@@ -612,9 +604,7 @@ const CommunityDropdown = ({ onNavigate }) => {
                     onClick={() => { setOpen(false); onNavigate?.(); }}
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
                   >
-                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${READS_ITEM.gradient} shrink-0 shadow-sm`}>
-                      <READS_ITEM.Icon className="w-4 h-4 text-white" />
-                    </span>
+                    <NavIconTile iconKey={navIconKey.link(READS_ITEM.href)} Icon={READS_ITEM.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${READS_ITEM.gradient}`} />
                     <div className="min-w-0">
                       <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{READS_ITEM.label}</p>
                       <p className="text-[11px] text-muted-foreground truncate">{READS_ITEM.desc}</p>
@@ -672,9 +662,7 @@ const GradingDropdown = ({ onNavigate }) => {
                 onClick={() => { setOpen(false); onNavigate?.(); }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
-                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
-                  <item.Icon className="w-4 h-4 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} />
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
@@ -730,9 +718,7 @@ const AnalyticsDropdown = ({ onNavigate }) => {
                 onClick={() => { setOpen(false); onNavigate?.(); }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
-                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
-                  <item.Icon className="w-4 h-4 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} />
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
@@ -777,9 +763,7 @@ const MoreDropdown = ({ onNavigate }) => {
                 onClick={() => { setOpen(false); onNavigate?.(); }}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors group"
               >
-                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0 shadow-sm`}>
-                  <item.Icon className="w-4 h-4 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={DESKTOP_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} />
                 <div className="min-w-0">
                   <p className="text-[13px] font-semibold text-foreground group-hover:text-primary transition-colors">{item.label}</p>
                   <p className="text-[11px] text-muted-foreground truncate">{item.desc}</p>
@@ -845,9 +829,7 @@ const MobileShopSection = ({ onNavigate }) => {
                   className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                 >
                   <span className="flex items-center gap-2 min-w-0">
-                    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
-                      <group.Icon className="w-3.5 h-3.5 text-white" />
-                    </span>
+                    <NavIconTile iconKey={navIconKey.shopGroup(group.slug)} Icon={group.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${group.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
                     <span className="min-w-0">
                       <span className="block text-xs font-semibold text-foreground truncate">{group.label}</span>
                       <span className="block text-[11px] text-muted-foreground truncate">{group.navDesc}</span>
@@ -873,9 +855,7 @@ const MobileShopSection = ({ onNavigate }) => {
                           onClick={onNavigate}
                           className="flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-muted transition-colors text-left"
                         >
-                          <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${group.gradient} shrink-0`}>
-                            <item.Icon className="w-3.5 h-3.5 text-white" />
-                          </span>
+                          <NavIconTile iconKey={navIconKey.shopCategory(item.slug)} Icon={item.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${group.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
                           <span className="min-w-0">
                             <span className="block text-xs font-semibold text-foreground truncate">{item.name}</span>
                             <span className="block text-[11px] text-muted-foreground truncate">{item.desc}</span>
@@ -927,12 +907,7 @@ const MobileCommunitySection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span
-                  className={`inline-flex items-center justify-center w-6 h-6 rounded-lg shrink-0 overflow-hidden ${badgeStyle(item).className}`}
-                  style={badgeStyle(item).style}
-                >
-                  <item.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={MOBILE_TILE} bgClassName={badgeStyle(item).className} style={badgeStyle(item).style} iconClassName="w-3.5 h-3.5 text-white" />
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
@@ -955,9 +930,7 @@ const MobileCommunitySection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
-                  <item.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
@@ -969,9 +942,7 @@ const MobileCommunitySection = ({ onNavigate }) => {
               onClick={onNavigate}
               className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
             >
-              <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${READS_ITEM.gradient} shrink-0`}>
-                <READS_ITEM.Icon className="w-3.5 h-3.5 text-white" />
-              </span>
+              <NavIconTile iconKey={navIconKey.link(READS_ITEM.href)} Icon={READS_ITEM.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${READS_ITEM.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
               <span className="text-xs font-semibold text-foreground truncate">{READS_ITEM.label}</span>
             </Link>
           </SheetClose>
@@ -1014,9 +985,7 @@ const MobileGradingSection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
-                  <item.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
@@ -1051,9 +1020,7 @@ const MobileAnalyticsSection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
-                  <item.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
@@ -1088,9 +1055,7 @@ const MobileMoreSection = ({ onNavigate }) => {
                 onClick={onNavigate}
                 className="flex items-center gap-2 px-3 py-2.5 rounded-xl hover:bg-muted transition-colors"
               >
-                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br ${item.gradient} shrink-0`}>
-                  <item.Icon className="w-3.5 h-3.5 text-white" />
-                </span>
+                <NavIconTile iconKey={navIconKey.link(item.href)} Icon={item.Icon} className={MOBILE_TILE} bgClassName={`bg-gradient-to-br ${item.gradient}`} iconClassName="w-3.5 h-3.5 text-white" />
                 <span className="text-xs font-semibold text-foreground truncate">{item.label}</span>
               </Link>
             </SheetClose>
