@@ -152,7 +152,7 @@ const Footer = () => {
 
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-muted-foreground text-sm font-medium">
-            © {new Date().getFullYear()} CardPop Australia™. All Rights Reserved.
+            © {new Date().getFullYear()} CardPop Australia™ – All Rights Reserved.
           </p>
           <p className="text-muted-foreground text-sm flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <WhatsAppChatLink
