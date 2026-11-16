@@ -8,15 +8,15 @@ them without parsing anything.
 
 | Field | Column | Where it shows |
 |---|---|---|
-| Event Website | `website_url` | "Official Website" under Follow the Organiser; `organizer.url` in JSON-LD; prerender |
+| Event Website | `website_url` | "Official Website" under Follow this event; `organizer.url` in JSON-LD; prerender |
 | Tickets / Registration URL | `ticket_url` | the **Get Tickets** button (routed through the member offer's referral link when one is set — `docs/event-ticket-offers.md`) |
 | Trader / Vendor Applications URL | `vendor_application_url` | **Apply for a trader table** button under the ticket/directions/calendar actions, upcoming events only |
-| Instagram URL | `instagram_url` | Follow the Organiser; `organizer.sameAs` |
-| Facebook URL | `facebook_url` | Follow the Organiser; `organizer.sameAs` |
-| YouTube Channel URL | `youtube_channel_url` | Follow the Organiser; `organizer.sameAs` |
-| TikTok URL | `tiktok_url` | Follow the Organiser; `organizer.sameAs` |
-| X (Twitter) URL | `x_url` | Follow the Organiser; `organizer.sameAs` |
-| Discord URL | `discord_url` | Follow the Organiser; `organizer.sameAs` |
+| Instagram URL | `instagram_url` | Follow this event; `organizer.sameAs` |
+| Facebook URL | `facebook_url` | Follow this event; `organizer.sameAs` |
+| YouTube Channel URL | `youtube_channel_url` | Follow this event; `organizer.sameAs` |
+| TikTok URL | `tiktok_url` | Follow this event; `organizer.sameAs` |
+| X (Twitter) URL | `x_url` | Follow this event; `organizer.sameAs` |
+| Discord URL | `discord_url` | Follow this event; `organizer.sameAs` |
 | Facebook Public Post / Reel URL | `facebook_video_url` | embedded in Event Videos after the YouTube list — `docs/event-videos.md` |
 
 **A YouTube *channel* is not a YouTube *video*.** Videos embedded on the page
@@ -26,7 +26,7 @@ button.
 
 ## Where the links are read
 
-- `components/EventDetailCard.jsx` — the "Follow the Organiser" block (hidden
+- `components/EventDetailCard.jsx` — the "Follow this event" block (hidden
   when every link is blank) and the trader-table button (`isPast` hides it).
 - `lib/eventSeo.js` — `buildEventJsonLd()` puts every profile link in
   `organizer.sameAs`, blanks skipped.

@@ -362,9 +362,9 @@ describe('EventDetailCard — ticket prices', () => {
 });
 
 describe('EventDetailCard — organiser links', () => {
-  it('hides "Follow the Organiser" and the trader button when no links are set', () => {
+  it('hides "Follow this event" and the trader button when no links are set', () => {
     renderCard(baseEvent);
-    expect(screen.queryByText('Follow the Organiser')).not.toBeInTheDocument();
+    expect(screen.queryByText('Follow this event')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
   });
 
@@ -377,11 +377,11 @@ describe('EventDetailCard — organiser links', () => {
       discord_url: 'https://discord.gg/collectitcon',
       vendor_application_url: 'https://collectitcon.com.au/traders',
     });
-    expect(screen.getByText('Follow the Organiser')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /YouTube/ })).toHaveAttribute('href', 'https://youtube.com/@collectitcon');
-    expect(screen.getByRole('link', { name: /TikTok/ })).toHaveAttribute('href', 'https://tiktok.com/@collectitcon');
-    expect(screen.getByRole('link', { name: /^X$/ })).toHaveAttribute('href', 'https://x.com/collectitcon');
-    expect(screen.getByRole('link', { name: /Discord/ })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
+    expect(screen.getByText('Follow this event')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'YouTube' })).toHaveAttribute('href', 'https://youtube.com/@collectitcon');
+    expect(screen.getByRole('link', { name: 'TikTok' })).toHaveAttribute('href', 'https://tiktok.com/@collectitcon');
+    expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute('href', 'https://x.com/collectitcon');
+    expect(screen.getByRole('link', { name: 'Discord' })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
     expect(screen.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
   });
 
