@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, History, ArrowLeft, Users, Pencil, ExternalLink } from 'lucide-react';
+import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Instagram, Facebook, Youtube } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import EventCard from '@/components/EventCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,7 +22,10 @@ import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrgan
 // they co-hosted. Reached from the organiser name / logo on an event page.
 const EVENT_LIMIT = 200;
 
-const LOGO_BOX = 'w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
+// Social links render as icon-only round buttons; the website keeps its label.
+const LINK_ICONS = { website_url: Globe, instagram_url: Instagram, facebook_url: Facebook, youtube_url: Youtube };
+
+const LOGO_BOX ='w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
 
 const LogoTile = ({ url, name, onFail }) => (
   isVideoLogoUrl(url) ? (
@@ -157,32 +160,36 @@ export default function EventOrganiserPage() {
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center gap-6">
               <OrganiserLogos org={org} />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Event organiser</p>
                 <h1 className={`font-serif font-extrabold text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`}>{name}</h1>
-                <p className="text-muted-foreground mt-2">
-                  {total === 0
-                    ? 'No public events listed yet.'
-                    : `${upcoming.length} upcoming · ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop`}
-                </p>
-                {org.description && (
-                  <p className="text-sm md:text-base text-foreground/80 mt-4 max-w-2xl whitespace-pre-line">{org.description}</p>
-                )}
                 {(links.length > 0 || canEdit) && (
-                  <div className="flex flex-wrap items-center gap-2 mt-4">
-                    {links.map(({ key, label, url }) => (
-                      <Button key={key} asChild variant="outline" size="sm" className="rounded-full gap-1.5">
-                        <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc">
-                          {label} <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-                        </a>
-                      </Button>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    {links.map(({ key, label, url }) => {
+                      const Icon = LINK_ICONS[key];
+                      return (
+                        <Button key={key} asChild variant="outline" size="sm" className={Icon && key !== 'website_url' ? 'rounded-full w-9 h-9 p-0' : 'rounded-full gap-1.5'}>
+                          <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label={`${name} on ${label}`} title={label}>
+                            {Icon && <Icon className="w-4 h-4" aria-hidden="true" />}
+                            {key === 'website_url' && label}
+                          </a>
+                        </Button>
+                      );
+                    })}
                     {canEdit && (
                       <Button size="sm" className="rounded-full gap-1.5 font-bold" onClick={() => setEditing(true)}>
                         <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit page
                       </Button>
                     )}
                   </div>
+                )}
+                <p className="text-muted-foreground mt-4">
+                  {total === 0
+                    ? 'No public events listed yet.'
+                    : `${upcoming.length} upcoming · ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop`}
+                </p>
+                {org.description && (
+                  <p className="text-sm md:text-base text-foreground/80 mt-4 whitespace-pre-line">{org.description}</p>
                 )}
               </div>
             </div>
