@@ -19,6 +19,7 @@ const FEATURE_LABELS = {
   event_discovery: 'Event scan: search',
   event_extraction: 'Event scan: page reading',
   supplier_price: 'Supplier price checks',
+  organiser_message_scan: 'Organiser message screening',
 };
 
 const isoDay = (d) => {

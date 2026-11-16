@@ -13,6 +13,7 @@ import {
   eventSubmittedEmail,
   eventReviewOutcomeEmail,
   organiserRequestOutcomeEmail,
+  organiserMessageEmail,
   eventChangesMadeEmail,
   eventFeaturePaidEmail,
   identityReviewNeededEmail,
@@ -315,6 +316,17 @@ export async function sendOrganiserRequestOutcome({ to, name, organiserName, app
       ? `You're confirmed as the organiser of ${organiserName || 'your page'}`
       : `Your organiser request wasn’t approved`,
     html: organiserRequestOutcomeEmail({ name, organiserName, approved, note, pageUrl }),
+  });
+}
+
+// A screened message from a member to the owner of an organiser page
+// (src/routes/organiser-messages.js). Replying answers the sender directly.
+export async function sendOrganiserMessage({ to, ownerName, organiserName, senderName, senderEmail, topicLabel, message, inboxUrl }) {
+  return send({
+    to,
+    subject: `New message for ${organiserName || 'your organiser page'} from ${senderName || 'a CardPop member'}`,
+    html: organiserMessageEmail({ ownerName, organiserName, senderName, senderEmail, topicLabel, message, inboxUrl }),
+    replyTo: senderEmail,
   });
 }
 

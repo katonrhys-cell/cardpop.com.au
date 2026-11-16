@@ -34,6 +34,7 @@ export const OUTBOUND_TIMEOUT_MS = Object.freeze({
   aiProxy: 35_000,
   // Anthropic SDK clients (`new Anthropic({ timeout })`), per function budget.
   anthropicShort: 20_000, // supplier price read, inside the 40 s function
+  anthropicScreen: 12_000, // organiser message screen — a member is waiting on the form; one retry stays under 40 s
   anthropicGrade: 150_000, // grade estimator vision stream (two photos), api/grade-estimate.js's 300 s function
   anthropicScan: 180_000, // event scan / page extraction, 300 s function
   anthropicDraft: 240_000, // blog draft stream, 300 s function

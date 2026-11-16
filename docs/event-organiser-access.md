@@ -90,3 +90,9 @@ The owner edits them in **Edit page** (`components/events/OrganiserPageEditor.js
 buttons and the prerender's `Organization.sameAs` read. To add another, extend
 `LINK_FIELDS` + `ORGANISER_PAGE_COLUMNS` there, the editor's `LINKS`, and the
 page's `LINK_ICONS`.
+
+## Messages from collectors
+
+The owner of an organiser page also receives the messages collectors send from
+it (screened first) and reads them in **Your messages** on the page —
+`docs/organiser-messages.md`.

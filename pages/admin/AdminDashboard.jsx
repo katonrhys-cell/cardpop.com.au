@@ -284,6 +284,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Invoices" description="A tax invoice for every paid order and a credit note for every refund, with Xero exports and sync status." icon={FileText} link="/admin/invoices" />
           <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
           <ManagementBox title="Organiser Requests" description="Confirm members who say they run events, so they can edit their organiser page." icon={Megaphone} link="/admin/organiser-requests" />
+          <ManagementBox title="Organiser Messages" description="Messages collectors send to organisers: ones the screen held, and ones for pages nobody has claimed." icon={MessageSquareText} link="/admin/organiser-messages" />
           <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
           <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
           <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />

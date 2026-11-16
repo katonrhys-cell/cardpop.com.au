@@ -242,6 +242,7 @@ const HeroShowcaseAdminPage = lazy(() => import('@/pages/admin/HeroShowcaseAdmin
 const CollectionSectionsAdminPage = lazy(() => import('@/pages/admin/CollectionSectionsAdminPage.jsx'));
 const ChatModerationPage = lazy(() => import('@/pages/admin/ChatModerationPage.jsx'));
 const OrganiserRequestsAdminPage = lazy(() => import('@/pages/admin/OrganiserRequestsAdminPage.jsx'));
+const OrganiserMessagesAdminPage = lazy(() => import('@/pages/admin/OrganiserMessagesAdminPage.jsx'));
 const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryAdminPage.jsx'));
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
@@ -586,6 +587,7 @@ const App = () => {
                           <Route path="messages" element={<ChatModerationPage />} />
                           <Route path="store-directory" element={<StoreDirectoryAdminPage />} />
                           <Route path="organiser-requests" element={<OrganiserRequestsAdminPage />} />
+                          <Route path="organiser-messages" element={<OrganiserMessagesAdminPage />} />
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />
