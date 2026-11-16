@@ -14,6 +14,7 @@ import {
   eventReviewOutcomeEmail,
   organiserRequestOutcomeEmail,
   organiserMessageEmail,
+  storeOwnerRequestOutcomeEmail,
   eventChangesMadeEmail,
   eventFeaturePaidEmail,
   identityReviewNeededEmail,
@@ -327,6 +328,17 @@ export async function sendOrganiserMessage({ to, ownerName, organiserName, sende
     subject: `New message for ${organiserName || 'your organiser page'} from ${senderName || 'a CardPop member'}`,
     html: organiserMessageEmail({ ownerName, organiserName, senderName, senderEmail, topicLabel, message, inboxUrl }),
     replyTo: senderEmail,
+  });
+}
+
+// A member's request to own a card shop page was approved or declined.
+export async function sendStoreOwnerRequestOutcome({ to, name, storeName, approved, note, pageUrl }) {
+  return send({
+    to,
+    subject: approved
+      ? `You're confirmed as the owner of ${storeName || 'your shop'} on CardPop`
+      : 'Your shop owner request wasn’t approved',
+    html: storeOwnerRequestOutcomeEmail({ name, storeName, approved, note, pageUrl }),
   });
 }
 

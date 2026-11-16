@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
-  ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft, Sun, Moon, Tag,
+  ShoppingCart, Menu, Shield, MessageSquare, ArrowRightLeft, Sun, Moon, Tag, Bell,
 } from 'lucide-react';
 import { useDarkMode } from '@/hooks/useDarkMode.js';
 import { useAuth } from '@/contexts/AuthContext.jsx';
@@ -29,10 +29,18 @@ const VaultDropdown = lazy(() => import('@/components/VaultDropdown.jsx'));
 // chunk. On phones the desktop nav is gated out entirely (see useIsDesktop), and
 // the mobile menu only loads when the hamburger is opened.
 import HeaderNavPlaceholder from '@/components/HeaderNavPlaceholder.jsx';
+import { readAdminHint, writeAdminHint } from '@/lib/headerHints.js';
 const DesktopNavMenus = lazy(() => import('@/components/HeaderMenus.jsx').then(m => ({ default: m.DesktopNavMenus })));
 const MobileNavMenus = lazy(() => import('@/components/HeaderMenus.jsx').then(m => ({ default: m.MobileNavMenus })));
 
 const prefetchMenus = () => import('@/components/HeaderMenus.jsx');
+
+// Same box and icon as NotificationBell's trigger, not interactive.
+const BellPlaceholder = () => (
+  <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" aria-hidden="true">
+    <Bell className="h-4 w-4" />
+  </span>
+);
 
 // Every Radix layer that locks scrolling sets inline styles on <body>, not just
 // Dialog/Sheet: dropdown menus (role="menu") and selects (role="listbox") do too.
@@ -71,6 +79,24 @@ const Header = () => {
     catch { return false; }
   });
   const { isDark, toggle: toggleDarkMode } = useDarkMode();
+
+  // A saved session that is still being checked: lay the header out as the
+  // member's header straight away (messages, bell, avatar — and the Admin
+  // button if this browser's member was an admin last time), exactly as the
+  // static shell does for the same visitor. It used to render the signed-out
+  // layout until the session resolved, then add three or four controls and
+  // shove everything left on every page load.
+  const [adminHint] = useState(readAdminHint);
+  const authPending = authLoading && optimisticAuth;
+  const memberLayout = isAuthenticated || authPending;
+  const showAdminLink = isAdmin || (adminHint && (authPending || (isAuthenticated && profileLoading)));
+
+  // Remember, once the session and profile are both settled, whether to leave
+  // room for the Admin button next time.
+  useEffect(() => {
+    if (authLoading || profileLoading) return;
+    writeAdminHint(isAuthenticated && isAdmin);
+  }, [authLoading, profileLoading, isAuthenticated, isAdmin]);
 
   useEffect(() => {
     setMobileMenuOpen(false);
@@ -279,7 +305,7 @@ const Header = () => {
           {/* Spacer pushes all action icons to the right edge */}
           <div className="flex-1" />
 
-            {!authLoading && isAdmin && (
+            {showAdminLink && (
               <Button asChild variant="ghost" size="sm" className="hidden xl:flex gap-2 text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:text-[hsl(var(--admin-warning,24.6_95%_53.1%))] hover:bg-[hsl(var(--admin-warning,24.6_95%_53.1%))]/10 rounded-xl">
                 <Link to="/admin">
                   <Shield className="w-4 h-4" />
@@ -288,7 +314,7 @@ const Header = () => {
               </Button>
             )}
 
-            {!authLoading && isAuthenticated && settings.enable_trading !== false && (
+            {memberLayout && settings.enable_trading !== false && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/trade-requests" aria-label={tradeCount > 0 ? `Trade requests, ${tradeCount > 99 ? '99+' : tradeCount} pending` : 'Trade requests'}>
                   <ArrowRightLeft className="h-5 w-5" aria-hidden="true" />
@@ -301,7 +327,7 @@ const Header = () => {
               </Button>
             )}
 
-            {!authLoading && isAuthenticated && (
+            {memberLayout && (
               <Button asChild variant="ghost" size="icon" className="hidden sm:flex relative rounded-xl hover:bg-muted">
                 <Link to="/messaging" aria-label={unreadCount > 0 ? `Messages, ${unreadCount > 99 ? '99+' : unreadCount} unread` : 'Messages'}>
                   <MessageSquare className="h-5 w-5" aria-hidden="true" />
@@ -316,12 +342,13 @@ const Header = () => {
 
             {/* Notifications show on every screen size — phones included — so a
                 signed-in member never has to open the menu to see an alert.
-                The fallback holds the bell's footprint so the row doesn't shift. */}
-            {!authLoading && isAuthenticated && (
-              <Suspense fallback={<div className="h-11 w-11 shrink-0" aria-hidden="true" />}>
+                Until the session is confirmed and the bell's chunk has loaded,
+                an inert bell holds its exact place. */}
+            {isAuthenticated ? (
+              <Suspense fallback={<BellPlaceholder />}>
                 <NotificationBell />
               </Suspense>
-            )}
+            ) : authPending ? <BellPlaceholder /> : null}
 
             {/* Sell CTA — the primary marketplace action (list a card). Routes to
                 the add-card flow; ProtectedRoute prompts login for signed-out
@@ -338,7 +365,7 @@ const Header = () => {
             <Button
               variant="ghost"
               size="icon"
-              className={`shrink-0 rounded-xl hover:bg-muted ${isAuthenticated ? 'hidden sm:inline-flex' : ''}`}
+              className={`shrink-0 rounded-xl hover:bg-muted ${memberLayout ? 'hidden sm:inline-flex' : ''}`}
               aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
               onClick={toggleDarkMode}
             >

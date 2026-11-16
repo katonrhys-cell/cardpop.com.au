@@ -23,8 +23,8 @@
  *   • Pro ($99 a year) is for vendors and avid traders: 30 listings a month,
  *     the store page, the Pro display styles, Whatnot show listings and the
  *     homepage Featured Cards spots. (It absorbed the old Premium tier.)
- *   • Ultimate ($199 a year) is for show organisers and unlimited-volume
- *     sellers: everything in Pro, unlimited listings, every display style, and
+ *   • Ultimate ($199 a year) is for show organisers, card shop owners and
+ *     unlimited-volume sellers: everything in Pro, unlimited listings, every display style, and
  *     Calendar Spotlight on every event the member runs (the
  *     `sync_membership_event_spotlight` triggers switch `events.is_featured`
  *     on for them). (It absorbed the old Elite tier.)
@@ -227,8 +227,8 @@ export const PLANS = {
     key: PLAN_ULTIMATE,
     name: 'Ultimate',
     tier: 'ultimate',
-    tagline: 'For show organisers — every event you run, featured.',
-    audience: 'Show organisers',
+    tagline: 'For show organisers and card shop owners — every event you run, featured.',
+    audience: 'Show organisers and card shop owners',
     priceAud: TIER_PRICES_AUD.ultimate,
     currency: SUBSCRIPTION_CURRENCY,
     interval: SUBSCRIPTION_INTERVAL,

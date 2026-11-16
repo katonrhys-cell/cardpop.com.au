@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, Filter, ArrowUpDown, Loader2, MoreHorizontal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -194,9 +195,41 @@ const ListingsManagementPage = () => {
   };
 
   const openDetailModal = (listing) => {
+    setDetailTab('details');
     setSelectedListing(listing);
     setIsDetailModalOpen(true);
   };
+
+  // "Edit listing" on a marketplace listing's public page lands here as
+  // ?listing=<id>: open that listing's dialog on the Edit tab, then drop the
+  // param so a refresh doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [detailTab, setDetailTab] = useState('details');
+  const listingParam = searchParams.get('listing');
+  useEffect(() => {
+    if (!listingParam) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('listings')
+        .select('*, vault_item:vault_items(card_name, set_name, card_image, card_images, category_id, condition, grade)')
+        .eq('id', listingParam)
+        .maybeSingle();
+      if (cancelled) return;
+      if (error || !data) toast.error('Could not find that listing to edit.');
+      else {
+        setSelectedListing(data);
+        setDetailTab('edit');
+        setIsDetailModalOpen(true);
+      }
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('listing');
+        return next;
+      }, { replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [listingParam, setSearchParams]);
 
   const openStatusModal = (listing) => {
     setSelectedListing(listing);
@@ -418,6 +451,7 @@ const ListingsManagementPage = () => {
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         listing={selectedListing}
+        initialTab={detailTab}
         onUpdate={(updated) => {
           setListings(prev => prev.map(l => l.id === updated.id ? updated : l));
           setSelectedListing(updated);

@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { PLANS, PLAN_ORDER, PLAN_HOBBY, PLAN_PRO, planKeyFromTier } from '@/config/plans.js';
 
 // Public pricing page: Hobby (free, always), Pro ($99 a year — vendors and
-// avid traders) and Ultimate ($199 a year — show organisers). Anyone can
+// avid traders) and Ultimate ($199 a year — show organisers and card shop owners). Anyone can
 // browse and buy; listing, selling and trading unlock after a quick Stripe
 // Identity check on every plan. Both paid plans are charged yearly at
 // sign-up, with no trial, and the price is the whole price (GST included).
@@ -86,7 +86,7 @@ const PricingPage = () => {
         <title>Pricing — Hobby, Pro &amp; Ultimate | CardPop</title>
         <meta
           name="description"
-          content="CardPop is free to join, and always will be. Pro is $99 a year for vendors and avid traders; Ultimate is $199 a year for show organisers who want every event featured."
+          content="CardPop is free to join, and always will be. Pro is $99 a year for vendors and avid traders; Ultimate is $199 a year for show organisers and card shop owners who want every event featured."
         />
       </Helmet>
 

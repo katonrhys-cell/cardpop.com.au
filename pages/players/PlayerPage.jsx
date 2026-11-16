@@ -16,6 +16,8 @@ import { formatAud } from '@/lib/cardPrices.js';
 import { resolveCollectionSlug } from '@/data/collectionConfigs.js';
 import { formatBorn, keyCardImage, playerPath, playerSlug, playerSeo, playerFaqs, splitParagraphs } from '@/utils/players.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminPlayerPath } from '@/utils/adminEditLinks.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -97,6 +99,9 @@ const PlayerPage = () => {
       .catch(() => { if (!cancelled) setPlayer(null); });
     return () => { cancelled = true; };
   }, [slug, rawSlug]);
+
+  // Admins get an "Edit in admin" shortcut to this player's form.
+  useAdminEditTarget('Edit player', adminPlayerPath(player?.id));
 
   const paragraphs = useMemo(() => splitParagraphs(player?.bio), [player]);
   const notes = useMemo(() => splitParagraphs(player?.collecting_notes), [player]);

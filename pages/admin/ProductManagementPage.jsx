@@ -268,6 +268,29 @@ const ProductManagementPage = () => {
     fetchProducts();
   };
 
+  // "Edit product" on a shop product's public page lands here as ?edit=<id>.
+  // Read the row directly rather than from the list (which is capped), open
+  // its form, and drop the param so a refresh doesn't reopen it.
+  const editId = searchParams.get('edit');
+  useEffect(() => {
+    if (!editId) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data, error: loadError } = await supabase
+        .from('shop_products').select('*').eq('id', editId).maybeSingle();
+      if (cancelled) return;
+      if (loadError || !data) toast.error('Could not find that product to edit.');
+      else handleEdit(data);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per ?edit= value
+  }, [editId]);
+
   const filteredProducts = useMemo(
     () => sortProducts(filterProducts(products, filters, { variantsByProduct, groups: categoryGroups }), sortKey, sortDir, { costs }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

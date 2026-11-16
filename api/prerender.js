@@ -2778,10 +2778,10 @@ const STATIC_CONTENT = {
   // charged at sign-up with no trial). tests/backend/prerender.test.js checks.
   '/pricing': {
     title: 'Pricing — Hobby, Pro & Ultimate | CardPop',
-    description: 'CardPop is free to join, and always will be. Pro is $99 a year for vendors and avid traders; Ultimate is $199 a year for show organisers who want every event featured.',
+    description: 'CardPop is free to join, and always will be. Pro is $99 a year for vendors and avid traders; Ultimate is $199 a year for show organisers and card shop owners who want every event featured.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }],
     h1: 'Simple, fair pricing',
-    intro: 'Joining CardPop is free, and always will be. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Pro is one yearly payment for vendors and avid traders; Ultimate is for show organisers who want every event they run featured on the calendar.',
+    intro: 'Joining CardPop is free, and always will be. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Pro is one yearly payment for vendors and avid traders; Ultimate is for show organisers and card shop owners who want every event they run featured on the calendar.',
     sections: [
       { h2: 'Hobby — free, and always will be', paras: ['Free, and always will be — collect, buy and sell casually.'], items: [
         { text: 'Browse and buy instantly — no membership needed.' },
@@ -2799,7 +2799,7 @@ const STATIC_CONTENT = {
         { text: 'Advertise your Whatnot live shows on the community directory.' },
         { text: 'Your cards fill the homepage Featured Cards spots.' },
       ] },
-      { h2: 'Ultimate — $199 a year AUD', paras: ['For show organisers — every event you run, featured. One payment a year, GST included.'], items: [
+      { h2: 'Ultimate — $199 a year AUD', paras: ['For show organisers and card shop owners — every event you run, featured. One payment a year, GST included.'], items: [
         { text: 'Everything in Pro, plus:' },
         { text: 'Calendar Spotlight on every show you run — the Featured events strip, first in its month and a Featured badge.' },
         { text: 'Unlimited listings.' },

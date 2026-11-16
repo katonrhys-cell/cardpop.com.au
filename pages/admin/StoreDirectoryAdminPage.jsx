@@ -8,9 +8,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS } from '@/lib/storeDirectory.js';
 import StoreEditorDialog from '@/components/admin/StoreEditorDialog.jsx';
+import StoreOwnerRequests from '@/components/admin/StoreOwnerRequests.jsx';
 import { cleanStorePhotos, cleanStoreVideos, storePath } from '@/utils/storePage.js';
 
-const StoreRow = ({ store, onAction, onEdit }) => (
+const StoreRow = ({ store, onAction, onEdit, onRemoveOwner }) => (
   <div className="bg-card border border-border rounded-2xl p-5">
     <div className="flex items-start justify-between gap-4 flex-wrap">
       <div className="min-w-0">
@@ -19,6 +20,15 @@ const StoreRow = ({ store, onAction, onEdit }) => (
           <Badge variant={store.status === 'approved' ? 'default' : store.status === 'pending' ? 'secondary' : 'destructive'}>
             {store.status}
           </Badge>
+          {store.owner_id && (
+            <>
+              <Badge variant="outline">Owner-managed</Badge>
+              <Link to={`/admin/users/${store.owner_id}`} className="text-xs text-primary hover:underline">Owner</Link>
+              <button type="button" onClick={() => onRemoveOwner(store)} className="text-xs text-muted-foreground hover:text-destructive hover:underline">
+                Remove owner
+              </button>
+            </>
+          )}
         </div>
         <p className="text-sm text-muted-foreground mt-0.5">
           {[store.suburb, DIRECTORY_CITIES[store.city]?.label || store.city, store.state]
@@ -120,6 +130,18 @@ const StoreDirectoryAdminPage = () => {
     setStores((prev) => prev.map((s) => (s.id === store.id ? { ...s, status } : s)));
   };
 
+  const onRemoveOwner = async (store) => {
+    if (!window.confirm(`Remove the owner of "${store.name}"? The page and its photos stay; they just can't edit it any more.`)) return;
+    try {
+      const res = await apiServerClient.fetch(`/store-owner-requests/admin/owner/${store.id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+      toast.success(`"${store.name}" no longer has an owner`);
+      setStores((prev) => prev.map((s) => (s.id === store.id ? { ...s, owner_id: null } : s)));
+    } catch (error) {
+      toast.error(`Could not remove the owner: ${error.message}`);
+    }
+  };
+
   const pending = stores.filter((s) => s.status === 'pending');
   const rest = stores.filter((s) => s.status !== 'pending');
 
@@ -132,7 +154,7 @@ const StoreDirectoryAdminPage = () => {
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Approve or reject public "/card-shops" listings, and edit each shop&apos;s own page —
-            address, hours, photos and videos. Approved stores appear immediately.
+            address, hours, photos and videos — and confirm members who apply to own a shop. Approved stores appear immediately.
           </p>
         </div>
         <Button onClick={() => setEditing(null)}>
@@ -148,6 +170,8 @@ const StoreDirectoryAdminPage = () => {
         onSaved={load}
       />
 
+      <StoreOwnerRequests onChanged={load} />
+
       {loading && <p className="text-muted-foreground">Loading…</p>}
 
       {!loading && (
@@ -155,12 +179,12 @@ const StoreDirectoryAdminPage = () => {
           <section className="space-y-3">
             <h2 className="text-lg font-semibold">Pending review ({pending.length})</h2>
             {pending.length === 0 && <p className="text-sm text-muted-foreground">Nothing waiting — all clear.</p>}
-            {pending.map((store) => <StoreRow key={store.id} store={store} onAction={onAction} onEdit={setEditing} />)}
+            {pending.map((store) => <StoreRow key={store.id} store={store} onAction={onAction} onEdit={setEditing} onRemoveOwner={onRemoveOwner} />)}
           </section>
 
           <section className="space-y-3">
             <h2 className="text-lg font-semibold">All listings ({rest.length})</h2>
-            {rest.map((store) => <StoreRow key={store.id} store={store} onAction={onAction} onEdit={setEditing} />)}
+            {rest.map((store) => <StoreRow key={store.id} store={store} onAction={onAction} onEdit={setEditing} onRemoveOwner={onRemoveOwner} />)}
           </section>
         </>
       )}

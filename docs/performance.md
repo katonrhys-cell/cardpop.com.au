@@ -72,6 +72,15 @@ things flashed or jumped during a load. The rules that came out of fixing them:
   matches the real header" fails when the shell, the placeholder or `NAV_LINKS`
   drift, and also pins the logo ™ markup, the Sell button, the phone search row,
   the hero spacing classes and the default tab title.
+- **A signed-in visitor gets the member's header from the first paint.** The
+  CSP bootstrap puts `cp-member` on `<html>` when a Supabase session is cached
+  (and `cp-admin` when `lib/headerHints.js` last saw an admin in this browser);
+  the critical CSS in `index.html` swaps the shell's `cps-guest` pieces for the
+  `cps-member` / `cps-admin` ones; and `Header.jsx` renders the same layout
+  (`memberLayout`: Messages, bell, avatar, Admin) while the session is still
+  being checked. The admin hint only sizes the header — it never grants
+  anything. Changing the bootstrap means updating its sha256 in both CSP
+  headers in `vercel.json`.
 - **The hero exists three times** — `tools/home-shell.html`, `HeroSection.jsx`
   (the "/" Suspense fallback) and the hero in `HomePage.jsx`. Spacing classes
   must be identical in all three at every breakpoint (the same test checks).

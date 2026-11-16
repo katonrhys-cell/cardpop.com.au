@@ -19,6 +19,7 @@ import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
 import organiserRequestsRouter from './organiser-requests.js';
 import organiserMessagesRouter from './organiser-messages.js';
+import storeOwnerRequestsRouter from './store-owner-requests.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
@@ -119,6 +120,10 @@ export default () => {
     // Screened member-to-organiser messages — docs/organiser-messages.md
     router.use('/organiser-messages', apiLimiter);
     router.use('/organiser-messages', organiserMessagesRouter);
+
+    // Card shop ownership: member requests + admin confirmation — docs/store-pages.md
+    router.use('/store-owner-requests', apiLimiter);
+    router.use('/store-owner-requests', storeOwnerRequestsRouter);
     
     // Auth routes with endpoint-specific rate limiting
     router.use('/auth/login', loginLimiter);

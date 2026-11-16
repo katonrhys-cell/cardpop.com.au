@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -13,8 +13,11 @@ import SoldBadge from '@/components/SoldBadge.jsx';
 // listings.price_aud is stored in whole dollars.
 const formatAud = (dollars) => `$${(Number(dollars) || 0).toFixed(2)}`;
 
-const ListingDetailModal = ({ isOpen, onClose, listing, onUpdate, onDelete, onStatusChange }) => {
-  const [activeTab, setActiveTab] = useState('details');
+const ListingDetailModal = ({ isOpen, onClose, listing, onUpdate, onDelete, onStatusChange, initialTab = 'details' }) => {
+  const [activeTab, setActiveTab] = useState(initialTab);
+  // Each time the dialog opens it starts on `initialTab` (e.g. the Edit tab when
+  // an admin arrives from "Edit listing" on the public page).
+  useEffect(() => { if (isOpen) setActiveTab(initialTab); }, [isOpen, initialTab, listing?.id]);
 
   if (!listing) return null;
 
