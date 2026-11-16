@@ -14,7 +14,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
-import { NAV_MENU_ICONS_KEY } from '@/utils/navMenuIcons.js';
 
 const DEFAULT_SETTINGS = {
   site_name: 'CardPop',
@@ -39,8 +38,14 @@ const DEFAULT_SETTINGS = {
   google_workspace_referral_url: WORKSPACE_REFERRAL_DEFAULT_URL,
 };
 
-// Structured settings edited on their own admin page (Admin → Menu Icons).
-const KEYS_OWNED_ELSEWHERE = new Set([NAV_MENU_ICONS_KEY]);
+// The keys this page owns — exactly the fields rendered below. It reads and
+// writes these and nothing else. platform_settings also holds settings edited
+// on other admin pages (commission and processing-fee rates, AI allowances,
+// refund retention, invoice details…); when Save wrote back every row the page
+// had loaded, it silently restored whatever those held when this tab opened,
+// undoing a change made elsewhere in the meantime. A field added to this page
+// must be added to DEFAULT_SETTINGS, or it will not save.
+const OWN_KEYS = Object.keys(DEFAULT_SETTINGS);
 
 const AdminSettingsPage = () => {
   const navigate = useNavigate();
@@ -55,14 +60,11 @@ const AdminSettingsPage = () => {
     setLoading(true);
     setError(null);
 
-    supabase.from('platform_settings').select('key, value').then(({ data, error: fetchErr }) => {
+    supabase.from('platform_settings').select('key, value').in('key', OWN_KEYS).then(({ data, error: fetchErr }) => {
       if (cancelled) return;
       if (fetchErr) { setError(fetchErr.message || 'Failed to load settings.'); setLoading(false); return; }
       const merged = { ...DEFAULT_SETTINGS };
-      // Save writes back every key loaded here, so a setting another admin
-      // page owns must stay out — or saving this page would put back the
-      // value it held when this tab opened.
-      (data ?? []).forEach(({ key, value }) => { if (!KEYS_OWNED_ELSEWHERE.has(key)) merged[key] = value; });
+      (data ?? []).forEach(({ key, value }) => { if (key in DEFAULT_SETTINGS) merged[key] = value; });
       setSettings(merged);
       setLoading(false);
     }).catch(err => {
@@ -77,7 +79,9 @@ const AdminSettingsPage = () => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const entries = Object.entries(settings).map(([key, value]) => ({ key, value }));
+      // Built from OWN_KEYS, not from whatever is in state: a setting another
+      // admin page owns must never ride along in this save.
+      const entries = OWN_KEYS.map(key => ({ key, value: settings[key] }));
 
       // platform_settings.label is NOT NULL with no default, so a bare
       // {key, value} upsert fails its INSERT arm for any key whose row doesn't
@@ -88,7 +92,8 @@ const AdminSettingsPage = () => {
       // a label derived from the key so the constraint is satisfied.
       const { data: existingRows, error: readErr } = await supabase
         .from('platform_settings')
-        .select('key');
+        .select('key')
+        .in('key', OWN_KEYS);
       if (readErr) throw readErr;
       const existing = new Set((existingRows ?? []).map(r => r.key));
 

@@ -63,9 +63,9 @@ the admin-only `media` bucket.
 
 **Saving.** The page re-reads the row immediately before each write and
 changes only the one item, so two admins editing different items don't undo
-each other. Admin → Settings deliberately skips this key
-(`KEYS_OWNED_ELSEWHERE` in `AdminSettingsPage.jsx`) — that page writes back
-every key it loaded, which would otherwise restore a stale copy.
+each other. Admin → Settings never touches this key: it reads and writes only
+its own fields (`OWN_KEYS` in `AdminSettingsPage.jsx`), so saving it can't
+restore a stale copy.
 
 **Bundle.** The built-in icon library is a separate chunk loaded only when an
 override names a library icon (`useNavLibraryIcon`), and by the admin page.
