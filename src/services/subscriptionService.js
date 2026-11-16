@@ -4,7 +4,9 @@ import logger from '../utils/logger.js';
 import { markTrialRedeemed } from './welcomeOfferService.js';
 import { isStripeObjectMissing } from '../utils/stripeErrors.js';
 import { recordSubscriptionReferral } from './partnerService.js';
-import { ENV, PAID_TIER_ORDER, TIER_PRICES_AUD, canonicalTier } from '../../config/subscription.js';
+import {
+  ENV, PAID_TIER_ORDER, TIER_PRICES_AUD, SUBSCRIPTION_INTERVAL, SUBSCRIPTION_CURRENCY, canonicalTier,
+} from '../../config/subscription.js';
 import { PLANS } from '../../config/plans.js';
 import { sendMembershipTrialEnding, sendMembershipRenewalReminder } from '../utils/emailService.js';
 
@@ -26,6 +28,39 @@ export const COMPLIMENTARY_STATUS = 'grandfathered';
 
 /** The tier every admin holds, free — the top of config/plans.js PLAN_ORDER. */
 export const ADMIN_COMPLIMENTARY_TIER = 'ultimate';
+
+/**
+ * The Stripe price a paid plan bills against, checked before anything is
+ * charged to it: it must be an active AUD price for exactly the plan's
+ * advertised amount, billed once a year. A stale or mistyped price id (a
+ * retired monthly price, a test-mode id, the other plan's price) would
+ * otherwise bill members something other than what the page told them — and
+ * Ultimate's variable keeps its pre-yearly name, so the check is what stands
+ * between an un-updated value and a $150-a-month charge. Used by sign-up
+ * checkout and by plan changes. Throws 503 for an unset or unsuitable price.
+ * @returns {Promise<{ priceId: string, price: object }>}
+ */
+export async function resolveMembershipPrice(tier) {
+  const envName = ENV.stripePriceIds[tier];
+  const priceId = envName ? process.env[envName] : null;
+  if (!priceId) {
+    logger.error(`[SUB] ${envName} not configured`);
+    throw httpError(503, `The ${tier} plan is not available yet.`);
+  }
+  const price = await stripe.prices.retrieve(priceId);
+  const expectedCents = Math.round(TIER_PRICES_AUD[tier] * 100);
+  if (
+    price?.active === false
+    || price?.currency !== SUBSCRIPTION_CURRENCY
+    || price?.recurring?.interval !== SUBSCRIPTION_INTERVAL
+    || (price?.recurring?.interval_count ?? 1) !== 1
+    || price?.unit_amount !== expectedCents
+  ) {
+    logger.error(`[SUB] ${envName} (${priceId}) is not an active ${SUBSCRIPTION_CURRENCY.toUpperCase()} ${expectedCents}c/${SUBSCRIPTION_INTERVAL} price — refusing to bill it`);
+    throw httpError(503, `The ${tier} plan is not available yet.`);
+  }
+  return { priceId, price };
+}
 
 /**
  * Which paid plan a Stripe subscription buys. The plan is stamped into the
@@ -601,11 +636,7 @@ export function mapPaypalStatus(paypalStatus) {
  */
 export async function changeStripeSubscriptionTier(userId, tier) {
   if (!PAID_TIER_ORDER.includes(tier)) throw httpError(400, 'Choose a paid plan to switch to.');
-  const priceId = process.env[ENV.stripePriceIds[tier]];
-  if (!priceId) {
-    logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
-    throw httpError(503, `The ${tier} plan is not available yet.`);
-  }
+  const { priceId } = await resolveMembershipPrice(tier);
 
   const { data: profile, error } = await supabase
     .from('profiles')

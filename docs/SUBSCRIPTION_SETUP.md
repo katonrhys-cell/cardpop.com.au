@@ -207,16 +207,17 @@ Migrations apply automatically on merge to `main` (see CLAUDE.md).
    ever switched on — the advertised price includes GST.
 2. Copy each price id (`price_...`) into its env var:
    **`STRIPE_MEMBERSHIP_PRICE_ID_PRO`** and
-   **`STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE`**. A plan whose price id is unset
-   can't be purchased (its checkout answers 503). The checkout route also
-   retrieves the price and refuses it unless it is an active AUD price of
-   exactly the plan's amount billed once a year — so a stale id can't bill a
-   member something the page didn't say.
-3. The old monthly variables — `STRIPE_SUBSCRIPTION_PRICE_ID`, `…_PREMIUM`,
-   `…_ELITE`, `…_ULTIMATE` — are **no longer read**. They were renamed on
-   purpose: had the names been kept, a deploy with the old values would have
-   sold "$99 a year" and billed $20 a month. Delete them, and archive the old
-   monthly prices/products in Stripe.
+   **`STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE`**. A plan whose price id is unset
+   can't be purchased (its checkout answers 503). Ultimate keeps the
+   variable name it always had, now holding the yearly price; Pro has a new
+   one. Sign-up checkout **and** plan changes go through
+   `resolveMembershipPrice()`, which retrieves the price and refuses it (503)
+   unless it is an active AUD price of exactly the plan's amount billed once a
+   year — so a stale monthly id left in either variable can't bill a member
+   something the page didn't say.
+3. The other old monthly variables — `STRIPE_SUBSCRIPTION_PRICE_ID`,
+   `…_PREMIUM`, `…_ELITE` — are **no longer read**. Delete them, and archive
+   the old monthly prices in Stripe.
 4. The app webhook endpoint (`/api/stripe/webhook`) needs these events:
    `customer.subscription.created`, `customer.subscription.updated`,
    `customer.subscription.deleted`, `customer.subscription.trial_will_end`,
@@ -244,8 +245,8 @@ Add to Vercel (and `.env` for local dev):
 
 | Variable | Used by |
 |---|---|
-| `STRIPE_MEMBERSHIP_PRICE_ID_PRO` | Stripe checkout — Pro ($99 / year) |
-| `STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE` | Stripe checkout — Ultimate ($199 / year) |
+| `STRIPE_MEMBERSHIP_PRICE_ID_PRO` | Stripe checkout and plan changes — Pro ($99 / year) |
+| `STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE` | Stripe checkout — Ultimate ($199 / year) |
 | `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | PayPal REST auth (off) |
 | `PAYPAL_SUBSCRIPTION_PLAN_ID` / `_ULTIMATE` | PayPal plans (off) |
 | `PAYPAL_WEBHOOK_ID` | PayPal webhook verification (off) |

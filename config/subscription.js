@@ -18,8 +18,8 @@
  * History: until 2026-11 there were four monthly tiers (Pro $20, Premium $40,
  * Elite $80, Ultimate $150) with a 30-day trial. Premium was folded into Pro
  * and Elite into Ultimate — `canonicalTier()` maps the retired names, and the
- * Stripe price env vars were RENAMED so a leftover monthly price id can never
- * be billed against a plan the site now sells by the year.
+ * server refuses to bill any configured price that is not the advertised
+ * yearly amount, so a leftover monthly price id can never be charged.
  *
  * IMPORTANT: the paid subscription does not gate *selling* outright. Any
  * ID-verified account (Hobby included) may list and sell — the DB `can_sell()`
@@ -95,14 +95,18 @@ export const ENTITLED_STATUSES = ['trialing', 'active', 'grandfathered'];
  * Names of the environment variables the backend reads (documented for setup).
  * Each paid plan bills against its own yearly Stripe price. A plan whose price
  * id is unset simply can't be purchased (the checkout route answers 503 for
- * it). The old monthly `STRIPE_SUBSCRIPTION_PRICE_ID*` variables are no longer
- * read and can be deleted.
+ * it). Pro reads a new variable; Ultimate keeps the name it always had
+ * (`STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE`), now holding the yearly price.
+ * Reusing a name is safe because resolveMembershipPrice() refuses any price
+ * that isn't the advertised yearly amount. The other three old monthly
+ * variables (`STRIPE_SUBSCRIPTION_PRICE_ID`, `…_PREMIUM`, `…_ELITE`) are no
+ * longer read and can be deleted.
  */
 export const ENV = {
   // Stripe yearly recurring prices (price_...), one per paid plan.
   stripePriceIds: {
     pro: 'STRIPE_MEMBERSHIP_PRICE_ID_PRO',
-    ultimate: 'STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE',
+    ultimate: 'STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE',
   },
   // PayPal
   paypalClientId: 'PAYPAL_CLIENT_ID',

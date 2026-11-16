@@ -87,7 +87,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.APP_URL = 'https://cardpop.com.au';
   process.env.STRIPE_MEMBERSHIP_PRICE_ID_PRO = 'price_pro';
-  process.env.STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE = 'price_ultimate';
+  process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE = 'price_ultimate';
   mockPriceRetrieve.mockImplementation(async (id) => yearlyPrice(id === 'price_ultimate' ? 19900 : 9900, id));
   // update(...).eq(...) resolves; a second .eq (the revoke's status filter) too.
   mockUpdateEq.mockImplementation(() => ({ eq: mockUpdateEq, then: (resolve) => resolve({ data: null, error: null }) }));

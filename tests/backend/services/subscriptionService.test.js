@@ -91,9 +91,9 @@ describe('tierFromStripeSubscription', () => {
   });
 
   it('ignores a bogus metadata tier and falls back to the price-id match', () => {
-    vi.stubEnv('STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE', 'price_ultimate_123');
-    // The retired monthly price variables are no longer read.
-    vi.stubEnv('STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE', 'price_old_monthly');
+    vi.stubEnv('STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE', 'price_ultimate_123');
+    // The retired monthly Pro / Premium / Elite variables are no longer read.
+    vi.stubEnv('STRIPE_SUBSCRIPTION_PRICE_ID_ELITE', 'price_old_monthly');
     try {
       expect(tierFromStripeSubscription({
         metadata: { tier: 'god-mode' },

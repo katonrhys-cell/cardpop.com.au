@@ -16,7 +16,16 @@ vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 vi.mock('../../src/utils/stripeClient.js', () => ({
-  default: { subscriptions: { retrieve: mockRetrieve, update: mockUpdate } },
+  default: {
+    subscriptions: { retrieve: mockRetrieve, update: mockUpdate },
+    // resolveMembershipPrice(): the configured price is checked before a plan change.
+    prices: {
+      retrieve: vi.fn(async (id) => ({
+        id, active: true, currency: 'aud', recurring: { interval: 'year', interval_count: 1 },
+        unit_amount: id === 'price_ultimate' ? 19900 : 9900,
+      })),
+    },
+  },
 }));
 vi.mock('../../src/utils/supabaseClient.js', () => ({
   supabase: {
@@ -65,7 +74,7 @@ const proProfile = {
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.STRIPE_MEMBERSHIP_PRICE_ID_PRO = 'price_pro';
-  process.env.STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE = 'price_ultimate';
+  process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE = 'price_ultimate';
   mockMaybeSingle.mockResolvedValue({ data: proProfile, error: null });
   mockRetrieve.mockResolvedValue({
     id: 'sub_123',
@@ -158,7 +167,7 @@ describe('POST /subscription/stripe/change-tier', () => {
   });
 
   it('answers 503 when the target tier has no Stripe price configured', async () => {
-    delete process.env.STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE;
+    delete process.env.STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE;
     const res = await change('ultimate');
     expect(res.status).toBe(503);
     expect(mockUpdate).not.toHaveBeenCalled();

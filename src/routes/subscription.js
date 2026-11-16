@@ -17,6 +17,7 @@ import {
   resumeStripeMembership,
   createMembershipCardSession,
   confirmMembershipCard,
+  resolveMembershipPrice,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -24,9 +25,7 @@ import {
   getPaypalSubscription,
   verifyPaypalWebhook,
 } from '../utils/paypalClient.js';
-import {
-  TRIAL_DAYS, ENV, normalizePaidTier, TIER_PRICES_AUD, SUBSCRIPTION_INTERVAL, SUBSCRIPTION_CURRENCY,
-} from '../../config/subscription.js';
+import { TRIAL_DAYS, normalizePaidTier } from '../../config/subscription.js';
 import { validatePartnerCode } from '../services/partnerService.js';
 
 const router = express.Router();
@@ -51,12 +50,6 @@ router.get('/status', authMiddleware, async (req, res) => {
 router.post('/stripe/checkout', authMiddleware, async (req, res) => {
   try {
     const tier = normalizePaidTier(req.body?.tier);
-    const priceId = process.env[ENV.stripePriceIds[tier]];
-    if (!priceId) {
-      logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
-      return res.status(503).json({ error: `The ${tier} plan is not available yet.` });
-    }
-
     const { successUrl, cancelUrl, refCode } = req.body;
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
@@ -64,22 +57,9 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
     if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
 
-    // The configured price must be the one the site advertises: a yearly AUD
-    // price for exactly the plan's amount. A stale or mistyped price id (the
-    // retired monthly prices, a test-mode id, the other plan's price) would
-    // otherwise bill members something other than what the page told them.
-    const price = await stripe.prices.retrieve(priceId);
-    const expectedCents = Math.round(TIER_PRICES_AUD[tier] * 100);
-    if (
-      price?.active === false
-      || price?.currency !== SUBSCRIPTION_CURRENCY
-      || price?.recurring?.interval !== SUBSCRIPTION_INTERVAL
-      || (price?.recurring?.interval_count ?? 1) !== 1
-      || price?.unit_amount !== expectedCents
-    ) {
-      logger.error(`[SUB] ${ENV.stripePriceIds[tier]} (${priceId}) is not an active ${SUBSCRIPTION_CURRENCY.toUpperCase()} ${expectedCents}c/${SUBSCRIPTION_INTERVAL} price — refusing checkout`);
-      return res.status(503).json({ error: `The ${tier} plan is not available yet.` });
-    }
+    // The configured price must be the one the site advertises (yearly, AUD,
+    // exactly the plan's amount) — 503 otherwise. See resolveMembershipPrice().
+    const { priceId, price } = await resolveMembershipPrice(tier);
 
     const userId = req.user.id;
     // Admins hold Ultimate free and complimentary members already have their
