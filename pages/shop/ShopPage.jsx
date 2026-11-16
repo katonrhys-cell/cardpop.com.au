@@ -40,7 +40,7 @@ const ShopPage = () => {
   const { addToCart } = useCart();
   const fetchRef = useRef(null);
   const pageRef = useRef(0);
-  const facets = useShopFacets({ scopeKey: 'all', keys: FACET_KEYS });
+  const facets = useShopFacets({ scopeKey: 'all', keys: FACET_KEYS, expectFilters: true });
   const selectionKey = JSON.stringify(facets.selection);
   // Only a filtered grid reads the facet rows — don't refetch the unfiltered
   // grid just because they finished loading.
@@ -197,7 +197,7 @@ const ShopPage = () => {
         {/* The whole catalogue always has filters, so hold their row's place
             while the facet rows load instead of letting the grid drop 60px. */}
         <ShopFilterPanel
-          loading={!facets.loaded}
+          loading={facets.pending}
           options={facets.options}
           rows={facets.rows}
           selection={facets.selection}
