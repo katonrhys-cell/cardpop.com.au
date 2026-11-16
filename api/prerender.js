@@ -40,7 +40,7 @@ import {
   STORE_PAGE_COLUMNS, absoluteMediaUrl, cleanStorePhotos, cleanStoreVideos, storeHoursLines, storeIsIndexable,
   storeJsonLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storeExternalLink,
 } from '../utils/storePage.js';
-import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
+import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
 import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
@@ -2754,9 +2754,18 @@ const STATIC_CONTENT = {
         paras: [
           ...(i === 0 ? [FEATURED_EARLY_BIRD_NOTE] : []),
           `Or ${p.packPrice} for three events with the 3-event pack.`,
-          ...(i === LIST_EVENT_FEATURED_PACKAGES.length - 1 ? [FEATURED_BUNDLE_NOTE] : []),
+          ...(i === LIST_EVENT_FEATURED_PACKAGES.length - 1 ? [FEATURED_BUNDLE_NOTE, FEATURED_MEMBERSHIP_NOTE] : []),
         ],
         items: p.points.map((text) => ({ text })),
+      })),
+      ...LIST_EVENT_EXTRAS.map((x, i) => ({
+        h2: `Promotion extra: ${x.name} (${x.price})`,
+        paras: [
+          ...(i === 0 ? [EXTRAS_NOTE] : []),
+          ...(x.terms.length ? [`Conditions: ${x.terms.join('. ')}.`] : []),
+          ...(i === LIST_EVENT_EXTRAS.length - 1 ? [EXTRAS_ENQUIRY_NOTE] : []),
+        ],
+        items: x.points.map((text) => ({ text })),
       })),
       { h2: 'How it works', items: LIST_EVENT_STEPS.map(({ step, body }) => ({ text: `${step}: ${body}` })) },
     ],

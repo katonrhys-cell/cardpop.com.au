@@ -328,11 +328,11 @@ export async function sendEventChangesMade({ to, event, editorName, rows }) {
 }
 
 // Every admin: an organiser paid for Featured Placement on their event.
-export async function sendEventFeaturePaid({ to, event, packageName, amountAud, earlyBird, organiserName, extras }) {
+export async function sendEventFeaturePaid({ to, event, packageName, amountAud, earlyBird, organiserName, extras, isExtra = false }) {
   return send({
     to,
-    subject: `Featured Placement paid: ${event?.title || 'Untitled'}`,
-    html: eventFeaturePaidEmail({ event, packageName, amountAud, earlyBird, organiserName, extras }),
+    subject: `${isExtra ? `Event extra paid (${packageName})` : 'Featured Placement paid'}: ${event?.title || 'Untitled'}`,
+    html: eventFeaturePaidEmail({ event, packageName, amountAud, earlyBird, organiserName, extras, isExtra }),
   });
 }
 

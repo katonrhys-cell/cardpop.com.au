@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CalendarDays, Eye, Search, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star } from 'lucide-react';
+import { CalendarDays, Eye, Search, Plus, Pencil, ExternalLink, Info, MapPin, Store, BadgeCheck, RotateCcw, Trash2, FileText, Star, Megaphone } from 'lucide-react';
 import { toast } from 'sonner';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
@@ -13,8 +13,9 @@ import EventBadgeDialog from '@/components/events/EventBadgeDialog.jsx';
 import FeatureEventDialog from '@/components/events/FeatureEventDialog.jsx';
 import FeatureEventChooser from '@/components/events/FeatureEventChooser.jsx';
 import FeatureUpsellCard from '@/components/events/FeatureUpsellCard.jsx';
+import EventExtrasDialog from '@/components/events/EventExtrasDialog.jsx';
 import {
-  BUNDLE, FEATURED_PACKAGES, bundleCents, featureEligibility, formatAud, todayInAustralia,
+  BUNDLE, FEATURED_PACKAGES, bundleCents, canBuyExtras, featureEligibility, formatAud, todayInAustralia,
 } from '@/utils/featuredPackages.js';
 import { MY_EVENT_BUCKETS, myEventBucket, countMyEventBuckets, normaliseBucket } from '@/utils/myEventStatus.js';
 import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
@@ -58,6 +59,8 @@ const AccountEvents = () => {
   const [viewsEvent, setViewsEvent] = useState(null);
   const [featureEvent, setFeatureEvent] = useState(null);
   const [featurePack, setFeaturePack] = useState(false);
+  // Promote: the promotion extras (Instagram story / post, event review).
+  const [extrasEvent, setExtrasEvent] = useState(null);
   // "Feature Now": the event chooser, and the intent to go straight to the
   // package picker + Stripe once the event being submitted is saved.
   const [chooserOpen, setChooserOpen] = useState(false);
@@ -137,6 +140,15 @@ const AccountEvents = () => {
     const t = setTimeout(() => fetchMyEvents({ silent: true }), 3000);
     return () => clearTimeout(t);
   }, [searchParams, setSearchParams, fetchMyEvents]);
+
+  // Back from Stripe after paying for a promotion extra.
+  useEffect(() => {
+    if (searchParams.get('extra') !== 'success') return;
+    toast.success('Payment received. Your extra is booked, and we\'ll be in touch before the show.');
+    const next = new URLSearchParams(searchParams);
+    next.delete('extra');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // `?feature=1` ("Feature Now" on /list-your-event; a signed-out visitor
   // signs in first and lands back here): ask which of their events to
@@ -301,6 +313,11 @@ const AccountEvents = () => {
           {featureEligibility(event, today).ok && (
             <Button size="sm" className="rounded-xl gap-1.5 font-bold" onClick={() => setFeatureEvent(event)} aria-label={`Feature ${event.title}`}>
               <Star className="w-3.5 h-3.5" aria-hidden="true" /> Feature
+            </Button>
+          )}
+          {canBuyExtras(event, today) && (
+            <Button variant="outline" size="sm" className="rounded-xl gap-1.5" onClick={() => setExtrasEvent(event)} aria-label={`Promote ${event.title}`}>
+              <Megaphone className="w-3.5 h-3.5" aria-hidden="true" /> Promote
             </Button>
           )}
           {(event.status === 'approved' || event.status === 'completed') && (
@@ -488,6 +505,8 @@ const AccountEvents = () => {
         startInPack={featurePack}
         onClose={() => { setFeatureEvent(null); setFeaturePack(false); }}
       />
+
+      <EventExtrasDialog event={extrasEvent} onClose={() => setExtrasEvent(null)} />
 
       <FeatureEventChooser
         open={chooserOpen}

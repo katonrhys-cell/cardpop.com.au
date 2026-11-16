@@ -162,6 +162,7 @@ begin
       new.is_featured := exists (
         select 1 from public.event_feature_purchases p
          where p.event_id = new.id and p.status = 'paid'
+           and p.package in ('spotlight', 'spotlight_instagram', 'full')
       );
     else
       new.membership_featured := false;
@@ -211,6 +212,7 @@ begin
            is_featured = exists (
              select 1 from public.event_feature_purchases p
               where p.event_id = e.id and p.status = 'paid'
+                and p.package in ('spotlight', 'spotlight_instagram', 'full')
            )
      where e.organiser_id = new.id
        and e.membership_featured;
