@@ -160,7 +160,7 @@ export default function EventOrganiserPage() {
           ) : (
             <div className="flex flex-col sm:flex-row sm:items-center gap-6">
               <OrganiserLogos org={org} />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Event organiser</p>
                 <h1 className={`font-serif font-extrabold text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`}>{name}</h1>
                 {(links.length > 0 || canEdit) && (
@@ -189,7 +189,7 @@ export default function EventOrganiserPage() {
                     : `${upcoming.length} upcoming · ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop`}
                 </p>
                 {org.description && (
-                  <p className="text-sm md:text-base text-foreground/80 mt-4 max-w-2xl whitespace-pre-line">{org.description}</p>
+                  <p className="text-sm md:text-base text-foreground/80 mt-4 whitespace-pre-line">{org.description}</p>
                 )}
               </div>
             </div>
