@@ -17,5 +17,14 @@ export const adminEventPath = (id) => (id ? `/admin/events?edit=${enc(id)}` : nu
 /** Marketplace listing → Admin → All Listings, listing dialog open. */
 export const adminListingPath = (id) => (id ? `/admin/all-listings?listing=${enc(id)}` : null);
 
+/** Blog article → Admin → Content, article editor open. */
+export const adminArticlePath = (id) => (id ? `/admin/content?edit=${enc(id)}` : null);
+
+/** Event review (a blog article with a scorecard) → its own full-page editor. */
+export const adminEventReviewPath = (reviewId) => (reviewId ? `/admin/event-reviews/${enc(reviewId)}` : null);
+
+/** Player → Admin → Players, player form open. */
+export const adminPlayerPath = (id) => (id ? `/admin/players?edit=${enc(id)}` : null);
+
 /** Card shop → Admin → Store Directory, store editor open. */
 export const adminStorePath = (slug) => (slug ? `/admin/store-directory?edit=${enc(slug)}` : null);

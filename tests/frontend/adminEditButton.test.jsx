@@ -10,6 +10,7 @@ import AdminEditButton from '@/components/AdminEditButton.jsx';
 import { setAdminEditTarget, useAdminEditTarget } from '@/lib/adminEditTarget.js';
 import {
   adminShopProductPath, adminEventPath, adminListingPath, adminStorePath,
+  adminArticlePath, adminEventReviewPath, adminPlayerPath,
 } from '@/utils/adminEditLinks.js';
 
 // A stand-in for a public page that registers what it shows.
@@ -37,12 +38,18 @@ describe('adminEditLinks', () => {
     expect(adminEventPath('e1')).toBe('/admin/events?edit=e1');
     expect(adminListingPath('l1')).toBe('/admin/all-listings?listing=l1');
     expect(adminStorePath('the shop')).toBe('/admin/store-directory?edit=the%20shop');
+    expect(adminArticlePath('a1')).toBe('/admin/content?edit=a1');
+    expect(adminEventReviewPath('r1')).toBe('/admin/event-reviews/r1');
+    expect(adminPlayerPath('p1')).toBe('/admin/players?edit=p1');
   });
 
   it('returns null without an id so nothing is registered', () => {
     expect(adminShopProductPath(undefined)).toBeNull();
     expect(adminEventPath(null)).toBeNull();
     expect(adminListingPath('')).toBeNull();
+    expect(adminArticlePath(undefined)).toBeNull();
+    expect(adminEventReviewPath(null)).toBeNull();
+    expect(adminPlayerPath('')).toBeNull();
   });
 });
 
