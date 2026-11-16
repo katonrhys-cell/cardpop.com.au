@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
-import { ArrowLeft, CalendarDays } from 'lucide-react';
+import { ArrowLeft, CalendarDays, ChevronRight } from 'lucide-react';
 import EventDetailCard from '@/components/EventDetailCard.jsx';
 import EventInfoBoard from '@/components/events/EventInfoBoard.jsx';
 import EventDiscussion from '@/components/events/EventDiscussion.jsx';
@@ -66,12 +66,43 @@ const EventDetailPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col bg-background font-sans min-h-screen">
-        <div className="flex-1 container-default py-12 w-full space-y-6">
-          <Skeleton className="h-10 w-44 rounded-xl" />
-          <Skeleton className="h-96 w-full rounded-3xl" />
-          <Skeleton className="h-6 w-2/3" />
-          <Skeleton className="h-6 w-1/2" />
+      // The same frame the loaded page has — the real Back link and the start
+      // of the breadcrumb, then the card with its poster area and title block
+      // at their real sizes — so only the poster and text fill in. It used to
+      // be four loose bars at different paddings, and the whole page
+      // rearranged when the event arrived.
+      <div className="flex flex-col bg-background font-sans min-h-screen" aria-busy="true">
+        <div className="flex-1 container-default py-4 md:py-12 w-full">
+          <Button
+            variant="ghost"
+            asChild
+            className="mb-1 md:mb-8 -ml-4 text-muted-foreground hover:bg-card hover:text-primary transition-colors rounded-xl"
+          >
+            <Link to="/events">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Calendar
+            </Link>
+          </Button>
+          <div className="w-full">
+            <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-3 md:mb-6 font-medium">
+              <Link to="/" className="hover:text-primary transition-colors">Home</Link>
+              <ChevronRight className="w-4 h-4" />
+              <Link to="/events" className="hover:text-primary transition-colors">Events</Link>
+              <ChevronRight className="w-4 h-4" />
+              <Skeleton className="h-4 w-48" />
+            </nav>
+            <div className="bg-card rounded-3xl overflow-hidden border border-border shadow-lg" aria-hidden="true">
+              <div className="w-full h-64 md:h-96 lg:h-[450px] bg-muted animate-pulse" />
+              <div className="px-5 pt-5 pb-8 md:px-10 md:pt-8 md:pb-10">
+                <Skeleton className="h-8 w-32 rounded-full" />
+                <Skeleton className="h-8 md:h-12 lg:h-[60px] w-3/4 mt-4" />
+                <div className="mt-8 space-y-3">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-2/3" />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );

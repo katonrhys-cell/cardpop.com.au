@@ -29,6 +29,7 @@ import {
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import RookieJerseyIcon from '@/components/icons/RookieJerseyIcon.jsx';
 import { toast } from 'sonner';
+import { ProductCardSkeletons } from '@/components/ProductCardSkeleton.jsx';
 
 // Sentinel for the "Any …" option in each dropdown — Radix Select can't use ''
 const ANY = '__any__';
@@ -1154,14 +1155,7 @@ const MarketplacePage = () => {
           // screen, dimmed, until the new rows land — swapping it for eight
           // skeletons collapsed the page and flashed every card.
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array(8).fill(0).map((_, i) => (
-              <div key={i} className="flex flex-col space-y-4 bg-card border border-border rounded-2xl p-4">
-                <Skeleton className="aspect-[4/5] w-full rounded-xl" />
-                <Skeleton className="h-5 w-1/3 rounded-md" />
-                <Skeleton className="h-6 w-3/4 rounded-md" />
-                <Skeleton className="h-10 w-full rounded-xl mt-auto" />
-              </div>
-            ))}
+            <ProductCardSkeletons count={8} />
           </div>
         ) : listings.length > 0 ? (
           <>

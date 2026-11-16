@@ -1,6 +1,7 @@
 import React from 'react';
 import ProductCard from './ProductCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ProductCardSkeletons } from '@/components/ProductCardSkeleton.jsx';
 
 const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
   // Matches the responsive product grid used on the main Shop and Marketplace
@@ -15,14 +16,7 @@ const ProductGrid = ({ items, loading, isVault = true, onAddToCart }) => {
   if (loading && !items?.length) {
     return (
       <div className={gridClass}>
-        {[...Array(8)].map((_, i) => (
-          <div key={i} className="flex flex-col gap-3 rounded-2xl border border-border p-4 h-[350px]">
-            <Skeleton className="w-full h-48 rounded-xl" />
-            <Skeleton className="w-3/4 h-5 mt-2" />
-            <Skeleton className="w-1/2 h-4" />
-            <Skeleton className="w-1/3 h-6 mt-auto" />
-          </div>
-        ))}
+        <ProductCardSkeletons count={8} />
       </div>
     );
   }
