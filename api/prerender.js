@@ -1572,7 +1572,7 @@ const EVENT_FIELDS =
 
 // Organiser links from the event form's Organiser tab (migration
 // 20261029020720_event_organiser_links.sql): one list of outbound profile /
-// application links so a no-JS reader gets the same "Follow the Organiser"
+// application links so a no-JS reader gets the same "Follow this event"
 // block the SPA shows. Every href is escaped; a non-http(s) value is dropped.
 const ORGANISER_LINKS = [
   ['instagram_url', 'Instagram'],
@@ -1588,7 +1588,7 @@ const organiserLinksHtml = (event) => {
     .map(([key, label]) => [typeof event[key] === 'string' ? event[key].trim() : '', label])
     .filter(([url]) => /^https?:\/\//i.test(url));
   if (!links.length) return '';
-  return `<section><h2>Follow the Organiser</h2><ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul></section>`;
+  return `<section><h2>Follow this event</h2><ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul></section>`;
 };
 
 // Sold-out status + waitlist link (events.tickets_sold_out / waitlist_url).

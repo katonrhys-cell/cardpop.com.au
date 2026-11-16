@@ -65,6 +65,18 @@ const EventDetailCard = ({ event, isPast = false }) => {
   const ticketLink = ticketDestination(event, ticketOffer);
   const countTicketClick = () => { if (ticketOffer) recordEventTicketClick(event.id); };
 
+  // This event's own links (the event form's Organiser tab) as icon-only
+  // buttons. The organiser's own profile links live on their organiser page.
+  const followLinks = [
+    { key: 'instagram', label: 'Instagram', url: event.instagram_url, Icon: Instagram, iconClass: 'text-pink-600' },
+    { key: 'facebook', label: 'Facebook', url: event.facebook_url, Icon: Facebook, iconClass: 'text-blue-600' },
+    { key: 'youtube', label: 'YouTube', url: event.youtube_channel_url, Icon: Youtube, iconClass: 'text-red-600' },
+    { key: 'tiktok', label: 'TikTok', url: event.tiktok_url, Icon: Music2, iconClass: '' },
+    { key: 'x', label: 'X', url: event.x_url, Icon: XIcon, iconClass: '' },
+    { key: 'discord', label: 'Discord', url: event.discord_url, Icon: MessageCircle, iconClass: 'text-indigo-500' },
+    { key: 'website', label: 'Event website', url: event.website_url, Icon: Globe, iconClass: 'text-primary' },
+  ].filter((l) => l.url);
+
   const handleShare = (platform) => {
     const url = encodeURIComponent(window.location.href);
     const text = encodeURIComponent(`Check out ${event.name}!`);
@@ -385,59 +397,17 @@ const EventDetailCard = ({ event, isPast = false }) => {
             </div>
             )}
 
-            {(event.instagram_url || event.facebook_url || event.youtube_channel_url || event.tiktok_url || event.x_url || event.discord_url || event.website_url) && (
+            {followLinks.length > 0 && (
               <div className="pt-6 border-t border-border">
-                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Follow the Organiser</p>
-                <div className="flex flex-col gap-2">
-                  {event.instagram_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.instagram_url} target="_blank" rel="noopener noreferrer">
-                        <Instagram className="w-4 h-4 mr-2 text-pink-600" /> Instagram
+                <p className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-3">Follow this event</p>
+                <div className="flex flex-wrap gap-2">
+                  {followLinks.map(({ key, label, url, Icon, iconClass }) => (
+                    <Button key={key} variant="outline" size="icon" className="rounded-full w-10 h-10 border-border hover:bg-muted" asChild>
+                      <a href={url} target="_blank" rel="noopener noreferrer" aria-label={label} title={label}>
+                        <Icon className={`w-4 h-4 ${iconClass}`} />
                       </a>
                     </Button>
-                  )}
-                  {event.facebook_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.facebook_url} target="_blank" rel="noopener noreferrer">
-                        <Facebook className="w-4 h-4 mr-2 text-blue-600" /> Facebook
-                      </a>
-                    </Button>
-                  )}
-                  {event.youtube_channel_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.youtube_channel_url} target="_blank" rel="noopener noreferrer">
-                        <Youtube className="w-4 h-4 mr-2 text-red-600" /> YouTube
-                      </a>
-                    </Button>
-                  )}
-                  {event.tiktok_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.tiktok_url} target="_blank" rel="noopener noreferrer">
-                        <Music2 className="w-4 h-4 mr-2" /> TikTok
-                      </a>
-                    </Button>
-                  )}
-                  {event.x_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.x_url} target="_blank" rel="noopener noreferrer">
-                        <XIcon className="w-4 h-4 mr-2" /> X
-                      </a>
-                    </Button>
-                  )}
-                  {event.discord_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.discord_url} target="_blank" rel="noopener noreferrer">
-                        <MessageCircle className="w-4 h-4 mr-2 text-indigo-500" /> Discord
-                      </a>
-                    </Button>
-                  )}
-                  {event.website_url && (
-                    <Button variant="outline" className="w-full justify-start h-11 border-border hover:bg-muted font-semibold" asChild>
-                      <a href={event.website_url} target="_blank" rel="noopener noreferrer">
-                        <Globe className="w-4 h-4 mr-2 text-primary" /> Official Website
-                      </a>
-                    </Button>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
