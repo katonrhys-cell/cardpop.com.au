@@ -54,6 +54,16 @@ describe('featured packages', () => {
     expect(featureEligibility(null, TODAY).ok).toBe(false);
   });
 
+  it('does not sell featuring for an event the Ultimate membership already spotlights', () => {
+    const ev = { status: 'approved', start_date: '2026-11-20', is_featured: true, membership_featured: true };
+    expect(featureEligibility(ev, TODAY)).toEqual({
+      ok: false, reason: 'Calendar Spotlight is already included with your Ultimate membership.',
+    });
+    // A paid or admin-pinned featuring keeps the ordinary message.
+    expect(featureEligibility({ ...ev, membership_featured: false }, TODAY).reason).toBe('This event is already featured.');
+    expect(featureEligibility(ev, TODAY, { paid: true }).reason).toBe('This event is already featured.');
+  });
+
   it('dates bookings in Sydney time', () => {
     // 14:00 UTC on 10 Nov is 01:00 on 11 Nov in Sydney (AEDT).
     expect(todayInAustralia(new Date('2026-11-10T14:00:00Z'))).toBe('2026-11-11');
