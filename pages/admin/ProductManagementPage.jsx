@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Search, Plus, Save, DollarSign, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload, ExternalLink } from 'lucide-react';
+import { Search, Plus, Save, DollarSign, Filter, MoreHorizontal, Edit, Trash2, AlertCircle, RefreshCcw, Package, ChevronLeft, BarChart3, ArrowUp, ArrowDown, ArrowUpDown, X, LayoutList, Rows3, ChevronRight, ChevronsDownUp, ChevronsUpDown, FolderTree, Upload, ExternalLink, ImageOff } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import BulkProductImport from '@/components/admin/BulkProductImport.jsx';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
+import { cardThumbUrl } from '@/utils/imageUrl.js';
 import { variantKind } from '@/utils/shopVariants.js';
 import {
   SECTION_NAMES, filterProducts, sortProducts, groupProducts, categoryOptions, brandOptions,
@@ -318,19 +319,44 @@ const ProductManagementPage = () => {
   const renderRow = (product) => (
     <TableRow key={product.id}>
       <TableCell className="font-bold text-foreground">
-        {/* The name opens the product's public page in a new tab — the same
-            canonical URL shoppers use (utils/shopProductUrl.js), so a draft
-            or archived row shows the admin exactly what the shop would. */}
-        <a
-          href={shopProductPath(product)}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Open product page in a new tab"
-          className="inline-flex items-center gap-1.5 hover:text-primary hover:underline underline-offset-2"
-        >
-          {product.title}
-          <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-        </a>
+        <div className="flex items-center gap-2.5">
+          {/* Photo indicator: a small thumbnail when at least one photo is
+              uploaded, a red "no photo" icon when there is none, so a product
+              missing its picture stands out while scanning the list. */}
+          {(() => {
+            const firstImage = Array.isArray(product.images) ? product.images.find(Boolean) : null;
+            const thumb = firstImage ? cardThumbUrl(firstImage) : null;
+            return thumb ? (
+              <img
+                src={thumb}
+                alt=""
+                loading="lazy"
+                title={`${product.images.filter(Boolean).length} photo(s) uploaded`}
+                className="h-8 w-8 shrink-0 rounded border border-border bg-muted object-cover"
+              />
+            ) : (
+              <span
+                title="No photo uploaded"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded border border-dashed border-destructive/40 bg-destructive/5 text-destructive"
+              >
+                <ImageOff className="h-4 w-4" aria-label="No photo uploaded" />
+              </span>
+            );
+          })()}
+          {/* The name opens the product's public page in a new tab — the same
+              canonical URL shoppers use (utils/shopProductUrl.js), so a draft
+              or archived row shows the admin exactly what the shop would. */}
+          <a
+            href={shopProductPath(product)}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open product page in a new tab"
+            className="inline-flex items-center gap-1.5 hover:text-primary hover:underline underline-offset-2"
+          >
+            {product.title}
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </a>
+        </div>
       </TableCell>
       <TableCell className="font-mono text-xs text-muted-foreground">
         {product.sku || <span className="text-destructive">missing</span>}
