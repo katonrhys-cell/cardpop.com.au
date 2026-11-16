@@ -12,7 +12,8 @@ import { OrganiserReachSection, useOrganiserStats } from '@/components/events/Or
 import {
   LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_PATH, LIST_EVENT_SEO,
   LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH,
-  LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE,
+  LIST_EVENT_FEATURED_PACKAGES, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE, FEATURED_MEMBERSHIP_NOTE,
+  LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, EXTRAS_ENQUIRY_MAILTO,
 } from '@/data/listYourEvent.js';
 
 const TIER_ICONS = { listing: CalendarPlus, offer: Ticket, featured: Megaphone };
@@ -115,10 +116,10 @@ const ListYourEventPage = () => {
         {/* Featured Placement packages — prices from utils/featuredPackages.js */}
         <section id="featured-packages" aria-labelledby="featured-packages-heading" className="scroll-mt-8">
           <h2 id="featured-packages-heading" className="mb-2 text-center font-serif text-2xl font-bold sm:text-3xl">
-            Featured Placement packages
+            Featured Placement
           </h2>
           <p className="mx-auto mb-6 max-w-xl text-center text-sm text-muted-foreground">{FEATURED_EARLY_BIRD_NOTE}</p>
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="mx-auto grid max-w-md gap-4">
             {LIST_EVENT_FEATURED_PACKAGES.map((pkg) => (
               <div
                 key={pkg.key}
@@ -148,6 +149,52 @@ const ListYourEventPage = () => {
             ))}
           </div>
           <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted-foreground">{FEATURED_BUNDLE_NOTE}</p>
+          <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-muted-foreground">
+            {FEATURED_MEMBERSHIP_NOTE}{' '}
+            <Link to="/pricing" className="font-semibold text-primary hover:underline">See membership</Link>
+          </p>
+        </section>
+
+        {/* Promotion extras — separate from featuring and membership */}
+        <section id="event-extras" aria-labelledby="event-extras-heading" className="scroll-mt-8">
+          <h2 id="event-extras-heading" className="mb-2 text-center font-serif text-2xl font-bold sm:text-3xl">
+            Promotion extras
+          </h2>
+          <p className="mx-auto mb-6 max-w-xl text-center text-sm text-muted-foreground">{EXTRAS_NOTE}</p>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {LIST_EVENT_EXTRAS.map((extra) => (
+              <div
+                key={extra.key}
+                className={`flex flex-col rounded-3xl border bg-card p-6 ${extra.highlight ? 'border-primary shadow-md' : 'border-border'}`}
+              >
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h3 className="text-lg font-bold">{extra.name}</h3>
+                  <span className="text-2xl font-bold tabular-nums">{extra.price}</span>
+                </div>
+                <ul className="mb-4 space-y-2 text-sm">
+                  {extra.points.map((p) => (
+                    <li key={p} className="flex gap-2">
+                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
+                      <span>{p}</span>
+                    </li>
+                  ))}
+                </ul>
+                {extra.terms.length > 0 && (
+                  <p className="mb-4 text-xs font-medium text-foreground">Conditions: {extra.terms.join('. ')}.</p>
+                )}
+                <Link
+                  to={SUBMIT_EVENT_PATH}
+                  className={`mt-auto inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-bold transition-opacity hover:opacity-90 ${extra.highlight ? 'bg-primary text-primary-foreground' : 'border border-border bg-background'}`}
+                >
+                  Add in My Events <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            ))}
+          </div>
+          <p className="mx-auto mt-6 max-w-2xl text-center text-sm text-muted-foreground">
+            {EXTRAS_ENQUIRY_NOTE}{' '}
+            <a href={EXTRAS_ENQUIRY_MAILTO} className="font-semibold text-primary hover:underline">Email us</a>
+          </p>
         </section>
 
         {/* How it works */}

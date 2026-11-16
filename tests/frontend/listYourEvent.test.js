@@ -2,8 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   LIST_EVENT_TIERS, LIST_EVENT_FAQS, LIST_EVENT_STEPS, MEMBER_OFFER_MAILTO, FEATURED_MAILTO,
   ORGANISER_EMAIL, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES,
+  LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, EXTRAS_ENQUIRY_MAILTO, FEATURED_MEMBERSHIP_NOTE,
+  FEATURED_BUNDLE_NOTE, FEATURED_EARLY_BIRD_NOTE,
 } from '@/data/listYourEvent.js';
-import { FEATURED_PACKAGES } from '@/utils/featuredPackages.js';
+import { FEATURED_PACKAGES, EVENT_EXTRAS, EXTRAS_ENQUIRY_EMAIL, BUNDLE } from '@/utils/featuredPackages.js';
+import { TIER_PRICES_AUD } from '@/config/subscription.js';
 import { buildOrganiserStats } from '@/components/events/OrganiserReach.jsx';
 
 const fresh = new Date().toISOString();
@@ -25,12 +28,56 @@ describe('organiser landing copy', () => {
     }
   });
 
-  it('never claims an audience figure, and only quotes the featuring prices', () => {
-    const text = JSON.stringify([LIST_EVENT_TIERS, LIST_EVENT_FAQS, LIST_EVENT_STEPS]);
+  it('never claims an audience figure, and only quotes prices from the tables the server charges from', () => {
+    const text = JSON.stringify([
+      LIST_EVENT_TIERS, LIST_EVENT_FAQS, LIST_EVENT_STEPS, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE,
+      FEATURED_MEMBERSHIP_NOTE, FEATURED_BUNDLE_NOTE, FEATURED_EARLY_BIRD_NOTE,
+    ]);
     expect(text).not.toMatch(/\d[\d,]{3,}\s*(visitors|collectors|members|pageviews|views)/i);
-    // Every dollar figure is one of the featuring package prices (utils/featuredPackages.js).
-    const allowed = new Set(FEATURED_PACKAGES.map((p) => `$${p.priceAud}`));
-    for (const price of text.match(/\$\d[\d.]*/g) || []) expect(allowed.has(price)).toBe(true);
+    // Every dollar figure is Calendar Spotlight, its 3-event pack, an extra
+    // (utils/featuredPackages.js) or the Ultimate membership (config/subscription.js).
+    const allowed = new Set([
+      ...FEATURED_PACKAGES.map((p) => `$${p.priceAud}`),
+      ...Object.values(BUNDLE.priceAud).map((aud) => `$${aud}`),
+      ...EVENT_EXTRAS.map((x) => `$${x.priceAud}`),
+      `$${TIER_PRICES_AUD.ultimate}`,
+    ]);
+    const prices = text.match(/\$\d[\d.]*/g) || [];
+    expect(prices.length).toBeGreaterThan(0);
+    // A price that ends a sentence carries its full stop in the match.
+    for (const price of prices) expect(allowed.has(price.replace(/\.$/, ''))).toBe(true);
+  });
+
+  it('lists the three promotion extras at the prices the server charges', () => {
+    expect(LIST_EVENT_EXTRAS.map((x) => [x.key, x.name, x.price])).toEqual(
+      EVENT_EXTRAS.map((x) => [x.key, x.name, `$${x.priceAud}`]),
+    );
+    expect(LIST_EVENT_EXTRAS.map((x) => x.price)).toEqual(['$49', '$99', '$199']);
+    const review = LIST_EVENT_EXTRAS.find((x) => x.key === 'review');
+    expect(review.terms.join(' | ')).toMatch(/free entry/i);
+    expect(review.terms.join(' | ')).toMatch(/on the day/i);
+    for (const x of LIST_EVENT_EXTRAS) expect(x.points.length).toBeGreaterThan(0);
+  });
+
+  it('keeps extras separate from featuring and membership, and points further enquiries to email', () => {
+    expect(EXTRAS_NOTE).toMatch(/separate from featured placement and from membership/);
+    expect(EXTRAS_ENQUIRY_NOTE).toContain(EXTRAS_ENQUIRY_EMAIL);
+    expect(EXTRAS_ENQUIRY_MAILTO.startsWith(`mailto:${EXTRAS_ENQUIRY_EMAIL}?subject=`)).toBe(true);
+    expect(EXTRAS_ENQUIRY_MAILTO).not.toMatch(/ /);
+    // Featuring no longer promises Instagram or a homepage spot.
+    const featured = LIST_EVENT_TIERS.find((t) => t.key === 'featured');
+    expect(JSON.stringify([featured, LIST_EVENT_FEATURED_PACKAGES])).not.toMatch(/instagram|homepage/i);
+    const faq = LIST_EVENT_FAQS.find((f) => /Instagram/.test(f.q));
+    expect(faq.a).toContain('Instagram story $49, Instagram post $99, Full event review $199');
+    expect(faq.a).toContain(EXTRAS_ENQUIRY_EMAIL);
+    expect(faq.a).toMatch(/free entry/);
+  });
+
+  it('offers the Ultimate membership as the way to feature every show', () => {
+    expect(FEATURED_MEMBERSHIP_NOTE).toContain(`$${TIER_PRICES_AUD.ultimate} a year`);
+    expect(FEATURED_MEMBERSHIP_NOTE).toMatch(/features every event you run/);
+    expect(FEATURED_BUNDLE_NOTE).toContain('Calendar Spotlight $119');
+    expect(FEATURED_BUNDLE_NOTE).not.toMatch(/Instagram|Full Feature/);
   });
 
   it('lists every featuring package at the price the server charges', () => {

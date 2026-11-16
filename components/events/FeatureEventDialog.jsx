@@ -12,8 +12,9 @@ import {
 } from '@/utils/featuredPackages.js';
 import { formatEventDates } from '@/utils/eventPicker.js';
 
-// Account → My Events → Feature: pick a Featured Placement package and pay on
-// Stripe. The price shown is the same calculation the server charges
+// Account → My Events → Feature: buy Featured Placement (Calendar Spotlight)
+// and pay on Stripe. Instagram and the event review are the separate promotion
+// extras (EventExtrasDialog), not featuring packages. The price shown is the same calculation the server charges
 // (utils/featuredPackages.js); the server re-prices it, never trusting this.
 //
 // `featurable` is every event of the organiser's that can be featured right
@@ -23,7 +24,7 @@ import { formatEventDates } from '@/utils/eventPicker.js';
 const bySoonest = (a, b) => String(a.start_date || '').localeCompare(String(b.start_date || ''));
 
 const FeatureEventDialog = ({ event, featurable = [], startInPack = false, onClose }) => {
-  const [selected, setSelected] = useState('spotlight_instagram');
+  const [selected, setSelected] = useState(FEATURED_PACKAGES[0].key);
   const [submitting, setSubmitting] = useState(false);
   const [pack, setPack] = useState(false);
   const [packIds, setPackIds] = useState([]);
@@ -216,6 +217,8 @@ const FeatureEventDialog = ({ event, featurable = [], startInPack = false, onClo
 
         <p className="text-xs text-muted-foreground">
           Featuring switches on as soon as payment goes through and lasts until your show ends.
+          It is included for every event with an Ultimate membership. Instagram and event reviews
+          are separate extras: press Promote next to your event.
           {(pack ? packEvents.some((e) => e.status === 'pending_review') : event?.status === 'pending_review')
             && ' An event still being reviewed appears on the calendar, featured, once it\'s approved.'}
         </p>

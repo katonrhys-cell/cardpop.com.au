@@ -1,54 +1,70 @@
 /**
- * CardPop membership subscription / free-trial configuration — single source
- * of truth for billing.
+ * CardPop membership configuration — single source of truth for billing.
  *
- * There are four paid tiers (see `config/plans.js` for the full feature
- * matrix): Pro, Premium, Elite and Ultimate. Every paid tier is billed
- * monthly through the same Stripe/PayPal subscription machinery; which tier a
- * member is on is decided by WHICH price/plan their subscription bills
- * against (see the ENV map below). Change the trial length, toggle whether a
- * card is required to start, or adjust pricing here and both the frontend and
- * backend pick it up. This file is intentionally dependency-free so it can be
- * imported from the React SPA (via the `@/` alias) and from the Express
+ * There are two paid plans (see `config/plans.js` for the feature matrix):
+ *
+ *   • Pro      — $99 a year.  Vendors and avid traders.
+ *   • Ultimate — $199 a year. Show organisers (Calendar Spotlight on every
+ *                event they run) and unlimited-volume sellers.
+ *
+ * Both are yearly, auto-renewing Stripe subscriptions charged IN FULL AT
+ * SIGN-UP — there is no free trial. The price is flat and GST-inclusive: the
+ * member pays exactly $99 / $199 and nothing is added on top. Which plan a
+ * member is on is decided by WHICH price their subscription bills against
+ * (see the ENV map below). This file is intentionally dependency-free so it
+ * can be imported from the React SPA (via the `@/` alias) and from the Express
  * backend (via a relative path).
+ *
+ * History: until 2026-11 there were four monthly tiers (Pro $20, Premium $40,
+ * Elite $80, Ultimate $150) with a 30-day trial. Premium was folded into Pro
+ * and Elite into Ultimate — `canonicalTier()` maps the retired names, and the
+ * server refuses to bill any configured price that is not the advertised
+ * yearly amount, so a leftover monthly price id can never be charged.
  *
  * IMPORTANT: the paid subscription does not gate *selling* outright. Any
  * ID-verified account (Hobby included) may list and sell — the DB `can_sell()`
  * gate keys off identity verification, not the subscription. What the paid
- * tiers change is the monthly listing allowance, the storefront and the
- * display-style ladder (see `config/plans.js`).
+ * plans change is the monthly listing allowance, the storefront, the
+ * display-style ladder and (Ultimate) event featuring.
  *
  * NOTE: Stripe/PayPal identifiers (price ids, plan ids, secrets) live in
  * environment variables — never hard-code them here. See the ENV map below.
  */
 
-/** Length of the paid-tier free trial, in days. Change this to change the offer. */
-export const TRIAL_DAYS = 30;
-
 /**
- * When true, upgrading to a paid tier captures a card / PayPal up front and
- * starts a trialing subscription immediately (no charge until the trial ends).
- * When false, the trial is tracked purely by `trial_ends_at` (no payment method).
+ * Length of a free trial before the first charge, in days. `0` = none: the
+ * member is charged at sign-up. The trial plumbing (Stripe `trialing` status,
+ * `trial_ends_at`) is still understood everywhere, so setting a number here
+ * brings the trial back.
  */
+export const TRIAL_DAYS = 0;
+
+/** A payment method is always collected at sign-up (it is charged there). */
 export const REQUIRE_CARD_AT_SIGNUP = true;
 
 /**
- * The paid tiers in ascending order, and what each bills per month (AUD).
- * These MUST match the recurring prices configured in Stripe / PayPal — the
- * providers charge what their price/plan says, this map is what the UI shows.
+ * The paid plans in ascending order, and what each bills per year (AUD,
+ * GST-inclusive). These MUST match the recurring prices configured in Stripe —
+ * the checkout route refuses (503) a price whose amount or interval differs.
  */
-export const PAID_TIER_ORDER = ['pro', 'premium', 'elite', 'ultimate'];
+export const PAID_TIER_ORDER = ['pro', 'ultimate'];
 export const TIER_PRICES_AUD = {
-  pro: 20,
-  premium: 40,
-  elite: 80,
-  ultimate: 150,
+  pro: 99,
+  ultimate: 199,
 };
+
+/** Retired tier names → the plan that absorbed them. */
+export const LEGACY_TIER_MAP = { premium: 'pro', elite: 'ultimate' };
+
+/** Map a stored / requested tier onto a current one (retired names folded in). */
+export function canonicalTier(tier) {
+  return LEGACY_TIER_MAP[tier] || tier;
+}
 
 /** Back-compat: the entry-level (Pro) price. Prefer TIER_PRICES_AUD[tier]. */
 export const SUBSCRIPTION_PRICE_AUD = TIER_PRICES_AUD.pro;
 export const SUBSCRIPTION_CURRENCY = 'aud';
-export const SUBSCRIPTION_INTERVAL = 'month';
+export const SUBSCRIPTION_INTERVAL = 'year';
 
 /**
  * Payment providers offered for the paid upgrade, in display order.
@@ -61,9 +77,9 @@ export const PAYMENT_PROVIDERS = ['stripe'];
 
 /**
  * What the paid subscription unlocks. Kept here so the meaning of an entitlement
- * is documented in one place: the paid account tiers (higher monthly listing
- * allowances, the storefront on Local Traders, the display-style ladder and the
- * badge). Browsing, buying, selling and community are available to free Hobby
+ * is documented in one place: the paid plans (higher monthly listing
+ * allowances, the storefront on Local Traders, the display-style ladder, the
+ * badge and — on Ultimate — Calendar Spotlight on the member's events). Browsing, buying, selling and community are available to free Hobby
  * accounts (selling requires ID verification, not a paid tier).
  */
 export const GATED_CAPABILITY = 'pro';
@@ -71,46 +87,43 @@ export const GATED_CAPABILITY = 'pro';
 /**
  * Subscription statuses mirrored onto `profiles.subscription_status`.
  * `trialing` and `active` grant the paid tier; everything else denies it.
- * `grandfathered` is a synonym for active used for legacy paid accounts.
+ * `grandfathered` is a complimentary membership (admins, comped accounts).
  */
 export const ENTITLED_STATUSES = ['trialing', 'active', 'grandfathered'];
 
 /**
  * Names of the environment variables the backend reads (documented for setup).
- * Each paid tier bills against its own Stripe price / PayPal plan; the Pro
- * identifiers keep their original un-suffixed names for back-compat. A tier
- * whose price/plan id is unset simply can't be purchased (the checkout route
- * answers 503 for it) — existing subscriptions are unaffected.
+ * Each paid plan bills against its own yearly Stripe price. A plan whose price
+ * id is unset simply can't be purchased (the checkout route answers 503 for
+ * it). Pro reads a new variable; Ultimate keeps the name it always had
+ * (`STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE`), now holding the yearly price.
+ * Reusing a name is safe because resolveMembershipPrice() refuses any price
+ * that isn't the advertised yearly amount. The other three old monthly
+ * variables (`STRIPE_SUBSCRIPTION_PRICE_ID`, `…_PREMIUM`, `…_ELITE`) are no
+ * longer read and can be deleted.
  */
 export const ENV = {
-  // Stripe recurring prices (price_...), one per paid tier.
+  // Stripe yearly recurring prices (price_...), one per paid plan.
   stripePriceIds: {
-    pro: 'STRIPE_SUBSCRIPTION_PRICE_ID',
-    premium: 'STRIPE_SUBSCRIPTION_PRICE_ID_PREMIUM',
-    elite: 'STRIPE_SUBSCRIPTION_PRICE_ID_ELITE',
+    pro: 'STRIPE_MEMBERSHIP_PRICE_ID_PRO',
     ultimate: 'STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE',
   },
-  // Back-compat alias (Pro).
-  stripePriceId: 'STRIPE_SUBSCRIPTION_PRICE_ID',
   // PayPal
   paypalClientId: 'PAYPAL_CLIENT_ID',
   paypalSecret: 'PAYPAL_CLIENT_SECRET',
-  // PayPal billing plans (P-...) with the trial, one per paid tier.
+  // PayPal billing plans (P-...), one per paid plan (PayPal is switched off).
   paypalPlanIds: {
     pro: 'PAYPAL_SUBSCRIPTION_PLAN_ID',
-    premium: 'PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM',
-    elite: 'PAYPAL_SUBSCRIPTION_PLAN_ID_ELITE',
     ultimate: 'PAYPAL_SUBSCRIPTION_PLAN_ID_ULTIMATE',
   },
-  // Back-compat alias (Pro).
-  paypalPlanId: 'PAYPAL_SUBSCRIPTION_PLAN_ID',
   paypalWebhookId: 'PAYPAL_WEBHOOK_ID',
   paypalEnv: 'PAYPAL_ENV',                          // 'sandbox' | 'live'
 };
 
-/** Coerce any requested tier onto a purchasable paid tier (default 'pro'). */
+/** Coerce any requested tier onto a purchasable paid plan (default 'pro'). */
 export function normalizePaidTier(tier) {
-  return PAID_TIER_ORDER.includes(tier) ? tier : 'pro';
+  const canonical = canonicalTier(tier);
+  return PAID_TIER_ORDER.includes(canonical) ? canonical : 'pro';
 }
 
 /** True if a subscription status counts as an entitled (paid) member. */
@@ -123,6 +136,8 @@ export default {
   REQUIRE_CARD_AT_SIGNUP,
   PAID_TIER_ORDER,
   TIER_PRICES_AUD,
+  LEGACY_TIER_MAP,
+  canonicalTier,
   SUBSCRIPTION_PRICE_AUD,
   SUBSCRIPTION_CURRENCY,
   SUBSCRIPTION_INTERVAL,

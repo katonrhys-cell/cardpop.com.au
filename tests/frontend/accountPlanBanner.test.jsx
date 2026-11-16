@@ -44,11 +44,17 @@ describe('AccountPlanBanner', () => {
     setAuth({});
     renderBanner();
     const ladder = screen.getByRole('list', { name: 'Plan options' });
-    ['Hobby', 'Pro', 'Premium', 'Elite', 'Ultimate'].forEach((name) => {
+    ['Hobby', 'Pro', 'Ultimate'].forEach((name) => {
       expect(ladder).toHaveTextContent(name);
     });
-    expect(ladder).toHaveTextContent('$20/mo');
-    expect(ladder).toHaveTextContent('$150/mo');
+    expect(ladder.querySelectorAll('li')).toHaveLength(3);
+    expect(ladder).not.toHaveTextContent('Premium');
+    expect(ladder).not.toHaveTextContent('Elite');
+    // Yearly prices — never the retired monthly ones.
+    expect(ladder).toHaveTextContent('$99/yr');
+    expect(ladder).toHaveTextContent('$199/yr');
+    expect(ladder).not.toHaveTextContent('/mo ');
+    expect(ladder).toHaveTextContent('30 listings/mo');
     expect(ladder).toHaveTextContent('Unlimited listings');
     const current = ladder.querySelector('[aria-current="true"]');
     expect(current).toHaveTextContent('Hobby');
@@ -64,13 +70,19 @@ describe('AccountPlanBanner', () => {
   });
 
   it('names the real tier for a paid member and preselects the next step up', () => {
+    setAuth({ isPro: true, subscriptionTier: 'pro' });
+    renderBanner();
+    expect(screen.getByText('CardPop Pro')).toBeInTheDocument();
+    const ladder = screen.getByRole('list', { name: 'Plan options' });
+    expect(ladder.querySelector('[aria-current="true"]')).toHaveTextContent('Pro');
+    expect(screen.getByRole('link', { name: /upgrade your plan/i }))
+      .toHaveAttribute('href', '/account/membership?tier=ultimate');
+  });
+
+  it('shows a member still stored on a retired tier the plan that absorbed it', () => {
     setAuth({ isPro: true, subscriptionTier: 'premium' });
     renderBanner();
-    expect(screen.getByText('CardPop Premium')).toBeInTheDocument();
-    const ladder = screen.getByRole('list', { name: 'Plan options' });
-    expect(ladder.querySelector('[aria-current="true"]')).toHaveTextContent('Premium');
-    expect(screen.getByRole('link', { name: /upgrade your plan/i }))
-      .toHaveAttribute('href', '/account/membership?tier=elite');
+    expect(screen.getByText('CardPop Pro')).toBeInTheDocument();
   });
 
   it('hides the upgrade button on the top plan', () => {
@@ -84,8 +96,8 @@ describe('AccountPlanBanner', () => {
   });
 
   // Every admin holds Ultimate free (subscription_status 'grandfathered'): the
-  // card says it is included rather than quoting the $150/mo they never pay.
-  it('tells an admin their Ultimate plan is complimentary, not $150/mo', () => {
+  // card says it is included rather than quoting the $199/yr they never pay.
+  it('tells an admin their Ultimate plan is complimentary, not $199/yr', () => {
     setAuth({ isPro: true, isAdmin: true, subscriptionTier: 'ultimate', subscriptionStatus: 'grandfathered' });
     renderBanner();
     expect(screen.getByText('CardPop Ultimate')).toBeInTheDocument();
@@ -93,7 +105,7 @@ describe('AccountPlanBanner', () => {
     expect(screen.getByText(/included with your admin access/i)).toBeInTheDocument();
     const current = screen.getByRole('list', { name: 'Plan options' }).querySelector('[aria-current="true"]');
     expect(current).toHaveTextContent('Included free');
-    expect(current).not.toHaveTextContent('$150/mo');
+    expect(current).not.toHaveTextContent('$199/yr');
     expect(screen.queryByRole('link', { name: /upgrade your plan/i })).toBeNull();
   });
 

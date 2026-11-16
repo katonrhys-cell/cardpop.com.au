@@ -4,7 +4,7 @@ import logger from '../utils/logger.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { requireAdmin, requireAal2 } from '../middleware/requireAal2.js';
 import { invalidReturnUrl } from '../utils/returnUrl.js';
-import { createFeatureCheckout, createFeatureBundleCheckout, FeatureCheckoutError } from '../services/eventFeatureService.js';
+import { createFeatureCheckout, createFeatureBundleCheckout, createExtraCheckout, FeatureCheckoutError } from '../services/eventFeatureService.js';
 import {
   FEATURED_PACKAGES, EARLY_BIRD, featureEligibility, featuredQuote, formatAud, todayInAustralia,
 } from '../../utils/featuredPackages.js';
@@ -381,6 +381,32 @@ router.post('/feature-bundle-checkout', authMiddleware, requireAal2, async (req,
     if (err instanceof FeatureCheckoutError) return res.status(err.status).json({ error: err.message });
     logger.error(`[EVENTS] feature-bundle-checkout failed: ${err.message}`);
     res.status(500).json({ error: 'Could not start checkout. Please try again.' });
+  }
+});
+
+/**
+ * POST /events/:id/extra-checkout  { extra, successUrl, cancelUrl }
+ *
+ * Opens a Stripe Checkout Session for one promotion extra (Instagram story,
+ * Instagram post or event review — EVENT_EXTRAS in utils/featuredPackages.js)
+ * on the caller's own event. Separate from featuring and from membership: any
+ * organiser can buy one, featured or not. Priced server-side; money in, so it
+ * is MFA-gated like the featuring checkout.
+ */
+router.post('/:id/extra-checkout', authMiddleware, requireAal2, async (req, res) => {
+  const { id } = req.params;
+  const { extra: extraKey, successUrl, cancelUrl } = req.body || {};
+  if (!successUrl || !cancelUrl) return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
+  const badUrl = invalidReturnUrl({ successUrl, cancelUrl });
+  if (badUrl) return res.status(400).json({ error: badUrl });
+
+  try {
+    const result = await createExtraCheckout({ user: req.user, eventId: id, extraKey, successUrl, cancelUrl });
+    return res.json({ url: result.url });
+  } catch (err) {
+    if (err instanceof FeatureCheckoutError) return res.status(err.status).json({ error: err.message });
+    logger.error(`[EVENTS] extra-checkout failed for ${id}: ${err.message}`);
+    return res.status(500).json({ error: 'Could not start checkout. Please try again.' });
   }
 });
 

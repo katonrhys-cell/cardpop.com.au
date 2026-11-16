@@ -106,7 +106,7 @@ const SignupPage = () => {
         }).catch(() => {});
       }
 
-      // Issue the welcome offer (unique code → 30-day trial + 10% off first
+      // Issue the welcome offer (unique code → 10% off the first
       // order) — arrives as its own email, separate from verification.
       // Fire-and-forget: never blocks registration.
       if (user?.id) {
@@ -183,17 +183,17 @@ const SignupPage = () => {
                 : ' Clicking it confirms your email and walks you through the next steps — verifying your ID and adding a card — so you\'re ready to buy, sell and trade.'}
             </p>
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">
-              Your account is <span className="text-foreground font-bold">free, forever</span> — buy straight away.
+              Your account is <span className="text-foreground font-bold">free, and always will be</span> — buy straight away.
               To list, sell or trade, verify your <span className="text-foreground font-bold">ID</span> (a quick photo
               of your licence or passport, handled securely by Stripe) and add a{' '}
               <span className="text-foreground font-bold">card on file</span> — it's never charged until a sale or
-              trade completes. Want more monthly listings, your own store page and premium display
-              styles? Upgrade to <span className="text-foreground font-bold">Pro</span> or higher anytime.
+              trade completes. Want more monthly listings, your own store page and more display
+              styles? Join <span className="text-foreground font-bold">Pro</span> ($99 a year) or <span className="text-foreground font-bold">Ultimate</span> ($199 a year) anytime.
             </p>
             <p className="text-sm text-muted-foreground mb-8 leading-relaxed">
               We've also sent your <span className="text-foreground font-bold">welcome code</span> in a separate
               email — it gives you <span className="text-foreground font-bold">10% off your first order</span> at
-              checkout and a free trial if you go Pro.
+              checkout.
             </p>
             <Button asChild className="w-full h-12 font-bold">
               <Link to="/login">Go to Login</Link>

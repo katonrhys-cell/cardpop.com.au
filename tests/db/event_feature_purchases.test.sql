@@ -129,3 +129,50 @@ do $$ begin
   end;
 end $$;
 \echo 'event_feature_bundles: all checks passed'
+
+-- ── Promotion extras (20261116103431) ──────────────────────────────────────
+-- 'Show' (…e1) already has a paid Full Feature; 'Show 2' (…f2) a paid Spotlight.
+do $$
+declare
+  org uuid := '00000000-0000-0000-0000-0000000000b1';
+  show uuid := '00000000-0000-0000-0000-0000000000e1';
+  show2 uuid := '00000000-0000-0000-0000-0000000000f2';
+begin
+  perform set_config('request.jwt.claim.sub', '', false);
+  -- Each extra sits beside a paid featuring, once per event.
+  insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status) values
+    (show, org, 'story', 49, 49, 'paid'),
+    (show, org, 'post', 99, 99, 'paid'),
+    (show, org, 'review', 199, 199, 'paid'),
+    (show2, org, 'story', 49, 49, 'paid');
+  begin
+    insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status)
+    values (show, org, 'story', 49, 49, 'paid');
+    raise exception 'the same extra must not be paid twice for one event';
+  exception when unique_violation then null;
+  end;
+  -- A pending retry of an extra is fine (only one *paid*).
+  insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud)
+  values (show, org, 'story', 49, 49);
+  -- Still one paid featuring per event, whatever extras it carries.
+  begin
+    insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status)
+    values (show2, org, 'spotlight', 49, 49, 'paid');
+    raise exception 'a second paid featuring for one event must still be refused';
+  exception when unique_violation then null;
+  end;
+  begin
+    insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud)
+    values (show, org, 'reel', 1, 1);
+    raise exception 'an unknown extra must be refused';
+  exception when check_violation then null;
+  end;
+end $$;
+
+-- An event with extras but no featuring can still be featured later.
+insert into public.events (id, organiser_id, title, status, start_date) values
+  ('00000000-0000-0000-0000-0000000000f5', '00000000-0000-0000-0000-0000000000b1', 'Show 5', 'approved', '2026-12-24');
+insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status) values
+  ('00000000-0000-0000-0000-0000000000f5', '00000000-0000-0000-0000-0000000000b1', 'post', 99, 99, 'paid'),
+  ('00000000-0000-0000-0000-0000000000f5', '00000000-0000-0000-0000-0000000000b1', 'spotlight', 49, 49, 'paid');
+\echo 'event_promotion_extras: all checks passed'

@@ -17,6 +17,7 @@ const stripeMock = vi.hoisted(() => ({
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
 const mockProfileUpdate = vi.hoisted(() => vi.fn());
 const mockSendTrialEnding = vi.hoisted(() => vi.fn());
+const mockSendRenewal = vi.hoisted(() => vi.fn());
 
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -42,7 +43,10 @@ vi.mock('../../src/services/partnerService.js', () => ({
   validatePartnerCode: vi.fn(),
   recordSubscriptionReferral: vi.fn(),
 }));
-vi.mock('../../src/utils/emailService.js', () => ({ sendMembershipTrialEnding: mockSendTrialEnding }));
+vi.mock('../../src/utils/emailService.js', () => ({
+  sendMembershipTrialEnding: mockSendTrialEnding,
+  sendMembershipRenewalReminder: mockSendRenewal,
+}));
 vi.mock('../../src/utils/paypalClient.js', () => ({
   isPaypalConfigured: vi.fn(() => false),
   createPaypalSubscription: vi.fn(),
@@ -55,6 +59,7 @@ import {
   applyStripeSubscription,
   handleSubscriptionInvoiceFailed,
   sendTrialEndingReminder,
+  sendRenewalReminder,
   invoiceSubscriptionId,
 } from '../../src/services/subscriptionService.js';
 
@@ -265,5 +270,71 @@ describe('trial-ending reminder', () => {
   it('is skipped once the member has cancelled', async () => {
     await sendTrialEndingReminder(sub({ cancel_at_period_end: true }));
     expect(mockSendTrialEnding).not.toHaveBeenCalled();
+  });
+});
+
+// Yearly plans: Stripe's `invoice.upcoming` drives a reminder before each
+// renewal, so a once-a-year charge is never a surprise.
+describe('yearly renewal reminder (invoice.upcoming)', () => {
+  const PERIOD_END = 1_800_000_000;
+  const yearly = (overrides = {}) => sub({
+    status: 'active', trial_end: null,
+    metadata: { userId: 'user-1', tier: 'ultimate' },
+    items: { data: [{ id: 'si_1', current_period_end: PERIOD_END, price: { id: 'price_ultimate', unit_amount: 19900 } }] },
+    ...overrides,
+  });
+  const member = (overrides = {}) => mockMaybeSingle.mockResolvedValue({
+    data: { email: 'm@example.com', display_name: 'Max', subscription_status: 'active', ...overrides }, error: null,
+  });
+
+  it('emails the renewal date, plan and the amount the invoice will take', async () => {
+    member();
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly());
+    await sendRenewalReminder({ subscription: 'sub_1', amount_due: 19900 });
+    expect(stripeMock.subscriptions.retrieve).toHaveBeenCalledWith('sub_1');
+    expect(mockSendRenewal).toHaveBeenCalledWith({
+      to: 'm@example.com', name: 'Max', planName: 'Ultimate', amountAud: 199,
+      chargeDate: new Date(PERIOD_END * 1000).toISOString(),
+    });
+  });
+
+  it('quotes the invoice amount when a downgrade credit reduces the renewal', async () => {
+    member();
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly({ metadata: { userId: 'user-1', tier: 'pro' } }));
+    await sendRenewalReminder({ parent: { subscription_details: { subscription: 'sub_1' } }, amount_due: 4150 });
+    expect(mockSendRenewal).toHaveBeenCalledWith(expect.objectContaining({ planName: 'Pro', amountAud: 41.5 }));
+  });
+
+  it('is skipped once the member has cancelled', async () => {
+    member();
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly({ cancel_at_period_end: true }));
+    await sendRenewalReminder({ subscription: 'sub_1', amount_due: 19900 });
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly({ cancel_at: PERIOD_END }));
+    await sendRenewalReminder({ subscription: 'sub_1', amount_due: 19900 });
+    expect(mockSendRenewal).not.toHaveBeenCalled();
+  });
+
+  it('is skipped for a subscription that is not active (trialing, past due)', async () => {
+    member();
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly({ status: 'trialing' }));
+    await sendRenewalReminder({ subscription: 'sub_1', amount_due: 19900 });
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly({ status: 'past_due' }));
+    await sendRenewalReminder({ subscription: 'sub_1', amount_due: 19900 });
+    expect(mockSendRenewal).not.toHaveBeenCalled();
+  });
+
+  it('is skipped for a complimentary member — they are never billed', async () => {
+    member({ subscription_status: 'grandfathered' });
+    stripeMock.subscriptions.retrieve.mockResolvedValue(yearly());
+    await sendRenewalReminder({ subscription: 'sub_1', amount_due: 19900 });
+    expect(mockSendRenewal).not.toHaveBeenCalled();
+  });
+
+  it('ignores an invoice that is not for a subscription, and one whose subscription is gone', async () => {
+    await sendRenewalReminder({ amount_due: 5000 });
+    expect(stripeMock.subscriptions.retrieve).not.toHaveBeenCalled();
+    stripeMock.subscriptions.retrieve.mockRejectedValue(Object.assign(new Error('No such subscription'), { code: 'resource_missing', statusCode: 404 }));
+    await expect(sendRenewalReminder({ subscription: 'sub_gone', amount_due: 9900 })).resolves.toBeUndefined();
+    expect(mockSendRenewal).not.toHaveBeenCalled();
   });
 });
