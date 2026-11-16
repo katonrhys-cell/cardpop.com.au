@@ -41,6 +41,8 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { trackViewItem } from '@/lib/analytics.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
 import { brandedTitle } from '@/utils/seoTitle.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminShopProductPath } from '@/utils/adminEditLinks.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -68,6 +70,8 @@ const ShopProductPage = () => {
   const { row, family, selectedId, setSelectedId, loading } = useShopLine({
     slug: product?.slug, sku: product?.sku, enabled: validPair,
   });
+  // Admins get an "Edit in admin" shortcut to the colour/product on screen.
+  useAdminEditTarget('Edit product', adminShopProductPath(row?.id));
   // Point-size lines (Top Loaders 35pt…180pt) are separate products; the picker
   // links them. Choosing a size opens its own page without jumping to the top.
   const navigate = useNavigate();

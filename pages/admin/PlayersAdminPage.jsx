@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Pencil, Trash2, RefreshCw, ExternalLink, UsersRound, GripVertical } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
@@ -110,6 +110,28 @@ const PlayersAdminPage = () => {
     const set = new Set([...SPORTS_COLLECTIONS, ...players.map((p) => p.sport).filter(Boolean)]);
     return [...set].sort();
   }, [players]);
+
+  // "Edit player" on a player's public page lands here as ?edit=<id>: open
+  // that player's form, then drop the param so a refresh doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  useEffect(() => {
+    if (!editId) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('players').select(PLAYER_PAGE_COLUMNS).eq('id', editId).maybeSingle();
+      if (cancelled) return;
+      if (error || !data) toast.error('Could not find that player to edit.');
+      else { setForm(toForm(data)); setErrors({}); setEditing(data); }
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [editId, setSearchParams]);
 
   const openNew = () => { setForm(EMPTY); setErrors({}); setEditing('new'); };
   const openEdit = (p) => { setForm(toForm(p)); setErrors({}); setEditing(p); };

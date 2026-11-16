@@ -35,6 +35,8 @@ import { usePlatformSettings } from '@/contexts/PlatformSettingsContext.jsx';
 import { trackViewItem } from '@/lib/analytics.js';
 import { getCardImage, toCdnUrl } from '@/utils/imageUrl.js';
 import BuyerProtection from '@/components/BuyerProtection.jsx';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminShopProductPath } from '@/utils/adminEditLinks.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -51,6 +53,8 @@ const ShopBinderProductPage = () => {
   const { row, family, selectedId, setSelectedId, loading } = useShopLine({
     slug: product?.slug, sku: product?.sku, enabled: !!product,
   });
+  // Admins get an "Edit in admin" shortcut to the colour/product on screen.
+  useAdminEditTarget('Edit product', adminShopProductPath(row?.id));
   const [enquiryOpen, setEnquiryOpen] = useState(false);
   const [selectedVariantId, setSelectedVariantId] = useState(null);
   useEffect(() => { setSelectedVariantId(pickDefaultVariant(row)?.id ?? null); }, [row]);

@@ -11,6 +11,8 @@ import EventReviewTeaser from '@/components/reviews/EventReviewTeaser.jsx';
 import EventAttendeeReviews from '@/components/events/EventAttendeeReviews.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { useRecordEventView } from '@/hooks/useRecordEventView.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminEventPath } from '@/utils/adminEditLinks.js';
 import { isPastEvent } from '@/utils/eventPast.js';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,6 +65,8 @@ const EventDetailPage = () => {
 
   // A view of a public event (events_public only returns public ones).
   useRecordEventView(event?.id, Boolean(event));
+  // Admins get an "Edit in admin" shortcut straight to this event's form.
+  useAdminEditTarget('Edit event', adminEventPath(event?.id));
 
   if (isLoading) {
     return (

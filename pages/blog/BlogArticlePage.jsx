@@ -18,6 +18,8 @@ import EventReviewGallery from '@/components/reviews/EventReviewGallery.jsx';
 import EventReviewPickups from '@/components/reviews/EventReviewPickups.jsx';
 import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
 import EventReviewDeals from '@/components/reviews/EventReviewDeals.jsx';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminArticlePath, adminEventReviewPath } from '@/utils/adminEditLinks.js';
 import { buildEventReviewJsonLd, buildReviewVideoJsonLds, hasScorecard, hasQuickFacts, cleanVideos, cleanDeals } from '@/utils/eventReview.js';
 
 const ConvictionRating = ({ article }) => {
@@ -222,6 +224,14 @@ const BlogArticlePage = () => {
   // pickups) in event_reviews, plus the event they cover — see docs/event-reviews.md.
   const [eventReview, setEventReview] = useState(null);
   const [reviewedEvent, setReviewedEvent] = useState(null);
+  // Admins get an "Edit in admin" shortcut. An event review is a blog article
+  // with a scorecard, edited in its own full-page editor; every other article
+  // opens in Admin → Content. Wait for the review lookup so the link is right.
+  useAdminEditTarget(
+    eventReview ? 'Edit review' : 'Edit article',
+    !article?.id || loading ? null
+      : (eventReview ? adminEventReviewPath(eventReview.id) : adminArticlePath(article.id)),
+  );
 
   useEffect(() => {
     let cancelled = false;

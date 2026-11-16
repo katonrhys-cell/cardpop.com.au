@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Edit, Trash2, FileText, AlertCircle, RefreshCcw, FileCode2, Globe, EyeOff, ArrowLeft, BookOpen, PenLine } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -69,6 +69,31 @@ const ContentManagementPage = () => {
     fetchArticles(cancelled);
     return () => { cancelled.value = true; };
   }, []);
+
+  // "Edit article" on a blog article's public page lands here as ?edit=<id>:
+  // open that article's editor, then drop the param so a refresh doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  useEffect(() => {
+    if (!editId) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data, error: loadErr } = await supabase
+        .from('blog_articles')
+        .select('*, author_profile:profiles!author_id(display_name, username)')
+        .eq('id', editId)
+        .maybeSingle();
+      if (cancelled) return;
+      if (loadErr || !data) toast.error('Could not find that article to edit.');
+      else { setSelectedArticle(data); setIsModalOpen(true); }
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
+    })();
+    return () => { cancelled = true; };
+  }, [editId, setSearchParams]);
 
   const handleCreateNew = () => {
     setSelectedArticle(null);
