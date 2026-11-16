@@ -28,6 +28,7 @@ const VaultDropdown = lazy(() => import('@/components/VaultDropdown.jsx'));
 // is needed for the first paint of the header bar, so it lives in its own async
 // chunk. On phones the desktop nav is gated out entirely (see useIsDesktop), and
 // the mobile menu only loads when the hamburger is opened.
+import HeaderNavPlaceholder from '@/components/HeaderNavPlaceholder.jsx';
 const DesktopNavMenus = lazy(() => import('@/components/HeaderMenus.jsx').then(m => ({ default: m.DesktopNavMenus })));
 const MobileNavMenus = lazy(() => import('@/components/HeaderMenus.jsx').then(m => ({ default: m.MobileNavMenus })));
 
@@ -467,7 +468,9 @@ const Header = () => {
         {isDesktop && (
           <div className="hidden lg:flex items-center py-1.5">
             <nav className="flex items-center justify-evenly w-full">
-              <Suspense fallback={<div className="h-9 w-full" aria-hidden="true" />}>
+              {/* The fallback is the same seven labels as plain links, so the
+                  row doesn't blank while the menus chunk loads. */}
+              <Suspense fallback={<HeaderNavPlaceholder settings={settings} />}>
                 <DesktopNavMenus onNavigate={() => setMobileMenuOpen(false)} />
               </Suspense>
             </nav>

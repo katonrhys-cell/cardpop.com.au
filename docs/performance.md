@@ -56,6 +56,42 @@ CI workflow for it was removed in November 2026; it had been disabled since
    mount used to be the critical path of every "Just Listed" photo. When the image
    CDN is configured the "/" document also preconnects to it (the end of that chain).
 
+## Nothing moves when React takes over
+
+The static shell is on screen for a second or more before React mounts, so any
+difference between the two is a visible redraw on every page load. In
+November 2026 the shell's header had fallen behind `Header.jsx` (nine old menu
+labels, no Sell button, a larger ™, no phone search row) and nine separate
+things flashed or jumped during a load. The rules that came out of fixing them:
+
+- **The shell header is a copy of the real one — change them together.** Menu
+  labels live in `components/HeaderNavPlaceholder.jsx` (`DESKTOP_NAV_PLACEHOLDER`):
+  the shell's nav row, the Suspense fallback `Header.jsx` shows while the lazy
+  `HeaderMenus` chunk loads, and the real menus all read the same seven labels
+  in the same order. `tests/frontend/homeShell.test.js` → "static shell header
+  matches the real header" fails when the shell, the placeholder or `NAV_LINKS`
+  drift, and also pins the logo ™ markup, the Sell button, the phone search row,
+  the hero spacing classes and the default tab title.
+- **The hero exists three times** — `tools/home-shell.html`, `HeroSection.jsx`
+  (the "/" Suspense fallback) and the hero in `HomePage.jsx`. Spacing classes
+  must be identical in all three at every breakpoint (the same test checks).
+- **No entrance animation on anything that is already on screen.** `PageLoader`
+  has no fade-in and the homepage hero badge/trust chips don't "pop in": each
+  replaces an identical element, so the animation read as a blink.
+- **Data that arrives late holds its place first.** `LiveActivityTicker` renders
+  blank tiles of the real strip's height until its first read settles;
+  `ShopFilterPanel` takes `loading` to reserve the filter row; the hero card
+  showcase mounts once, with the admin-configured cards (fetched at boot in
+  `main.jsx`), instead of showing the built-in set and swapping.
+- **Skeletons are neutral** (`bg-muted`), not a tint of the brand red.
+- **One spinner.** `ProtectedRoute` / `ProtectedAdminRoute` show `PageLoader`,
+  the same one the shell and the route Suspense show.
+
+To check a change, serve `dist/` with "/" → `index.html` and every other path →
+`app.html` (`vite preview` serves `index.html` for everything, so it never
+exercises the app shell), throttle the network, and watch the
+`layout-shift` entries across the takeover — there should be none.
+
 ## Keeping third parties out of the measured window
 
 Lighthouse stops tracing roughly a second or two after `load` once the page is

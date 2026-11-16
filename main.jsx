@@ -14,6 +14,7 @@ import { initImpactTag } from '@/lib/impactTag.js';
 import { scheduleAdsenseLoad } from '@/lib/adsense.js';
 import { onFirstInteractionOrLoad } from '@/lib/deferredLoad.js';
 import { prefetchHomepageData } from '@/lib/homepageData.js';
+import { fetchActiveShowcaseCards } from '@/lib/heroShowcase.js';
 import '@/index.css';
 import '@/global.css';
 
@@ -237,6 +238,11 @@ if (typeof window !== 'undefined') {
   // so nothing is fetched twice.
   if (window.location.pathname === '/') {
     try { prefetchHomepageData(); } catch { /* HomePage fetches on mount regardless */ }
+    // Same for the hero card showcase (desktop only — it isn't rendered below
+    // lg), so the cards are in hand by the time the showcase mounts.
+    try {
+      if (window.matchMedia('(min-width: 1024px)').matches) fetchActiveShowcaseCards();
+    } catch { /* HomePage fetches on mount regardless */ }
   }
 
   // Register service worker after page load for offline support

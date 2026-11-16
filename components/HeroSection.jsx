@@ -58,7 +58,7 @@ export const HeroSearchForm = ({ className = '' }) => {
 
 const HeroSection = () => {
   return (
-    <section className="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 overflow-hidden bg-zinc-950">
+    <section className="relative lg:min-h-[92dvh] flex items-start justify-center pt-8 sm:pt-14 pb-10 sm:pb-16 overflow-hidden bg-zinc-950">
 
       {/* Stage floor gradient */}
       <div className="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none" />
@@ -106,7 +106,7 @@ const HeroSection = () => {
       <div className="max-w-[90rem] mx-auto w-full px-5 sm:px-8 lg:px-12 xl:px-16 relative z-10 lg:pr-[548px] xl:pr-[624px]">
         <div className="text-center lg:text-left">
           <div
-            className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase"
+            className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase"
             style={{
               background: 'rgba(220,38,38,0.12)',
               borderColor: 'rgba(220,38,38,0.35)',
@@ -120,7 +120,7 @@ const HeroSection = () => {
             <span className="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
           </div>
 
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
             Buy and Sell Trading Cards{' '}
             <br className="hidden sm:block" />
             <span
@@ -131,7 +131,7 @@ const HeroSection = () => {
             </span>
           </h1>
 
-          <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
+          <p className="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-8 leading-relaxed text-balance mx-auto lg:mx-0">
             Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.
           </p>
 
@@ -139,7 +139,7 @@ const HeroSection = () => {
             <HeroSearchForm />
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
+          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
             <Button
               asChild
               size="lg"

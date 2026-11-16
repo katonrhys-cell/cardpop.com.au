@@ -306,7 +306,9 @@ const App = () => {
                 <WhatsAppFloatingButton />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
-                    <title>CardPop | Australia's Trading Card Marketplace</title>
+                    {/* Same string as index.html's static <title>, so the tab title
+                        doesn't flip while a page's own SEOHead is still loading. */}
+                    <title>CardPop Australia™ | Trading Card Marketplace</title>
                     <meta name="description" content="Buy, sell, and trade Pokémon, Magic: The Gathering, sports cards and more on CardPop — Australia's most trusted trading card platform." />
                   </Helmet>
                   
