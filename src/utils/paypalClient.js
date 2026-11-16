@@ -12,7 +12,7 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
  *   PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM / _ELITE / _ULTIMATE for the higher
  *   tiers — see config/subscription.js ENV), and PAYPAL_WEBHOOK_ID.
  *
- * The plans themselves (including the 30-day free trial) are created once in
+ * The plans themselves (yearly, no trial) are created once in
  * the PayPal dashboard / API and referenced here by id — see docs/SUBSCRIPTION_SETUP.md.
  */
 

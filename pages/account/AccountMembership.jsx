@@ -6,10 +6,9 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import StartTrialOptions from '@/components/StartTrialOptions.jsx';
 import MembershipBillingCard from '@/components/account/MembershipBillingCard.jsx';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { ArrowUpRight, BadgeCheck, Clock, Crown, Gift, Loader2, Sparkles } from 'lucide-react';
-import { TRIAL_DAYS, TIER_PRICES_AUD, PAID_TIER_ORDER, normalizePaidTier } from '@/config/subscription.js';
+import { ArrowUpRight, BadgeCheck, Clock, Crown, Loader2, Sparkles } from 'lucide-react';
+import { TIER_PRICES_AUD, PAID_TIER_ORDER, normalizePaidTier } from '@/config/subscription.js';
 import { PLANS, planKeyFromTier, isTopPlan, upgradePlansFor } from '@/config/plans.js';
 
 const statusLabel = (subscriptionStatus, tierName) => ({
@@ -25,50 +24,11 @@ const AccountMembership = () => {
   const { isPro, isAdmin, subscriptionStatus, subscriptionTier, trialDaysLeft, refetchProfile } = useAuth();
   const [params, setParams] = useSearchParams();
   const [activating, setActivating] = useState(false);
-  const [welcomeCode, setWelcomeCode] = useState('');
-  const [redeeming, setRedeeming] = useState(false);
-  const [codeConfirmed, setCodeConfirmed] = useState(false);
-  // Which paid tier the member is buying — preselected by /pricing's and the
-  // dashboard's "?tier=premium" style links, switchable here before checkout.
+  // Which paid plan the member is buying — preselected by /pricing's and the
+  // dashboard's "?tier=ultimate" style links, switchable here before checkout.
   const [selectedTier, setSelectedTier] = useState(() => normalizePaidTier(params.get('tier')));
   // A paid member upgrading in place: which tier is being switched to.
   const [upgrading, setUpgrading] = useState(null);
-
-  // Prefill the welcome-code input with the user's own unredeemed code so
-  // arriving from the offer email is one click, not a copy-paste hunt.
-  useEffect(() => {
-    if (isPro) return;
-    let cancelled = false;
-    apiServerClient.fetch('/welcome-offer/mine')
-      .then(res => (res.ok ? res.json() : null))
-      .then(data => {
-        const offer = data?.offer;
-        if (!cancelled && offer?.code && !offer.trial_redeemed_at) setWelcomeCode(offer.code);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [isPro]);
-
-  const handleRedeemWelcomeCode = async (e) => {
-    e.preventDefault();
-    if (!welcomeCode.trim()) { toast.error('Enter your welcome code first.'); return; }
-    setRedeeming(true);
-    try {
-      const res = await apiServerClient.fetch('/welcome-offer/validate-trial', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: welcomeCode }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Could not validate the code.');
-      setCodeConfirmed(true);
-      toast.success('Code confirmed! Add a card below to start your free trial.');
-    } catch (err) {
-      toast.error(err.message || 'Could not validate the code.');
-    } finally {
-      setRedeeming(false);
-    }
-  };
 
   // Handle returns from Stripe / PayPal.
   useEffect(() => {
@@ -84,7 +44,7 @@ const AccountMembership = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subscriptionId: paypalSubId }),
           });
-          if (res.ok) toast.success('Your free trial is active. Welcome aboard!');
+          if (res.ok) toast.success('Your membership is active. Welcome aboard!');
           else toast.error('We could not confirm your PayPal subscription. Please contact support.');
         } catch {
           toast.error('We could not confirm your PayPal subscription.');
@@ -92,9 +52,9 @@ const AccountMembership = () => {
           setActivating(false);
         }
       } else if (trial === 'started') {
-        toast.success('Your free trial is active. Welcome aboard!');
+        toast.success('Payment received — your membership is active. Welcome aboard!');
       } else if (trial === 'cancelled') {
-        toast('Checkout cancelled — you can start your trial anytime.');
+        toast('Checkout cancelled — nothing was charged. You can join anytime.');
       }
 
       if (paypalSubId || trial) {
@@ -113,9 +73,9 @@ const AccountMembership = () => {
   const meta = statusLabel(subscriptionStatus, currentTierName) || statusLabel('none', currentTierName);
   const { Icon } = meta;
   const complimentary = subscriptionStatus === 'grandfathered';
-  // Tiers a paid member can switch to — up or down. A tier change re-prices the
-  // existing subscription (no second trial), so it goes through its own
-  // endpoint, not the trial checkout. A complimentary plan is managed by
+  // Plans a paid member can switch to — up or down. A plan change re-prices the
+  // existing yearly subscription, so it goes through its own endpoint, not the
+  // sign-up checkout. A complimentary plan is managed by
   // CardPop, so it only ever shows what sits above it (disabled).
   const changeOptions = !isPro ? [] : complimentary
     ? upgradePlansFor(currentPlanKey)
@@ -154,9 +114,10 @@ const AccountMembership = () => {
       title="CardPop Membership"
       description={
         <>
-          Buying and selling are free on every plan (selling just needs ID verification). The paid
-          tiers — Pro, Premium, Elite and Ultimate — unlock a bigger monthly listing allowance, your
-          own store page on Local Traders and premium display styles.{' '}
+          Hobby is free, and always will be — buying and selling need no membership (selling just
+          needs ID verification). Pro ($99 a year) is for vendors and avid traders: 30 listings a
+          month, your own store page and the Pro display styles. Ultimate ($199 a year) is for show
+          organisers: every event you run is featured on the calendar, with unlimited listings.{' '}
           <Link to="/pricing" className="text-primary hover:underline">Compare plans →</Link>
         </>
       }
@@ -191,7 +152,8 @@ const AccountMembership = () => {
                 You're on our top plan
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Ultimate includes unlimited listings and every display style — there's nothing above it
+                Ultimate includes unlimited listings, every display style and Calendar Spotlight on
+                your events — there's nothing above it
                 {complimentary ? ', and nothing to pay' : ''}.
               </p>
             </>
@@ -204,9 +166,9 @@ const AccountMembership = () => {
               <p className="mt-1 text-sm text-muted-foreground">
                 {complimentary
                   ? 'Your complimentary membership is managed by CardPop — contact support to change it.'
-                  : 'Move up or down any time. The change applies straight away and is pro-rated on your next invoice — a downgrade credits the unused part of your current plan. Your trial, if you have one, carries over. To stop paying altogether, cancel your membership above.'}
+                  : 'Move up or down any time, and the change applies straight away. Upgrading charges your card today for the difference over the rest of your year; downgrading credits the unused part of your current plan against your next renewal. Your renewal date stays the same. To stop paying altogether, cancel your membership above.'}
               </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {changeOptions.map((key) => {
                   const plan = PLANS[key];
                   const preselected = normalizePaidTier(params.get('tier')) === key;
@@ -221,7 +183,7 @@ const AccountMembership = () => {
                     >
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="font-heading text-base font-bold text-foreground">{plan.name}</span>
-                        <span className="text-sm font-semibold text-foreground">${TIER_PRICES_AUD[key]}/mo</span>
+                        <span className="text-sm font-semibold text-foreground">${TIER_PRICES_AUD[key]}/yr</span>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">{plan.tagline}</p>
                       <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
@@ -251,45 +213,13 @@ const AccountMembership = () => {
 
       {!isPro && !pastDue && (
         <>
-          <div className="rounded-card border border-brand-red/30 bg-brand-red/5 p-6">
-            <div className="flex items-center gap-2 font-heading text-lg font-bold text-foreground">
-              <Gift className="h-5 w-5 text-brand-red" />
-              Have a welcome code?
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              New members get a code by email. Redeem it to claim your {TRIAL_DAYS}-day free trial —
-              add a card to activate, and you won't be charged until the trial ends.
-              The same code also gives you 10% off your first order at checkout.
-            </p>
-            {codeConfirmed ? (
-              <p className="mt-4 flex items-center gap-2 text-sm font-semibold text-green-600">
-                <BadgeCheck className="h-4 w-4" />
-                Code confirmed — add your card below to start your {TRIAL_DAYS} free days.
-              </p>
-            ) : (
-              <form onSubmit={handleRedeemWelcomeCode} className="mt-4 flex gap-2">
-                <Input
-                  value={welcomeCode}
-                  onChange={(e) => setWelcomeCode(e.target.value.toUpperCase())}
-                  placeholder="POP-XXXX-XXXX"
-                  autoComplete="off"
-                  className="font-mono tracking-widest uppercase"
-                  aria-label="Welcome code"
-                />
-                <Button type="submit" disabled={redeeming} className="shrink-0 font-bold">
-                  {redeeming ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Redeem'}
-                </Button>
-              </form>
-            )}
-          </div>
-
           <div>
             <h2 className="mb-4 font-heading text-lg font-bold text-foreground">
-              Start your {TRIAL_DAYS}-day free trial
+              Choose your membership
             </h2>
 
-            {/* Tier picker — every paid tier starts with the same free trial. */}
-            <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {/* Plan picker — both plans are one yearly payment, charged at sign-up. */}
+            <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PAID_TIER_ORDER.map((tier) => {
                 const active = selectedTier === tier;
                 return (
@@ -307,7 +237,7 @@ const AccountMembership = () => {
                       {PLANS[tier]?.name || tier}
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      ${TIER_PRICES_AUD[tier]}/mo
+                      ${TIER_PRICES_AUD[tier]} a year · {PLANS[tier]?.audience}
                     </span>
                   </button>
                 );

@@ -270,28 +270,34 @@ export function welcomeOfferEmail({ name, code, trialDays, discountPct, expiresA
 <p style="margin:0;font-size:28px;font-weight:900;letter-spacing:3px;color:#111827;">${esc(code)}</p>
 </div>`;
 
+  // Memberships no longer start with a free trial (config/subscription.js
+  // TRIAL_DAYS = 0), so a code issued today is the first-order discount only.
+  // Codes issued while the trial existed still carry trial_days > 0.
+  const hasTrial = Number(trialDays) > 0;
   const body = `${heroBadge('🎁')}
 ${heroHeading('Your welcome gift', `Welcome aboard, ${esc(name)} — a one-time thank-you for joining CardPop.`)}
 ${statRow([
   { glyph: '%', colour: TILE.red, value: `${Number(discountPct)}%`, caption: 'Off your first order' },
-  { glyph: '★', colour: TILE.green, value: String(Number(trialDays)), caption: 'Days of selling, free' },
+  ...(hasTrial ? [{ glyph: '★', colour: TILE.green, value: String(Number(trialDays)), caption: 'Days of selling, free' }] : []),
   { glyph: '⏱', colour: TILE.charcoal, value: esc(expiryStr), caption: 'Code expires', small: true },
 ])}
 ${codeBlock}
-<p style="margin:0 0 8px;"><strong>Your code unlocks both of these:</strong></p>
+${hasTrial ? `<p style="margin:0 0 8px;"><strong>Your code unlocks both of these:</strong></p>
 <ul style="margin:0 0 20px;padding-left:20px;">
 <li style="margin-bottom:8px;"><strong>${Number(trialDays)} days of selling, free.</strong> Redeem your code on the Membership page, add a card or PayPal to activate, and pay nothing until the trial ends — cancel anytime.</li>
 <li><strong>${Number(discountPct)}% off your first order.</strong> It’s applied automatically at checkout when you’re signed in.</li>
-</ul>
+</ul>` : centred(`<strong>${Number(discountPct)}% off your first order.</strong> It’s applied automatically at checkout when you’re signed in — or enter the code in the Promo Code box.`)}
 ${centred(`Your code expires on <strong>${esc(expiryStr)}</strong>, so don’t sit on it like a sealed booster box.`)}`;
 
   return cpEmail(
-    `Your CardPop welcome gift: ${Number(trialDays)} days of selling free + ${Number(discountPct)}% off your first order.`,
+    hasTrial
+      ? `Your CardPop welcome gift: ${Number(trialDays)} days of selling free + ${Number(discountPct)}% off your first order.`
+      : `Your CardPop welcome gift: ${Number(discountPct)}% off your first order.`,
     '',
     '',
     body,
-    'https://cardpop.com.au/account/membership',
-    'Redeem My Code',
+    hasTrial ? 'https://cardpop.com.au/account/membership' : 'https://cardpop.com.au/marketplace',
+    hasTrial ? 'Redeem My Code' : 'Find Your First Card',
     'This one-time offer was generated for your new CardPop account and can’t be transferred.',
   );
 }
@@ -1245,7 +1251,7 @@ export function membershipTrialEndingEmail({ name, planName, amountAud, chargeDa
   const when = new Date(chargeDate);
   const whenStr = when.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
   const daysLeft = Math.max(1, Math.ceil((when.getTime() - Date.now()) / 86400000));
-  const price = amountAud != null ? `${money(amountAud)}/month` : 'the monthly price';
+  const price = amountAud != null ? `${money(amountAud)} for the year` : 'the yearly price';
   const body = `${heroBadge('⏱', TILE.charcoal)}
 ${heroHeading('Your free trial ends soon', `Hi ${esc(name || 'there')} — here’s what happens next.`)}
 ${statRow([
@@ -1262,6 +1268,32 @@ ${centred('Don’t want it? Cancel any time before then from Account → Members
     'https://cardpop.com.au/account/membership',
     'Manage Membership',
     'You’re receiving this because you started a free trial of a CardPop membership.',
+  );
+}
+
+// Sent on Stripe's `invoice.upcoming` ahead of a yearly renewal, so the charge
+// is never a surprise and the member knows where to cancel.
+export function membershipRenewalEmail({ name, planName, amountAud, chargeDate }) {
+  const when = new Date(chargeDate);
+  const whenStr = when.toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' });
+  const daysLeft = Math.max(1, Math.ceil((when.getTime() - Date.now()) / 86400000));
+  const price = amountAud != null ? money(amountAud) : 'the yearly price';
+  const body = `${heroBadge('⏱', TILE.charcoal)}
+${heroHeading('Your membership renews soon', `Hi ${esc(name || 'there')} — here’s what happens next.`)}
+${statRow([
+  { glyph: '★', colour: TILE.red, value: esc(planName), caption: 'Your plan', small: true },
+  { glyph: '⏱', colour: TILE.charcoal, value: String(daysLeft), caption: `${plural(daysLeft, 'Day', 'Days')} left · ${esc(whenStr)}` },
+])}
+${centred(`On ${esc(whenStr)} your card will be charged ${esc(price)} (GST included) for another 12 months of CardPop ${esc(planName)}.`)}
+${centred('Nothing to do if you’re staying. Don’t want another year? Cancel any time before then from Account → Membership and you won’t be charged — your account moves to the free Hobby plan, where buying and selling still work.')}`;
+  return cpEmail(
+    `Your CardPop ${esc(planName)} membership renews on ${esc(whenStr)}.`,
+    '',
+    '',
+    body,
+    'https://cardpop.com.au/account/membership',
+    'Manage Membership',
+    'You’re receiving this because you hold a yearly CardPop membership.',
   );
 }
 

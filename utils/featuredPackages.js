@@ -163,6 +163,11 @@ export const featureEligibility = (event, today, { paid = false } = {}) => {
   const days = daysUntilEvent(event.start_date, today);
   if (days == null) return { ok: false, reason: 'Add your event\'s date before featuring it.' };
   if (days < 0) return { ok: false, reason: 'This event has already started.' };
+  // Calendar Spotlight switched on by the organiser's Ultimate membership
+  // (events.membership_featured, set by the membership spotlight triggers).
+  if (event.membership_featured && !paid) {
+    return { ok: false, reason: 'Calendar Spotlight is already included with your Ultimate membership.' };
+  }
   if (paid || event.is_featured) return { ok: false, reason: 'This event is already featured.' };
   return { ok: true, reason: null };
 };

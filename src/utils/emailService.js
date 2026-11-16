@@ -33,6 +33,7 @@ import {
   backInStockEmail,
   welcomeOfferReminderEmail,
   membershipTrialEndingEmail,
+  membershipRenewalEmail,
   giveawayWinnerEmail,
   adminReviewAlertEmail,
 } from '../emails/templates.js';
@@ -124,10 +125,16 @@ export async function sendLaunchWelcome({ to, name }) {
   });
 }
 
+export async function sendMembershipRenewalReminder({ to, name, planName, amountAud, chargeDate }) {
+  return send({ to, subject: `Your CardPop ${planName} membership renews soon`, html: membershipRenewalEmail({ name, planName, amountAud, chargeDate }) });
+}
+
 export async function sendWelcomeOffer({ to, name, code, trialDays, discountPct, expiresAt }) {
   return send({
     to,
-    subject: `Your CardPop welcome gift: ${trialDays} days free + ${discountPct}% off`,
+    subject: Number(trialDays) > 0
+      ? `Your CardPop welcome gift: ${trialDays} days free + ${discountPct}% off`
+      : `Your CardPop welcome gift: ${discountPct}% off your first order`,
     html: welcomeOfferEmail({ name, code, trialDays, discountPct, expiresAt }),
   });
 }

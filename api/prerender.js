@@ -2765,16 +2765,16 @@ const STATIC_CONTENT = {
   },
 
   // Keep pricing copy in sync with config/plans.js + config/subscription.js
-  // (monthly listing limits 5/15/30/50/unlimited, prices $20/$40/$80/$150 AUD,
-  // 30-day trial).
+  // (monthly listing limits 5/30/unlimited, prices $99 / $199 AUD a year,
+  // charged at sign-up with no trial). tests/backend/prerender.test.js checks.
   '/pricing': {
-    title: 'Pricing — Hobby, Pro, Premium, Elite & Ultimate | CardPop',
-    description: 'CardPop is free to join. Buy instantly and sell once your ID is verified, for a small fee per sale. Upgrade for more listings, a store page and premium styles.',
+    title: 'Pricing — Hobby, Pro & Ultimate | CardPop',
+    description: 'CardPop is free to join, and always will be. Pro is $99 a year for vendors and avid traders; Ultimate is $199 a year for show organisers who want every event featured.',
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Pricing', path: '/pricing' }],
     h1: 'Simple, fair pricing',
-    intro: 'Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Upgrade when you want more monthly listings, your own store page and the premium showcase styles.',
+    intro: 'Joining CardPop is free, and always will be. Browse and buy right away. To list, sell or trade, just verify your identity — then you only pay a small fee when a sale or trade completes. Pro is one yearly payment for vendors and avid traders; Ultimate is for show organisers who want every event they run featured on the calendar.',
     sections: [
-      { h2: 'Hobby — free forever', paras: ['Free forever — collect, buy and sell casually.'], items: [
+      { h2: 'Hobby — free, and always will be', paras: ['Free, and always will be — collect, buy and sell casually.'], items: [
         { text: 'Browse and buy instantly — no membership needed.' },
         { text: 'List up to 5 cards a month once your ID is verified.' },
         { text: 'Pay only a small fee when a sale or trade completes.' },
@@ -2782,37 +2782,25 @@ const STATIC_CONTENT = {
         { text: 'Trade with other verified collectors.' },
         { text: 'Community, wishlists and price tracking.' },
       ] },
-      { h2: 'Pro — $20/month AUD, 30-day free trial', paras: ['Your own store page and the Pro display styles.'], items: [
+      { h2: 'Pro — $99 a year AUD', paras: ['For vendors and avid traders — your own store and room to sell. One payment a year, GST included.'], items: [
         { text: 'Everything in Hobby, plus:' },
-        { text: '15 listings a month.' },
+        { text: '30 listings a month.' },
         { text: 'Your own branded store page on the Local Traders directory.' },
-        { text: 'Pro display styles for your listings.' },
-        { text: 'Pro seller badge for extra buyer trust.' },
-        { text: 'Advanced sales analytics and price insights.' },
-        { text: 'Up to 20 images per listing.' },
-      ] },
-      { h2: 'Premium — $40/month AUD', paras: ['More listings and the Premium showcase styles.'], items: [
-        { text: 'Everything in Pro, plus 30 listings a month.' },
-        { text: 'Premium display styles — Glass Museum and Slab Display.' },
+        { text: 'Pro display styles — Premium Stand, Floating, Neon Glow, Glass Museum, Slab Display and Spotlight.' },
         { text: 'Advertise your Whatnot live shows on the community directory.' },
         { text: 'Your cards fill the homepage Featured Cards spots.' },
-        { text: 'Priority placement in the Local Traders directory.' },
       ] },
-      { h2: 'Elite — $80/month AUD', paras: ['High-volume selling with the Elite showcase.'], items: [
-        { text: 'Everything in Premium, plus 50 listings a month.' },
-        { text: 'Elite display styles — Rotating Premium showcase.' },
-        { text: 'Priority support.' },
-      ] },
-      { h2: 'Ultimate — $150/month AUD', paras: ['No limits. The full CardPop experience.'], items: [
-        { text: 'Everything in Elite, plus unlimited listings.' },
-        { text: 'Ultimate display styles — interactive Holographic showcase.' },
+      { h2: 'Ultimate — $199 a year AUD', paras: ['For show organisers — every event you run, featured. One payment a year, GST included.'], items: [
+        { text: 'Everything in Pro, plus:' },
+        { text: 'Calendar Spotlight on every show you run — the Featured events strip, first in its month and a Featured badge.' },
+        { text: 'Unlimited listings.' },
+        { text: 'Every display style — Rotating, Spinning Stand, Prism and the interactive Holographic showcase.' },
         { text: 'Featured Seller placement on the CardPop homepage.' },
-        { text: 'Top placement in search and Local Traders.' },
       ] },
       { h2: 'How it works', items: [
         { text: "Buy with no membership — anyone can check out. A card on file gives one-tap buying and is required to sell or trade, but it's never charged until you actually transact." },
         { text: 'Verify to sell & trade — to list, sell or trade on any plan, verify your ID (a quick selfie + document check via Stripe) and keep a card on file.' },
-        { text: 'Fees only when you sell — no listing fees and no monthly cost on Hobby; every plan pays the same small fee only when a sale or trade goes through.' },
+        { text: 'Fees only when you sell — no listing fees and no membership cost on Hobby; every plan pays the same small fee only when a sale or trade goes through.' },
       ] },
     ],
     links: [{ text: 'Create a free account', href: '/signup' }, { text: 'Browse the Marketplace', href: '/marketplace' }, { text: 'Trust & Safety', href: '/trust-safety' }],

@@ -35,7 +35,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { reconcilePendingOrders } from '../services/pendingOrderAlertService.js';
-import { applyStripeSubscription, handleSubscriptionInvoiceFailed, sendTrialEndingReminder, applyMembershipCardFromSession } from '../services/subscriptionService.js';
+import { applyStripeSubscription, handleSubscriptionInvoiceFailed, sendTrialEndingReminder, sendRenewalReminder, applyMembershipCardFromSession } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress, checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
@@ -920,7 +920,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         await applyIdentitySession(event.data.object);
         break;
 
-      // Membership subscription lifecycle (free trial → active → canceled).
+      // Membership subscription lifecycle (active → canceled).
       // Mirrors the subscription state onto the seller's profile so the
       // selling gate (can_sell) reflects it.
       case 'customer.subscription.created':
@@ -935,6 +935,13 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
         // webhook and have Stripe redeliver (and re-apply) the event.
         await sendTrialEndingReminder(event.data.object).catch((err) =>
           logger.error(`[STRIPE] Trial-ending reminder failed for ${event.data.object.id}: ${err.message}`));
+        break;
+
+      // A yearly renewal is coming up — tell the member the date and amount.
+      // Best-effort for the same reason as the trial reminder above.
+      case 'invoice.upcoming':
+        await sendRenewalReminder(event.data.object).catch((err) =>
+          logger.error(`[STRIPE] Renewal reminder failed for ${event.data.object.id || 'upcoming invoice'}: ${err.message}`));
         break;
 
       // A membership charge failed (first charge after the trial, or a

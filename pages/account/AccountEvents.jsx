@@ -230,7 +230,7 @@ const AccountEvents = () => {
             <Badge variant="outline" className={`font-semibold ${badge.cls}`}>{badge.label}</Badge>
             {event.is_featured && (
               <Badge variant="outline" className="font-semibold bg-amber-400/15 text-amber-800 border-amber-400 dark:text-amber-300 gap-1">
-                <Star className="w-3 h-3 fill-current" aria-hidden="true" /> Featured
+                <Star className="w-3 h-3 fill-current" aria-hidden="true" /> {event.membership_featured ? 'Featured · Ultimate' : 'Featured'}
               </Badge>
             )}
           </div>

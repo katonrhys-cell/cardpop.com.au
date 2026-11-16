@@ -170,8 +170,8 @@ export default function MembershipBillingCard({ subscriptionStatus, onChanged })
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {trialing
-              ? `Your free trial ends${when ? ` on ${when}` : ''}. ${price ? `Your card will then be charged ${price}/month` : 'Your card will then be charged monthly'} unless you cancel before then.`
-              : `${price ? `${price}/month` : 'Billed monthly'}${when ? ` · next charge ${when}` : ''}. Cancel any time — you keep ${planName} until the end of the period you've paid for.`}
+              ? `Your free trial ends${when ? ` on ${when}` : ''}. ${price ? `Your card will then be charged ${price} a year` : 'Your card will then be charged yearly'} unless you cancel before then.`
+              : `${price ? `${price} a year` : 'Billed yearly'}${when ? ` · renews ${when}` : ''}. We email you before it renews. Cancel any time — you keep ${planName} until the end of the year you've paid for.`}
           </p>
         </>
       )}
