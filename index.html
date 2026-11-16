@@ -6,7 +6,11 @@
     <meta name="theme-color" content="#CE1126" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#1F2937" media="(prefers-color-scheme: dark)" />
     <!-- Properly sized icons (source art: cardpop-favicon-icon.png, 1254px —
-         referencing it directly shipped a 690 KB PNG on every page view). -->
+         referencing it directly shipped a 690 KB PNG on every page view).
+         The favicons are the red outline only on a fully transparent
+         background, so they blend into light, grey and dark browser tabs —
+         never re-add a white fill. apple-touch-icon / PWA icons stay opaque
+         because iOS and Android fill transparency with black. -->
     <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png">
     <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
