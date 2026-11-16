@@ -56,6 +56,14 @@
       /* Typography — ensure text renders immediately */
       h1, h2, h3, h4, h5, h6 { font-family: 'Syne', 'Syne Fallback', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
+      /* Static shell: guest vs member header pieces (tools/home-shell.html).
+         The CSP bootstrap adds cp-member / cp-admin to <html> before first
+         paint; without them the guest layout shows. */
+      .cps-guest { display: contents; }
+      .cps-member, .cps-admin { display: none; }
+      .cp-member .cps-guest { display: none; }
+      .cp-member .cps-member, .cp-admin .cps-admin { display: contents; }
+
       /* Flexbox for layout stability */
       .flex { display: flex; }
       .flex-col { flex-direction: column; }
