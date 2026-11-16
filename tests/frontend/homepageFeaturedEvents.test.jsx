@@ -39,10 +39,33 @@ describe('homepageEventsToShow', () => {
 describe('<HomepageFeaturedEvents />', () => {
   beforeEach(() => { homeEvents.result = { data: [], error: null }; });
 
-  it('renders nothing when there is no featured event', async () => {
-    const { container } = render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
-    await Promise.resolve();
-    expect(container).toBeEmptyDOMElement();
+  it('invites organisers to take the spot when there is no featured event', async () => {
+    render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+    expect(await screen.findByTestId('home-featured-events-empty')).toHaveTextContent('No featured events right now');
+    expect(screen.getByRole('heading', { name: /Featured events/ })).toBeInTheDocument();
+    // List event lives under the section: sign up first, then the submit form.
+    expect(screen.getByRole('link', { name: /list event/i }))
+      .toHaveAttribute('href', `/signup?next=${encodeURIComponent('/account/events?new=1')}`);
+    expect(screen.getByRole('link', { name: /feature it here/i })).toHaveAttribute('href', '/list-your-event#featured-packages');
+  });
+
+  it('shows each featured event with its details', async () => {
+    homeEvents.result = {
+      data: [ev({
+        start_date: '2099-01-01', start_time: '09:00', end_time: '16:00', venue_name: 'Town Hall',
+        entry_fee_aud: 10, organizer_name: 'Card Shows Co', short_description: 'Two halls of traders.',
+      })],
+      error: null,
+    };
+    render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+    const link = (await screen.findByText('Sydney Card Show')).closest('a');
+    expect(link).toHaveTextContent('Two halls of traders.');
+    expect(link).toHaveTextContent('9am – 4pm');
+    expect(link).toHaveTextContent('Town Hall, Parramatta, NSW');
+    expect(link).toHaveTextContent('$10.00 AUD');
+    expect(link).toHaveTextContent('Card Shows Co');
+    expect(screen.queryByTestId('home-featured-events-empty')).toBeNull();
+    expect(screen.getByRole('link', { name: /list event/i })).toBeInTheDocument();
   });
 
   it('shows featured events as gold cards linking to their pages', async () => {
