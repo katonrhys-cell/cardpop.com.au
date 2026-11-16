@@ -8,6 +8,21 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // whose row hasn't been seeded — and one bad key failed the WHOLE batch, so
 // nothing on the page saved. The save must update existing rows value-only
 // (never clobbering curated labels) and insert missing rows with a label.
+//
+// It also guards ownership: platform_settings holds settings edited on other
+// admin pages (fee rates, AI allowances…). The page once wrote back every row
+// it had loaded, so saving it restored whatever those held when the tab opened.
+// It must write its own keys and nothing else.
+
+// Every field rendered on the page — the keys it owns (its DEFAULT_SETTINGS).
+const PAGE_KEYS = [
+  'site_name', 'contact_email', 'notification_email', 'maintenance_mode',
+  'listing_approval_required', 'max_images_per_listing', 'free_shipping_threshold_aud',
+  'default_shipping_rate_aud', 'require_mfa_admins', 'email_verification_required',
+  'enable_marketplace', 'enable_trading', 'enable_blog', 'banned_words',
+  'marketplace_identity_threshold_aud',
+  'google_workspace_referral_enabled', 'google_workspace_referral_url',
+];
 
 const state = vi.hoisted(() => ({
   existingKeys: [],
@@ -19,6 +34,10 @@ vi.mock('@/lib/supabaseClient.js', () => {
     const ctx = { upsert: null };
     const b = {
       select: vi.fn(() => b),
+      // Deliberately NOT applied: reads answer with every row in the table, as
+      // if no key filter existed, so the ownership tests prove the save itself
+      // leaves other pages' keys alone rather than leaning on a narrowed load.
+      in: vi.fn(() => b),
       upsert: vi.fn((payload, opts) => { ctx.upsert = { payload, opts }; return b; }),
       then: (resolve, reject) => {
         if (ctx.upsert) {
@@ -87,14 +106,7 @@ describe('AdminSettingsPage save', () => {
   it('sends no insert batch when every key already has a row', async () => {
     // All DEFAULT_SETTINGS keys present → the with-labels batch must not fire,
     // so curated labels can never be overwritten by derived ones.
-    state.existingKeys = [
-      'site_name', 'contact_email', 'notification_email', 'maintenance_mode',
-      'listing_approval_required', 'max_images_per_listing', 'free_shipping_threshold_aud',
-      'default_shipping_rate_aud', 'require_mfa_admins', 'email_verification_required',
-      'enable_marketplace', 'enable_trading', 'enable_blog', 'banned_words',
-      'marketplace_identity_threshold_aud',
-      'google_workspace_referral_enabled', 'google_workspace_referral_url',
-    ];
+    state.existingKeys = [...PAGE_KEYS];
     const user = userEvent.setup();
     render(<AdminSettingsPage />);
 
@@ -103,5 +115,48 @@ describe('AdminSettingsPage save', () => {
 
     expect(state.upserts).toHaveLength(1);
     expect(state.upserts[0].payload.every((r) => !('label' in r))).toBe(true);
+  });
+
+  it('never writes a key another admin page owns, even when the table holds one', async () => {
+    // Commission Settings owns the processing-fee rates. If this page wrote
+    // them back, an admin saving here would silently revert a rate changed in
+    // another tab since this one loaded.
+    const foreignKeys = [
+      'processing_fee_enabled', 'processing_fee_pct', 'processing_fee_fixed_aud',
+      'ai_monthly_limit_card_scan', 'refund_fee_retention_pct', 'invoice_supplier_details',
+      'nav_menu_icons',
+    ];
+    state.existingKeys = ['site_name', 'contact_email', ...foreignKeys];
+    const user = userEvent.setup();
+    render(<AdminSettingsPage />);
+
+    await user.click(await screen.findByRole('button', { name: /save/i }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+
+    const writtenKeys = state.upserts.flatMap((u) => u.payload.map((r) => r.key));
+    for (const key of foreignKeys) expect(writtenKeys).not.toContain(key);
+    // …and it still saves every one of its own, exactly once.
+    expect([...writtenKeys].sort()).toEqual([...PAGE_KEYS].sort());
+  });
+
+  it('reads only its own keys from the table', async () => {
+    const { supabase } = await import('@/lib/supabaseClient.js');
+    const user = userEvent.setup();
+    render(<AdminSettingsPage />);
+
+    await user.click(await screen.findByRole('button', { name: /save/i }));
+    await waitFor(() => expect(toast.success).toHaveBeenCalled());
+
+    // Both reads — the page load and the which-rows-exist check in the save.
+    const reads = supabase.from.mock.results
+      .map((r) => r.value)
+      .filter((b) => b.select.mock.calls.length > 0);
+    expect(reads).toHaveLength(2);
+    for (const b of reads) {
+      expect(b.in).toHaveBeenCalledTimes(1);
+      const [column, keys] = b.in.mock.calls[0];
+      expect(column).toBe('key');
+      expect([...keys].sort()).toEqual([...PAGE_KEYS].sort());
+    }
   });
 });
