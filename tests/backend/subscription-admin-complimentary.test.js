@@ -14,6 +14,7 @@ const mockRetrieve = vi.hoisted(() => vi.fn());
 const mockCancel = vi.hoisted(() => vi.fn());
 const mockCheckoutCreate = vi.hoisted(() => vi.fn());
 const mockCustomersCreate = vi.hoisted(() => vi.fn());
+const mockPriceRetrieve = vi.hoisted(() => vi.fn());
 const mockMaybeSingle = vi.hoisted(() => vi.fn());
 const mockUpdate = vi.hoisted(() => vi.fn());
 const mockUpdateEq = vi.hoisted(() => vi.fn());
@@ -26,7 +27,7 @@ vi.mock('../../src/utils/stripeClient.js', () => ({
     subscriptions: { retrieve: mockRetrieve, cancel: mockCancel },
     checkout: { sessions: { create: mockCheckoutCreate } },
     customers: { create: mockCustomersCreate, retrieve: vi.fn() },
-    prices: { retrieve: vi.fn() },
+    prices: { retrieve: mockPriceRetrieve },
     coupons: { create: vi.fn() },
   },
 }));
@@ -73,10 +74,21 @@ app.use('/subscription', subscriptionRouter);
 
 const RETURN = { successUrl: 'https://cardpop.com.au/account/membership', cancelUrl: 'https://cardpop.com.au/account/membership' };
 
+const yearlyPrice = (unitAmount, id = 'price_pro') => ({
+  id, active: true, currency: 'aud', unit_amount: unitAmount, recurring: { interval: 'year', interval_count: 1 },
+});
+const hobbyBuyer = () => mockMaybeSingle
+  // First maybeSingle: the gate's profile read; second: getOrCreateStripeCustomer.
+  .mockResolvedValueOnce({ data: { is_admin: false, subscription_status: 'none' }, error: null })
+  .mockResolvedValueOnce({ data: { stripe_customer_id: null, display_name: 'Col' }, error: null });
+const checkout = (tier) => request(app).post('/subscription/stripe/checkout').send({ ...RETURN, tier });
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env.APP_URL = 'https://cardpop.com.au';
-  process.env.STRIPE_SUBSCRIPTION_PRICE_ID = 'price_pro';
+  process.env.STRIPE_MEMBERSHIP_PRICE_ID_PRO = 'price_pro';
+  process.env.STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE = 'price_ultimate';
+  mockPriceRetrieve.mockImplementation(async (id) => yearlyPrice(id === 'price_ultimate' ? 19900 : 9900, id));
   // update(...).eq(...) resolves; a second .eq (the revoke's status filter) too.
   mockUpdateEq.mockImplementation(() => ({ eq: mockUpdateEq, then: (resolve) => resolve({ data: null, error: null }) }));
   mockUpdate.mockReturnValue({ eq: mockUpdateEq });
@@ -88,7 +100,7 @@ beforeEach(() => {
 describe('grantAdminComplimentaryMembership', () => {
   it('cancels a live Stripe subscription at once, with no final invoice, then marks the profile complimentary Ultimate', async () => {
     mockMaybeSingle.mockResolvedValue({ data: {
-      subscription_status: 'active', subscription_provider: 'stripe', subscription_tier: 'premium',
+      subscription_status: 'active', subscription_provider: 'stripe', subscription_tier: 'pro',
       stripe_subscription_id: 'sub_paid', paypal_subscription_id: null,
     }, error: null });
     mockRetrieve.mockResolvedValue({ id: 'sub_paid', status: 'active' });
@@ -221,5 +233,58 @@ describe('paid checkout refuses accounts that hold the plan free', () => {
     const res = await request(app).post('/subscription/paypal/create').send({ returnUrl: RETURN.successUrl, cancelUrl: RETURN.cancelUrl, tier: 'pro' });
     expect(res.status).toBe(409);
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe('POST /subscription/stripe/checkout — yearly plans charged at sign-up', () => {
+  it('opens a subscription checkout on the plan\'s yearly price with no trial', async () => {
+    hobbyBuyer();
+    const res = await checkout('ultimate');
+    expect(res.status).toBe(200);
+    expect(mockPriceRetrieve).toHaveBeenCalledWith('price_ultimate');
+    const [params] = mockCheckoutCreate.mock.calls[0];
+    expect(params.mode).toBe('subscription');
+    expect(params.line_items).toEqual([{ price: 'price_ultimate', quantity: 1 }]);
+    // No trial: the year is charged at checkout (Stripe rejects trial_period_days: 0).
+    expect(params.subscription_data).not.toHaveProperty('trial_period_days');
+    expect(params.subscription_data.metadata).toEqual({ userId: 'user-1', tier: 'ultimate' });
+  });
+
+  it('folds a retired tier name onto the plan that absorbed it', async () => {
+    hobbyBuyer();
+    const res = await checkout('premium');
+    expect(res.status).toBe(200);
+    expect(mockCheckoutCreate.mock.calls[0][0].line_items).toEqual([{ price: 'price_pro', quantity: 1 }]);
+    expect(mockCheckoutCreate.mock.calls[0][0].subscription_data.metadata.tier).toBe('pro');
+  });
+
+  it.each([
+    ['a monthly price', { ...yearlyPrice(9900), recurring: { interval: 'month', interval_count: 1 } }],
+    ['the wrong amount (the old $20 Pro price)', yearlyPrice(2000)],
+    ['the other plan\'s amount', yearlyPrice(19900)],
+    ['a price every two years', { ...yearlyPrice(9900), recurring: { interval: 'year', interval_count: 2 } }],
+    ['a non-AUD price', { ...yearlyPrice(9900), currency: 'usd' }],
+    ['an archived price', { ...yearlyPrice(9900), active: false }],
+    ['a one-off price', { ...yearlyPrice(9900), recurring: null }],
+  ])('answers 503 and opens no checkout when the configured price is %s', async (_label, price) => {
+    hobbyBuyer();
+    mockPriceRetrieve.mockResolvedValue(price);
+    const res = await checkout('pro');
+    expect(res.status).toBe(503);
+    expect(mockCheckoutCreate).not.toHaveBeenCalled();
+    expect(mockCustomersCreate).not.toHaveBeenCalled();
+  });
+
+  it('answers 503 when the plan\'s price id is not configured — the retired monthly variable is not a fallback', async () => {
+    delete process.env.STRIPE_MEMBERSHIP_PRICE_ID_PRO;
+    process.env.STRIPE_SUBSCRIPTION_PRICE_ID = 'price_old_monthly';
+    try {
+      const res = await checkout('pro');
+      expect(res.status).toBe(503);
+      expect(mockPriceRetrieve).not.toHaveBeenCalled();
+      expect(mockCheckoutCreate).not.toHaveBeenCalled();
+    } finally {
+      delete process.env.STRIPE_SUBSCRIPTION_PRICE_ID;
+    }
   });
 });

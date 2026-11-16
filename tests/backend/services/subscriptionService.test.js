@@ -81,17 +81,27 @@ describe('mapPaypalStatus', () => {
 
 describe('tierFromStripeSubscription', () => {
   it('trusts a valid tier stamped into the subscription metadata', () => {
-    expect(tierFromStripeSubscription({ metadata: { tier: 'premium' } })).toBe('premium');
+    expect(tierFromStripeSubscription({ metadata: { tier: 'pro' } })).toBe('pro');
     expect(tierFromStripeSubscription({ metadata: { tier: 'ultimate' } })).toBe('ultimate');
   });
 
+  it('resolves a retired tier stamp to the plan that absorbed it', () => {
+    expect(tierFromStripeSubscription({ metadata: { tier: 'premium' } })).toBe('pro');
+    expect(tierFromStripeSubscription({ metadata: { tier: 'elite' } })).toBe('ultimate');
+  });
+
   it('ignores a bogus metadata tier and falls back to the price-id match', () => {
-    vi.stubEnv('STRIPE_SUBSCRIPTION_PRICE_ID_ELITE', 'price_elite_123');
+    vi.stubEnv('STRIPE_MEMBERSHIP_PRICE_ID_ULTIMATE', 'price_ultimate_123');
+    // The retired monthly price variables are no longer read.
+    vi.stubEnv('STRIPE_SUBSCRIPTION_PRICE_ID_ULTIMATE', 'price_old_monthly');
     try {
       expect(tierFromStripeSubscription({
         metadata: { tier: 'god-mode' },
-        items: { data: [{ price: { id: 'price_elite_123' } }] },
-      })).toBe('elite');
+        items: { data: [{ price: { id: 'price_ultimate_123' } }] },
+      })).toBe('ultimate');
+      expect(tierFromStripeSubscription({
+        items: { data: [{ price: { id: 'price_old_monthly' } }] },
+      })).toBe('pro');
     } finally {
       vi.unstubAllEnvs();
     }
@@ -105,9 +115,9 @@ describe('tierFromStripeSubscription', () => {
 
 describe('tierFromPaypalPlanId', () => {
   it('resolves a configured per-tier plan id', () => {
-    vi.stubEnv('PAYPAL_SUBSCRIPTION_PLAN_ID_PREMIUM', 'P-PREMIUM');
+    vi.stubEnv('PAYPAL_SUBSCRIPTION_PLAN_ID_ULTIMATE', 'P-ULTIMATE');
     try {
-      expect(tierFromPaypalPlanId('P-PREMIUM')).toBe('premium');
+      expect(tierFromPaypalPlanId('P-ULTIMATE')).toBe('ultimate');
     } finally {
       vi.unstubAllEnvs();
     }
@@ -184,11 +194,11 @@ describe('complimentary memberships are never overwritten by provider events', (
 
     await applyStripeSubscription({
       id: 'sub_2', customer: 'cus_2', status: 'active',
-      metadata: { userId: 'buyer', tier: 'elite' }, items: { data: [] },
+      metadata: { userId: 'buyer', tier: 'ultimate' }, items: { data: [] },
     });
 
     expect(b.update).toHaveBeenCalledWith(expect.objectContaining({
-      subscription_status: 'active', subscription_tier: 'elite', stripe_subscription_id: 'sub_2',
+      subscription_status: 'active', subscription_tier: 'ultimate', stripe_subscription_id: 'sub_2',
     }));
     expect(markTrialRedeemed).toHaveBeenCalledWith('buyer');
   });
