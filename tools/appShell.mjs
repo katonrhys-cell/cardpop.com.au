@@ -21,7 +21,7 @@
 export const APP_SHELL_MAIN =
   '<main class="flex-grow flex flex-col">' +
     '<div class="min-h-[calc(100vh-8rem)] flex flex-col items-center justify-center bg-background">' +
-      '<div class="flex flex-col items-center gap-4 animate-in fade-in duration-500">' +
+      '<div class="flex flex-col items-center gap-4">' +
         '<div class="relative">' +
           '<div class="absolute inset-0 bg-primary/20 rounded-full blur-xl animate-pulse"></div>' +
           '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-10 h-10 text-primary animate-spin relative z-10" aria-hidden="true"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>' +

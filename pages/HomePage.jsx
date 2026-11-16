@@ -341,7 +341,10 @@ const HomePage = () => {
   const [featuredCards, setFeaturedCards]     = useState([]);
   const [featuredSellers, setFeaturedSellers] = useState([]);
   const [loading, setLoading]                 = useState(true);
-  const [heroCards, setHeroCards]             = useState(HERO_CARDS);
+  // null until the admin-configured set has been read (or has failed, when the
+  // built-in set stands in). Starting on the built-in cards showed them for a
+  // moment, wiped the shelf back to blanks, then dealt a different set.
+  const [heroCards, setHeroCards]             = useState(null);
   // Real platform counts — null until loaded; the strip renders nothing rather
   // than invented numbers if the query fails or the counts are still small.
   const [platformStats, setPlatformStats]     = useState(null);
@@ -496,9 +499,9 @@ const HomePage = () => {
   useEffect(() => {
     if (!isDesktop) return undefined;
     let isMounted = true;
-    fetchActiveShowcaseCards().then((cards) => {
-      if (isMounted && cards.length > 0) setHeroCards(cards);
-    });
+    fetchActiveShowcaseCards()
+      .then((cards) => { if (isMounted) setHeroCards(cards.length > 0 ? cards : HERO_CARDS); })
+      .catch(() => { if (isMounted) setHeroCards(HERO_CARDS); });
     return () => { isMounted = false; };
   }, [isDesktop]);
 
@@ -572,7 +575,7 @@ const HomePage = () => {
                 beside the headline. The column is the header's content box, so
                 the text starts flush with the logo and the shelf's right edge
                 lines up with the header's right edge. */}
-            {isDesktop && (
+            {isDesktop && heroCards && (
               <Suspense fallback={null}>
                 <HeroCardShowcase cards={heroCards} />
               </Suspense>
@@ -586,9 +589,12 @@ const HomePage = () => {
             <div className="text-center lg:text-left">
               {/* LIVE show badge */}
               <div
-                className="anim-pop-in inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase"
+                // No entrance animation here or on the trust chips below: this
+                // hero replaces an identical one already on screen (the static
+                // shell, then <HeroSection/>), so "popping in" made the badge
+                // and chips vanish and reappear mid-load.
+                className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase"
                 style={{
-                  animationDelay: '0.15s',
                   background: 'rgba(220,38,38,0.12)',
                   borderColor: 'rgba(220,38,38,0.35)',
                   color: '#f87171',
@@ -655,8 +661,7 @@ const HomePage = () => {
   
               {/* Trust chips */}
               <div
-                className="anim-fade-in flex flex-wrap items-center justify-center lg:justify-start gap-3"
-                style={{ animationDelay: '0.5s' }}
+                className="flex flex-wrap items-center justify-center lg:justify-start gap-3"
               >
                 {[
                   { icon: <ShieldCheck className="w-3.5 h-3.5" />, label: 'Buyer Protection on every order' },

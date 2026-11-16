@@ -194,7 +194,10 @@ const ShopPage = () => {
           </Select>
         </div>
 
+        {/* The whole catalogue always has filters, so hold their row's place
+            while the facet rows load instead of letting the grid drop 60px. */}
         <ShopFilterPanel
+          loading={!facets.loaded}
           options={facets.options}
           rows={facets.rows}
           selection={facets.selection}

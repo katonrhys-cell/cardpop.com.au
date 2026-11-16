@@ -2,12 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
+import PageLoader from '@/components/PageLoader.jsx';
 
-const Spinner = () => (
-  <div className="min-h-screen flex items-center justify-center bg-background">
-    <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-  </div>
-);
+// The same loader the static shell and the route Suspense show, so the
+// spinner doesn't change size and jump while the session is checked.
+const Spinner = PageLoader;
 
 const ProtectedAdminRoute = ({ children }) => {
   const { isAuthenticated, isAdmin, loading, profileLoading, listMFAFactors } = useAuth();
