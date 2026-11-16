@@ -60,6 +60,9 @@ insert into public.events (id, organiser_id, title, status, start_date, is_featu
   ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000b5', 'Paid show',   'approved', '2027-04-03', true);
 insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status, stripe_session_id)
 values ('00000000-0000-0000-0000-0000000000e5', '00000000-0000-0000-0000-0000000000b5', 'spotlight', 49, 49, 'paid', 'cs_paid');
+-- A promotion extra on the plain show: paid, but it is not a featuring.
+insert into public.event_feature_purchases (event_id, organiser_id, package, base_aud, amount_aud, status, stripe_session_id)
+values ('00000000-0000-0000-0000-0000000000e3', '00000000-0000-0000-0000-0000000000b5', 'post', 99, 99, 'paid', 'cs_extra');
 
 do $$ begin
   assert (select not is_featured from public.events where title = 'Plain show'), 'Pro does not spotlight events';
@@ -102,7 +105,7 @@ end $$;
 -- The membership ends (webhook drops the tier): only what it switched on goes.
 update public.profiles set subscription_tier = 'free', subscription_status = 'canceled' where display_name = 'Pro';
 do $$ begin
-  assert (select not is_featured and not membership_featured from public.events where title = 'Plain show'), 'spotlight ends with the membership';
+  assert (select not is_featured and not membership_featured from public.events where title = 'Plain show'), 'spotlight ends with the membership, even with a paid promotion extra';
   assert (select not is_featured and not membership_featured from public.events where id = '00000000-0000-0000-0000-0000000000e6'), 'spotlight ends with the membership (new event)';
   assert (select is_featured from public.events where title = 'Pinned show'), 'an admin pin survives the membership ending';
   assert (select is_featured from public.events where title = 'Paid show'), 'a paid featuring survives the membership ending';

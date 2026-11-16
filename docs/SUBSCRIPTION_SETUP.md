@@ -79,10 +79,14 @@ it:
 - A failed renewal drops the tier to Hobby while Stripe retries, so the
   spotlight pauses with it and returns when the payment succeeds.
 - Account → My Events shows **Featured · Ultimate** on those events and offers
-  no *Feature* button (`featureEligibility()`). The Instagram and homepage
-  packages are not sold self-serve for an event the membership already
-  features — an admin can still switch *Homepage featured* on in the event
-  form. Pro and Hobby organisers buy featuring per event exactly as before.
+  no *Feature* button (`featureEligibility()`). Pro and Hobby organisers buy
+  Calendar Spotlight per event ($49) as before.
+- **Membership and promotion extras never overlap.** The membership is the
+  placement on the site; the extras (Instagram story $49, Instagram post $99,
+  full event review $199) are hand-done promotion sold per event to any
+  organiser, Ultimate included, at the same price — see
+  `docs/event-featuring.md` → Promotion extras. A paid extra is not a
+  featuring: it does not keep an event featured when the membership ends.
 
 Test: `tests/db/run-membership-plans-migration.sh`.
 
