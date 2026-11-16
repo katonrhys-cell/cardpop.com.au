@@ -22,6 +22,9 @@ const LINKS = [
   ['instagram_url', 'Instagram', 'instagram.com/yourshow'],
   ['facebook_url', 'Facebook', 'facebook.com/yourshow'],
   ['youtube_url', 'YouTube channel', 'youtube.com/@yourshow'],
+  ['tiktok_url', 'TikTok', 'tiktok.com/@yourshow'],
+  ['x_url', 'X', 'x.com/yourshow'],
+  ['linktree_url', 'Linktree', 'linktr.ee/yourshow'],
 ];
 
 export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }) {
@@ -31,6 +34,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     instagram_url: org.instagram_url || '',
     facebook_url: org.facebook_url || '',
     youtube_url: org.youtube_url || '',
+    tiktok_url: org.tiktok_url || '',
+    x_url: org.x_url || '',
+    linktree_url: org.linktree_url || '',
   }));
   const [logoFile, setLogoFile] = useState(null);
   // Joint organisers: more logos beside the main one. Each item is a saved URL

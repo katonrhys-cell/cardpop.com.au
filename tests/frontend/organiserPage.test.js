@@ -14,6 +14,18 @@ describe('organiserLinks', () => {
   it('handles a missing organiser', () => {
     expect(organiserLinks(null)).toEqual([]);
   });
+  it('includes TikTok, X and Linktree after YouTube, http(s) only', () => {
+    const links = organiserLinks({
+      linktree_url: 'https://linktr.ee/show',
+      x_url: 'https://x.com/show',
+      tiktok_url: 'https://tiktok.com/@show',
+      youtube_url: 'https://youtube.com/@show',
+    });
+    expect(links.map((l) => [l.key, l.label])).toEqual([
+      ['youtube_url', 'YouTube'], ['tiktok_url', 'TikTok'], ['x_url', 'X'], ['linktree_url', 'Linktree'],
+    ]);
+    expect(organiserLinks({ x_url: 'javascript:alert(1)', tiktok_url: 'ftp://x' })).toEqual([]);
+  });
 });
 
 describe('canEditOrganiserPage', () => {

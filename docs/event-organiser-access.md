@@ -80,3 +80,21 @@ the prerender falls back to the original four, like the SPA.
 `event_organiser_verifications` (Admin → an event → Organiser access) is a
 separate, older flag that lets an event's organiser see its vendor list. It is
 independent of page ownership; an admin sets each deliberately.
+
+
+## Social links
+
+An organiser page carries website, Instagram, Facebook, YouTube, **TikTok, X and
+Linktree** links (`event_organisers.*_url`, http(s) only by a CHECK constraint;
+TikTok / X / Linktree arrived in `20261116110000_organiser_tiktok_x_linktree_links.sql`).
+The owner edits them in **Edit page** (`components/events/OrganiserPageEditor.jsx`);
+`organiserLinks()` in `utils/organiserPage.js` is the one list the page's icon
+buttons and the prerender's `Organization.sameAs` read. To add another, extend
+`LINK_FIELDS` + `ORGANISER_PAGE_COLUMNS` there, the editor's `LINKS`, and the
+page's `LINK_ICONS`.
+
+## Messages from collectors
+
+The owner of an organiser page also receives the messages collectors send from
+it (screened first) and reads them in **Your messages** on the page —
+`docs/organiser-messages.md`.

@@ -683,6 +683,31 @@ export function organiserRequestOutcomeEmail({ name, organiserName, approved, no
   );
 }
 
+// ─── Message to an organiser (docs/organiser-messages.md) ────────────────────
+
+// Sent to the owner of an organiser page once a member's message has passed
+// the screen. Reply-to is the sender, so answering is one click; the footer
+// says where to send anything that should not have got through.
+export function organiserMessageEmail({ ownerName, organiserName, senderName, senderEmail, topicLabel, message, inboxUrl }) {
+  const from = esc(senderName) || 'A CardPop member';
+  const body = `<p>${from} sent you a message from the <strong>${esc(organiserName) || 'organiser'}</strong> page on CardPop.</p>
+${summaryTable([
+  ['From', `${from}${senderEmail ? ` (${esc(senderEmail)})` : ''}`],
+  ['About', esc(topicLabel) || 'Message'],
+])}
+${quoteBlock('Their message', message)}
+<p style="margin:0;font-size:13px;line-height:1.6;color:${MUTED};">Reply to this email to answer ${from} directly. Messages are checked before they reach you. If this one is abusive or unwanted, forward it to admin@cardpop.com.au and we will deal with it.</p>`;
+  return cpEmail(
+    `New message from ${from}`,
+    'Message From a Collector',
+    `Hi ${esc(ownerName) || 'there'},`,
+    body,
+    inboxUrl || 'https://cardpop.com.au/account/events',
+    'Open your messages',
+    'You received this because you manage an event organiser page on CardPop.',
+  );
+}
+
 // ─── Shop owner request decided (member notification) ────────────────────────
 
 // The shop twin of organiserRequestOutcomeEmail: a member asked to own a card

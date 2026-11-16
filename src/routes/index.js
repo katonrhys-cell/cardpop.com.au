@@ -18,6 +18,7 @@ import eventScraperRouter from './event-scraper.js';
 import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
 import organiserRequestsRouter from './organiser-requests.js';
+import organiserMessagesRouter from './organiser-messages.js';
 import storeOwnerRequestsRouter from './store-owner-requests.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
@@ -115,6 +116,11 @@ export default () => {
     // Event organiser access: member requests + admin confirmation — docs/event-organiser-access.md
     router.use('/organiser-requests', apiLimiter);
     router.use('/organiser-requests', organiserRequestsRouter);
+
+    // Screened member-to-organiser messages — docs/organiser-messages.md
+    router.use('/organiser-messages', apiLimiter);
+    router.use('/organiser-messages', organiserMessagesRouter);
+
     // Card shop ownership: member requests + admin confirmation — docs/store-pages.md
     router.use('/store-owner-requests', apiLimiter);
     router.use('/store-owner-requests', storeOwnerRequestsRouter);

@@ -13,7 +13,7 @@ service-role key (`src/utils/aiUsage.js` → `recordAiUsage()`):
 
 | Column | Meaning |
 |---|---|
-| `feature` | `card_scan`, `card_scan_escalation`, `grade_estimate`, `card_description`, `blog_draft`, `event_discovery`, `event_extraction`, `supplier_price` |
+| `feature` | `card_scan`, `card_scan_escalation`, `grade_estimate`, `card_description`, `blog_draft`, `event_discovery`, `event_extraction`, `supplier_price`, `organiser_message_scan` |
 | `model` | The model that served the call (`message.model`, so a server-side fallback is priced correctly) |
 | `user_id` | The member, for the three member-facing features; null for cron and admin work |
 | `input_tokens` / `output_tokens` / `cache_read_tokens` / `cache_write_tokens` / `web_search_requests` | From the response's `usage` |
