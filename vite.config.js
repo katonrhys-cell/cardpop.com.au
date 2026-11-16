@@ -288,7 +288,9 @@ function addRoutePreloadMap(html, bundle, warn) {
 // its size-adjust is deliberately oversized so no later Syne repaint can become
 // a larger LCP candidate (see index.css). Keep in sync with index.css.
 const SYNE_FALLBACK_FONT_FACE =
-	"@font-face{font-family:'Syne Fallback';src:local('Arial'),local('Roboto'),local('Liberation Sans'),local('DejaVu Sans');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:115%}";
+	"@font-face{font-family:'Syne Fallback';src:local('Arial'),local('Roboto'),local('Liberation Sans'),local('DejaVu Sans');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:115%}" +
+	"@font-face{font-family:'Syne Fallback';font-weight:700 800;src:local('Arial Bold'),local('Arial-BoldMT'),local('Roboto Bold'),local('Roboto-Bold'),local('Liberation Sans Bold'),local('LiberationSans-Bold'),local('DejaVu Sans Bold'),local('DejaVuSans-Bold');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:113%}" +
+	"@font-face{font-family:'Syne Fallback';font-weight:600;src:local('Arial'),local('Roboto'),local('Liberation Sans'),local('DejaVu Sans');ascent-override:94%;descent-override:26%;line-gap-override:0%;size-adjust:115%}";
 
 // Normalise a bare host or full URL to an origin (`https://img.cardpop.com.au`),
 // mirroring normalizeCdnHost in utils/imageUrl.js. Returns null when unset.
