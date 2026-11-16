@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { Camera, Clock, ExternalLink, Instagram, MapPin, Pencil, Phone, Video } from 'lucide-react';
+import { Camera, Clock, ExternalLink, Instagram, MapPin, Pencil, Phone, Store as StoreIcon, Video } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { EventPhotoGrid } from '@/components/reviews/EventReviewGallery.jsx';
 import { ReviewVideoPlayer } from '@/components/reviews/EventReviewVideo.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toCdnUrl } from '@/utils/imageUrl.js';
-import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS, fetchStore } from '@/lib/storeDirectory.js';
+import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS, fetchStore, fetchStoreOwnerId } from '@/lib/storeDirectory.js';
+import StoreEditorDialog from '@/components/admin/StoreEditorDialog.jsx';
 import {
   cleanStorePhotos,
   cleanStoreVideos,
@@ -30,19 +31,33 @@ const SITE_ORIGIN = 'https://cardpop.com.au';
 // See docs/store-pages.md.
 const StorePage = () => {
   const { city, slug } = useParams();
-  const { isAdmin } = useAuth();
+  const { isAdmin, currentUser } = useAuth();
   const cityInfo = DIRECTORY_CITIES[city];
   // undefined = loading, null = not found
   const [store, setStore] = useState(undefined);
 
+  // undefined = not known (loading, or the ownership column isn't readable),
+  // null = no owner yet, otherwise the owner's user id.
+  const [ownerId, setOwnerId] = useState(undefined);
+  const [editing, setEditing] = useState(false);
+
   useEffect(() => {
     let cancelled = false;
     setStore(undefined);
+    setOwnerId(undefined);
     fetchStore(slug)
       .then((data) => { if (!cancelled) setStore(data); })
       .catch(() => { if (!cancelled) setStore(null); });
+    fetchStoreOwnerId(slug).then((id) => { if (!cancelled) setOwnerId(id); });
     return () => { cancelled = true; };
   }, [slug]);
+
+  // After the owner saves: re-read the page in place (no loading flash).
+  const reload = useCallback(() => {
+    fetchStore(slug).then((data) => { if (data) setStore(data); }).catch(() => {});
+  }, [slug]);
+
+  const isOwner = Boolean(currentUser?.id) && ownerId === currentUser.id;
 
   if (!cityInfo) return <Navigate to="/card-shops" replace />;
   if (store === null) return <Navigate to={`/card-shops/${city}`} replace />;
@@ -119,6 +134,15 @@ const StorePage = () => {
               )}
               <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
             </div>
+            {isOwner && !isAdmin && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+              >
+                <Pencil className="w-4 h-4" /> Edit this page
+              </button>
+            )}
             {isAdmin && (
               <Link
                 to={`/admin/store-directory?edit=${encodeURIComponent(store.slug)}`}
@@ -247,6 +271,38 @@ const StorePage = () => {
             )}
           </aside>
         </div>
+
+        {/* Nobody manages this page yet: its real owner can apply to. */}
+        {ownerId === null && store.status === 'approved' && (
+          <section className="bg-card border border-border rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0">
+              <h2 className="font-heading text-lg font-bold flex items-center gap-2">
+                <StoreIcon className="w-4 h-4 text-brand-red" aria-hidden="true" /> Is this your shop?
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Apply to manage this page and keep its hours, photos and details up to date yourself. It’s free, and we confirm every owner.
+              </p>
+            </div>
+            <Link
+              to={currentUser
+                ? `/account/events?claim=${encodeURIComponent(store.slug)}`
+                : `/signup?next=${encodeURIComponent(`/account/events?claim=${store.slug}`)}`}
+              className="shrink-0 inline-flex items-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground hover:opacity-90"
+            >
+              Apply to manage this page
+            </Link>
+          </section>
+        )}
+
+        {isOwner && (
+          <StoreEditorDialog
+            open={editing}
+            store={store}
+            ownerMode
+            onClose={() => setEditing(false)}
+            onSaved={reload}
+          />
+        )}
 
         <Link to={`/card-shops/${city}`} className="inline-block text-sm text-primary hover:underline">
           ← More card shops in {cityInfo.label}

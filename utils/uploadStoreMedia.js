@@ -3,8 +3,10 @@ import { compressImage } from '@/utils/compressImage.js';
 import { captureVideoPoster } from '@/utils/cardVideo.js';
 import { reviewVideoFileError } from '@/utils/eventReview.js';
 
-// Uploads for a card shop's page (Admin → Store Directory → Edit). Both go to
-// the admin-only `media` bucket under stores/<slug>/, on a timestamped,
+// Uploads for a card shop's page (Admin → Store Directory → Edit, or the
+// shop's confirmed owner from the page itself). They go to the `media` bucket
+// under stores/<slug>/ — admins anywhere in it, an owner only in their own
+// shop's folder (storage policy store_owner_media_insert) — on a timestamped,
 // immutable path with a year-long cache header — the rules every other upload
 // follows (docs/image-cdn.md). They return canonical Supabase public URLs; the
 // CDN rewrite happens at render time.
@@ -16,8 +18,12 @@ const safeSegment = (value, fallback) =>
     .replace(/^-+|-+$/g, '')
     .slice(0, 48) || fallback;
 
+// The folder is the shop's slug, whole: the storage policy that lets a shop's
+// owner upload matches the folder name to local_game_stores.slug exactly.
+const slugSegment = (slug) => String(slug || '').toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'store';
+
 const stem = (slug, kind, file, fallback) =>
-  `stores/${safeSegment(slug, 'store')}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${safeSegment((file.name || '').replace(/\.[^/.]+$/, ''), fallback)}`;
+  `stores/${slugSegment(slug)}/${kind}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}-${safeSegment((file.name || '').replace(/\.[^/.]+$/, ''), fallback)}`;
 
 /** One photo, compressed in the browser first. Returns its public URL. */
 export const uploadStorePhoto = async (file, slug, { kind = 'photos', maxDimension = 2000 } = {}) => {

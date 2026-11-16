@@ -6,6 +6,7 @@ import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import EventFormModal from '@/components/EventFormModal.jsx';
 import OrganiserAccessCard from '@/components/events/OrganiserAccessCard.jsx';
 import { useOrganiserAccess } from '@/hooks/useOrganiserAccess.js';
+import { useStoreOwnerAccess } from '@/hooks/useStoreOwnerAccess.js';
 import OrganiserVendorsDialog from '@/components/events/OrganiserVendorsDialog.jsx';
 import EventSearchDialog from '@/components/events/EventSearchDialog.jsx';
 import EventViewsDialog from '@/components/events/EventViewsDialog.jsx';
@@ -53,6 +54,7 @@ const AccountEvents = () => {
   // { [eventId]: { total, last7, last30 } } — other people's views of live events.
   const [viewStats, setViewStats] = useState({});
   const organiserAccess = useOrganiserAccess(currentUser?.id);
+  const storeOwnerAccess = useStoreOwnerAccess(currentUser?.id);
   const [vendorsEvent, setVendorsEvent] = useState(null);
   const [badgeEvent, setBadgeEvent] = useState(null);
   const [searchEvent, setSearchEvent] = useState(null);
@@ -355,7 +357,11 @@ const AccountEvents = () => {
       }
     >
 
-      <OrganiserAccessCard access={organiserAccess} />
+      <OrganiserAccessCard
+        access={organiserAccess}
+        storeAccess={storeOwnerAccess}
+        claimStoreSlug={searchParams.get('claim') || ''}
+      />
 
       <div className="flex items-start gap-3 p-4 bg-primary/5 border border-primary/20 rounded-2xl text-sm text-muted-foreground">
         <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" aria-hidden="true" />

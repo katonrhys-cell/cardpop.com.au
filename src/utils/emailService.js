@@ -13,6 +13,7 @@ import {
   eventSubmittedEmail,
   eventReviewOutcomeEmail,
   organiserRequestOutcomeEmail,
+  storeOwnerRequestOutcomeEmail,
   eventChangesMadeEmail,
   eventFeaturePaidEmail,
   identityReviewNeededEmail,
@@ -315,6 +316,17 @@ export async function sendOrganiserRequestOutcome({ to, name, organiserName, app
       ? `You're confirmed as the organiser of ${organiserName || 'your page'}`
       : `Your organiser request wasn’t approved`,
     html: organiserRequestOutcomeEmail({ name, organiserName, approved, note, pageUrl }),
+  });
+}
+
+// A member's request to own a card shop page was approved or declined.
+export async function sendStoreOwnerRequestOutcome({ to, name, storeName, approved, note, pageUrl }) {
+  return send({
+    to,
+    subject: approved
+      ? `You're confirmed as the owner of ${storeName || 'your shop'} on CardPop`
+      : 'Your shop owner request wasn’t approved',
+    html: storeOwnerRequestOutcomeEmail({ name, storeName, approved, note, pageUrl }),
   });
 }
 

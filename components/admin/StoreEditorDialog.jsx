@@ -38,10 +38,13 @@ const move = (list, i, dir) => {
 
 // Add or edit one card shop's page (Admin → Store Directory). `store` is the
 // row being edited, or null to add a new one (created already approved).
+// `ownerMode` is the shop's confirmed owner editing from the page itself: the
+// name and city are shown but locked (the database pins them for an owner —
+// trg_local_game_stores_owner_guard).
 // Photos and video clips upload to the admin-only `media` bucket as they are
 // picked; nothing reaches the store until Save. `takenSlugs` keeps a new
 // store's slug unique. See docs/store-pages.md.
-const StoreEditorDialog = ({ open, store, takenSlugs = [], onClose, onSaved }) => {
+const StoreEditorDialog = ({ open, store, takenSlugs = [], ownerMode = false, onClose, onSaved }) => {
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(null); // 'logo' | 'photos' | 'video' | null
@@ -165,7 +168,9 @@ const StoreEditorDialog = ({ open, store, takenSlugs = [], onClose, onSaved }) =
         <DialogHeader>
           <DialogTitle>{store ? `Edit ${store.name}` : 'Add a store'}</DialogTitle>
           <DialogDescription>
-            {store
+            {ownerMode
+              ? 'Everything here shows on your shop’s page in the CardPop directory. Changes go live when you save.'
+              : store
               ? 'Everything here shows on the shop’s own page in the directory.'
               : 'The store goes live in the directory as soon as you save.'}
           </DialogDescription>
@@ -175,11 +180,12 @@ const StoreEditorDialog = ({ open, store, takenSlugs = [], onClose, onSaved }) =
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Label htmlFor="store-name">Store name</Label>
-              <Input id="store-name" value={form.name} onChange={(e) => set({ name: e.target.value })} maxLength={120} />
+              <Input id="store-name" value={form.name} onChange={(e) => set({ name: e.target.value })} maxLength={120} disabled={ownerMode} />
+              {ownerMode && <p className="text-xs text-muted-foreground mt-1">Need the name or city changed? Message CardPop and we’ll update it.</p>}
             </div>
             <div>
               <Label>City / region</Label>
-              <Select value={form.city} onValueChange={(city) => set({ city })}>
+              <Select value={form.city} onValueChange={(city) => set({ city })} disabled={ownerMode}>
                 <SelectTrigger><SelectValue placeholder="Choose a city" /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(DIRECTORY_CITIES).map(([slug, info]) => (
