@@ -70,6 +70,22 @@
 
         <div class="flex-1"></div>
 
+        <!-- Member controls. A visitor with a saved sign-in gets the member's
+             header from the first paint: the CSP bootstrap (vite.config.js) puts
+             `cp-member` on <html> when a Supabase session is cached — and
+             `cp-admin` when lib/headerHints.js last saw an admin — and the
+             rules in index.html's critical CSS swap the `cps-guest` pieces for
+             the `cps-member` / `cps-admin` ones (all `display: contents`
+             wrappers). Mirrors Header.jsx's `memberLayout` state: Admin (xl),
+             Messages (sm+), bell, theme toggle hidden below sm, avatar circle. -->
+        <span class="cps-admin" aria-hidden="true">
+          <span class="hidden xl:flex items-center justify-center whitespace-nowrap h-9 px-3 text-xs font-medium gap-2 rounded-xl text-[hsl(var(--admin-warning,24.6_95%_53.1%))]"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>Admin</span>
+        </span>
+        <span class="cps-member" aria-hidden="true">
+          <span class="hidden sm:flex items-center justify-center h-11 w-11 shrink-0 rounded-xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+          <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span>
+        </span>
+
         <!-- Sell CTA lookalike — mirrors Header's outline "Sell" button (a real link:
              /vault/add sends a signed-out visitor to sign in). Icon-only below sm. -->
         <a href="/vault/add" aria-label="Sell a card" class="items-center justify-center whitespace-nowrap border border-input bg-background shadow-sm h-9 text-xs inline-flex font-bold rounded-xl gap-1.5 shrink-0 px-2.5 sm:px-3">
@@ -79,8 +95,11 @@
 
         <!-- Theme toggle placeholder (moon = light-mode default). The icons are
              16px: Button's `[&_svg]:size-4` outranks the h-5/h-6 the real icons carry. -->
-        <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        <span class="cps-guest" aria-hidden="true">
+          <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
+        </span>
+        <span class="cps-member" aria-hidden="true">
+          <span class="hidden sm:inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>
         </span>
 
         <!-- Cart placeholder -->
@@ -88,11 +107,19 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
         </span>
 
-        <!-- Account area — matches Header's signed-out authLoading skeleton (Login + Sign up widths) -->
-        <div class="hidden md:flex items-center gap-2 shrink-0" aria-hidden="true">
-          <div class="h-9 w-[57px] rounded-xl bg-muted animate-pulse"></div>
-          <div class="h-9 w-[74px] rounded-xl bg-muted animate-pulse"></div>
-        </div>
+        <!-- Account area — matches Header's authLoading skeletons: Login + Sign up
+             widths for a guest, the avatar circle for a member. -->
+        <span class="cps-guest" aria-hidden="true">
+          <div class="hidden md:flex items-center gap-2 shrink-0">
+            <div class="h-9 w-[57px] rounded-xl bg-muted animate-pulse"></div>
+            <div class="h-9 w-[74px] rounded-xl bg-muted animate-pulse"></div>
+          </div>
+        </span>
+        <span class="cps-member" aria-hidden="true">
+          <div class="hidden md:flex items-center gap-2 shrink-0">
+            <div class="h-10 w-10 rounded-full bg-muted animate-pulse"></div>
+          </div>
+        </span>
 
         <!-- Mobile hamburger placeholder -->
         <span class="lg:hidden inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">

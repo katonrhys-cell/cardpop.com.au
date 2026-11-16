@@ -9,6 +9,7 @@ import { AUTH_TOKEN_STORAGE_KEY, QUIET_PREFIXES as ANNOUNCEMENT_QUIET } from '@/
 import { QUIET_PREFIXES as COOKIE_QUIET } from '@/components/CookieConsentBanner.jsx';
 import { appShellFromHomeShell, APP_SHELL_MAIN } from '../../tools/appShell.mjs';
 import { DESKTOP_NAV_PLACEHOLDER, NAV_ITEM_CLASS } from '@/components/HeaderNavPlaceholder.jsx';
+import { ADMIN_HINT_STORAGE_KEY } from '@/lib/headerHints.js';
 
 // The static homepage shell is what the first paint shows before any JS runs.
 // It must match what React renders on its first commit (or the takeover shifts
@@ -163,6 +164,48 @@ describe('static shell header matches the real header', () => {
   it('default tab title is the static document’s title', () => {
     const staticTitle = read('index.html').match(/<title>([^<]+)<\/title>/)[1];
     expect(read('App.jsx')).toContain(`<title>${staticTitle}</title>`);
+  });
+});
+
+// A visitor with a saved sign-in gets the member's header from the first paint:
+// the bootstrap marks <html>, the critical CSS swaps the pieces, and Header.jsx
+// renders the same layout while the session is still being checked.
+describe('static shell header for a signed-in member', () => {
+  const read = (rel) => readFileSync(path.join(root, rel), 'utf8');
+  const indexHtml = read('index.html');
+  const header = read('components/Header.jsx');
+
+  it('bootstrap marks members and remembered admins using the app’s storage keys', () => {
+    expect(bootstrap).toContain(`if(localStorage.getItem("${AUTH_TOKEN_STORAGE_KEY}")){de.classList.add("cp-member")`);
+    expect(bootstrap).toContain(`localStorage.getItem("${ADMIN_HINT_STORAGE_KEY}")==="1")de.classList.add("cp-admin")`);
+  });
+
+  it('critical CSS shows the guest pieces by default and swaps them for a member', () => {
+    const css = indexHtml.replace(/\s+/g, ' ');
+    expect(css).toContain('.cps-guest { display: contents; }');
+    expect(css).toContain('.cps-member, .cps-admin { display: none; }');
+    expect(css).toContain('.cp-member .cps-guest { display: none; }');
+    expect(css).toContain('.cp-member .cps-member, .cp-admin .cps-admin { display: contents; }');
+    // …and the build keeps those rules although nothing matches them at build time.
+    expect(viteConfig).toMatch(/allowRules: \[[^\]]*cp-\(member\|admin\)[^\]]*cps-\(guest\|member\|admin\)/);
+  });
+
+  it('shell carries guest, member and admin variants', () => {
+    expect(shell.match(/class="cps-guest"/g)).toHaveLength(2);  // theme toggle, Login/Sign up skeleton
+    expect(shell.match(/class="cps-member"/g)).toHaveLength(3); // messages + bell, theme toggle, avatar
+    expect(shell.match(/class="cps-admin"/g)).toHaveLength(1);
+    // Same skeleton sizes Header.jsx renders while auth is loading.
+    for (const cls of ['h-9 w-[57px] rounded-xl bg-muted animate-pulse', 'h-9 w-[74px] rounded-xl bg-muted animate-pulse', 'h-10 w-10 rounded-full bg-muted animate-pulse']) {
+      expect(shell).toContain(cls);
+      expect(header).toContain(cls);
+    }
+  });
+
+  it('Header lays out as a member while a saved session is pending', () => {
+    expect(header).toContain('const authPending = authLoading && optimisticAuth;');
+    expect(header).toContain('const memberLayout = isAuthenticated || authPending;');
+    expect(header).toContain('{showAdminLink && (');
+    expect(header).not.toContain('!authLoading && isAuthenticated && (');
   });
 });
 
