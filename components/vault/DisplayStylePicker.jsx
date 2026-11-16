@@ -29,8 +29,6 @@ const STYLE_ICON = {
 // Tier pill styling for locked styles, drawn from the existing tier palette.
 const TIER_PILL = {
   pro:      'bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-400/40',
-  premium:  'bg-violet-500/10 text-violet-700 dark:text-violet-400 border-violet-400/40',
-  elite:    'bg-amber-500/10 text-amber-800 dark:text-amber-400 border-amber-400/40',
   ultimate: 'bg-primary/10 text-primary border-primary/40',
 };
 

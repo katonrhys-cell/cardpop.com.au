@@ -6,7 +6,7 @@ import {
   ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
   FolderTree, RefreshCw, ArrowRightLeft, Calendar,
   Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen, Gift, Megaphone } from 'lucide-react';
+  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen, Gift, Megaphone, Shapes } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -305,6 +305,7 @@ const AdminDashboard = () => {
           <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />
           <ManagementBox title="Event Reviews" description="Write and publish reviews of the shows CardPop attends." icon={ClipboardPen} link="/admin/event-reviews" />
           <ManagementBox title="Hero Showcase" description="Manage cards in the homepage hero animation." icon={Sparkles} link="/admin/hero-showcase" />
+          <ManagementBox title="Menu Icons" description="Change the icon beside each item in the header’s dropdown menus — upload a picture or pick another icon." icon={Shapes} link="/admin/menu-icons" />
           <ManagementBox title="Collection Sections" description="Pin cards to collection page strips." icon={LayoutList} link="/admin/collection-sections" />
           <ManagementBox title="Media Library" description="Upload and manage images." icon={Image} link="/admin/media" />
           <ManagementBox title="Card Art" description="Upload thumbnails for sports cards and override card art in analytics." icon={Image} link="/admin/card-art" />

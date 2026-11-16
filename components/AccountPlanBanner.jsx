@@ -9,11 +9,11 @@ import { PLANS, PLAN_ORDER, PLAN_HOBBY, planKeyFromTier, planRank, isTopPlan, ne
 /**
  * Compact plan-and-next-steps banner for the account dashboard.
  *
- *   • shows which plan the account is on (Hobby, Pro, Premium, Elite or
- *     Ultimate) with the whole ladder beside it, the current step marked
+ *   • shows which plan the account is on (Hobby, Pro or Ultimate) with the
+ *     whole ladder beside it, the current step marked
  *   • offers "Upgrade your plan" to everyone except Ultimate members — the
  *     link preselects the next step up on Account → Membership, where a paid
- *     member switches tier in place and a Hobby member starts a trial
+ *     member switches plan in place and a Hobby member joins (charged yearly)
  *   • nudges Hobby users to verify their ID (to unlock selling/trading) and
  *     sellers to keep a card on file for one-tap buying
  *   • a complimentary membership (`subscription_status === 'grandfathered'` —
@@ -72,7 +72,7 @@ const AccountPlanBanner = () => {
                   : 'CardPop covers this membership — you are never billed for it.'}
               </p>
             ) : topPlan ? (
-              <p className="text-sm text-muted-foreground">You're on our top plan — unlimited listings and every display style.</p>
+              <p className="text-sm text-muted-foreground">You're on our top plan — unlimited listings, every display style and Calendar Spotlight on your events.</p>
             ) : (
               <p className="text-sm text-muted-foreground">
                 Next up: <span className="font-semibold text-foreground">{PLANS[nextPlan].name}</span> — {PLANS[nextPlan].tagline}
@@ -90,7 +90,7 @@ const AccountPlanBanner = () => {
       {/* The plan ladder — where this account sits and what each step costs.
           Every step is a link to the membership page with that tier
           preselected; the current one just links to Membership. */}
-      <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5" aria-label="Plan options">
+      <ol className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-label="Plan options">
         {PLAN_ORDER.map((key) => {
           const plan = PLANS[key];
           const isCurrent = key === currentPlanKey;
@@ -116,7 +116,7 @@ const AccountPlanBanner = () => {
                 )}
                 <span className={`font-bold ${isCurrent ? 'pr-16 text-foreground' : !isBelow ? 'text-foreground' : ''}`}>{plan.name}</span>
                 <span className="text-xs text-muted-foreground">
-                  {isCurrent && complimentary ? 'Included free' : plan.priceAud ? `$${plan.priceAud}/mo` : 'Free'}
+                  {isCurrent && complimentary ? 'Included free' : plan.priceAud ? `$${plan.priceAud}/yr` : 'Free'}
                   {' · '}
                   {plan.limits.listingsPerMonth == null ? 'Unlimited listings' : `${plan.limits.listingsPerMonth} listings/mo`}
                 </span>

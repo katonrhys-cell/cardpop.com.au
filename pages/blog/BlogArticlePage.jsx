@@ -202,6 +202,10 @@ const resolveCardImage = (path) => {
   return publicImageUrl(path);
 };
 
+// The article row fetched at a legacy URL (/blog/<uuid>, /blog/slug/<slug>),
+// held for the moment it takes the redirect to the clean /blog/<slug> to land.
+let redirectHandoff = null;
+
 const BlogArticlePage = () => {
   const { id, slug } = useParams();
   const navigate = useNavigate();
@@ -221,23 +225,38 @@ const BlogArticlePage = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let redirecting = false;
     const fetchArticleData = async () => {
       setLoading(true);
       setError(null);
       try {
-        let query = supabase.from('blog_articles').select('*');
-        query = bySlug
-          ? query.eq('slug', identifier).single()
-          : query.eq('id', identifier).single();
+        let res = null;
+        if (bySlug && redirectHandoff?.slug === identifier) {
+          // Arrived from the redirect below — the row is already in hand.
+          res = redirectHandoff;
+          redirectHandoff = null;
+        } else {
+          let query = supabase.from('blog_articles').select('*');
+          query = bySlug
+            ? query.eq('slug', identifier).single()
+            : query.eq('id', identifier).single();
 
-        const { data: res, error: fetchErr } = await query;
-        if (fetchErr) throw fetchErr;
-        if (cancelled) return;
+          const { data, error: fetchErr } = await query;
+          if (fetchErr) throw fetchErr;
+          if (cancelled) return;
+          res = data;
+        }
 
         // Redirect UUID URLs and /blog/slug/ prefixed URLs to clean /blog/[slug]
         if (res.slug) {
           const target = `/blog/${res.slug}`;
           if (window.location.pathname !== target) {
+            // Hand the row to the render at the clean URL and keep the
+            // skeleton up: clearing `loading` here (the `finally` below)
+            // flashed "Article Not Found" until the same article had been
+            // fetched a second time.
+            redirectHandoff = res;
+            redirecting = true;
             navigate(target, { replace: true });
             return;
           }
@@ -306,7 +325,7 @@ const BlogArticlePage = () => {
       } catch (err) {
         if (!cancelled) setError('Article not found or unavailable.');
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !redirecting) setLoading(false);
       }
     };
     fetchArticleData();

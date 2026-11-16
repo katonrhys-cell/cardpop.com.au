@@ -48,7 +48,7 @@
               <rect x="14" y="23" width="28" height="31" rx="2.5" stroke="currentColor" stroke-width="1.5" opacity="0.6"/>
             </svg>
             <span class="flex flex-col leading-none">
-              <span class="font-serif font-bold tracking-wide leading-none text-[1.55rem]"><span class="text-foreground">Card</span><span class="text-primary">Pop<sup class="text-[0.5em] leading-none text-foreground" style="text-decoration:none">™</sup></span></span>
+              <span class="font-serif font-bold tracking-wide leading-none text-[1.55rem]"><span class="text-foreground">Card</span><span class="text-primary relative">Pop<sup class="absolute left-full top-[0.22em] text-[0.65em] font-sans font-normal tracking-normal leading-none text-foreground">™</sup></span></span>
               <span class="flex items-center gap-1.5 mt-1 text-[9px] font-bold tracking-[0.28em] uppercase text-muted-foreground">
                 <span class="flex-1 h-px bg-border"></span>
                 Australia
@@ -70,14 +70,22 @@
 
         <div class="flex-1"></div>
 
-        <!-- Theme toggle placeholder (moon = light-mode default) -->
+        <!-- Sell CTA lookalike — mirrors Header's outline "Sell" button (a real link:
+             /vault/add sends a signed-out visitor to sign in). Icon-only below sm. -->
+        <a href="/vault/add" aria-label="Sell a card" class="items-center justify-center whitespace-nowrap border border-input bg-background shadow-sm h-9 text-xs inline-flex font-bold rounded-xl gap-1.5 shrink-0 px-2.5 sm:px-3">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+          <span class="hidden sm:inline">Sell</span>
+        </a>
+
+        <!-- Theme toggle placeholder (moon = light-mode default). The icons are
+             16px: Button's `[&_svg]:size-4` outranks the h-5/h-6 the real icons carry. -->
         <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
         </span>
 
         <!-- Cart placeholder -->
         <span class="inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg>
         </span>
 
         <!-- Account area — matches Header's signed-out authLoading skeleton (Login + Sign up widths) -->
@@ -88,51 +96,61 @@
 
         <!-- Mobile hamburger placeholder -->
         <span class="lg:hidden inline-flex items-center justify-center h-11 w-11 shrink-0 rounded-xl" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
         </span>
       </div>
 
-      <!-- Row 2: nav links (desktop only) — mirrors Header.jsx row 2; dropdown
-           triggers link to their hub pages until React swaps in the real menus -->
+      <!-- Mobile/tablet search row — mirrors Header.jsx (rendered below lg only).
+           Without it the header was 65px shorter here than React's, and the
+           whole page dropped by that much on every phone load. -->
+      <div class="lg:hidden py-2.5 border-b border-border/40" aria-hidden="true">
+        <div class="relative w-full max-w-md max-w-full">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <div class="flex h-11 w-full items-center rounded-full border border-[hsl(var(--input-border))] bg-background pl-9 pr-10 text-base md:text-sm shadow-sm text-muted-foreground">Search cards, sets, sellers...</div>
+        </div>
+      </div>
+
+      <!-- Row 2: nav links (desktop only) — the same seven labels, order and classes
+           as components/HeaderNavPlaceholder.jsx, which is what React renders
+           here until the real menus load. Change both together (a test checks). -->
       <div class="hidden lg:flex items-center py-1.5">
         <nav class="flex items-center justify-evenly w-full">
-          <a href="/marketplace" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Browse Collections<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
-          <a href="/shop" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Shop</a>
-          <a href="/marketplace" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Marketplace</a>
-          <a href="/analytics" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Analytics</a>
-          <a href="/blog" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Blog<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
-          <a href="/community" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Community<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
-          <a href="/events" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Events<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
-          <a href="/grading" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">Grading<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
-          <a href="/about" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium whitespace-nowrap text-muted-foreground">About</a>
+          <div class="relative"><a href="/marketplace" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-muted-foreground">Buy Cards<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
+          <div class="relative"><a href="/shop" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-muted-foreground">Supplies<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
+          <a href="/vault/add" class="px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-primary font-bold">Sell</a>
+          <div class="relative"><a href="/analytics" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-muted-foreground">Prices<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
+          <div class="relative"><a href="/community" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-muted-foreground">Community<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
+          <div class="relative"><a href="/grading" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-muted-foreground">Grading<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
+          <div class="relative"><a href="/about" class="flex items-center gap-1 px-2 xl:px-3 py-2 rounded-lg text-[13px] xl:text-sm font-medium transition-all duration-200 whitespace-nowrap text-muted-foreground">More<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3.5 h-3.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a></div>
         </nav>
       </div>
     </div>
   </header>
   <main class="flex-grow flex flex-col">
-    <section class="relative min-h-[92dvh] flex items-start justify-center pt-10 sm:pt-14 pb-16 overflow-hidden bg-zinc-950">
+    <section class="relative lg:min-h-[92dvh] flex items-start justify-center pt-8 sm:pt-14 pb-10 sm:pb-16 overflow-hidden bg-zinc-950">
       <div class="absolute inset-0 bg-gradient-to-b from-zinc-950 via-[#0f0f14] to-zinc-950 pointer-events-none"></div>
       <div class="max-w-[90rem] mx-auto w-full px-5 sm:px-8 lg:px-12 xl:px-16 relative z-10 lg:pr-[548px] xl:pr-[624px]">
         <div class="text-center lg:text-left">
-          <div class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-8 border text-sm font-black tracking-wider uppercase" style="background:rgba(220,38,38,0.12);border-color:rgba(220,38,38,0.35);color:#f87171;box-shadow:0 0 24px rgba(220,38,38,0.2)">
+          <div class="inline-flex items-center gap-2.5 px-4 py-2 rounded-full mb-5 sm:mb-8 border text-sm font-black tracking-wider uppercase" style="background:rgba(220,38,38,0.12);border-color:rgba(220,38,38,0.35);color:#f87171;box-shadow:0 0 24px rgba(220,38,38,0.2)">
             <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
             CardPop™
             <span class="text-white/30 font-normal">·</span>
             <span class="text-white/60 font-semibold normal-case tracking-normal">Australia's Trading Card Marketplace</span>
           </div>
-          <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-6 leading-[1.2] text-white">
+          <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-[4.25rem] font-bold font-serif tracking-normal text-balance mb-4 sm:mb-6 leading-[1.2] text-white">
             Buy and Sell Trading Cards
             <br class="hidden sm:block" />
             <span class="text-transparent bg-clip-text" style="background-image:linear-gradient(90deg, #fbbf24 0%, #f87171 45%, #a78bfa 100%)">with Collectors Across Australia</span>
           </h1>
-          <p class="text-base md:text-lg text-zinc-400 max-w-lg mb-8 leading-relaxed text-balance mx-auto lg:mx-0">Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.</p>
+          <p class="text-base md:text-lg text-zinc-400 max-w-lg mb-6 sm:mb-8 leading-relaxed text-balance mx-auto lg:mx-0">Pokémon, Magic, sports cards and more from verified Australian sellers — priced in AUD, paid securely, and covered by Buyer Protection on every order. Selling is free.</p>
           <div class="mb-6 flex justify-center lg:justify-start">
-            <form role="search" action="/search" method="get" class="flex w-full max-w-xl items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] p-1.5">
-              <input type="search" name="q" aria-label="Search cards" placeholder="Search Charizard, Black Lotus, Luka Dončić rookie…" autocomplete="off" class="h-11 min-w-0 flex-1 bg-transparent pl-3 text-base text-white placeholder:text-zinc-500 focus:outline-none" />
-              <button type="submit" class="inline-flex h-11 shrink-0 items-center justify-center rounded-xl px-5 font-bold" style="background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);color:#fff;border:none">Search</button>
+            <form role="search" action="/search" method="get" class="flex w-full max-w-xl items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.06] p-1.5 backdrop-blur-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="ml-3 h-5 w-5 shrink-0 text-zinc-400" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+              <input type="search" name="q" aria-label="Search cards" placeholder="Search Charizard, Black Lotus, Luka Dončić rookie…" autocomplete="off" class="h-11 min-w-0 flex-1 bg-transparent text-base text-white placeholder:text-zinc-500 focus:outline-none" />
+              <button type="submit" class="inline-flex h-11 shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-5 text-sm font-bold" style="background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);color:#fff;border:none">Search</button>
             </form>
           </div>
-          <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-10">
+          <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 mb-6 sm:mb-10">
             <a href="/marketplace" class="inline-flex items-center justify-center w-full sm:w-auto h-14 px-8 rounded-2xl font-black text-lg" style="background:linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);box-shadow:0 8px 32px rgba(220,38,38,0.4);color:#fff;border:none">Shop Cards</a>
             <a href="/signup?next=%2Fvault%2Fadd" class="inline-flex items-center justify-center w-full sm:w-auto h-14 px-8 rounded-2xl font-bold text-lg" style="background:rgba(255,255,255,0.05);border:1.5px solid rgba(255,255,255,0.15);color:#e4e4e7">Sell for Free</a>
           </div>

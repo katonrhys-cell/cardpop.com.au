@@ -31,7 +31,9 @@ vi.mock('../../src/utils/adminNotificationRecipient.js', () => ({
 }));
 
 import eventsRouter from '../../src/routes/events.js';
-import { handleEventFeaturePaid, handleEventFeatureExpired, EVENT_FEATURE_KIND } from '../../src/services/eventFeatureService.js';
+import {
+  handleEventFeaturePaid, handleEventFeatureExpired, EVENT_FEATURE_KIND, FEATURING_PACKAGES,
+} from '../../src/services/eventFeatureService.js';
 import { todayInAustralia } from '../../utils/featuredPackages.js';
 
 const app = express();
@@ -62,7 +64,7 @@ const event = (over = {}) => ({
   start_date: addDays(10), end_date: null, is_featured: false, organiser_id: 'org-1', organizer_name: 'Jane',
   ...over,
 });
-const body = { package: 'spotlight_instagram', successUrl: 'https://cardpop.com.au/account/events?featured=success', cancelUrl: 'https://cardpop.com.au/account/events' };
+const body = { package: 'spotlight', successUrl: 'https://cardpop.com.au/account/events?featured=success', cancelUrl: 'https://cardpop.com.au/account/events' };
 
 let builders;
 beforeEach(() => {
@@ -88,10 +90,10 @@ describe('POST /events/:id/feature-checkout', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ url: 'https://checkout.stripe.com/c/cs_123', sessionId: 'cs_123' });
     const insertArgs = insert.calls.find((c) => c[0] === 'insert')[1];
-    expect(insertArgs).toMatchObject({ event_id: EVENT_ID, organiser_id: 'org-1', package: 'spotlight_instagram', amount_aud: 99, early_bird: false, status: 'pending' });
+    expect(insertArgs).toMatchObject({ event_id: EVENT_ID, organiser_id: 'org-1', package: 'spotlight', amount_aud: 49, early_bird: false, status: 'pending' });
     const session = mockStripe.checkout.sessions.create.mock.calls[0][0];
-    expect(session.line_items[0].price_data.unit_amount).toBe(9900);
-    expect(session.metadata).toMatchObject({ kind: EVENT_FEATURE_KIND, purchaseId: 'pur-1', eventId: EVENT_ID, package: 'spotlight_instagram' });
+    expect(session.line_items[0].price_data.unit_amount).toBe(4900);
+    expect(session.metadata).toMatchObject({ kind: EVENT_FEATURE_KIND, purchaseId: 'pur-1', eventId: EVENT_ID, package: 'spotlight' });
     expect(stamp.calls).toContainEqual(['eq', 'id', 'pur-1']);
   });
 
@@ -99,11 +101,11 @@ describe('POST /events/:id/feature-checkout', () => {
     const insert = chain({ data: { id: 'pur-1' }, error: null });
     builders.push(chain({ data: event({ start_date: addDays(40) }), error: null }), chain({ data: [], error: null }), insert, chain({ error: null }));
 
-    const res = await request(app).post(`/${EVENT_ID}/feature-checkout`).send({ ...body, package: 'full' });
+    const res = await request(app).post(`/${EVENT_ID}/feature-checkout`).send(body);
 
     expect(res.status).toBe(200);
-    expect(mockStripe.checkout.sessions.create.mock.calls[0][0].line_items[0].price_data.unit_amount).toBe(11920);
-    expect(insert.calls.find((c) => c[0] === 'insert')[1]).toMatchObject({ base_aud: 149, discount_aud: 29.8, amount_aud: 119.2, early_bird: true });
+    expect(mockStripe.checkout.sessions.create.mock.calls[0][0].line_items[0].price_data.unit_amount).toBe(3920);
+    expect(insert.calls.find((c) => c[0] === 'insert')[1]).toMatchObject({ base_aud: 49, discount_aud: 9.8, amount_aud: 39.2, early_bird: true });
   });
 
   it("refuses someone else's event", async () => {
@@ -121,12 +123,154 @@ describe('POST /events/:id/feature-checkout', () => {
     expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
   });
 
+  it('is not blocked by a paid promotion extra: only a paid featuring counts', async () => {
+    // The "already paid?" lookup is scoped to the featuring packages, so a
+    // paid Instagram story on the event never reads as "already featured".
+    const paidLookup = chain({ data: [], error: null });
+    builders.push(chain({ data: event(), error: null }), paidLookup, chain({ data: { id: 'pur-1' }, error: null }), chain({ error: null }));
+
+    const res = await request(app).post(`/${EVENT_ID}/feature-checkout`).send(body);
+
+    expect(res.status).toBe(200);
+    expect(paidLookup.calls).toContainEqual(['in', 'package', FEATURING_PACKAGES]);
+    expect(FEATURING_PACKAGES).not.toEqual(expect.arrayContaining(['story', 'post', 'review']));
+  });
+
+  it('no longer sells the retired Instagram and Full Feature packages', async () => {
+    for (const retired of ['spotlight_instagram', 'full']) {
+      expect((await request(app).post(`/${EVENT_ID}/feature-checkout`).send({ ...body, package: retired })).status).toBe(400);
+    }
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
   it('rejects an unknown package and foreign return URLs', async () => {
     builders.push();
     expect((await request(app).post(`/${EVENT_ID}/feature-checkout`).send({ ...body, package: 'gold' })).status).toBe(400);
     mockReturnUrl.bad = 'successUrl must be on cardpop.com.au';
     expect((await request(app).post(`/${EVENT_ID}/feature-checkout`).send(body)).status).toBe(400);
     expect((await request(app).post('/not-a-uuid/feature-checkout').send(body)).status).toBe(400);
+  });
+});
+
+describe('POST /events/:id/extra-checkout', () => {
+  const extraBody = { extra: 'post', successUrl: 'https://cardpop.com.au/account/events?extra=success', cancelUrl: 'https://cardpop.com.au/account/events' };
+
+  it('prices the extra server-side, with no early bird, and opens a Stripe session', async () => {
+    const insert = chain({ data: { id: 'pur-9' }, error: null });
+    const stamp = chain({ error: null });
+    // 40 days out: featuring would be early bird, an extra never is.
+    builders.push(
+      chain({ data: event({ start_date: addDays(40), is_featured: true, membership_featured: true }), error: null }),
+      chain({ data: [{ package: 'story' }, { package: 'spotlight' }], error: null }),
+      insert,
+      stamp,
+    );
+
+    const res = await request(app).post(`/${EVENT_ID}/extra-checkout`).send({ ...extraBody, amount: 1 });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ url: 'https://checkout.stripe.com/c/cs_123' });
+    expect(insert.calls.find((c) => c[0] === 'insert')[1]).toMatchObject({
+      event_id: EVENT_ID, organiser_id: 'org-1', package: 'post', base_aud: 99, discount_aud: 0, amount_aud: 99, early_bird: false, status: 'pending',
+    });
+    const session = mockStripe.checkout.sessions.create.mock.calls[0][0];
+    expect(session.mode).toBe('payment');
+    expect(session.line_items[0].price_data.unit_amount).toBe(9900);
+    expect(session.line_items[0].price_data.product_data.name).toBe('Event promotion: Instagram post');
+    expect(session.metadata).toMatchObject({ kind: EVENT_FEATURE_KIND, purchaseId: 'pur-9', eventId: EVENT_ID, package: 'post' });
+    expect(stamp.calls).toContainEqual(['eq', 'id', 'pur-9']);
+  });
+
+  it('charges $49 for a story and $199 for the review', async () => {
+    for (const [extra, cents] of [['story', 4900], ['review', 19900]]) {
+      mockStripe.checkout.sessions.create.mockClear();
+      builders.push(chain({ data: event(), error: null }), chain({ data: [], error: null }), chain({ data: { id: 'p' }, error: null }), chain({ error: null }));
+      expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send({ ...extraBody, extra })).status).toBe(200);
+      expect(mockStripe.checkout.sessions.create.mock.calls[0][0].line_items[0].price_data.unit_amount).toBe(cents);
+    }
+  });
+
+  it("refuses someone else's event", async () => {
+    builders.push(chain({ data: event({ organiser_id: 'someone-else' }), error: null }));
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send(extraBody)).status).toBe(403);
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses an extra already booked for the event, or an event that has started', async () => {
+    builders.push(chain({ data: event(), error: null }), chain({ data: [{ package: 'post' }], error: null }));
+    const dup = await request(app).post(`/${EVENT_ID}/extra-checkout`).send(extraBody);
+    expect(dup.status).toBe(409);
+    expect(dup.body.error).toMatch(/already booked/);
+    builders.push(chain({ data: event({ start_date: addDays(-1) }), error: null }), chain({ data: [], error: null }));
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send(extraBody)).status).toBe(409);
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+
+  it('answers 404 for a missing event', async () => {
+    builders.push(chain({ data: null, error: null }));
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send(extraBody)).status).toBe(404);
+  });
+
+  it('rejects an unknown extra, a featuring package, and foreign or missing return URLs', async () => {
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send({ ...extraBody, extra: 'gold' })).status).toBe(400);
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send({ ...extraBody, extra: 'spotlight' })).status).toBe(400);
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send({ extra: 'post' })).status).toBe(400);
+    mockReturnUrl.bad = 'successUrl must be on cardpop.com.au';
+    expect((await request(app).post(`/${EVENT_ID}/extra-checkout`).send(extraBody)).status).toBe(400);
+    expect(mockSupabase.from).not.toHaveBeenCalled();
+    expect(mockStripe.checkout.sessions.create).not.toHaveBeenCalled();
+  });
+});
+
+describe('Stripe webhook for a promotion extra', () => {
+  const session = { id: 'cs_x', payment_status: 'paid', payment_intent: 'pi_x', metadata: { kind: EVENT_FEATURE_KIND, purchaseId: 'pur-9' } };
+  const row = (pkg, amount) => ({ id: 'pur-9', event_id: EVENT_ID, organiser_id: 'org-1', package: pkg, amount_aud: amount, early_bird: false, status: 'pending' });
+  const run = async (purchase) => {
+    const claim = chain({ data: [{ id: 'pur-9' }], error: null });
+    const eventQuery = chain({ data: event(), error: null });
+    const bells = chain({ error: null });
+    builders.push(
+      chain({ data: purchase, error: null }),
+      claim,
+      eventQuery,
+      chain({ data: [{ id: 'admin-1' }], error: null }),
+      bells,
+      chain({ data: { display_name: 'Jane' }, error: null }),
+    );
+    await handleEventFeaturePaid(session);
+    return { claim, eventQuery, bells };
+  };
+
+  it('marks it paid and tells the team what to do, without touching the featuring', async () => {
+    const { claim, eventQuery, bells } = await run(row('post', 99));
+
+    expect(claim.calls).toContainEqual(['update', expect.objectContaining({ status: 'paid', stripe_session_id: 'cs_x' })]);
+    // The event is only read: is_featured is never written for an extra.
+    expect(eventQuery.calls.some((c) => c[0] === 'update')).toBe(false);
+    expect(eventQuery.calls).toContainEqual(['eq', 'id', EVENT_ID]);
+    const rows = bells.calls.find((c) => c[0] === 'insert')[1];
+    expect(rows.map((r) => [r.user_id, r.title])).toEqual([
+      ['org-1', 'Instagram post booked'], ['admin-1', 'Event extra paid'],
+    ]);
+    expect(rows[1].body).toMatch(/To do: Instagram post before the show/);
+    expect(mockSendFeaturePaid).toHaveBeenCalledWith(expect.objectContaining({
+      isExtra: true, packageName: 'Instagram post', amountAud: 99, extras: ['Instagram post before the show'],
+    }));
+  });
+
+  it('lists the attendance and free-entry work for the full event review', async () => {
+    await run(row('review', 199));
+    const sent = mockSendFeaturePaid.mock.calls[0][0];
+    expect(sent).toMatchObject({ isExtra: true, packageName: 'Full event review' });
+    expect(sent.extras.join(' | ')).toMatch(/free entry/);
+    expect(sent.extras.join(' | ')).toMatch(/on the day/);
+  });
+
+  it('still features the event for a Calendar Spotlight row', async () => {
+    const { eventQuery, bells } = await run(row('spotlight', 49));
+    expect(eventQuery.calls).toContainEqual(['update', { is_featured: true }]);
+    expect(bells.calls.find((c) => c[0] === 'insert')[1][0].title).toBe('Your event is featured');
+    expect(mockSendFeaturePaid).toHaveBeenCalledWith(expect.objectContaining({ isExtra: false, packageName: 'Calendar Spotlight', extras: [] }));
   });
 });
 

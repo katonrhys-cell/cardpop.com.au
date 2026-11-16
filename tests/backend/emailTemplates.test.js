@@ -21,6 +21,8 @@ import {
   welcomeOfferReminderEmail,
   orderDeliveredEmail,
   welcomeOfferEmail,
+  membershipRenewalEmail,
+  membershipTrialEndingEmail,
   refundProcessedEmail,
   refundIssuedEmail,
   contactMessageEmail,
@@ -484,5 +486,41 @@ describe('invoiceBlock', () => {
     expect(html).toMatch(/border-top:2px solid #1F2937;">Total \(AUD\)<\/td>/);
     expect(html).toContain('Shipping');
     expect(html).toContain('Includes GST of $9.09 AUD');
+  });
+});
+
+describe('membership emails — yearly plans, no trial', () => {
+  it('a welcome code issued without a trial is the first-order discount only', () => {
+    const html = welcomeOfferEmail({ name: 'Ash', code: 'POP-ABCD-EFGH', trialDays: 0, discountPct: 10, expiresAt: '2027-02-03T00:00:00Z' });
+    expect(html).toContain('POP-ABCD-EFGH');
+    expect(html).toContain('10% off your first order');
+    expect(html).not.toMatch(/trial/i);
+    expect(html).not.toMatch(/days of selling/i);
+    expect(html).toContain('https://cardpop.com.au/marketplace');
+    expect(html).not.toContain('https://cardpop.com.au/account/membership');
+  });
+
+  it('a code issued while the trial existed still describes it', () => {
+    const html = welcomeOfferEmail({ name: 'Ash', code: 'POP-1', trialDays: 30, discountPct: 10, expiresAt: '2027-02-03T00:00:00Z' });
+    expect(html).toContain('30 days of selling, free');
+    expect(html).toContain('https://cardpop.com.au/account/membership');
+  });
+
+  it('the renewal reminder states the date, the yearly amount and where to cancel', () => {
+    const html = membershipRenewalEmail({ name: XSS, planName: 'Ultimate', amountAud: 199, chargeDate: '2027-11-16T02:00:00Z' });
+    expect(html).toContain('Your membership renews soon');
+    expect(html).toContain('16 November 2027');
+    expect(html).toContain('$199.00');
+    expect(html).toContain('another 12 months of CardPop Ultimate');
+    expect(html).toContain('Account → Membership');
+    expect(html).toContain('https://cardpop.com.au/account/membership');
+    expect(html).not.toMatch(/\/month|monthly/i);
+    expect(html).not.toContain(XSS);
+  });
+
+  it('the trial-ending email quotes a yearly price, never a monthly one', () => {
+    const html = membershipTrialEndingEmail({ name: 'Ash', planName: 'Pro', amountAud: 99, chargeDate: '2027-11-16T02:00:00Z' });
+    expect(html).toContain('$99.00 for the year');
+    expect(html).not.toMatch(/\/month|monthly/i);
   });
 });

@@ -69,9 +69,9 @@ export async function loadTickerEvents(client = supabase) {
 }
 
 // "Just listed / just sold" strip. Seeds from the newest active and sold
-// listings and re-seeds when the visitor comes back to the tab. Renders
-// nothing until it has something to show, so it can sit on any page without
-// reserving empty space — `framed` additionally wraps it in its own
+// listings and re-seeds when the visitor comes back to the tab. Holds its
+// place with blank tiles while the first read is out, and renders nothing if
+// that read comes back empty — `framed` additionally wraps it in its own
 // full-width bordered section (used on the homepage).
 //
 // It deliberately holds NO realtime channel. It used to subscribe every
@@ -82,8 +82,13 @@ export async function loadTickerEvents(client = supabase) {
 // database time on the project, for a decoration. A visitor looking at the
 // strip sees what was live when the page loaded; one who tabbed away gets a
 // fresh strip on return (useRefreshOnReturn).
+const PLACEHOLDER_TILES = [0, 1, 2, 3, 4, 5];
+
 const LiveActivityTicker = ({ className = '', framed = false }) => {
   const [events, setEvents] = useState([]);
+  // False until the first read settles (either way): the strip holds its
+  // place with blank tiles meanwhile, see below.
+  const [loaded, setLoaded] = useState(false);
 
   // Everything below is best-effort: the strip is decoration, so a failed
   // query must degrade to "no ticker", never break the page hosting it.
@@ -91,7 +96,8 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
     let cancelled = false;
     loadTickerEvents()
       .then(merged => { if (!cancelled) setEvents(merged); })
-      .catch(err => console.warn('[LiveActivityTicker] seed failed:', err?.message));
+      .catch(err => console.warn('[LiveActivityTicker] seed failed:', err?.message))
+      .finally(() => { if (!cancelled) setLoaded(true); });
     return () => { cancelled = true; };
   }, []);
 
@@ -101,10 +107,15 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
       .catch(err => console.warn('[LiveActivityTicker] refresh failed:', err?.message));
   });
 
-  if (events.length === 0) return null;
+  // Nothing to show once the read is back: render nothing. While it is still
+  // out, keep the strip's exact footprint (same heading row and tile classes,
+  // so the same height) — it used to render nothing until the data landed and
+  // then push the filters and grid below it down by ~190px on every visit.
+  if (events.length === 0 && loaded) return null;
+  const pending = events.length === 0;
 
   const body = (
-    <div className={`overflow-hidden ${className}`}>
+    <div className={`overflow-hidden ${className}`} aria-busy={pending || undefined}>
       <div className="flex items-center gap-2 mb-2 pl-2 py-1">
         <span className="relative flex h-2.5 w-2.5">
           <span className="motion-safe:animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-60" />
@@ -113,6 +124,20 @@ const LiveActivityTicker = ({ className = '', framed = false }) => {
         <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Live on CardPop</p>
       </div>
       <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-1 px-1 scrollbar-thin">
+        {pending && PLACEHOLDER_TILES.map(i => (
+          <div
+            key={i}
+            aria-hidden="true"
+            className="shrink-0 flex items-center gap-3 sm:gap-4 bg-card border border-border rounded-2xl p-2 pr-5"
+          >
+            <div className="w-16 h-[5.625rem] sm:w-20 sm:h-28 rounded-xl bg-muted/40 shrink-0" />
+            <div className="w-36 sm:w-44 space-y-2">
+              <div className="h-3 w-20 rounded bg-muted/60" />
+              <div className="h-4 w-full rounded bg-muted/60" />
+              <div className="h-3 w-14 rounded bg-muted/60" />
+            </div>
+          </div>
+        ))}
         {events.map(ev => (
           <Link
             key={ev.key}

@@ -105,9 +105,10 @@ const FacetDropdown = ({ facetKey, options, counts, value, onChange }) => {
  * cross-filtered (each group respects the other selections) and options with
  * no matches are disabled rather than hidden so the range stays visible.
  * `plain` renders the facets as stacked chip groups with no chrome or Clear
- * link, for pages that nest it in their own filter sidebar.
+ * link, for pages that nest it in their own filter sidebar. `loading` reserves
+ * the dropdown row's height until the facets are known.
  */
-const ShopFilterPanel = ({ options, rows, selection, onChange, onClear, className = '', plain = false }) => {
+const ShopFilterPanel = ({ options, rows, selection, onChange, onClear, className = '', plain = false, loading = false }) => {
   const keys = Object.keys(options || {});
   const activeCount = Object.keys(selection || {}).length;
 
@@ -116,7 +117,13 @@ const ShopFilterPanel = ({ options, rows, selection, onChange, onClear, classNam
     [rows, selection, options],
   );
 
-  if (keys.length === 0) return null;
+  if (keys.length === 0) {
+    // `loading` (a page that knows its grid will have filters, while the facet
+    // rows are still on their way) holds the row's place — h-9 chips + mb-6 —
+    // so the grid below doesn't drop when the chips arrive.
+    if (loading && !plain) return <div className={`mb-6 h-9 ${className}`} aria-hidden="true" data-testid="shop-filter-placeholder" />;
+    return null;
+  }
 
   if (plain) {
     return (

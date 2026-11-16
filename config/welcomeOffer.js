@@ -2,9 +2,9 @@
  * Welcome-offer configuration — single source of truth.
  *
  * Every new registration gets a unique single-use code (e.g. POP-K7QN-4WX2),
- * emailed separately from the verification email. Redeeming it claims the free
- * selling trial (activated via the normal Stripe/PayPal card-on-file flow) and
- * a percentage discount on the user's first order.
+ * emailed separately from the verification email. It gives a percentage
+ * discount on the user's first order. (It also used to confirm a free
+ * membership trial — retired with the yearly plans; WELCOME_TRIAL_DAYS = 0.)
  *
  * Like `config/subscription.js`, this file is dependency-free so it can be
  * imported from the React SPA (via the `@/` alias) and from the Express
@@ -12,8 +12,12 @@
  * values per-row at issue time, so changing them here only affects new codes.
  */
 
-/** Length of the free selling trial the code unlocks, in days. */
-export const WELCOME_TRIAL_DAYS = 30;
+/**
+ * Length of the free membership trial the code unlocks, in days. `0` = none:
+ * memberships are charged at sign-up (config/subscription.js TRIAL_DAYS), so
+ * a new code is the first-order discount only and the email says just that.
+ */
+export const WELCOME_TRIAL_DAYS = 0;
 
 /** Discount applied to the redeemer's first order (percent of item subtotal). */
 export const WELCOME_DISCOUNT_PCT = 10;

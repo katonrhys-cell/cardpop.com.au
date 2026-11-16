@@ -17,6 +17,7 @@ import {
   resumeStripeMembership,
   createMembershipCardSession,
   confirmMembershipCard,
+  resolveMembershipPrice,
 } from '../services/subscriptionService.js';
 import {
   isPaypalConfigured,
@@ -24,7 +25,7 @@ import {
   getPaypalSubscription,
   verifyPaypalWebhook,
 } from '../utils/paypalClient.js';
-import { TRIAL_DAYS, ENV, normalizePaidTier } from '../../config/subscription.js';
+import { TRIAL_DAYS, normalizePaidTier } from '../../config/subscription.js';
 import { validatePartnerCode } from '../services/partnerService.js';
 
 const router = express.Router();
@@ -42,25 +43,23 @@ router.get('/status', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /stripe/checkout ───────────────────────────────────────────────────
-// Start the trial via Stripe Checkout in subscription mode. The card is captured
-// but NOT charged until the trial ends (trial_period_days). Returns a hosted URL.
-// `tier` picks which paid plan is bought ('pro' | 'premium' | 'elite' |
-// 'ultimate', default 'pro'); each tier bills against its own Stripe price.
+// Join a paid plan via Stripe Checkout in subscription mode. The first year is
+// charged at checkout (TRIAL_DAYS = 0 — a non-zero value defers it behind a
+// trial). Returns a hosted URL. `tier` picks which plan is bought ('pro' |
+// 'ultimate', default 'pro'); each bills against its own yearly Stripe price.
 router.post('/stripe/checkout', authMiddleware, async (req, res) => {
   try {
     const tier = normalizePaidTier(req.body?.tier);
-    const priceId = process.env[ENV.stripePriceIds[tier]];
-    if (!priceId) {
-      logger.error(`[SUB] ${ENV.stripePriceIds[tier]} not configured`);
-      return res.status(503).json({ error: `The ${tier} plan is not available yet.` });
-    }
-
     const { successUrl, cancelUrl, refCode } = req.body;
     if (!successUrl || !cancelUrl) {
       return res.status(400).json({ error: 'successUrl and cancelUrl are required' });
     }
     const badReturnUrl = invalidReturnUrl({ successUrl, cancelUrl });
     if (badReturnUrl) return res.status(400).json({ error: badReturnUrl });
+
+    // The configured price must be the one the site advertises (yearly, AUD,
+    // exactly the plan's amount) — 503 otherwise. See resolveMembershipPrice().
+    const { priceId, price } = await resolveMembershipPrice(tier);
 
     const userId = req.user.id;
     // Admins hold Ultimate free and complimentary members already have their
@@ -69,11 +68,11 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     const customerId = await getOrCreateStripeCustomer(userId, req.user.email);
 
     // Partner referral: the partner's % comes off the first invoice (a 'once'
-    // coupon — with a trial that's the trial-end invoice), and the commission
-    // is booked when the subscription first turns active. The expected first
-    // payment is stamped into the subscription metadata now so the webhook
-    // doesn't have to re-derive pricing. An invalid ref code never blocks the
-    // trial — it's silently dropped.
+    // coupon — the sign-up charge), and the commission is booked when the
+    // subscription first turns active. The expected first payment is stamped
+    // into the subscription metadata now so the webhook doesn't have to
+    // re-derive pricing. An invalid ref code never blocks the checkout — it's
+    // silently dropped.
     let discounts;
     // `tier` in the metadata is what the webhook mirrors onto
     // profiles.subscription_tier when the subscription is entitled.
@@ -81,7 +80,6 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
     if (typeof refCode === 'string' && refCode.trim()) {
       try {
         const partner = await validatePartnerCode(userId, refCode);
-        const price = await stripe.prices.retrieve(priceId);
         const unitAmount = price?.unit_amount || 0;
         const firstPaymentCents = Math.round(unitAmount * (1 - Number(partner.discount_pct) / 100));
         if (Number(partner.discount_pct) > 0) {
@@ -107,10 +105,11 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
       customer: customerId,
       line_items: [{ price: priceId, quantity: 1 }],
       subscription_data: {
-        trial_period_days: TRIAL_DAYS,
+        // Stripe rejects trial_period_days: 0 — omit it to charge at sign-up.
+        ...(TRIAL_DAYS > 0 ? { trial_period_days: TRIAL_DAYS } : {}),
         metadata: subMetadata,
       },
-      payment_method_collection: 'always', // require a card even during the trial
+      payment_method_collection: 'always',
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: { userId, kind: 'subscription' },
@@ -128,8 +127,9 @@ router.post('/stripe/checkout', authMiddleware, async (req, res) => {
 });
 
 // ─── POST /stripe/change-tier ────────────────────────────────────────────────
-// Move an existing Stripe-billed membership to another paid tier, up or down,
-// in place (re-prices the subscription with prorations; no new trial). Hobby members
+// Move an existing Stripe-billed membership to the other paid plan, in place:
+// an upgrade charges the pro-rated difference now (402 if the card declines),
+// a downgrade credits the next renewal. Hobby members
 // and anyone without an active Stripe subscription get a 409 and should start
 // a plan through /stripe/checkout instead. MFA-gated like the other routes
 // that change what the member's card is charged.

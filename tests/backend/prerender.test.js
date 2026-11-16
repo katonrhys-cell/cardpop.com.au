@@ -41,6 +41,7 @@ vi.mock('@supabase/supabase-js', () => {
 
 import handler from '../../api/prerender.js';
 import { BINDER_SLUGS } from '../../data/shopBinderProducts.js';
+import { PLANS, PLAN_PRO, PLAN_ULTIMATE, LISTINGS_PER_MONTH } from '../../config/plans.js';
 import { PALMS_OFF_PRODUCTS } from '../../data/palmsOffCatalogue.js';
 import { PALMS_OFF_CATEGORIES } from '../../data/palmsOffCategories.js';
 
@@ -1009,6 +1010,24 @@ describe('prerender events', () => {
 });
 
 describe('prerender static content pages', () => {
+  // The prerendered /pricing copy is hand-written: keep it on the plans the
+  // site actually sells (config/plans.js + config/subscription.js).
+  it('renders /pricing with the three plans and their yearly prices', async () => {
+    const { status, body } = await run('/pricing');
+    expect(status).toBe(200);
+    expect(body).toContain('<title>Pricing — Hobby, Pro &amp; Ultimate | CardPop');
+    expect(body).toContain(`Pro — $${PLANS[PLAN_PRO].priceAud} a year AUD`);
+    expect(body).toContain(`Ultimate — $${PLANS[PLAN_ULTIMATE].priceAud} a year AUD`);
+    expect(body).toContain('$99 a year');
+    expect(body).toContain('$199 a year');
+    expect(body).toContain(`${LISTINGS_PER_MONTH.pro} listings a month.`);
+    expect(body).toContain(`List up to ${LISTINGS_PER_MONTH.free} cards a month`);
+    expect(body).toContain('Unlimited listings.');
+    expect(body).toContain('Calendar Spotlight on every show you run');
+    // Nothing left of the four monthly tiers or the trial.
+    expect(body).not.toMatch(/\/month|free trial|Elite —|Premium —|\$20|\$40|\$80|\$150/);
+  });
+
   it('renders the grading hub with FAQ JSON-LD and chapter links', async () => {
     const { status, body } = await run('/grading');
     expect(status).toBe(200);

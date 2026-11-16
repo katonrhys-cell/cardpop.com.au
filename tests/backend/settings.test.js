@@ -88,6 +88,36 @@ describe('GET /settings/public', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual(PUBLIC_SETTINGS);
   });
+
+  // Admin → Menu Icons stores a JSON object; only its usable entries may be
+  // published, since the browser puts the image URLs straight into <img src>.
+  it('publishes the menu icon overrides, dropping anything malformed', async () => {
+    mockIn.mockResolvedValue({
+      data: [{
+        key: 'nav_menu_icons',
+        value: {
+          'collection:pokemon': { image: 'https://cdn.test/nav-icons/a.webp', fit: 'contain' },
+          'link:/grading/estimator': { icon: 'Calculator' },
+          'link:/about': { image: 'javascript:alert(1)' },
+          'link:/pricing': { image: 'http://insecure.test/a.png' },
+          'Bad Key': { icon: 'Star' },
+        },
+      }],
+      error: null,
+    });
+    const res = await request(app).get('/settings/public');
+    expect(res.status).toBe(200);
+    expect(res.body.nav_menu_icons).toEqual({
+      'collection:pokemon': { image: 'https://cdn.test/nav-icons/a.webp', fit: 'contain' },
+      'link:/grading/estimator': { icon: 'Calculator' },
+    });
+  });
+
+  it('publishes no menu icon overrides when the stored value is not an object', async () => {
+    mockIn.mockResolvedValue({ data: [{ key: 'nav_menu_icons', value: 'not json' }], error: null });
+    const res = await request(app).get('/settings/public');
+    expect(res.body.nav_menu_icons).toEqual({});
+  });
 });
 
 describe('GET /public/settings (edge-cached copy)', () => {

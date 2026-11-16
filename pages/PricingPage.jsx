@@ -5,13 +5,12 @@ import { Check, ShieldCheck, CreditCard, Sparkles, Store } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { PLANS, PLAN_ORDER, PLAN_HOBBY, PLAN_PRO, planKeyFromTier } from '@/config/plans.js';
-import { TRIAL_DAYS } from '@/config/subscription.js';
 
-// Public pricing page: Hobby (free) plus the four paid tiers — Pro, Premium,
-// Elite and Ultimate. Anyone can browse and buy; listing, selling and trading
-// unlock after a quick Stripe Identity check on every plan. Each tier gets a
-// bigger monthly listing allowance; every paid tier gets a store page on
-// Local Traders and progressively fancier display styles.
+// Public pricing page: Hobby (free, always), Pro ($99 a year — vendors and
+// avid traders) and Ultimate ($199 a year — show organisers). Anyone can
+// browse and buy; listing, selling and trading unlock after a quick Stripe
+// Identity check on every plan. Both paid plans are charged yearly at
+// sign-up, with no trial, and the price is the whole price (GST included).
 
 const PlanCard = ({ plan, highlighted, cta }) => (
   <div
@@ -26,7 +25,8 @@ const PlanCard = ({ plan, highlighted, cta }) => (
         Most popular
       </span>
     )}
-    <h2 className="font-heading text-xl font-bold text-foreground">{plan.name}</h2>
+    <p className="text-xs font-semibold uppercase tracking-wide text-brand-red">{plan.audience}</p>
+    <h2 className="mt-1 font-heading text-xl font-bold text-foreground">{plan.name}</h2>
     <p className="mt-1 text-sm text-muted-foreground">{plan.tagline}</p>
     <div className="mt-5 flex items-end gap-1">
       {plan.priceAud > 0 ? (
@@ -38,9 +38,11 @@ const PlanCard = ({ plan, highlighted, cta }) => (
         <span className="font-heading text-3xl font-extrabold text-foreground">Free</span>
       )}
     </div>
-    {plan.trialDays ? (
-      <p className="mt-1 text-xs font-semibold text-brand-red">
-        {plan.trialDays}-day free trial — cancel anytime
+    {plan.priceAud > 0 ? (
+      <p className="mt-1 text-xs text-muted-foreground">
+        {plan.trialDays
+          ? `${plan.trialDays}-day free trial, then billed yearly — cancel anytime`
+          : 'One payment a year, GST included — nothing added at checkout'}
       </p>
     ) : (
       <p className="mt-1 text-xs text-muted-foreground">No card required to start</p>
@@ -68,7 +70,7 @@ const PricingPage = () => {
     const label = isCurrent
       ? `Manage ${plan.name}`
       : isAuthenticated
-        ? `Start ${TRIAL_DAYS}-day ${plan.name} trial`
+        ? `Join ${plan.name} — $${plan.priceAud}/${plan.interval}`
         : `Get started with ${plan.name}`;
     const to = isAuthenticated ? `/account/membership?tier=${plan.key}` : '/signup';
     return (
@@ -81,24 +83,24 @@ const PricingPage = () => {
   return (
     <div className="container-default py-12">
       <Helmet>
-        <title>Pricing — Hobby, Pro, Premium, Elite &amp; Ultimate | CardPop</title>
+        <title>Pricing — Hobby, Pro &amp; Ultimate | CardPop</title>
         <meta
           name="description"
-          content="CardPop is free to join. Buy instantly and sell once your ID is verified, for a small fee per sale. Upgrade for more listings, a store page and premium styles."
+          content="CardPop is free to join, and always will be. Pro is $99 a year for vendors and avid traders; Ultimate is $199 a year for show organisers who want every event featured."
         />
       </Helmet>
 
       <div className="text-center">
         <h1 className="font-heading text-4xl font-extrabold text-foreground">Simple, fair pricing</h1>
         <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
-          Joining CardPop is free, forever. Browse and buy right away. To list, sell or trade, just
-          verify your identity — then you only pay a small fee when a sale or trade completes.
-          Upgrade when you want more monthly listings, your own store page and the premium showcase
-          styles.
+          Joining CardPop is free, and always will be. Browse and buy right away. To list, sell or
+          trade, just verify your identity — then you only pay a small fee when a sale or trade
+          completes. Pro is one yearly payment for vendors and avid traders; Ultimate is for show
+          organisers who want every event they run featured on the calendar.
         </p>
       </div>
 
-      <div className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="mx-auto mt-10 grid max-w-5xl gap-6 md:grid-cols-3">
         {PLAN_ORDER.map((key) => {
           const plan = PLANS[key];
           if (key === PLAN_HOBBY) {
@@ -145,8 +147,8 @@ const PricingPage = () => {
           <Sparkles className="h-6 w-6 text-brand-red" />
           <h3 className="mt-3 font-heading font-bold text-foreground">Fees only when you sell</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            No listing fees and no monthly cost on Hobby. Every plan pays the same small fee only when
-            a sale or trade goes through — upgrading buys features, not lower fees.
+            No listing fees and no membership cost on Hobby. Every plan pays the same small fee only
+            when a sale or trade goes through — a membership buys features, not lower fees.
           </p>
         </div>
       </div>
@@ -157,19 +159,20 @@ const PricingPage = () => {
         <div className="flex-1">
           <h3 className="font-heading text-lg font-bold text-foreground">Why upgrade?</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Every paid tier gets your own branded store page on the Local Traders directory, a seller
-            badge, advanced analytics and the premium display styles for your listings — plus a bigger
-            monthly listing allowance the higher you go, all the way to unlimited on Ultimate.
+            Pro gives vendors and avid traders their own store page on the Local Traders directory,
+            30 listings a month, Whatnot show listings and the Pro display styles. Ultimate adds
+            unlimited listings, every display style and Calendar Spotlight on every show you run.
           </p>
         </div>
         <Button asChild className="bg-brand-red font-bold hover:bg-brand-red/90">
-          <Link to={isAuthenticated ? '/account/membership' : '/signup'}>Start free trial</Link>
+          <Link to={isAuthenticated ? '/account/membership' : '/signup'}>Become a member</Link>
         </Button>
       </div>
 
       <p className="mt-8 text-center text-xs text-muted-foreground">
-        Prices in AUD and include applicable taxes. Payments are securely processed by Stripe —
-        CardPop never sees your card number.
+        Prices are in AUD and include GST. Memberships are charged once a year at sign-up and renew
+        each year until you cancel — we email you before each renewal. Payments are securely
+        processed by Stripe; CardPop never sees your card number.
       </p>
     </div>
   );

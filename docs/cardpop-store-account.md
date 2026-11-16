@@ -20,9 +20,9 @@ them with the shipped anon key. So they are granted service-side.
 | Dealer store renders | `is_sole_trader`, `store_slug`, `is_public` | `SoleTraderStorePage` refuses to render without all three |
 | Email confirmed | `auth.users.email_confirmed_at` | `email_verification_ok()` → RESTRICTIVE policy `listings_require_email_verified` |
 
-Why **Ultimate**: it was first provisioned at Premium (the tier where Whatnot
-show listings, the homepage Featured Cards spots and priority Local Traders
-placement start), and later raised to the top tier by
+Why **Ultimate**: it was first provisioned at the then-Premium tier (since
+folded into Pro — Whatnot show listings and the homepage Featured Cards
+spots), and later raised to the top plan by
 `20261004064733_grant_admin_accounts_ultimate_membership.sql` so the
 platform's own accounts hold every perk (unlimited listings, every display
 style) at no cost.
