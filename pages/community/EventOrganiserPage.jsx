@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Instagram, Facebook, Youtube } from 'lucide-react';
+import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Instagram, Facebook, Youtube, Music2, Link2 } from 'lucide-react';
+import XIcon from '@/components/XIcon.jsx';
 import SEOHead from '@/components/SEOHead.jsx';
 import EventCard from '@/components/EventCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -23,7 +24,9 @@ import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrgan
 const EVENT_LIMIT = 200;
 
 // Social links render as icon-only round buttons; the website keeps its label.
-const LINK_ICONS = { website_url: Globe, instagram_url: Instagram, facebook_url: Facebook, youtube_url: Youtube };
+const LINK_ICONS = { website_url: Globe, instagram_url: Instagram, facebook_url: Facebook, youtube_url: Youtube,
+  tiktok_url: Music2, x_url: XIcon, linktree_url: Link2,
+};
 
 const LOGO_BOX ='w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
 
