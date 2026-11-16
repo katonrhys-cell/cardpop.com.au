@@ -58,6 +58,8 @@ import MoreFromSeller from '@/components/MoreFromSeller.jsx';
 import RecentlyViewed from '@/components/RecentlyViewed.jsx';
 import { brandedTitle, SHORT_BRAND_SUFFIXES } from '@/utils/seoTitle.js';
 import { useBottomBarInset } from '@/lib/bottomBarInset.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminShopProductPath, adminListingPath } from '@/utils/adminEditLinks.js';
 // Lazy: only needed once a buyer taps "Make an Offer".
 const MakeOfferModal = lazy(() => import('@/components/MakeOfferModal.jsx'));
 const ProposeTradeModal = lazy(() => import('@/components/ProposeTradeModal.jsx'));
@@ -128,6 +130,15 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
     return () => io.disconnect();
     // Re-observe when the CTA block (re)mounts.
   }, [product?.id, product?.status]);
+
+  // Admins get an "Edit in admin" shortcut to this product's editor.
+  useAdminEditTarget(
+    source === 'shop' ? 'Edit product' : 'Edit listing',
+    !product?.id ? null
+      : source === 'shop' ? adminShopProductPath(product.id)
+      : source === 'marketplace' ? adminListingPath(product.id)
+      : null,
+  );
 
   const vaultViewerId = source === 'vault' ? currentUser?.id ?? null : null;
   const vaultIsAdmin = source === 'vault' ? isAdmin : false;

@@ -24,6 +24,7 @@ import AnalyticsPageViews from '@/components/AnalyticsPageViews.jsx';
 import AdsenseRouteLoader from '@/components/AdsenseRouteLoader.jsx';
 import GoogleReviewsBadgeLoader from '@/components/GoogleReviewsBadgeLoader.jsx';
 import WhatsAppFloatingButton from '@/components/WhatsAppFloatingButton.jsx';
+import AdminEditButton from '@/components/AdminEditButton.jsx';
 import ProtectedRoute from '@/components/ProtectedRoute.jsx';
 import ProtectedAdminRoute from '@/components/ProtectedAdminRoute.jsx';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
@@ -304,6 +305,7 @@ const App = () => {
                 <ReferralCapture />
                 <CookieConsentBanner />
                 <WhatsAppFloatingButton />
+                <AdminEditButton />
                 <div className="flex flex-col min-h-screen bg-background text-foreground">
                   <Helmet>
                     <title>CardPop | Australia's Trading Card Marketplace</title>

@@ -174,6 +174,28 @@ const EventsManagementPage = () => {
     else setParams({ sort: key, dir: defaultSortDir(key) });
   };
 
+  // "Edit event" on an event's public page lands here as ?edit=<id>: open that
+  // event's form (read directly, so it works whatever the list filters say),
+  // then drop the param so a refresh doesn't reopen it.
+  const editParam = searchParams.get('edit');
+  useEffect(() => {
+    if (!editParam) return undefined;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase.from('events').select('*').eq('id', editParam).maybeSingle();
+      if (cancelled) return;
+      if (error || !data) toast.error('Could not find that event to edit.');
+      else handleOpenModal(data);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('edit');
+        return next;
+      }, { replace: true });
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per ?edit= value
+  }, [editParam]);
+
   useEffect(() => {
     const timers = lingerTimers.current;
     return () => { timers.forEach(clearTimeout); timers.clear(); };
