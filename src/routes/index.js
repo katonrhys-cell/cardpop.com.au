@@ -18,6 +18,7 @@ import eventScraperRouter from './event-scraper.js';
 import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
 import organiserRequestsRouter from './organiser-requests.js';
+import storeOwnerRequestsRouter from './store-owner-requests.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
 import vaultRouter from './vault.js';
@@ -114,6 +115,9 @@ export default () => {
     // Event organiser access: member requests + admin confirmation — docs/event-organiser-access.md
     router.use('/organiser-requests', apiLimiter);
     router.use('/organiser-requests', organiserRequestsRouter);
+    // Card shop ownership: member requests + admin confirmation — docs/store-pages.md
+    router.use('/store-owner-requests', apiLimiter);
+    router.use('/store-owner-requests', storeOwnerRequestsRouter);
     
     // Auth routes with endpoint-specific rate limiting
     router.use('/auth/login', loginLimiter);

@@ -6,7 +6,9 @@ an admin confirms every request.
 
 ## The flow
 
-1. **Ask.** A signed-in member uses **Become an organiser** on Account → My Events
+1. **Ask.** A signed-in member uses **Apply as an organiser or shop owner** on
+   Account → My Events, leaves the **I'm applying as** dropdown on *Event organiser*
+   (the other choice, *Card shop owner*, is `docs/store-pages.md` → Shop owners)
    and fills in the organiser name, a website/social link and an optional note.
    A request needs a **confirmed email** so an admin has a real address — the
    route refuses one without it. The sign-up form no longer asks: the

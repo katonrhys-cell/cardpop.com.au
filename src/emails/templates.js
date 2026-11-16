@@ -683,6 +683,32 @@ export function organiserRequestOutcomeEmail({ name, organiserName, approved, no
   );
 }
 
+// ─── Shop owner request decided (member notification) ────────────────────────
+
+// The shop twin of organiserRequestOutcomeEmail: a member asked to own a card
+// shop's page in the directory and an admin approved or declined.
+export function storeOwnerRequestOutcomeEmail({ name, storeName, approved, note, pageUrl }) {
+  const shop = esc(storeName) || 'your shop';
+  const noteHtml = note
+    ? `<p style="margin:16px 0;padding:12px 16px;border-left:3px solid #CE1126;background:#f6f6f6;">${esc(note).replace(/\n/g, '<br>')}</p>`
+    : '';
+  const band = approved ? 'Shop Owner Access Approved' : 'Shop Owner Request Not Approved';
+  const body = approved
+    ? `<p>We've confirmed you as the owner of <strong>${shop}</strong> in the CardPop card shop directory.</p>
+<p>You can now edit your shop's page — address, opening hours, links, logo, photos and videos — with the <strong>Edit this page</strong> button on the page itself.</p>`
+    : `<p>We couldn't confirm you as the owner of <strong>${shop}</strong> yet.</p>${noteHtml}
+<p>If that's something you can fix, send a new request from <strong>Account → My Events</strong> with a link to the shop's website or social page so we can check it.</p>`;
+  return cpEmail(
+    band,
+    band,
+    `Hi ${esc(name) || 'there'},`,
+    body,
+    approved && pageUrl ? pageUrl : 'https://cardpop.com.au/account/events',
+    approved && pageUrl ? 'Open your shop page' : 'Go to your account',
+    'You received this because you asked to manage a card shop page on CardPop.',
+  );
+}
+
 // ─── Organiser edited their live event (admin notification) ──────────────────
 
 // Every admin gets exactly what changed: one row per field, before → after.
