@@ -410,11 +410,6 @@
 .anim-slide-in-right { animation: anim-slide-in-right 0.22s ease-in-out both; }
 .anim-slide-in-left  { animation: anim-slide-in-left 0.22s ease-in-out both; }
 
-/* Category browse carousel — a single track that slides one tile per arrow
-   click. Only transform transitions, so icons glide without flashing. */
-.cat-carousel-track          { transition: transform 0.35s ease-in-out; will-change: transform; }
-.cat-carousel-track--instant { transition: none; }
-
 /* Below-the-fold homepage sections: let the browser skip style, layout and
    paint for them until they approach the viewport. On a mid-range phone the
    first commit of the homepage spent ~600 ms in style & layout for content
@@ -432,7 +427,6 @@
   .anim-slide-in-right, .anim-slide-in-left {
     animation: none;
   }
-  .cat-carousel-track { transition: none; }
 }
 /* ═══════════════════════════════════════════════════════
    PROSE STYLES — Generic content container spacing
