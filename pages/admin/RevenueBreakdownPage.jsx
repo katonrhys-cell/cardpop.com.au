@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { orderRef as formatOrderRef } from '@/utils/orderRef.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -37,7 +38,7 @@ const STATUS_BADGE = {
   cancelled:         'bg-muted text-muted-foreground border-border',
 };
 
-const orderRef = (order) => (order?.id ? order.id.slice(0, 8).toUpperCase() : '—');
+const orderRef = (order) => formatOrderRef(order) || '—';
 
 const buyerName = (order) =>
   order?.buyer?.display_name || order?.buyer?.username || order?.buyer_email || 'Guest';

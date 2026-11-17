@@ -10,6 +10,7 @@ import OrderInvoiceLinks from '@/components/admin/OrderInvoiceLinks.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import { apiServerClient } from '@/lib/apiServerClient.js';
 import { format } from 'date-fns';
+import { orderRef } from '@/utils/orderRef.js';
 
 const STATUS_BADGE = {
   pending:           'bg-muted text-muted-foreground border-border',
@@ -98,7 +99,7 @@ const OrderDetailDialog = ({ orderId, onClose }) => {
       <DialogContent className="sm:max-w-lg rounded-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-heading font-bold font-mono">
-            {order?.order_number || (orderId ? orderId.slice(0, 8).toUpperCase() : 'Order')}
+            {orderRef({ order_number: order?.order_number, id: order?.id ?? orderId }) || 'Order'}
           </DialogTitle>
           <DialogDescription>Order details</DialogDescription>
         </DialogHeader>

@@ -1,5 +1,6 @@
 import { trackingUrl, carrierLabel, normalizeTrackingNumber } from '../../utils/shipmentTracking.js';
 import { MARKETPLACE_PROTECTION } from '../../utils/buyerProtectionPolicy.js';
+import { orderRef as formatOrderRef } from '../../utils/orderRef.js';
 
 /**
  * Shared HTML email template builder matching CardPop brand.
@@ -310,7 +311,7 @@ ${centred(`Your code expires on <strong>${esc(expiryStr)}</strong>, so don’t s
 // than added on top. Laid out like a printed invoice: a ruled header row,
 // one line per item with the amount right-aligned, then the totals with the
 // amount charged emphasised.
-function invoiceBlock(invoice, orderId) {
+function invoiceBlock(invoice, orderId, orderNumber) {
   const cell = (extra = '') => `padding:10px 0;font-size:14px;line-height:1.5;color:${BODY};border-bottom:1px solid ${RULE};${extra}`;
   const rows = (invoice.items || [])
     .map(it => `<tr>
@@ -341,7 +342,8 @@ function invoiceBlock(invoice, orderId) {
   const includedGstRow = invoice.gstIncluded > 0
     ? `<tr><td colspan="2" align="right" style="padding:2px 0 0;font-size:12px;color:${FAINT};">Includes GST of ${money(invoice.gstIncluded)} AUD</td></tr>`
     : '';
-  const ref = orderId ? `#${esc(String(orderId).slice(0, 8).toUpperCase())}` : '';
+  // `orderNumber` is the sequential CP-000123; orderRef() falls back to the short id.
+  const ref = orderId ? `#${esc(formatOrderRef({ id: orderId, order_number: orderNumber }))}` : '';
   const head = `font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:${MUTED};padding:0 0 8px;border-bottom:2px solid ${RULE};`;
 
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${PANEL};border:1px solid ${RULE};border-radius:8px;margin:24px 0;"><tr><td style="padding:20px 24px;">
@@ -381,7 +383,7 @@ function preorderNote(invoice) {
 // values resolveWalletType() can return (e.g. 'link') get no special label.
 const WALLET_LABELS = { google_pay: 'Google Pay', apple_pay: 'Apple Pay' };
 
-export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice, paymentWalletType }) {
+export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, orderNumber, invoice, paymentWalletType }) {
   const isTaxInvoice = Boolean(invoice?.abn);
   // Per Google Pay brand guidelines ("Put it all together"), receipts should
   // indicate when the buyer paid with Google Pay specifically. Plain text —
@@ -389,7 +391,7 @@ export function orderConfirmedEmail({ buyerName, cardName, itemPrice, total, ord
   // would often just be a broken box.
   const walletLabel = WALLET_LABELS[paymentWalletType];
   const paidWithLine = walletLabel ? `<p style="margin:0 0 20px;font-size:13px;color:#6B7280;text-align:center;">Paid with <strong style="color:#111827;">${esc(walletLabel)}</strong>.</p>` : '';
-  const ref = `#${String(orderId).slice(0, 8).toUpperCase()}`;
+  const ref = `#${formatOrderRef({ id: orderId, order_number: orderNumber })}`;
   const hasInvoice = Boolean(invoice?.items?.length);
   const orderDate = hasInvoice && invoice.orderDate
     ? new Date(invoice.orderDate).toLocaleDateString('en-AU', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Australia/Sydney' })
@@ -413,7 +415,7 @@ ${paidWithLine}`;
     body = `${hero}
 <p style="margin:0 0 12px;">Here's your ${isTaxInvoice ? 'tax invoice' : 'receipt'}:</p>
 ${businessBlock(invoice)}
-${invoiceBlock(invoice, orderId)}
+${invoiceBlock(invoice, orderId, orderNumber)}
 ${preorderNote(invoice)}
 ${isTaxInvoice ? (() => { const gstTotal = Number(invoice.gst || 0) + Number(invoice.gstIncluded || 0); return `<p style="font-size:13px;color:#6B7280;">This is a tax invoice.${gstTotal > 0 ? ` Total includes GST of ${money(gstTotal)} AUD.` : ''} Issued to ABN ${esc(invoice.abn)}.</p>`; })() : ''}
 ${centred('We’ll email you the tracking number as soon as it’s posted. Enjoy the new addition to your collection!')}`;
@@ -443,9 +445,9 @@ ${centred('We’ll email you the tracking number as soon as it’s posted. Enjoy
 // Internal heads-up sent to the admin contact for every confirmed order, so
 // sales are visible without watching the dashboard. Links to Order Management,
 // not a customer-facing page.
-export function orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }) {
+export function orderAdminNoticeEmail({ orderId, orderNumber, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }) {
   const rows = [
-    ['Order', `#${String(orderId || '').slice(0, 8).toUpperCase() || '—'}`],
+    ['Order', `#${formatOrderRef({ id: orderId, order_number: orderNumber }) || '—'}`],
     ['Items', esc(itemsSummary) || '—'],
     // Pre-order lines can't ship yet — flagged so they aren't packed early.
     ...(preorderSummary ? [['Pre-order', esc(preorderSummary)]] : []),

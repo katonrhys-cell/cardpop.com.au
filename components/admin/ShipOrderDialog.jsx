@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
+import { orderRef } from '@/utils/orderRef.js';
 import {
   CARRIERS, CARRIER_IDS, DEFAULT_CARRIER, isValidTrackingNumber, normalizeTrackingNumber, trackingUrl,
 } from '@/utils/shipmentTracking.js';
@@ -58,7 +59,7 @@ const ShipOrderDialog = ({ order, onClose, onShipped }) => {
           <DialogTitle className="text-xl font-heading font-bold flex items-center gap-2">
             <Truck className="w-5 h-5" /> {alreadyShipped ? 'Update Tracking' : 'Mark as Shipped'}
           </DialogTitle>
-          <DialogDescription>Order {order.order_number || order.id.slice(0, 8).toUpperCase()}</DialogDescription>
+          <DialogDescription>Order {orderRef(order)}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 py-2">

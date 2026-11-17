@@ -9,6 +9,10 @@ const mockSupabase = vi.hoisted(() => ({
 const mockIsAdminUser = vi.hoisted(() => vi.fn());
 const mockPayoutSeller = vi.hoisted(() => vi.fn());
 const mockSendOrderShipped = vi.hoisted(() => vi.fn());
+// The order-number lookup is its own best-effort query (src/utils/orderNumbers.js,
+// tested in orderNumbers.test.js); stubbed here so it doesn't consume one of the
+// queued supabase builders these tests feed in strict order. Default = short id.
+const mockOrderRefFor = vi.hoisted(() => vi.fn(async (id) => String(id).slice(0, 8).toUpperCase()));
 const mockGrantMembership = vi.hoisted(() => vi.fn());
 const mockRevokeMembership = vi.hoisted(() => vi.fn());
 
@@ -25,6 +29,10 @@ vi.mock('../../src/services/refundAmounts.js', async (importOriginal) => ({
   getRefundPolicyOptions: vi.fn(async () => ({ retentionPct: 50, retainProcessingFee: true })),
 }));
 vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: mockSendOrderShipped }));
+vi.mock('../../src/utils/orderNumbers.js', () => ({
+  orderRefFor: mockOrderRefFor,
+  fetchOrderNumbers: vi.fn(async () => new Map()),
+}));
 // The complimentary-Ultimate half of the role change has its own test
 // (subscription-admin-complimentary.test.js); here it only needs to be called.
 vi.mock('../../src/services/subscriptionService.js', () => ({
@@ -510,6 +518,7 @@ describe('POST /orders/:id/ship', () => {
       makeBuilder(),                                   // audit log
     );
     mockSendOrderShipped.mockResolvedValue(true);
+    mockOrderRefFor.mockResolvedValueOnce('CP-000042');
 
     const res = await request(app).post(`/admin/orders/${ORDER_ID}/ship`)
       .send({ carrier: 'auspost', tracking_number: '33ab 1234 567' });
@@ -519,8 +528,10 @@ describe('POST /orders/:id/ship', () => {
     expect(update.update).toHaveBeenCalledWith(expect.objectContaining({
       status: 'shipped', tracking_carrier: 'auspost', tracking_number: '33AB1234567',
     }));
+    expect(mockOrderRefFor).toHaveBeenCalledWith(ORDER_ID);
+    // The shipping email names the order by its sequential number.
     expect(mockSendOrderShipped).toHaveBeenCalledWith(expect.objectContaining({
-      buyerEmail: 'sam@example.com', buyerName: 'Sam Buyer', orderRef: '11111111',
+      buyerEmail: 'sam@example.com', buyerName: 'Sam Buyer', orderRef: 'CP-000042',
       items: ['Charizard Holo'], carrier: 'auspost', trackingNumber: '33AB1234567',
     }));
     expect(notifyUpdate.update).toHaveBeenCalledWith({ shipping_notified_at: expect.any(String) });

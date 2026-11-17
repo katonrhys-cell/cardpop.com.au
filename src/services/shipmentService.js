@@ -1,5 +1,6 @@
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
+import { orderRefFor } from '../utils/orderNumbers.js';
 import { sendOrderShipped, sendOrderDelivered } from '../utils/emailService.js';
 import { carrierLabel, normalizeTrackingNumber } from '../../utils/shipmentTracking.js';
 import { MARKETPLACE_PROTECTION } from '../../utils/buyerProtectionPolicy.js';
@@ -92,7 +93,7 @@ export async function markOrderShipped({ orderId, carrier, trackingNumber: rawTr
   if (updErr) throw updErr;
   if (!updated) throw httpError(409, 'This order changed while it was being marked shipped — reload and try again');
 
-  const orderRef = orderId.slice(0, 8).toUpperCase();
+  const orderRef = await orderRefFor(orderId); // CP-000123, else the short id
   const items = itemTitles(order);
   const lines = Array.isArray(order.order_items) ? order.order_items : [];
 
@@ -162,7 +163,7 @@ export async function markOrderDelivered({ orderId, source, deliveredAt = null, 
   if (!updated) return { changed: false, order }; // lost a race with another path
 
   if (notify) {
-    const orderRef = orderId.slice(0, 8).toUpperCase();
+    const orderRef = await orderRefFor(orderId); // CP-000123, else the short id
     const items = itemTitles(order);
     const isShopOnly = Array.isArray(order.order_items) && order.order_items.length > 0 && order.order_items.every((l) => l?.type === 'shop');
     const { buyerEmail, buyerName } = await buyerContact(order);

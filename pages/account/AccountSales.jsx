@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CARRIERS, CARRIER_IDS, DEFAULT_CARRIER, carrierLabel, trackingUrl, isValidTrackingNumber } from '@/utils/shipmentTracking.js';
 import { MARKETPLACE_PROTECTION } from '@/utils/buyerProtectionPolicy.js';
+import { orderRef } from '@/utils/orderRef.js';
 
 // Account → Sales: everything a seller must do after a card sells — see where
 // to post it, and mark it shipped with tracking. Until this page existed a
@@ -151,7 +152,7 @@ const SaleCard = ({ sale, onShip, onChanged }) => {
       <CardContent className="space-y-4 p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <p className="font-mono text-xs text-muted-foreground">{sale.order_id.slice(0, 8).toUpperCase()}</p>
+            <p className="font-mono text-xs text-muted-foreground">{orderRef(sale)}</p>
             <p className="text-sm text-muted-foreground">Sold {fmtDate(sale.sold_at)}{sale.buyer_name ? ` to ${sale.buyer_name}` : ''}</p>
           </div>
           <Badge variant="outline" className={`text-xs font-bold ${cfg.cls}`}><cfg.Icon className="mr-1 h-3.5 w-3.5" />{cfg.label}</Badge>
@@ -219,7 +220,20 @@ const AccountSales = () => {
     setLoading(true);
     const { data, error } = await supabase.rpc('seller_sales', { p_limit: 100 });
     if (error) toast.error('Could not load your sales.');
-    setSales(groupSales(data || []));
+    const rows = data || [];
+
+    // The order's sequential number (CP-000123). It comes from its own
+    // best-effort call — seller_sales() doesn't return it, and a failure (or the
+    // migration not having landed yet) just leaves the short id showing.
+    const numbers = {};
+    const ids = [...new Set(rows.map((r) => r.order_id))];
+    if (ids.length) {
+      try {
+        const { data: nums } = await supabase.rpc('seller_order_numbers', { p_order_ids: ids });
+        for (const n of nums || []) if (n?.order_number) numbers[n.order_id] = n.order_number;
+      } catch { /* fall back to the short id */ }
+    }
+    setSales(groupSales(rows.map((r) => ({ ...r, order_number: numbers[r.order_id] || null }))));
     setLoading(false);
   }, [currentUser?.id]);
 

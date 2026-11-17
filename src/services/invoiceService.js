@@ -10,6 +10,7 @@ import { getPlatformSettings, invalidatePlatformSettings } from '../utils/platfo
 import { resolveAccountMapping } from '../utils/invoiceAccounting.js';
 import { invoicesToCsv, invoicesToXeroCsv, toXeroDocument } from '../utils/invoiceExport.js';
 import { renderInvoicePdf, invoicePdfFilename, normaliseSupplier } from '../utils/invoicePdf.js';
+import { fetchOrderNumbers } from '../utils/orderNumbers.js';
 
 export const INVOICE_LIST_COLUMNS = [
   'id', 'order_id', 'kind', 'number', 'sequence', 'status', 'invoice_date', 'issued_at', 'due_date',
@@ -236,8 +237,15 @@ export async function saveSupplierDetails(details) {
 
 /** `{ buffer, filename }` for a stored invoice row. */
 export async function buildInvoicePdf(invoice) {
-  const supplier = await getSupplierDetails();
-  return { buffer: await renderInvoicePdf(invoice, supplier), filename: invoicePdfFilename(invoice) };
+  // The order's sequential number (CP-000123) is read here, best-effort, rather
+  // than joined into every invoice query: the order number never changes, and a
+  // missing one just prints the short id (see src/utils/orderNumbers.js).
+  const [supplier, numbers] = await Promise.all([
+    getSupplierDetails(),
+    fetchOrderNumbers([invoice?.order_id]),
+  ]);
+  const withNumber = { ...invoice, order_number: numbers.get(String(invoice?.order_id)) || null };
+  return { buffer: await renderInvoicePdf(withNumber, supplier), filename: invoicePdfFilename(invoice) };
 }
 
 export { normaliseSupplier };

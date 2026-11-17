@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import logger from './logger.js';
+import { fetchOrderNumbers } from './orderNumbers.js';
 import {
   orderConfirmedEmail,
   itemSoldEmail,
@@ -141,22 +142,29 @@ export async function sendWelcomeOffer({ to, name, code, trialDays, discountPct,
   });
 }
 
-export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, itemPrice, total, orderId, invoice, paymentWalletType }) {
+// `orders.order_number` (CP-000123) for an email, or null — looked up best-effort
+// here so the webhook's call sites don't each carry it; the templates fall back
+// to the short id. Never throws (see orderNumbers.js).
+const orderNumberFor = async (orderId) => (orderId ? (await fetchOrderNumbers([orderId])).get(String(orderId)) || null : null);
+
+export async function sendOrderConfirmed({ buyerEmail, buyerName, cardName, itemPrice, total, orderId, orderNumber, invoice, paymentWalletType }) {
   const isTaxInvoice = Boolean(invoice?.abn);
+  const number = orderNumber || await orderNumberFor(orderId);
   await send({
     to: buyerEmail,
     subject: isTaxInvoice ? 'Your CardPop tax invoice & order confirmation' : 'Your CardPop purchase is confirmed!',
-    html: orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, invoice, paymentWalletType }),
+    html: orderConfirmedEmail({ buyerName, cardName, itemPrice, total, orderId, orderNumber: number, invoice, paymentWalletType }),
   });
 }
 
 // Admin heads-up for every confirmed order. Sent to the configurable admin
 // contact address, not to the buyer or seller.
-export async function sendOrderAdminNotice({ to, orderId, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }) {
+export async function sendOrderAdminNotice({ to, orderId, orderNumber, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }) {
+  const number = orderNumber || await orderNumberFor(orderId);
   return send({
     to,
     subject: `New ${preorderSummary ? 'pre-order' : 'order'} received — $${Number(total || 0).toFixed(2)} AUD`,
-    html: orderAdminNoticeEmail({ orderId, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }),
+    html: orderAdminNoticeEmail({ orderId, orderNumber: number, buyerName, buyerEmail, total, itemsSummary, sellerName, preorderSummary }),
   });
 }
 

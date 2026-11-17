@@ -6,6 +6,8 @@
 // start (see tests/backend/outboundTimeouts.test.js for the same rule applied
 // to the Anthropic SDK). See docs/order-invoices.md → "PDF tax invoice".
 
+import { orderRef } from '../../utils/orderRef.js';
+
 const num = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -22,6 +24,25 @@ export const pdfSafe = (value) => String(value ?? '')
   .replace(/[^\n\t\x20-\x7E -ÿ]/g, '?');
 
 const isCreditNote = (invoice) => invoice?.kind === 'credit_note';
+
+/**
+ * The order reference printed on the page: the order's sequential number
+ * (`CP-000123`, passed in as `invoice.order_number` — see `buildInvoicePdf`),
+ * else the short id every screen showed before order numbers existed. The full
+ * UUID stays in the database — it's never printed on the page.
+ */
+const invoiceOrderRef = (invoice) => orderRef({ order_number: invoice?.order_number, id: invoice?.order_id });
+
+/**
+ * A payment reference short enough to read out: the last 8 characters of the
+ * Stripe id (`pi_3Q9xKLM2eZvKYlo21AbCdEfG` → `...bCdEfG` style, 8 chars after
+ * the ellipsis). The full id stays on the order row and in Stripe; 8 characters
+ * is enough to match a payout line.
+ */
+export const shortPaymentRef = (ref) => {
+  const s = String(ref || '').trim();
+  return s.length > 8 ? `…${s.slice(-8)}` : s;
+};
 
 /** Download name, e.g. `CardPop-tax-invoice-INV-000042.pdf`. */
 export const invoicePdfFilename = (invoice) => {
@@ -83,8 +104,7 @@ export async function renderInvoicePdf(invoice, supplierSetting) {
     info: {
       Title: `${credit ? 'Credit note' : 'Tax invoice'} ${invoice?.number || ''}`.trim(),
       Author: supplier.legalName,
-      Subject: `Order ${invoice?.order_id || ''}`,
-    },
+      Subject: `Order ${invoiceOrderRef(invoice)}`,    },
   });
   const chunks = [];
   doc.on('data', (c) => chunks.push(c));
@@ -103,7 +123,7 @@ export async function renderInvoicePdf(invoice, supplierSetting) {
   doc.fillColor(CHARCOAL).font('Helvetica-Bold').fontSize(11).text(T(invoice?.number || ''), left, doc.y + 2);
   doc.font('Helvetica').fontSize(9).fillColor(GREY);
   doc.text(T(`Date: ${formatInvoiceDate(invoice?.invoice_date)}`));
-  doc.text(T(`Order: ${invoice?.order_id || ''}`));
+  doc.text(T(`Order: ${invoiceOrderRef(invoice)}`));
   if (credit && invoice?.credits_number) doc.text(T(`Credits tax invoice: ${invoice.credits_number}`));
   const leftBottom = doc.y;
 
@@ -144,7 +164,7 @@ export async function renderInvoicePdf(invoice, supplierSetting) {
     .text(T(invoice?.status === 'void' ? 'Void' : (credit ? 'Refunded' : 'Paid in full')), px, y + 13, { width: half });
   doc.font('Helvetica').fontSize(9).fillColor(GREY);
   doc.text(T(`Method: ${String(invoice?.payment_method || 'card').replace(/_/g, ' ')}`), { width: half });
-  if (invoice?.stripe_payment_intent_id) doc.text(T(`Reference: ${invoice.stripe_payment_intent_id}`), { width: half });
+  if (invoice?.stripe_payment_intent_id) doc.text(T(`Reference: ${shortPaymentRef(invoice.stripe_payment_intent_id)}`), { width: half });
   if (invoice?.due_date && !credit) doc.text(T(`Paid ${formatInvoiceDate(invoice.invoice_date)}`), { width: half });
   y = Math.max(billBottom, doc.y) + 20;
 
