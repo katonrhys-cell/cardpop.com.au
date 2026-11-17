@@ -29,7 +29,7 @@ describe('cloudflare/scheduler SCHEDULES', () => {
     expect(byKey.daily.cron).toBe('23 19 * * *');
     expect(byKey.blog.cron).toBe('7 21 * * *');
     expect(byKey['event-scan'].cron).toBe('7 17 * * SUN');
-    expect(byKey.daily.jobs).toEqual(['site_traffic', 'prices', 'event_watch', 'supplier_watch', 'delivery_sweep', 'retention_sweep']);
+    expect(byKey.daily.jobs).toEqual(['site_traffic', 'prices', 'event_watch', 'event_instagram', 'supplier_watch', 'delivery_sweep', 'retention_sweep']);
     // Every scheduled job exists, and every job is on some schedule.
     const scheduled = new Set(SCHEDULES.flatMap((s) => s.jobs));
     for (const name of scheduled) expect(JOBS[name]).toBeTruthy();
@@ -44,9 +44,9 @@ describe('cloudflare/scheduler SCHEDULES', () => {
   });
 
   it('never retries a job that spends on a model call', () => {
-    for (const name of ['blog_generate', 'event_scan', 'event_watch']) expect(JOBS[name].attempts).toBe(1);
+    for (const name of ['blog_generate', 'event_scan', 'event_watch', 'event_instagram']) expect(JOBS[name].attempts).toBe(1);
     // 300 s functions get a timeout that outlasts them.
-    for (const name of ['blog_generate', 'event_scan', 'event_watch']) expect(JOBS[name].maxSeconds).toBeGreaterThan(300);
+    for (const name of ['blog_generate', 'event_scan', 'event_watch', 'event_instagram']) expect(JOBS[name].maxSeconds).toBeGreaterThan(300);
   });
 
   it('matches the cron the runtime hands it, tolerating whitespace', () => {
@@ -116,7 +116,7 @@ describe('runSchedule', () => {
     const report = await runSchedule(daily, env, { fetch, sleep: noSleep });
     expect(report.ok).toBe(false);
     expect(report.failed.sort()).toEqual(['event_watch', 'retention_sweep']);
-    expect(report.results).toHaveLength(6);
+    expect(report.results).toHaveLength(7);
     const paths = calls.map((c) => new URL(c.url).pathname + new URL(c.url).search);
     for (const name of daily.jobs) expect(paths).toContain(JOBS[name].endpoint);
   });
@@ -211,7 +211,7 @@ describe('handlers', () => {
     expect(ok.status).toBe(200);
     const report = await ok.json();
     expect(report.schedule).toBe('daily');
-    expect(report.results).toHaveLength(6);
+    expect(report.results).toHaveLength(7);
 
     // A single job by name, and an unknown target.
     const one = await handlers.fetch(new Request('https://sched.example.workers.dev/run/prices', { method: 'POST', headers: { authorization: `Bearer ${SECRET}` } }), env);

@@ -68,6 +68,10 @@ export const JOBS = Object.freeze({
   // Its own 300 s function; may spend on a model call, so never retried — a
   // due watch left over is simply picked up tomorrow.
   event_watch: { endpoint: '/cron/event-scan?mode=watches', maxSeconds: 330, attempts: 1 },
+  // Daily read of the event scanner's Instagram sources
+  // (docs/instagram-event-scan.md). One model call per new post, so never
+  // retried; answers 200 without doing anything until Instagram is connected.
+  event_instagram: { endpoint: '/cron/event-scan?mode=instagram', maxSeconds: 330, attempts: 1 },
   // Supplier price watch (docs/supplier-price-watch.md). A product checked
   // once isn't due again for a week, so a retry only picks up the rest.
   supplier_watch: { endpoint: '/api/shop-supplier-watch/run', maxSeconds: 50, attempts: 2 },
@@ -95,7 +99,7 @@ export const JOBS = Object.freeze({
 
 // One entry per Cron Trigger. The jobs of a schedule run concurrently: they
 // are independent, and the daily run's worst case (two 50 s attempts on five
-// endpoints plus one 330 s call) would not fit the 15-minute ceiling in series.
+// endpoints plus two 330 s calls) would not fit the 15-minute ceiling in series.
 export const SCHEDULES = Object.freeze([
   {
     // Every 2 hours at :15 past. A stuck payment is caught within ~2 hours.
@@ -111,7 +115,7 @@ export const SCHEDULES = Object.freeze([
     cron: '23 19 * * *',
     key: 'daily',
     name: 'Daily maintenance',
-    jobs: ['site_traffic', 'prices', 'event_watch', 'supplier_watch', 'delivery_sweep', 'retention_sweep'],
+    jobs: ['site_traffic', 'prices', 'event_watch', 'event_instagram', 'supplier_watch', 'delivery_sweep', 'retention_sweep'],
   },
   {
     // 21:07 UTC = 07:07 AEST.

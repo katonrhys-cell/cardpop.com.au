@@ -14,6 +14,9 @@ vi.mock('../../src/utils/eventSourceWatcher.js', () => ({
   scanEventSource: mockScanEventSource,
 }));
 
+const mockRunInstagramScan = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/instagramEventScanner.js', () => ({ runInstagramEventScan: mockRunInstagramScan }));
+
 const mockGetUser = vi.hoisted(() => vi.fn());
 const mockProfileLookup = vi.hoisted(() => vi.fn());
 const mockRunsLookup = vi.hoisted(() => vi.fn());
@@ -68,6 +71,7 @@ beforeEach(() => {
   mockRunsLookup.mockReturnValue({ data: [], error: null });
   mockRunDueWatches.mockResolvedValue({ due: 1, scanned: 1, results: [] });
   mockScanEventSource.mockResolvedValue({ eventId: EVENT_ID, status: 'updated' });
+  mockRunInstagramScan.mockResolvedValue({ runId: 'run-ig', scope: 'instagram', eventsCreated: 1 });
 });
 
 afterEach(() => {
@@ -217,5 +221,65 @@ describe('/cron/event-scan?mode=watches', () => {
     const res = await call('Bearer admin-access-token', { mode: 'watches', event: EVENT_ID });
 
     expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('/cron/event-scan?mode=instagram', () => {
+  const asAdmin = () => mockGetUser.mockResolvedValue({
+    data: { user: { id: 'admin-1', app_metadata: { is_admin: true } } },
+    error: null,
+  });
+
+  it('runs the Instagram scan for the scheduler, not the web scan', async () => {
+    const res = await call('Bearer super-secret', { mode: 'instagram' });
+
+    expect(res.statusCode).toBe(200);
+    expect(mockRunInstagramScan).toHaveBeenCalledWith({ trigger: 'cron', triggeredBy: null });
+    expect(mockRunEventScan).not.toHaveBeenCalled();
+  });
+
+  it('answers the scheduler 200 while Instagram is not connected, so nothing alerts', async () => {
+    mockRunInstagramScan.mockResolvedValue({ skipped: 'not_configured' });
+
+    const res = await call('Bearer super-secret', { mode: 'instagram' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toEqual({ skipped: 'not_configured' });
+  });
+
+  it('tells an admin plainly when Instagram is not connected', async () => {
+    asAdmin();
+    mockRunInstagramScan.mockResolvedValue({ skipped: 'not_configured' });
+
+    const res = await call('Bearer admin-access-token', { mode: 'instagram' });
+
+    expect(res.statusCode).toBe(503);
+    expect(res.body.error).toMatch(/not connected/);
+  });
+
+  it('requires a credential', async () => {
+    const res = await call(undefined, { mode: 'instagram' });
+
+    expect(res.statusCode).toBe(401);
+    expect(mockRunInstagramScan).not.toHaveBeenCalled();
+  });
+
+  it('refuses a second manual run while one is in flight', async () => {
+    asAdmin();
+    mockRunsLookup.mockReturnValue({ data: [{ id: 'run-ig' }], error: null });
+
+    const res = await call('Bearer admin-access-token', { mode: 'instagram' });
+
+    expect(res.statusCode).toBe(409);
+    expect(mockRunInstagramScan).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed run with its reason', async () => {
+    mockRunInstagramScan.mockRejectedValue(new Error('The Instagram access token has expired'));
+
+    const res = await call('Bearer super-secret', { mode: 'instagram' });
+
+    expect(res.statusCode).toBe(502);
+    expect(res.body.error).toMatch(/expired/);
   });
 });

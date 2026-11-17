@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { formatDistanceToNow } from 'date-fns';
-import { Radar, Loader2, Plus, Trash2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { Radar, Loader2, Plus, Trash2, AlertTriangle, CheckCircle2, Clock, Instagram, Users } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient';
 
@@ -39,11 +39,35 @@ const RUN_STATUS_STYLES = {
 
 const emptyDraft = { kind: 'search_query', value: '', label: '', priority: 100 };
 
+const isInstagramKind = (kind) => kind === 'instagram_account' || kind === 'instagram_tagged';
+
+const SOURCE_KIND_LABELS = {
+  search_query: 'Search',
+  seed_url: 'Page',
+  instagram_account: 'Instagram account',
+  instagram_tagged: 'Instagram',
+};
+
+const SOURCE_PLACEHOLDERS = {
+  search_query: 'e.g. Pokemon card show Sydney upcoming',
+  seed_url: 'https://example.com.au/events',
+  instagram_account: '@handle or instagram.com/handle',
+};
+
+const sourceTitle = (source) => {
+  if (source.kind === 'instagram_tagged') return 'Posts that tag CardPop';
+  if (source.kind === 'instagram_account') return `@${source.value}`;
+  return source.value;
+};
+
 const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
   const [runs, setRuns] = useState([]);
   const [sources, setSources] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
+  const [isScanningInstagram, setIsScanningInstagram] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const [instagram, setInstagram] = useState(null);
   const [draft, setDraft] = useState(emptyDraft);
 
   const load = useCallback(async () => {
@@ -68,15 +92,28 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
     if (isOpen) load();
   }, [isOpen, load]);
 
-  const handleRunNow = async () => {
-    setIsScanning(true);
-    toast.info('Scan started — this takes a few minutes.');
+  // Whether the Instagram account is connected. Asked once per open; a failure
+  // just leaves the status line out.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    let cancelled = false;
+    apiServerClient.fetch('/event-scan/instagram/status')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => { if (!cancelled) setInstagram(body); })
+      .catch(() => { if (!cancelled) setInstagram(null); });
+    return () => { cancelled = true; };
+  }, [isOpen]);
+
+  // Both scans run on the 300s function, called directly — not through
+  // apiServerClient, which targets /hcgi/api (the 40s function).
+  const runScan = async ({ path, setBusy, label }) => {
+    setBusy(true);
+    toast.info(`${label} started — this takes a few minutes.`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Your session has expired. Sign in again.');
 
-      // Not apiServerClient: that targets /hcgi/api, which is the 40s function.
-      const response = await window.fetch('/cron/event-scan', {
+      const response = await window.fetch(path, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
@@ -86,15 +123,42 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
       const created = body.eventsCreated ?? 0;
       toast.success(
         created > 0
-          ? `Scan finished — ${created} new draft${created === 1 ? '' : 's'} awaiting review.`
-          : 'Scan finished — nothing new found.',
+          ? `${label} finished — ${created} new draft${created === 1 ? '' : 's'} awaiting review.`
+          : `${label} finished — nothing new found.`,
       );
       await load();
       onScanFinished?.();
     } catch (err) {
       toast.error(err.message || 'Scan failed.');
     } finally {
-      setIsScanning(false);
+      setBusy(false);
+    }
+  };
+
+  const handleRunNow = () => runScan({ path: '/cron/event-scan', setBusy: setIsScanning, label: 'Scan' });
+  const handleRunInstagram = () => runScan({
+    path: '/cron/event-scan?mode=instagram',
+    setBusy: setIsScanningInstagram,
+    label: 'Instagram scan',
+  });
+
+  const handleImportOrganisers = async () => {
+    setIsImporting(true);
+    try {
+      const response = await apiServerClient.fetch('/event-scan/instagram/import-organisers', { method: 'POST' });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || 'Failed to add the accounts.');
+      const added = body.added ?? [];
+      if (added.length) setSources(prev => [...prev, ...added]);
+      toast.success(
+        added.length
+          ? `Added ${added.length} organiser account${added.length === 1 ? '' : 's'}.`
+          : 'Every organiser account on the site is already listed.',
+      );
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -134,7 +198,7 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
   };
 
   const handleDeleteSource = async (source) => {
-    if (!window.confirm(`Remove "${source.value}" from the scan list?`)) return;
+    if (!window.confirm(`Remove "${sourceTitle(source)}" from the scan list?`)) return;
     try {
       const response = await apiServerClient.fetch(`/event-scan/sources/${source.id}`, { method: 'DELETE' });
       if (!response.ok) throw new Error('Delete failed');
@@ -155,7 +219,7 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
           <DialogDescription>
             Runs nightly at 3am AEST. Searches the web for upcoming Australian trading card
             events and files anything new here as a draft for you to review — nothing is
-            published automatically.
+            published automatically. Instagram accounts on the list are read once a day.
           </DialogDescription>
         </DialogHeader>
 
@@ -180,6 +244,11 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                       <Badge variant="outline" className={`text-xs font-bold ${RUN_STATUS_STYLES[run.status]}`}>
                         {run.status}
                       </Badge>
+                      {run.scope === 'instagram' && (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Instagram className="w-3 h-3" /> Instagram
+                        </Badge>
+                      )}
                       <span className="text-xs text-muted-foreground capitalize">{run.trigger}</span>
                     </div>
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -189,9 +258,19 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                   </div>
 
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <span>{run.queries_run} queries</span>
-                    <span>{run.candidates_found} results</span>
-                    <span>{run.pages_fetched} pages read</span>
+                    {run.scope === 'instagram' ? (
+                      <>
+                        <span>{run.queries_run} accounts checked</span>
+                        <span>{run.candidates_found} new posts</span>
+                        <span>{run.pages_fetched} posts read</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>{run.queries_run} queries</span>
+                        <span>{run.candidates_found} results</span>
+                        <span>{run.pages_fetched} pages read</span>
+                      </>
+                    )}
                     <span className="font-bold text-foreground">{run.events_created} drafts created</span>
                     <span>{run.duplicates_skipped} already known</span>
                   </div>
@@ -217,7 +296,7 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
 
           <TabsContent value="sources" className="space-y-4 pt-4">
             <form onSubmit={handleAddSource} className="border border-border rounded-xl p-4 space-y-3">
-              <Label htmlFor="scan-source-value" className="text-sm font-bold">Add a search or a listing page</Label>
+              <Label htmlFor="scan-source-value" className="text-sm font-bold">Add a search, a listing page or an Instagram account</Label>
               <div className="flex flex-col sm:flex-row gap-2">
                 <select
                   aria-label="Source type"
@@ -227,14 +306,13 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                 >
                   <option value="search_query">Search</option>
                   <option value="seed_url">Page URL</option>
+                  <option value="instagram_account">Instagram account</option>
                 </select>
                 <Input
                   id="scan-source-value"
                   value={draft.value}
                   onChange={(e) => setDraft(d => ({ ...d, value: e.target.value }))}
-                  placeholder={draft.kind === 'search_query'
-                    ? 'e.g. Pokemon card show Sydney upcoming'
-                    : 'https://example.com.au/events'}
+                  placeholder={SOURCE_PLACEHOLDERS[draft.kind]}
                   className="flex-1"
                 />
                 <Button type="submit" className="rounded-lg font-bold">
@@ -242,6 +320,49 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                 </Button>
               </div>
             </form>
+
+            <div className="border border-border rounded-xl p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Instagram className="w-4 h-4 mt-0.5 shrink-0 text-brand-red" />
+                <div className="min-w-0 text-sm">
+                  <p className="font-bold">Instagram</p>
+                  <p className="text-xs text-muted-foreground">
+                    {instagram == null && 'Checking the connection…'}
+                    {instagram && !instagram.configured && 'Not connected yet. Add the CardPop account\u2019s access token (INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID) to switch this on.'}
+                    {instagram?.configured && instagram.connected && `Connected as @${instagram.username}. Reads public posts from the business and creator accounts listed below, and posts that tag CardPop. It never posts, likes or messages.`}
+                    {instagram?.configured && !instagram.connected && `The token is set, but Instagram refused it: ${instagram.error}`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleImportOrganisers}
+                  disabled={isImporting}
+                  className="rounded-lg"
+                >
+                  {isImporting
+                    ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    : <Users className="w-4 h-4 mr-1.5" />}
+                  Add organisers&rsquo; accounts
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunInstagram}
+                  disabled={isScanningInstagram || !instagram?.configured}
+                  className="rounded-lg"
+                >
+                  {isScanningInstagram
+                    ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />
+                    : <Instagram className="w-4 h-4 mr-1.5" />}
+                  Scan Instagram now
+                </Button>
+              </div>
+            </div>
 
             {isLoading ? (
               [1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-xl" />)
@@ -252,26 +373,30 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                     <Switch
                       checked={source.is_active}
                       onCheckedChange={() => handleToggleSource(source)}
-                      aria-label={`Toggle ${source.value}`}
+                      aria-label={`Toggle ${sourceTitle(source)}`}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{source.value}</p>
+                      <p className="text-sm font-medium truncate">{sourceTitle(source)}</p>
                       <p className="text-xs text-muted-foreground">
-                        {source.kind === 'seed_url' ? 'Page' : 'Search'}
+                        {SOURCE_KIND_LABELS[source.kind] || source.kind}
+                        {isInstagramKind(source.kind) && source.label && source.kind !== 'instagram_tagged' ? ` · ${source.label}` : ''}
                         {source.state ? ` · ${source.state}` : ''}
                         {source.last_scanned_at
                           ? ` · last run ${formatDistanceToNow(new Date(source.last_scanned_at), { addSuffix: true })}`
                           : ' · never run'}
                       </p>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteSource(source)}
-                      aria-label={`Remove ${source.value}`}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
+                    {/* The tagged-posts source is one fixed row: switch it off rather than remove it. */}
+                    {source.kind !== 'instagram_tagged' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteSource(source)}
+                        aria-label={`Remove ${sourceTitle(source)}`}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    )}
                   </div>
                 ))}
                 {sources.length === 0 && (

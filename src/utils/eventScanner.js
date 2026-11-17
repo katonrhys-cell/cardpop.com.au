@@ -43,7 +43,7 @@ import {
 // Sonnet 5.5 ($2 / $10) instead. Both set effort explicitly and use no forced
 // tool_choice; Sonnet 5.5 accepts the same `fallbacks: 'default'` form.
 const DISCOVERY_MODEL = 'claude-opus-5-5';
-const EXTRACTION_MODEL = 'claude-sonnet-5-5';
+export const EXTRACTION_MODEL = 'claude-sonnet-5-5';
 
 // Per-run budgets. The cron function has a 300s ceiling (vercel.json), and one
 // slow page plus one extraction is comfortably 20s, so these are sized to
@@ -63,7 +63,7 @@ const EXTRACTION_MODEL = 'claude-sonnet-5-5';
 // mid-run and strands the run row at 'running'. 12 is about half the budget.
 const MAX_SOURCES_PER_RUN = 12;
 const MAX_CANDIDATES_PER_RUN = 12;
-const RUN_DEADLINE_MS = 240_000;
+export const RUN_DEADLINE_MS = 240_000;
 
 // How far ahead an event may sit and still be worth importing. Anything beyond
 // this is usually a recurring "every second Sunday" page rather than a real
@@ -96,12 +96,16 @@ const TRACKING_PARAMS = [
   'fbclid', 'gclid', 'msclkid', 'mc_cid', 'mc_eid', 'ref', 'ref_src', 'igshid',
 ];
 
+// The kinds the weekly web scan works through. Instagram sources have their own
+// run (src/utils/instagramEventScanner.js) and must not take these slots.
+export const WEB_SOURCE_KINDS = ['search_query', 'seed_url'];
+
 let cachedClient = null;
 // Imported on first use, not at module load: routes/event-scan.js reaches this
 // file (via eventSourceWatcher) for two constants, which put the whole SDK on
 // every cold start. The timeout keeps a stalled call inside the 300 s function
 // budget; one retry rather than the SDK's default two.
-async function anthropic() {
+export async function anthropic() {
   if (!process.env.ANTHROPIC_API_KEY) {
     throw new Error('ANTHROPIC_API_KEY is not set — event scanning is disabled.');
   }
@@ -216,7 +220,7 @@ export function isBlockedDomain(rawUrl) {
   }
 }
 
-function todayIso() {
+export function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -225,11 +229,12 @@ function daysBetween(fromIso, toIso) {
 }
 
 /** Load the sources this run will work through, oldest-scanned first. */
-async function claimSources(limit) {
+export async function claimSources(limit, kinds = WEB_SOURCE_KINDS) {
   const { data, error } = await supabase
     .from('event_scan_sources')
     .select('*')
     .eq('is_active', true)
+    .in('kind', kinds)
     .order('last_scanned_at', { ascending: true, nullsFirst: true })
     .order('priority', { ascending: true })
     .limit(limit);
@@ -237,7 +242,7 @@ async function claimSources(limit) {
   return data ?? [];
 }
 
-async function markSourcesScanned(sourceIds) {
+export async function markSourcesScanned(sourceIds) {
   if (!sourceIds.length) return;
   const { error } = await supabase
     .from('event_scan_sources')
@@ -329,7 +334,7 @@ export async function discoverCandidates(queries) {
  * gets its last_seen_at bumped so the admin can tell a stale link from a fresh
  * one, but it is not re-fetched — that dedupe is the job's main cost control.
  */
-async function registerCandidates(candidates, runId, sourceId) {
+export async function registerCandidates(candidates, runId, sourceId, { limit = Infinity } = {}) {
   if (!candidates.length) return [];
 
   const urls = candidates.map((c) => c.url);
@@ -349,7 +354,9 @@ async function registerCandidates(candidates, runId, sourceId) {
     if (touchError) logger.warn(`[EVENT_SCAN] Failed to touch known candidates: ${touchError.message}`);
   }
 
-  const fresh = candidates.filter((c) => !knownUrls.has(c.url));
+  // `limit` leaves the overflow unrecorded on purpose: a recorded candidate is
+  // never looked at again, so one this run can't process must stay unseen.
+  const fresh = candidates.filter((c) => !knownUrls.has(c.url)).slice(0, Math.max(0, limit));
   if (!fresh.length) return [];
 
   const { data: inserted, error: insertError } = await supabase
@@ -367,7 +374,7 @@ async function registerCandidates(candidates, runId, sourceId) {
   return inserted ?? [];
 }
 
-async function updateCandidate(candidateId, patch) {
+export async function updateCandidate(candidateId, patch) {
   const { error } = await supabase
     .from('event_scan_candidates')
     .update(patch)
@@ -411,6 +418,14 @@ ${pageText}`,
   // Recorded before any check below: the call is billed either way.
   await recordAiUsage({ feature: 'event_extraction', model: message.model || EXTRACTION_MODEL, usage: message.usage });
 
+  return readExtraction(message, sourceUrl);
+}
+
+/**
+ * Turn an extraction reply (EVENT_SCHEMA) into `{ eventData }` or
+ * `{ rejected }`. Shared by the page extractor and the Instagram post reader.
+ */
+export function readExtraction(message, sourceUrl) {
   if (message.stop_reason === 'refusal') {
     throw new Error(`Extraction declined by the model (${message.stop_details?.category || 'unknown'}).`);
   }
@@ -454,7 +469,7 @@ async function findExistingEvent(eventData) {
 
   const { data: sameDay, error } = await supabase
     .from('events')
-    .select('id, title, venue_name, suburb')
+    .select('id, title, venue_name, suburb, instagram_url')
     .eq('start_date', eventData.start_date);
   if (error) {
     logger.warn(`[EVENT_SCAN] Duplicate check failed: ${error.message}`);
@@ -470,6 +485,12 @@ async function findExistingEvent(eventData) {
     }
     if (candidateVenue && existing.venue_name && comparableTitle(existing.venue_name) === candidateVenue) {
       return { event: existing, reason: `Same venue and date as existing event "${existing.title}".` };
+    }
+    // An organiser posts about one show many times, rarely under the same
+    // wording — their account plus the date is the event.
+    if (eventData.instagram_url && existing.instagram_url
+      && existing.instagram_url.toLowerCase() === eventData.instagram_url.toLowerCase()) {
+      return { event: existing, reason: `Same organiser Instagram and date as existing event "${existing.title}".` };
     }
   }
 
@@ -501,6 +522,53 @@ async function insertDraft(eventData) {
   }
 
   throw new Error('Failed to insert event: could not find a free slug.');
+}
+
+/**
+ * The gates between an extraction and a draft: dated, upcoming, not absurdly
+ * far out, not already on the site. Records the verdict on the candidate row
+ * and, when it passes, files the `pending_review` draft. Shared by the web
+ * scan and the Instagram scan so both hold a find to the same standard.
+ */
+export async function fileExtraction(candidate, { eventData, rejected }, stats) {
+  if (rejected) {
+    await updateCandidate(candidate.id, { status: 'rejected', reason: rejected });
+    return;
+  }
+
+  // start_date is NOT NULL on events, and an undated page is exactly the
+  // recurring-session case we don't want in the calendar.
+  if (!eventData.start_date) {
+    await updateCandidate(candidate.id, { status: 'rejected', reason: 'No specific start date on the page.' });
+    return;
+  }
+
+  const daysAhead = daysBetween(todayIso(), eventData.start_date);
+  if (daysAhead < 0) {
+    await updateCandidate(candidate.id, { status: 'rejected', reason: 'Event has already happened.' });
+    return;
+  }
+  if (daysAhead > MAX_DAYS_AHEAD) {
+    await updateCandidate(candidate.id, { status: 'rejected', reason: `Start date is ${daysAhead} days away — likely not a real date.` });
+    return;
+  }
+
+  const duplicate = await findExistingEvent(eventData);
+  if (duplicate) {
+    stats.duplicatesSkipped += 1;
+    await updateCandidate(candidate.id, {
+      status: 'duplicate',
+      reason: duplicate.reason,
+      event_id: duplicate.event.id,
+    });
+    return;
+  }
+
+  const created = await insertDraft(eventData);
+  stats.eventsCreated += 1;
+  stats.createdEvents.push({ id: created.id, title: created.title, slug: created.slug });
+  await updateCandidate(candidate.id, { status: 'imported', event_id: created.id, reason: null });
+  logger.info(`[EVENT_SCAN] Created draft "${created.title}" (${created.id}) from ${candidate.url}`);
 }
 
 /**
@@ -591,46 +659,7 @@ async function runEventScanInScope({ trigger = 'cron', triggeredBy = null } = {}
           continue;
         }
 
-        const { eventData, rejected } = await extractEventFromPage(pageText, candidate.url);
-
-        if (rejected) {
-          await updateCandidate(candidate.id, { status: 'rejected', reason: rejected });
-          continue;
-        }
-
-        // start_date is NOT NULL on events, and an undated page is exactly the
-        // recurring-session case we don't want in the calendar.
-        if (!eventData.start_date) {
-          await updateCandidate(candidate.id, { status: 'rejected', reason: 'No specific start date on the page.' });
-          continue;
-        }
-
-        const daysAhead = daysBetween(todayIso(), eventData.start_date);
-        if (daysAhead < 0) {
-          await updateCandidate(candidate.id, { status: 'rejected', reason: 'Event has already happened.' });
-          continue;
-        }
-        if (daysAhead > MAX_DAYS_AHEAD) {
-          await updateCandidate(candidate.id, { status: 'rejected', reason: `Start date is ${daysAhead} days away — likely not a real date.` });
-          continue;
-        }
-
-        const duplicate = await findExistingEvent(eventData);
-        if (duplicate) {
-          stats.duplicatesSkipped += 1;
-          await updateCandidate(candidate.id, {
-            status: 'duplicate',
-            reason: duplicate.reason,
-            event_id: duplicate.event.id,
-          });
-          continue;
-        }
-
-        const created = await insertDraft(eventData);
-        stats.eventsCreated += 1;
-        stats.createdEvents.push({ id: created.id, title: created.title, slug: created.slug });
-        await updateCandidate(candidate.id, { status: 'imported', event_id: created.id, reason: null });
-        logger.info(`[EVENT_SCAN] Created draft "${created.title}" (${created.id}) from ${candidate.url}`);
+        await fileExtraction(candidate, await extractEventFromPage(pageText, candidate.url), stats);
       } catch (err) {
         // One bad page must not end the run — record it and keep going.
         warnings.push(`${candidate.url}: ${err.message}`);

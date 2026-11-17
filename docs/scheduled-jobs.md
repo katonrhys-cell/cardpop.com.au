@@ -10,7 +10,7 @@ Four triggers carry nine endpoints:
 | Trigger (UTC) | Local | Key | What it calls |
 |---|---|---|---|
 | `15 */2 * * *` | every 2 hours | `reconcile` | `/api/stripe/reconcile-pending` |
-| `23 19 * * *` | 05:23 AEST daily | `daily` | The six daily endpoints below, concurrently |
+| `23 19 * * *` | 05:23 AEST daily | `daily` | The seven daily endpoints below, concurrently |
 | `7 21 * * *` | 07:07 AEST daily | `blog` | `/cron/blog-generate` |
 | `7 17 * * SUN` | 03:07 AEST Monday | `event-scan` | `/cron/event-scan` |
 
@@ -22,6 +22,7 @@ never blocks the rest, and the run is reported failed at the end if any did):
 | `site_traffic` (GA4 visitors) | `/api/site-traffic/sync` | 40 s | 2 attempts | `docs/site-traffic.md` |
 | `prices` | `/api/prices/refresh` | 40 s | 2 attempts | — |
 | `event_watch` (each watch weekly) | `/cron/event-scan?mode=watches` | 300 s | never | `docs/event-scanning.md` |
+| `event_instagram` | `/cron/event-scan?mode=instagram` | 300 s | never | `docs/instagram-event-scan.md` — a no-op (200) until Instagram is connected |
 | `supplier_watch` (each product weekly) | `/api/shop-supplier-watch/run` | 40 s | 2 attempts | `docs/supplier-price-watch.md` |
 | `delivery_sweep` | `/api/orders/delivery-sweep` | 40 s | 2 attempts | `docs/order-delivery.md` |
 | `retention_sweep` | `/api/retention/sweep` | 40 s | 2 attempts | `docs/retention.md` |
@@ -61,7 +62,7 @@ workflow stopped, including the migration push on merge. Cloudflare Cron
 Triggers are included on the Workers free plan and bill nothing per firing.
 The Worker's only work is a `fetch`, well inside the free plan's CPU budget,
 and a Cron Trigger invocation may run up to 15 minutes of wall clock, which
-is why the daily run's six jobs run concurrently rather than in series.
+is why the daily run's seven jobs run concurrently rather than in series.
 
 The Worker itself is not a privilege boundary: every endpoint **fails closed**
 (it refuses to run when the server has no `CRON_SECRET`), so without the

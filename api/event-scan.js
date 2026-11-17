@@ -3,6 +3,7 @@ import '../src/instrument.js';
 import crypto from 'node:crypto';
 import { runEventScan } from '../src/utils/eventScanner.js';
 import { runDueEventSourceScans, scanEventSource } from '../src/utils/eventSourceWatcher.js';
+import { runInstagramEventScan } from '../src/utils/instagramEventScanner.js';
 import supabase from '../src/utils/supabaseClient.js';
 import logger from '../src/utils/logger.js';
 import { decodeAal } from '../src/middleware/requireAal2.js';
@@ -25,8 +26,13 @@ import { decodeAal } from '../src/middleware/requireAal2.js';
 //     through /hcgi/api so the request gets the 300s budget — proxying it
 //     through the 40s API function would time out mid-run.
 //
-// Two jobs, picked by query string:
+// Three jobs, picked by query string:
 //   • (none)                      — the weekly discovery scan.
+//   • ?mode=instagram             — the daily read of the Instagram sources
+//                                   (docs/instagram-event-scan.md). Answers
+//                                   200 `{ skipped }` to the cron when
+//                                   Instagram isn't connected, so an unset
+//                                   token never pages anyone.
 //   • ?mode=watches               — the daily re-scan of every event website
 //                                   that has come due (docs/event-scanning.md).
 //   • ?mode=watches&event=<uuid>  — re-scan one event's website now; what the
@@ -77,12 +83,13 @@ async function resolveAdmin(token) {
   }
 }
 
-async function hasRunInFlight() {
+async function hasRunInFlight(scope = 'web') {
   const since = new Date(Date.now() - CONCURRENT_RUN_WINDOW_MS).toISOString();
   const { data } = await supabase
     .from('event_scan_runs')
     .select('id')
     .eq('status', 'running')
+    .eq('scope', scope)
     .gte('started_at', since)
     .limit(1);
   return Boolean(data?.length);
@@ -131,6 +138,29 @@ export default async function handler(req, res) {
     } catch (error) {
       logger.error(`[EVENT_WATCH] ${error.message}`);
       return res.status(502).json({ error: 'Event website re-scan failed.' });
+    }
+  }
+
+  if (query.mode === 'instagram') {
+    if (trigger === 'manual' && await hasRunInFlight('instagram')) {
+      return res.status(409).json({ error: 'An Instagram scan is already running. Wait for it to finish before starting another.' });
+    }
+    try {
+      const summary = await runInstagramEventScan({ trigger, triggeredBy });
+      logger.info(`[EVENT_SCAN] Instagram: ${JSON.stringify(summary)}`);
+      if (summary.skipped && trigger === 'manual') {
+        return res.status(summary.skipped === 'not_configured' ? 503 : 400).json({
+          error: summary.skipped === 'not_configured'
+            ? 'Instagram is not connected yet. Add INSTAGRAM_ACCESS_TOKEN and INSTAGRAM_ACCOUNT_ID, then redeploy.'
+            : 'No Instagram accounts are switched on. Add one under "What it searches for".',
+        });
+      }
+      return res.status(200).json(summary);
+    } catch (error) {
+      logger.error(`[EVENT_SCAN] Instagram: ${error.message}`);
+      // The reason is safe to show (never the token) and is what the admin
+      // needs: an expired token reads as exactly that.
+      return res.status(502).json({ error: `Instagram scan failed: ${error.message}` });
     }
   }
 

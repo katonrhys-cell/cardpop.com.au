@@ -38,6 +38,9 @@ export const OUTBOUND_TIMEOUT_MS = Object.freeze({
   anthropicGrade: 150_000, // grade estimator vision stream (two photos), api/grade-estimate.js's 300 s function
   anthropicScan: 180_000, // event scan / page extraction, 300 s function
   anthropicDraft: 240_000, // blog draft stream, 300 s function
+  // Instagram Graph API reads and post-photo downloads for the event scan
+  // (300 s function; the admin panel's status check runs on the 40 s one).
+  instagram: 15_000,
   // OpenStreetMap Nominatim, for the Local Map's shared geocode cache.
   nominatim: 4_000,
   // Reddit's public subreddit listing for the forum page (cached a minute).

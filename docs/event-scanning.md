@@ -246,6 +246,13 @@ immediate scan), `POST /event-scan/watches/:eventId/apply` and `/dismiss`
 
 ---
 
+## Instagram
+
+Instagram is login-walled, so the web scan cannot read it. A separate daily run
+reads listed accounts, and posts that tag CardPop, through Meta's official API
+and files drafts through the same gates and the same review queue. Setup, limits
+and costs: `docs/instagram-event-scan.md`.
+
 ## Environment
 
 | Variable | Effect if unset |
