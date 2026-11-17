@@ -120,15 +120,20 @@ A candidate is rejected (and recorded as such, with a reason) when:
 scheduler Worker's `event_backlog` job, and from **Read next batch** in the
 admin panel.
 
-The weekly search finds about a hundred pages and has time to read 18. Until
+The weekly search finds about a hundred pages and reads at most 30. Until
 2026-11-17 the rest were recorded as `pending` and never looked at again — 447
 of them had piled up, including most of the Humanitix, TryBooking and Eventbrite
 pages the search had turned up. The backlog run is what reads them:
 
 1. **Listing pages** — up to 10 `seed_url` sources not read in the last 7 days.
-2. **Backlog** — `pending` candidates, most recently seen first, up to 30 pages
+2. **Backlog** — `pending` candidates, most recently seen first, up to 75 pages
    a run in total, three at a time.
-3. A find nobody read within 120 days is retired unread (`rejected`): the event
+   Both caps were sized from the first real run (2026-11-17), where the search
+   plus 18 page reads took 78 s of the 240 s budget.
+3. A page that never mentions cards or collecting (`mentionsCollecting()`) is
+   rejected without a model call — a search for "card show <town>" also turns
+   up hardware stores and public-holiday calendars.
+4. A find nobody read within 120 days is retired unread (`rejected`): the event
    has almost always happened, so reading it would only pay for a rejection.
 
 Each page goes through the same extraction and gates as the weekly run. The run
@@ -172,7 +177,7 @@ Per-run budgets (`src/utils/eventScanner.js`):
 | Constant | Value | Why |
 |---|---|---|
 | `MAX_SOURCES_PER_RUN` | 12 | Sources rotate on `last_scanned_at`. Discovery is one batched call, so widening this adds searches inside a single request rather than extra requests — the cheap axis |
-| `MAX_CANDIDATES_PER_RUN` | 18 | Read three at a time (`READ_CONCURRENCY`); what is left over is read by the daily backlog run |
+| `MAX_CANDIDATES_PER_RUN` | 30 | Read three at a time (`READ_CONCURRENCY`); what is left over is read by the daily backlog run |
 | `RUN_DEADLINE_MS` | 240,000 | Stops gracefully inside the function's 300s ceiling; leftovers stay `pending` for next week |
 | `MAX_DAYS_AHEAD` | 550 | Beyond this a "date" is usually a misparse — but 400 was rejecting the national circuits, which publish a year-plus ahead |
 
@@ -191,12 +196,15 @@ is stranded at `running`. The extraction loop is the part that degrades safely.
   drafts created, duplicates skipped), plus any warnings or the failure reason.
 - **What it searches for** — add, remove, or switch off individual queries and
   seed pages.
-- **Run scan now** — starts a run immediately. Takes a few minutes.
+- **Run web search now** — starts a run immediately. Takes a few minutes.
+- **Read next batch (n unread)** — beside it in the dialog footer: runs the daily
+  backlog read now (listing pages that are due, then up to 75 unread pages).
+  Switched off when nothing is unread.
 
 The Events list gains a **Found by scan** filter whenever there are unreviewed
 discovered drafts, and each discovered event carries a small radar icon.
 
-### Why "Run scan now" doesn't go through `/hcgi/api`
+### Why "Run web search now" doesn't go through `/hcgi/api`
 
 A run takes minutes; `api/index.js` caps at 40s. The button posts directly to
 `/cron/event-scan`, which has its own 300s `maxDuration`. That endpoint accepts
