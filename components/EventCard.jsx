@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff, History, MessageSquareQuote, Star } from 'lucide-react';
+import { Calendar, MapPin, Clock, Edit, Trash2, Info, ImageOff, MessageSquareQuote, Star } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,11 +87,6 @@ const EventCard = ({ event, isAdmin, onView, onEdit, onDelete, rsvpData, reviewS
               <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground">{eventTypeLabel(event)}</Badge>
             );
           })()}
-          {past && (
-            <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm text-foreground gap-1">
-              <History className="w-3 h-3" /> Past event
-            </Badge>
-          )}
         </div>
         {showFeaturedPill && (
           <span className={`absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full ${FEATURED_PILL_CLASS} text-xs font-bold shadow-sm`}>
