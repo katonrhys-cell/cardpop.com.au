@@ -1,5 +1,5 @@
 
-import PriceDeal from '@/components/shop/PriceDeal.jsx';
+import PriceDeal, { DealRibbon } from '@/components/shop/PriceDeal.jsx';
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
@@ -666,7 +666,8 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
             cert — keeping the buy button above the fold. Row gap is disabled
             at lg because the cert section brings its own mt-8. */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-x-16 lg:gap-y-0">
-          <div className="lg:col-span-6 xl:col-span-7">
+          <div className="lg:col-span-6 xl:col-span-7 relative">
+            {isShop && !comingSoon && <DealRibbon price={product.price} rrp={product.retail_price_aud} />}
             {/* display_style is a vault-only field: on marketplace listings it
                 rides on the embedded vault_item, on vault records it's on the
                 record itself. Shop products have none and stay Classic. */}
