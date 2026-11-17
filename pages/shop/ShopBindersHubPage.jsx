@@ -6,6 +6,8 @@ import Breadcrumb from '@/components/Breadcrumb.jsx';
 import CardImage from '@/components/CardImage.jsx';
 import { getCardImage } from '@/utils/imageUrl.js';
 import { BINDER_PRODUCTS, binderImages, binderImageAlt } from '@/data/shopBinderProducts.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 const CANONICAL = `${SITE_ORIGIN}/shop/binders`;
@@ -22,6 +24,8 @@ const DESCRIPTION =
  * the internal links every product page points at it.
  */
 const ShopBindersHubPage = () => {
+  // Admins get shortcuts to the Binders products and the category manager.
+  useAdminEditTarget('Edit products', adminProductsPath({ category: 'Binders' }), [{ label: 'Edit categories', to: adminShopCategoriesPath() }]);
   const itemListLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',

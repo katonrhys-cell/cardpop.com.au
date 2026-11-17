@@ -10,6 +10,10 @@ export const GRADE_BADGE = {
   cgc:   'bg-green-700 text-white',
   ace:   'bg-orange-700 text-white',
   sgc:   'bg-purple-600 text-white',
+  tag:   'bg-neutral-900 text-white',
+  bccg:  'bg-blue-700 text-white',
+  bvg:   'bg-blue-700 text-white',
+  csg:   'bg-green-700 text-white',
   other: 'bg-slate-600 text-white',
 };
 

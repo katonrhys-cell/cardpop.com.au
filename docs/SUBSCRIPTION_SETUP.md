@@ -223,9 +223,9 @@ Migrations apply automatically on merge to `main` (see CLAUDE.md).
    `customer.subscription.deleted`, `customer.subscription.trial_will_end`,
    `invoice.payment_failed` and **`invoice.upcoming`** (the renewal reminder).
 5. In Stripe → Settings → Billing → *Subscriptions and emails*, set **Upcoming
-   renewal events** to the lead time you want the reminder sent at (30 days is
-   sensible for a yearly charge). Stripe sends `invoice.upcoming` that many
-   days before each renewal.
+   renewal events** to **7 days** — the checkout page promises "we email you a
+   week before every renewal", and that setting is the only thing that times
+   it. Stripe sends `invoice.upcoming` that many days before each renewal.
 
 ## 3. PayPal — currently switched OFF
 

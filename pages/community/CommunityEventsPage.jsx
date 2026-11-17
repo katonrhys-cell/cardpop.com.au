@@ -541,17 +541,37 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
               organiser before travelling.
             </p>
           </div>
-          <nav aria-labelledby="card-shows-by-city" className="md:col-span-2 order-last">
-            <h2 id="card-shows-by-city" className="text-lg font-bold mb-3">Card shows by city</h2>
-            <ul className="flex flex-wrap gap-2">
+          <nav
+            aria-labelledby="card-shows-by-city"
+            className="md:col-span-2 order-last relative overflow-hidden rounded-2xl border border-border bg-gradient-to-b from-brand-lightgrey/60 to-background dark:from-white/5 dark:to-transparent px-4 py-8 sm:px-8 sm:py-10 shadow-sm"
+          >
+            <div aria-hidden="true" className="absolute inset-x-0 top-0 h-1 bg-brand-red" />
+            <div className="text-center mb-7">
+              <span aria-hidden="true" className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-brand-red/10 text-brand-red mb-3">
+                <MapPin className="h-5 w-5" />
+              </span>
+              <h2 id="card-shows-by-city" className="text-2xl sm:text-3xl font-bold tracking-tight">
+                Explore Card Shows by <span className="text-brand-red">City</span>
+              </h2>
+              <div aria-hidden="true" className="mx-auto mt-3 h-0.5 w-14 rounded-full bg-brand-red" />
+              <p className="mt-3 text-sm text-muted-foreground">
+                Every upcoming show, fair and tournament near you — pick a city.
+              </p>
+            </div>
+            {/* One row of equal brand-charcoal buttons on desktop (4 × 2 on
+                tablets). The visible label is just the city — the heading
+                already says "Card shows by city" — and the full "Card shows
+                in <city>" stays in the link text for screen readers and SEO. */}
+            <ul className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3 max-w-6xl mx-auto">
               {EVENT_REGIONS.map(r => (
                 <li key={r.slug}>
                   <Link
                     to={eventRegionPath(r)}
                     aria-current={region?.slug === r.slug ? 'page' : undefined}
-                    className={`inline-flex rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${region?.slug === r.slug ? 'border-primary bg-primary text-primary-foreground' : 'border-border hover:border-primary hover:text-primary'}`}
+                    className={`group flex h-full items-center justify-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-200 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 ${region?.slug === r.slug ? 'border-brand-red bg-brand-red [@media(hover:hover)]:hover:bg-brand-red/90' : 'border-brand-charcoal dark:border-white/15 bg-brand-charcoal [@media(hover:hover)]:hover:bg-brand-red [@media(hover:hover)]:hover:border-brand-red'}`}
                   >
-                    Card shows in {r.city}
+                    <MapPin aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 transition-colors ${region?.slug === r.slug ? 'text-white' : 'text-brand-red [@media(hover:hover)]:group-hover:text-white'}`} />
+                    <span className="sr-only">Card shows in </span>{r.city}
                   </Link>
                 </li>
               ))}

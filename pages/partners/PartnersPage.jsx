@@ -1,6 +1,8 @@
 import React from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { ADMIN_LISTS } from '@/utils/adminEditLinks.js';
 import {
   Store, Megaphone, Users, ArrowRight, Tag, Link2, HandCoins,
   BadgeCheck, ClipboardList, Rocket, Banknote,
@@ -96,7 +98,10 @@ const FAQS = [
   },
 ];
 
-const PartnersPage = () => (
+const PartnersPage = () => {
+  // Admins get a shortcut to the admin screen behind this page.
+  useAdminEditTarget('Manage partners', ADMIN_LISTS.partners);
+  return (
   <div className="min-h-screen bg-background">
     <SEOHead
       title="Partner Program | CardPop — Earn with Australia's Card Marketplace"
@@ -229,6 +234,7 @@ const PartnersPage = () => (
 
     </div>
   </div>
-);
+  );
+};
 
 export default PartnersPage;

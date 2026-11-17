@@ -180,7 +180,7 @@ router.get('/price-estimate', publicCache(CACHE_PRICING), async (req, res) => {
     logger.info(`[EBAY_PRICE_ESTIMATE] After price filter: ${allItems.length} valid listings`);
 
     // Separate base cards from graded versions
-    const gradingKeywords = ['psa', 'bgs', 'cgc', 'sgc', 'autograph', 'auto'];
+    const gradingKeywords = ['psa', 'bgs', 'bccg', 'bvg', 'cgc', 'csg', 'sgc', 'tag', 'ksa', 'autograph', 'auto'];
     const baseCards = [];
     const gradedCards = [];
 

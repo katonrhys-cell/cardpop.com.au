@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { toast } from 'sonner';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminGiveawayPath } from '@/utils/adminEditLinks.js';
 import {
   AU_STATES, giveawayPhase, isAustralianPostcode, isValidInstagramHandle, normaliseInstagramHandle,
 } from '@/utils/giveaway.js';
@@ -106,6 +108,8 @@ const GiveawayPage = () => {
   }, [profile?.location_state]);
 
   const giveaway = data?.giveaway || null;
+  // Admins get an "Edit in admin" shortcut to this giveaway's form.
+  useAdminEditTarget('Edit giveaway', adminGiveawayPath(giveaway?.id));
   const phase = useMemo(() => (giveaway ? giveawayPhase(giveaway) : 'hidden'), [giveaway]);
   const prizes = Array.isArray(giveaway?.prizes) ? giveaway.prizes : [];
   const pickMode = giveaway?.entry_mode === 'pick_prize';

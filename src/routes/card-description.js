@@ -5,6 +5,7 @@ import { integratedAiRateLimit } from '../middleware/integrated-ai-rate-limit.js
 import { recordAiUsage } from '../utils/aiUsage.js';
 import { withAiConversation, traceAiAgent, traceChat, recordChatResponse, markAgentFailed } from '../utils/aiTracing.js';
 import { requireAiAllowance } from '../middleware/aiAllowance.js';
+import { GRADERS } from '../../data/gradeOptions.js';
 import { supabaseAuth } from '../middleware/supabase-auth.js';
 import logger from '../utils/logger.js';
 
@@ -31,8 +32,8 @@ const DESCRIPTION_TIMEOUT = 15_000;
 
 // Human-readable labels for the structured card fields we feed the model.
 const GRADING_LABELS = {
-	raw: 'Raw (ungraded)', psa: 'PSA', bgs: 'Beckett (BGS)',
-	cgc: 'CGC', ace: 'ACE', sgc: 'SGC', other: 'Other',
+	...Object.fromEntries(GRADERS.map((g) => [g.value, g.full === g.label ? g.label : `${g.full} (${g.label})`])),
+	raw: 'Raw (ungraded)', bgs: 'Beckett (BGS)', other: 'Other',
 };
 const CONDITION_LABELS = {
 	mint: 'Mint', near_mint: 'Near Mint', excellent: 'Excellent',

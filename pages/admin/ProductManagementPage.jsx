@@ -268,6 +268,19 @@ const ProductManagementPage = () => {
     fetchProducts();
   };
 
+  // "Edit categories" on a shop category page lands here as ?categories=1:
+  // open the Categories manager, then drop the param.
+  const openCategoriesParam = searchParams.get('categories');
+  useEffect(() => {
+    if (!openCategoriesParam) return;
+    setIsCategoriesOpen(true);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('categories');
+      return next;
+    }, { replace: true });
+  }, [openCategoriesParam, setSearchParams]);
+
   // "Edit product" on a shop product's public page lands here as ?edit=<id>.
   // Read the row directly rather than from the list (which is capped), open
   // its form, and drop the param so a refresh doesn't reopen it.
