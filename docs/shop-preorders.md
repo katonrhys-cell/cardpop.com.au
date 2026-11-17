@@ -65,13 +65,57 @@ Each is priced at the manufacturer RRP. The wholesale cost from the Palms Off
 trade price list is stored in `shop_product_costs`, so Admin → Products shows
 the margin.
 
-Before stock arrives, two things need doing in Admin → Products:
+The photos it seeded were small crops from the supplier's listing. They have
+since been replaced (see below).
 
-- **SKUs** are placeholders (`ACRYSHIELD-…`). Replace them with Palms Off's
-  SKUs once you have them.
-- **Photos** were cropped from the supplier's listing and are small, served
-  from `public/images/shop/acryshield/`. Upload the supplier's full-size
-  images when you can get them.
+### Stackable cases, the single-card case and sold-out lines
+
+Migration `20261117111213_acryshield_stackable_and_single_card_cases.sql` brings
+the shop up to the supplier's full Acryshield range of nineteen cases. It adds:
+
+- **Pokémon Booster Box Stackable Acrylic Case** in five base colours (Clear,
+  Red, Blue, Green, Yellow), SKUs `AS-STK-01` to `AS-STK-05`, RRP $54.99, linked
+  by `family_sku = 'AS-STK-BB'`. Page:
+  `/shop/display-cases/acryshield-pokemon-booster-box-stackable-acrylic-case`.
+- **Pokémon Elite Trainer Box Stackable Acrylic Case** in the same five colours,
+  SKUs `AS-STK-06` to `AS-STK-10`, RRP $59.99, `family_sku = 'AS-STK-ETB'`. Page:
+  `/shop/display-cases/acryshield-pokemon-elite-trainer-box-stackable-acrylic-case`.
+- **Single Card Acrylic Display Case with Stand**, SKU `CDC-01`, RRP $15.95.
+
+The colour is the colour of the base; the case itself is clear. These eleven use
+the supplier's own SKUs and full-size photos
+(`public/images/shop/acryshield/stackable/` and `single-card-case-*.jpg`). The
+ten stackable cases are pre-orders, "Ships in 5–7 days".
+
+Three lines were sold out at the supplier on 17 November 2026 and are **not**
+on pre-order: the Mew Ultra Premium Collection case, the Japanese Collection Box
+case and the Single Card Display Case. A pre-order can never show as sold out,
+so they are **Active with stock 0**, which shows **Sold out** and an **Enquire**
+button. When the supplier has them again, set the status back to **Pre-order**
+(the estimate is still filled in on the first two) or to Active with a stock
+count.
+
+The same migration refreshes the wholesale costs of the eight earlier cases
+from the supplier's November price list and records the supplier's SKU for each
+in `shop_product_costs.supplier_sku`. It then swaps their placeholder shop SKUs
+(`ACRYSHIELD-…`) for the supplier's: `MC-AS-ETB-P`, `MC-AS-BB-P`,
+`MC-AS-BB-JPMS`, `MC-AS-JBB-HC`, `BOX-UPC-151`, `BOX-JPN-COL`, `BOX-TD-WOTC`
+and `PE-SPC`. The PSA Graded Card Stand keeps `ACRYSHIELD-PSA-STAND`, because
+the supplier no longer lists it. The SKU is the offer id Google Merchant Center
+reads from the product page, so Google re-lists those eight under the new ids
+on its next crawl.
+
+Six of the earlier cases (Booster Box, Japanese High Class, Japanese Standard,
+Mew UPC, Prismatic Evolutions SPC and WOTC Theme Deck) swap their interim
+cropped photo for three full-size supplier photos each
+(`public/images/shop/acryshield/<case>-1.jpg` to `-3.jpg`). The Elite Trainer
+Box and Japanese Collection Box cases already had photos uploaded in Admin →
+Products and are left as they are. The old interim files stay in the folder so
+nothing 404s between the deploy and the migration; they are no longer used.
+
+The **PSA Graded Card Acrylic Stand** is no longer on the supplier's site, so
+the migration sets it to **Draft** (hidden from the shop). Set it back to
+Pre-order in Admin → Products if it can be sourced again.
 
 ## What the buyer sees
 
