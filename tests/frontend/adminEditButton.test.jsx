@@ -11,11 +11,12 @@ import { setAdminEditTarget, useAdminEditTarget } from '@/lib/adminEditTarget.js
 import {
   adminShopProductPath, adminEventPath, adminListingPath, adminStorePath,
   adminArticlePath, adminEventReviewPath, adminPlayerPath,
+  adminProductsPath, adminShopCategoriesPath,
 } from '@/utils/adminEditLinks.js';
 
 // A stand-in for a public page that registers what it shows.
-const FakePage = ({ label, to }) => {
-  useAdminEditTarget(label, to);
+const FakePage = ({ label, to, also }) => {
+  useAdminEditTarget(label, to, also);
   return <p>page</p>;
 };
 
@@ -41,6 +42,10 @@ describe('adminEditLinks', () => {
     expect(adminArticlePath('a1')).toBe('/admin/content?edit=a1');
     expect(adminEventReviewPath('r1')).toBe('/admin/event-reviews/r1');
     expect(adminPlayerPath('p1')).toBe('/admin/players?edit=p1');
+    expect(adminProductsPath()).toBe('/admin/products');
+    expect(adminProductsPath({ category: 'Top Loaders' })).toBe('/admin/products?category=Top+Loaders&view=list');
+    expect(adminProductsPath({ section: 'Protection' })).toBe('/admin/products?section=Protection&view=list');
+    expect(adminShopCategoriesPath()).toBe('/admin/products?categories=1');
   });
 
   it('returns null without an id so nothing is registered', () => {
@@ -91,6 +96,19 @@ describe('AdminEditButton', () => {
       </MemoryRouter>,
     );
     expect(screen.getByTestId('admin-edit-button')).toHaveAttribute('href', '/admin/products?edit=p2');
+  });
+
+  it('stacks extra links above the main one', () => {
+    renderAt('/shop/category/top-loaders', (
+      <FakePage
+        label="Edit products"
+        to="/admin/products?category=Top+Loaders&view=list"
+        also={[{ label: 'Edit categories', to: '/admin/products?categories=1' }]}
+      />
+    ));
+    expect(screen.getByTestId('admin-edit-button')).toHaveTextContent('Edit products');
+    const extra = screen.getByRole('link', { name: 'Edit categories' });
+    expect(extra).toHaveAttribute('href', '/admin/products?categories=1');
   });
 
   it('stays out of the admin panel itself', () => {
