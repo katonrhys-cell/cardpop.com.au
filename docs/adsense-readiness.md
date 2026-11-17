@@ -133,10 +133,14 @@ is most likely reacting to now:
    (`/prices/nrl/joseph-suaalii-rookie`).
 3. **One article has a sentence in its author field** ("CardPop's angle on one
    of Melbourne's Newest CardShows.") — fix in Admin → Event Reviews.
-4. **Price data has visible outliers** that make the price pages look
-   unreviewed: Stephen Curry Topps rookie raw $14,892 vs graded $7,551; Zoro
-   OP-06 raw $8,725 vs graded $6,275; Michael Jordan 1986 Fleer raw $160;
-   Leafeon VMAX alt art $458 on `/prices` vs $57.73 in the article about it.
+4. ~~Price data has visible outliers.~~ Addressed on 2026-11-17 in
+   `utils/priceSnapshotStats.js`: the daily snapshot now drops reprints,
+   proxies and lots by title, prices more than 5× from the median, and raw
+   listings that can't be the same card as the graded ones (above every graded
+   copy, or under 2% of the graded median). It applies to snapshots taken
+   after the deploy — earlier points in a card's history keep their old
+   values, and the Leafeon VMAX figure quoted inside its article is the
+   article's own text and still needs editing by hand.
 5. **Thin by nature**: 34 marketplace listing pages (15–20 words each: title,
    price, set, condition), 49 organiser pages (a list of event links), 128
    price pages whose unique content is four numbers and a blurb. Ask sellers
