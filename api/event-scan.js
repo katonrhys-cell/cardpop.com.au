@@ -21,7 +21,7 @@ import { decodeAal } from '../src/middleware/requireAal2.js';
 //
 // Two callers, two credentials:
 //   • Vercel Cron sends `Bearer <CRON_SECRET>` nightly.
-//   • The admin panel's "Run scan now" button sends the signed-in admin's
+//   • The admin panel's "Run web search now" button sends the signed-in admin's
 //     Supabase access token. It calls this path directly rather than going
 //     through /hcgi/api so the request gets the 300s budget — proxying it
 //     through the 40s API function would time out mid-run.

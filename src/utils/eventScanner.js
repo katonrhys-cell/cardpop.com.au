@@ -65,13 +65,16 @@ const MAX_SOURCES_PER_RUN = 12;
 // Pages are read a few at a time (READ_CONCURRENCY), so a run fits more of
 // them into the same wall clock. What a weekly run finds but can't read is not
 // lost: the daily backlog run (runEventBacklog) reads it.
-const MAX_CANDIDATES_PER_RUN = 18;
+const MAX_CANDIDATES_PER_RUN = 30;
 export const RUN_DEADLINE_MS = 240_000;
 const READ_CONCURRENCY = 3;
 
 // The daily backlog run: listing pages that have come due, then pages earlier
 // runs found but never read, newest first.
-const MAX_BACKLOG_PAGES_PER_RUN = 30;
+// Sized from the first real run (2026-11-17): the search plus 18 page reads
+// took 78 s of the 240 s budget, about 8 s per round of three. The deadline in
+// readCandidatePages still ends a slow run early; what is left stays pending.
+const MAX_BACKLOG_PAGES_PER_RUN = 75;
 const MAX_SEEDS_PER_RUN = 10;
 const SEED_REREAD_DAYS = 7;
 // A found page nobody read within this long is almost always an event that has
@@ -728,6 +731,15 @@ async function fileEvent(eventData, stats) {
   return { status: 'imported', event: created };
 }
 
+// Deliberately broad: it only has to tell a card or collectables page from one
+// about something else entirely. A false "yes" costs one extraction; a false
+// "no" loses an event, so anything hobby-adjacent counts.
+const COLLECTING_TERMS = /pok[eé]mon|trading card|card show|card fair|card fest|card expo|card market|card con\b|cardcon|card game|tcg\b|collectab|collectib|collector|sports? card|magic: ?the gathering|\bmtg\b|yu-?gi-?oh|lorcana|one piece|flesh and blood|digimon|dragon ball|star wars: ?unlimited|union arena|gundam|swap meet|toy fair|hobby fair|toy (?:and|&) hobby|comic con|pop culture|memorabilia|prerelease|pre-release|booster|card breaks?|graded card|\bpsa\b/i;
+
+export function mentionsCollecting(text) {
+  return COLLECTING_TERMS.test(String(text || ''));
+}
+
 /**
  * Fetch, extract and file a batch of candidate pages, READ_CONCURRENCY at a
  * time, until the deadline. Returns the candidates it never started — still
@@ -748,6 +760,13 @@ export async function readCandidatePages(candidates, { deadline, stats, warnings
 
       if (pageText.length < 200) {
         await updateCandidate(candidate.id, { status: 'rejected', reason: 'Page had almost no readable text.' });
+        return;
+      }
+      // A search for "card show <town>" also returns hardware stores and
+      // public-holiday calendars. A page that never mentions cards or
+      // collecting is not worth a model call to be told so.
+      if (!mentionsCollecting(pageText)) {
+        await updateCandidate(candidate.id, { status: 'rejected', reason: 'No mention of trading cards or collectables on the page.' });
         return;
       }
 
