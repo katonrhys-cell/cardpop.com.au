@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
 
 const ORDERS = vi.hoisted(() => [
-  // Guest checkout: buyer_id (and therefore the `buyer` join) is null, and
-  // `orders` has no order_number column — the shape that used to be dropped.
+  // Guest checkout: buyer_id (and therefore the `buyer` join) is null — the shape
+  // that used to be dropped — and the order has no order_number yet (an order the
+  // numbering migration hasn't reached), so the page falls back to the short id.
   {
     id: '42d5b6ed-8a99-428f-bfbf-18f63ee3fa97',
     created_at: '2026-09-13T01:03:19Z',
@@ -18,6 +19,7 @@ const ORDERS = vi.hoisted(() => [
     id: '60cbb06e-f227-4e3b-a38a-5ef124c0f332',
     created_at: '2026-08-02T11:20:46Z',
     status: 'cancelled',
+    order_number: 'CP-000124',
     buyer_id: '239faa6f', buyer: { id: '239faa6f', display_name: 'Ryan Conway', username: 'ryanc' }, seller: null,
     buyer_email: null, shipping_name: 'R K',
     total_aud: 11.33, platform_fee_aud: 1.33, refund_status: null,
@@ -67,11 +69,19 @@ describe('OrderManagementPage — tax invoices', () => {
 });
 
 describe('OrderManagementPage', () => {
-  it('lists guest orders, which have no buyer profile and no order number', async () => {
+  it('lists guest orders, which have no buyer profile', async () => {
     render(<OrderManagementPage />);
     expect(await screen.findByText('Jordan Carnelley')).toBeInTheDocument();
     expect(screen.getByText('Ryan Conway')).toBeInTheDocument();
+  });
+
+  it('shows the sequential order number, and the short id for an order without one', async () => {
+    render(<OrderManagementPage />);
+    await screen.findByText('Jordan Carnelley');
+    expect(screen.getByText('CP-000124')).toBeInTheDocument();
     expect(screen.getByText('42D5B6ED')).toBeInTheDocument();
+    // the numbered order does not also print its id
+    expect(screen.queryByText('60CBB06E')).not.toBeInTheDocument();
   });
 
   it('marks an order with no account as a guest', async () => {
@@ -90,14 +100,24 @@ describe('OrderManagementPage', () => {
     expect(screen.getByText('Jordan Carnelley')).toBeInTheDocument();
   });
 
-  it('searches by the order id shown in the Order # column', async () => {
+  it('searches by the order number shown in the Order # column', async () => {
     const user = userEvent.setup();
     render(<OrderManagementPage />);
     await screen.findByText('Jordan Carnelley');
 
-    await user.type(screen.getByPlaceholderText(/search by order/i), '60CBB06E');
+    await user.type(screen.getByPlaceholderText(/search by order/i), 'cp-000124');
     await waitFor(() => expect(screen.queryByText('Jordan Carnelley')).not.toBeInTheDocument());
     expect(screen.getByText('Ryan Conway')).toBeInTheDocument();
+  });
+
+  it('still finds an order by the start of its id (an unnumbered order shows it)', async () => {
+    const user = userEvent.setup();
+    render(<OrderManagementPage />);
+    await screen.findByText('Jordan Carnelley');
+
+    await user.type(screen.getByPlaceholderText(/search by order/i), '42D5B6ED');
+    await waitFor(() => expect(screen.queryByText('Ryan Conway')).not.toBeInTheDocument());
+    expect(screen.getByText('Jordan Carnelley')).toBeInTheDocument();
   });
 });
 

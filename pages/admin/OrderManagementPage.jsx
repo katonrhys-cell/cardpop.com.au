@@ -24,6 +24,7 @@ import ShipOrderDialog from '@/components/admin/ShipOrderDialog.jsx';
 import { orderPreorderLines, isAwaitingPreorderStock } from '@/utils/shopStock.js';
 import { toCsv } from '@/utils/finance.js';
 import { downloadOrderInvoicePdf, invoicesPathForOrder, orderHasInvoice } from '@/utils/invoiceDownload.js';
+import { orderRef } from '@/utils/orderRef.js';
 
 /**
  * The refund to show for an order. A rejected request can sit alongside a
@@ -165,7 +166,7 @@ const RefundDetailDialog = ({ order, refund, onClose, onUpdate }) => {
       <DialogContent className="sm:max-w-lg rounded-3xl">
         <DialogHeader>
           <DialogTitle className="text-xl font-heading font-bold">Refund Request</DialogTitle>
-          <DialogDescription>Order {order.order_number || order.id.slice(0,8).toUpperCase()}</DialogDescription>
+          <DialogDescription>Order {orderRef(order)}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
@@ -352,12 +353,12 @@ const OrderManagementPage = () => {
     setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
   };
 
-  // Guest checkout leaves buyer_id null (so the `buyer` join is null) and there
-  // is no order_number column — matching only those fields silently dropped
-  // every guest order from the table even with an empty search box. Skip the
-  // match entirely when nothing is typed, and search the fields a guest order
-  // actually has: the id shown in the Order # column, the checkout email and
-  // the shipping name.
+  // Guest checkout leaves buyer_id null (so the `buyer` join is null) — matching
+  // only the buyer fields silently dropped every guest order from the table even
+  // with an empty search box. Skip the match entirely when nothing is typed, and
+  // search the fields a guest order actually has: the order number shown in the
+  // Order # column (CP-000123, or the id while an order has none), the checkout
+  // email and the shipping name.
   const query = searchTerm.trim().toLowerCase();
   const filtered = orders.filter(o => {
     if (query) {
@@ -473,7 +474,7 @@ const OrderManagementPage = () => {
                       onClick={() => setViewOrderId(order.id)}
                       className="text-primary hover:underline underline-offset-2"
                     >
-                      {order.order_number || order.id.slice(0,8).toUpperCase()}
+                      {orderRef(order)}
                     </button>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm whitespace-nowrap">{format(new Date(order.created_at), 'dd MMM yyyy')}</TableCell>
@@ -517,7 +518,7 @@ const OrderManagementPage = () => {
                         </Link>
                         <Button
                           variant="ghost" size="icon" className="h-7 w-7"
-                          aria-label={`Download tax invoice for order ${order.order_number || order.id.slice(0, 8).toUpperCase()}`}
+                          aria-label={`Download tax invoice for order ${orderRef(order)}`}
                           title="Download tax invoice (PDF)"
                           onClick={() => downloadInvoice(order)}
                         >

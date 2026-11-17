@@ -2,6 +2,9 @@ import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 const mockSend = vi.hoisted(() => vi.fn());
 const state = vi.hoisted(() => ({ resendCount: 0 }));
+// order id -> order number, as the best-effort lookup (src/utils/orderNumbers.js)
+// would return it; ids not listed fall back to the short id in the templates.
+const orderNumbers = vi.hoisted(() => new Map([['order-1', 'CP-000007'], ['order-9', 'CP-000123']]));
 
 vi.mock('resend', () => ({
   Resend: class {
@@ -10,6 +13,9 @@ vi.mock('resend', () => ({
       this.emails = { send: mockSend };
     }
   },
+}));
+vi.mock('../../../src/utils/orderNumbers.js', () => ({
+  fetchOrderNumbers: vi.fn(async (ids) => new Map(ids.filter((id) => orderNumbers.has(id)).map((id) => [id, orderNumbers.get(id)]))),
 }));
 vi.mock('../../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -61,6 +67,18 @@ describe('emailService — sending', () => {
     expect(payload.subject).toMatch(/confirmed/i);
     expect(typeof payload.html).toBe('string');
     expect(payload.html.length).toBeGreaterThan(0);
+    // The receipt names the order by its sequential number, not the id.
+    expect(payload.html).toContain('#CP-000007');
+    expect(payload.html).not.toContain('#ORDER-1');
+  });
+
+  it('falls back to the short id on the receipt when the order has no number yet', async () => {
+    const svc = await load({ withKey: true });
+    await svc.sendOrderConfirmed({
+      buyerEmail: 'buyer@x.com', buyerName: 'Ada', cardName: 'Charizard',
+      itemPrice: '$100', total: '$110', orderId: 'abcd1234-0000-4000-8000-000000000000',
+    });
+    expect(mockSend.mock.calls[0][0].html).toContain('#ABCD1234');
   });
 
   it('sends an item-sold email to the seller', async () => {
@@ -96,6 +114,7 @@ describe('emailService — sending', () => {
     expect(payload.to).toBe('admin@cardpop.com.au');
     expect(payload.subject).toBe('New order received — $129.50 AUD');
     expect(payload.html).toContain('Charizard');
+    expect(payload.html).toContain('#CP-000123');
   });
 
   it('sends an event-submitted notice to the admin contact', async () => {

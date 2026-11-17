@@ -20,6 +20,7 @@ import apiServerClient from '@/lib/apiServerClient.js';
 import { isVerified } from '@/utils/verification.js';
 import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
+import { orderRef } from '@/utils/orderRef.js';
 
 /**
  * DATA RELATIONSHIPS DOCUMENTATION:
@@ -450,7 +451,7 @@ const UserDetailPage = () => {
                       .slice(0, 5)
                       .map(order => (
                         <TableRow key={order.id}>
-                          <TableCell className="font-mono text-xs">{order.order_number || order.id.substring(0,8)}</TableCell>
+                          <TableCell className="font-mono text-xs">{orderRef(order)}</TableCell>
                           <TableCell>
                             <Badge variant="secondary" className={order.userRole === 'Buyer' ? 'bg-blue-500/10 text-blue-600' : 'bg-purple-500/10 text-purple-600'}>
                               {order.userRole}

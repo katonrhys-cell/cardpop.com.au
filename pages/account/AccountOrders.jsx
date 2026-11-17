@@ -22,6 +22,7 @@ import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import { orderPreorderLines } from '@/utils/shopStock.js';
 import { computeRefundAmounts } from '@/utils/refundAmounts.js';
 import { refundWindow, daysLeftInWindow, MARKETPLACE_PROTECTION, SHOP_PROTECTION, PROTECTION_COPY } from '@/utils/buyerProtectionPolicy.js';
+import { orderRef } from '@/utils/orderRef.js';
 
 // Order states in which the buyer has something real to review — the seller
 // has shipped, the sale finished, or it ended in a refund. Mirrors the gate in
@@ -204,7 +205,7 @@ const OrderCard = ({ order, onRefundRequest, onReviewRequest, onProductReviewReq
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <p className="text-xs text-muted-foreground font-mono mb-1">{order.order_number || order.id.slice(0, 8).toUpperCase()}</p>
+          <p className="text-xs text-muted-foreground font-mono mb-1">{orderRef(order)}</p>
           <p className="text-sm text-muted-foreground">{format(new Date(order.created_at), 'dd MMM yyyy, h:mm a')}</p>
         </div>
         <Badge variant="outline" className={`text-xs font-bold ${statusCfg.color}`}>

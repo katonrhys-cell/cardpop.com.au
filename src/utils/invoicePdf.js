@@ -6,6 +6,8 @@
 // start (see tests/backend/outboundTimeouts.test.js for the same rule applied
 // to the Anthropic SDK). See docs/order-invoices.md → "PDF tax invoice".
 
+import { orderRef } from '../../utils/orderRef.js';
+
 const num = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -24,12 +26,12 @@ export const pdfSafe = (value) => String(value ?? '')
 const isCreditNote = (invoice) => invoice?.kind === 'credit_note';
 
 /**
- * The short order reference buyers and admins see everywhere else (Account →
- * Orders, Admin → Order Management): the first 8 characters of the order id,
- * upper-cased. `0f0f0f0f-0f0f-…` → `0F0F0F0F`. The full UUID stays in the
- * database — it's just not printed on the page.
+ * The order reference printed on the page: the order's sequential number
+ * (`CP-000123`, passed in as `invoice.order_number` — see `buildInvoicePdf`),
+ * else the short id every screen showed before order numbers existed. The full
+ * UUID stays in the database — it's never printed on the page.
  */
-export const shortOrderRef = (orderId) => String(orderId || '').replace(/-/g, '').slice(0, 8).toUpperCase();
+const invoiceOrderRef = (invoice) => orderRef({ order_number: invoice?.order_number, id: invoice?.order_id });
 
 /**
  * A payment reference short enough to read out: the last 8 characters of the
@@ -102,7 +104,7 @@ export async function renderInvoicePdf(invoice, supplierSetting) {
     info: {
       Title: `${credit ? 'Credit note' : 'Tax invoice'} ${invoice?.number || ''}`.trim(),
       Author: supplier.legalName,
-      Subject: `Order ${shortOrderRef(invoice?.order_id)}`,    },
+      Subject: `Order ${invoiceOrderRef(invoice)}`,    },
   });
   const chunks = [];
   doc.on('data', (c) => chunks.push(c));
@@ -121,7 +123,7 @@ export async function renderInvoicePdf(invoice, supplierSetting) {
   doc.fillColor(CHARCOAL).font('Helvetica-Bold').fontSize(11).text(T(invoice?.number || ''), left, doc.y + 2);
   doc.font('Helvetica').fontSize(9).fillColor(GREY);
   doc.text(T(`Date: ${formatInvoiceDate(invoice?.invoice_date)}`));
-  doc.text(T(`Order: ${shortOrderRef(invoice?.order_id)}`));
+  doc.text(T(`Order: ${invoiceOrderRef(invoice)}`));
   if (credit && invoice?.credits_number) doc.text(T(`Credits tax invoice: ${invoice.credits_number}`));
   const leftBottom = doc.y;
 
