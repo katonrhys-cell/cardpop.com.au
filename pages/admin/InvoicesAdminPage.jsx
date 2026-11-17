@@ -321,7 +321,7 @@ const SupplierDialog = ({ open, onClose, onSaved }) => {
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2"><Building2 className="w-5 h-5 text-primary" /> Invoice details</DialogTitle>
-          <DialogDescription>Printed at the top of every PDF tax invoice and credit note. The ABN is required for a valid tax invoice.</DialogDescription>
+          <DialogDescription>Printed at the top of every PDF tax invoice and credit note. The ABN is required for a valid tax invoice. The legal name and ABN are also shown publicly on the About, Contact and Terms pages and in the site footer; the other details stay private.</DialogDescription>
         </DialogHeader>
         {loading ? <Skeleton className="h-48 rounded-xl" /> : (
           <div className="space-y-3">
