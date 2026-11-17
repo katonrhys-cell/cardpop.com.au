@@ -18,6 +18,9 @@ import StripeWordmark from '@/components/StripeWordmark.jsx';
  * non-zero TRIAL_DAYS brings the "free, then charged" copy back.
  * `returnPath` is where the provider sends the user back to.
  */
+// GST inside a GST-inclusive price (1/11 at 10%).
+const gstOf = (price) => (price / 11).toFixed(2);
+
 const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' }) => {
   const [busy, setBusy] = useState(null); // 'stripe' | 'paypal' | null
 
@@ -77,6 +80,13 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
             ? `Add a payment method to unlock CardPop ${tierName}. You won't be charged until your trial ends, and you can cancel anytime before then from Account → Membership.`
             : `You pay $${priceAud} today for 12 months of CardPop ${tierName} — that is the whole price, nothing is added at checkout. It renews each year until you cancel from Account → Membership, and we email you a week before every renewal.`}
         </p>
+        {TRIAL_DAYS === 0 && (
+          <p className="mt-2 text-muted-foreground">
+            <span className="font-medium text-foreground">What&apos;s in the price:</span> GST (${gstOf(priceAud)} of
+            it) is included, and CardPop pays Stripe&apos;s standard card processing fee out of it. There are no extra
+            fees or surcharges on top.
+          </p>
+        )}
       </div>
 
       {PAYMENT_PROVIDERS.includes('stripe') && (

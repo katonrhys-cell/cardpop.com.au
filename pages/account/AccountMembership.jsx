@@ -114,11 +114,23 @@ const AccountMembership = () => {
       title="CardPop Membership"
       description={
         <>
-          Hobby is free, and always will be — buying and selling need no membership (selling just
-          needs ID verification). Pro ($99 a year) is for vendors and avid traders: 30 listings a
-          month, your own store page and the Pro display styles. Ultimate ($199 a year) is for show
-          organisers: every event you run is featured on the calendar, with unlimited listings.{' '}
-          <Link to="/pricing" className="text-primary hover:underline">Compare plans →</Link>
+          <span className="block">
+            Hobby is free, and always will be — buying and selling need no membership (selling just
+            needs ID verification).
+          </span>
+          <span className="mt-3 block">
+            <strong className="font-bold text-foreground">Pro ($99 a year)</strong> is for vendors and
+            avid traders: 30 listings a month, your own store page and the Pro display styles.
+          </span>
+          <span className="mt-3 block">
+            <strong className="font-bold text-foreground">Ultimate ($199 a year)</strong> is for show
+            organisers: every event you run is featured on the calendar, with unlimited listings.
+          </span>
+          <span className="mt-3 block text-base">
+            Every price is the full price: GST is included, and CardPop pays Stripe&rsquo;s standard
+            card processing fee out of it &mdash; nothing is added at checkout.{' '}
+            <Link to="/pricing" className="text-primary hover:underline">Compare plans →</Link>
+          </span>
         </>
       }
     >
