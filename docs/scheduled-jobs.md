@@ -123,7 +123,7 @@ a plain `ok` without auth and nothing else is served without the bearer.
 
 Any endpoint can also be called directly with `curl` and the bearer, exactly
 as the Worker does. The event scan additionally has an in-app trigger —
-Admin → Event Management → "Run scan now" — which calls `/cron/event-scan`
+Admin → Event Management → "Run web search now" — which calls `/cron/event-scan`
 with the signed-in admin's Supabase token instead of the secret.
 
 ## Seeing what ran

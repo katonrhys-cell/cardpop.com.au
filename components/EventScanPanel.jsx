@@ -26,7 +26,7 @@ import apiServerClient from '@/lib/apiServerClient';
 // event_scan_runs / event_scan_sources. Writes go through /event-scan on the
 // API, which holds the service-role key.
 //
-// "Run scan now" is the exception: it posts to /cron/event-scan directly rather
+// "Run web search now" is the exception: it posts to /cron/event-scan directly rather
 // than through /hcgi/api, because a scan runs for minutes and that path is the
 // one with the 300s function budget. The signed-in admin's Supabase token is
 // the credential — the cron secret never leaves the server.
@@ -249,19 +249,10 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
               <div className="flex flex-col gap-2 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm">
                   <span className="font-bold">{unreadPages} found page{unreadPages === 1 ? '' : 's'} not read yet.</span>{' '}
-                  <span className="text-muted-foreground">Up to 30 are read each day; you can read the next batch now.</span>
+                  <span className="text-muted-foreground">
+                    Up to 75 are read each day. &ldquo;Read next batch&rdquo; below reads the next 75 now.
+                  </span>
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleReadBacklog}
-                  disabled={isReadingBacklog}
-                  className="rounded-lg shrink-0"
-                >
-                  {isReadingBacklog && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
-                  Read next batch
-                </Button>
               </div>
             )}
             {isLoading ? (
@@ -454,10 +445,23 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={onClose} className="rounded-xl">Close</Button>
+          {/* Always here, not only in the banner: the unread count is a best-effort
+              read, and a button that hides when it fails can't be found. */}
+          <Button
+            variant="outline"
+            onClick={handleReadBacklog}
+            disabled={isReadingBacklog || unreadPages === 0}
+            className="rounded-xl font-bold"
+            title="Read listing pages that are due and pages earlier scans found but never read"
+          >
+            {isReadingBacklog
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Reading…</>
+              : <>Read next batch{unreadPages > 0 ? ` (${unreadPages} unread)` : ''}</>}
+          </Button>
           <Button onClick={handleRunNow} disabled={isScanning} className="rounded-xl font-bold">
             {isScanning
               ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Scanning…</>
-              : <><CheckCircle2 className="w-4 h-4 mr-2" /> Run scan now</>}
+              : <><CheckCircle2 className="w-4 h-4 mr-2" /> Run web search now</>}
           </Button>
         </DialogFooter>
       </DialogContent>

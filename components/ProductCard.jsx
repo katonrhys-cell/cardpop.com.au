@@ -14,6 +14,7 @@ import CardImage from '@/components/CardImage.jsx';
 import CardShowcase from '@/components/vault/CardShowcase.jsx';
 import BnplMessage from '@/components/BnplMessage.jsx';
 import { getCardImage, CARD_GRID_SIZES } from '@/utils/imageUrl.js';
+import { hasDarkBackdrop } from '@/utils/shopImageBackdrop.js';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { isVerified } from '@/utils/verification.js';
 import GradeBadge from '@/components/GradeBadge.jsx';
@@ -74,6 +75,8 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   // whole card scan is visible. display_style is a vault-only field, so its
   // presence reliably marks a vault item.
   const useShowcase = product.source === 'vault' || !!product.display_style;
+  // A photo shot on black fills the tile with black instead of floating in it.
+  const darkBackdrop = !useShowcase && hasDarkBackdrop(rawImg);
 
   return (
     <div className="group relative flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
@@ -89,7 +92,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
           <Pencil className="h-4 w-4" aria-hidden="true" />
         </Link>
       )}
-      <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
+      <Link to={detailPath} className={`block relative aspect-[4/5] overflow-hidden ${darkBackdrop ? 'bg-black' : 'bg-muted/30'}`} data-backdrop={darkBackdrop ? 'dark' : undefined}>
         {useShowcase ? (
           <CardShowcase
             src={imgSrc}
@@ -110,7 +113,7 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
             sizes={CARD_GRID_SIZES}
             fallbackSrc={imgFallback}
             alt={product.name || product.cardName || product.title || 'Product Image'}
-            imgClassName={`w-full h-full object-contain p-2 group-hover:scale-105 transition-transform duration-500 ${soldOut ? 'grayscale opacity-70' : ''}`}
+            imgClassName={`w-full h-full object-contain ${darkBackdrop ? '' : 'p-2'} group-hover:scale-105 transition-transform duration-500 ${soldOut ? 'grayscale opacity-70' : ''}`}
             width="400"
             height="500"
             priority={priority}

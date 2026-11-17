@@ -149,3 +149,27 @@ describe('ProductCard sold-out state', () => {
     expect(alert.querySelector('a').getAttribute('href')).toMatch(/^mailto:noreply@cardpop\.com\.au/);
   });
 });
+
+describe('ProductCard — photos shot on black', () => {
+  it('fills the image tile with black and drops the inset', () => {
+    const { container } = renderCard({
+      ...base,
+      stock_quantity: 5,
+      images: ['https://cardpop.com.au/images/shop/acryshield/stackable/etb-blue-1.jpg'],
+    });
+    const tile = container.querySelector('[data-backdrop="dark"]');
+    expect(tile).not.toBeNull();
+    expect(tile.className).toContain('bg-black');
+    expect(tile.querySelector('img').className).not.toContain('p-2');
+  });
+
+  it('keeps the normal tile for any other photo', () => {
+    const { container } = renderCard({
+      ...base,
+      stock_quantity: 5,
+      images: ['https://cardpop.com.au/images/shop/binders/binder-1.jpg'],
+    });
+    expect(container.querySelector('[data-backdrop="dark"]')).toBeNull();
+    expect(container.querySelector('img').className).toContain('p-2');
+  });
+});

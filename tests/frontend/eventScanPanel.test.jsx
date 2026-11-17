@@ -102,7 +102,7 @@ describe('EventScanPanel — backlog', () => {
     render(<EventScanPanel isOpen onClose={() => {}} />);
 
     expect(await screen.findByText(/447 found pages not read yet/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Read next batch' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Read next batch (447 unread)' }).disabled).toBe(false);
     expect(screen.getByText('6 listing pages')).toBeTruthy();
     tables.unread = 0;
   });
@@ -113,5 +113,7 @@ describe('EventScanPanel — backlog', () => {
 
     await screen.findByText('12 queries');
     expect(screen.queryByText(/not read yet/)).toBeNull();
+    // The button stays where it can be found, just switched off.
+    expect(screen.getByRole('button', { name: 'Read next batch' }).disabled).toBe(true);
   });
 });

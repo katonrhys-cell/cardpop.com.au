@@ -63,6 +63,7 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({
 const {
   runEventScan,
   runEventBacklog,
+  mentionsCollecting,
   LISTING_EVENT_SCHEMA,
   discoverCandidates,
   extractEventFromPage,
@@ -559,7 +560,7 @@ describe('listing pages', () => {
   });
 
   it('files every upcoming event on a listing page as its own draft', async () => {
-    mockFetchWebpage.mockResolvedValue(`<html><body>${'calendar '.repeat(60)}</body></html>`);
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'card show calendar '.repeat(30)}</body></html>`);
     mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({
       is_trading_card_event: false,
       rejection_reason: 'An index of several shows.',
@@ -582,7 +583,7 @@ describe('listing pages', () => {
 
   it('does not draft a listed show that is already on the site under a longer name', async () => {
     const date = inDays(40);
-    mockFetchWebpage.mockResolvedValue(`<html><body>${'calendar '.repeat(60)}</body></html>`);
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'card show calendar '.repeat(30)}</body></html>`);
     mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({
       is_trading_card_event: false,
       rejection_reason: 'An index.',
@@ -661,6 +662,27 @@ describe('runEventBacklog', () => {
     expect(pageVerdicts(calls).map((u) => u.status)).toEqual(['rejected', 'rejected']);
   });
 
+  it('rejects a page that never mentions cards or collecting, without a model call', async () => {
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'Regional public holidays and store trading hours for Western Australia. '.repeat(10)}</body></html>`);
+    const calls = scriptDatabase({ backlog: [{ id: 'c1', url: 'https://holidays.example.com.au/wa', title: 'Holidays' }] });
+
+    const summary = await runEventBacklog();
+
+    expect(mockAnthropicCreate).not.toHaveBeenCalled();
+    expect(pageVerdicts(calls)).toEqual([expect.objectContaining({ status: 'rejected', reason: 'No mention of trading cards or collectables on the page.' })]);
+    expect(summary.pagesFetched).toBe(1);
+  });
+
+  it('reads up to 75 pages in one run', async () => {
+    mockFetchWebpage.mockResolvedValue(page);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({ is_trading_card_event: false, rejection_reason: 'Past.' })));
+    scriptDatabase({ backlog: Array.from({ length: 75 }, (_, i) => ({ id: `c${i}`, url: `https://example.com.au/show-${i}`, title: 'Show' })) });
+
+    const summary = await runEventBacklog();
+
+    expect(summary.pagesFetched).toBe(75);
+  });
+
   it('retires finds nobody read within four months, unread', async () => {
     const calls = scriptDatabase();
 
@@ -735,17 +757,40 @@ describe('runEventBacklog', () => {
 describe('runEventScan — weekly', () => {
   it('claims only search queries, and tells the admin when finds are left for the backlog', async () => {
     mockAnthropicCreate.mockResolvedValueOnce(searchResponse(
-      Array.from({ length: 25 }, (_, i) => ({ type: 'web_search_result', url: `https://example.com.au/e-${i}`, title: `E${i}` })),
+      Array.from({ length: 40 }, (_, i) => ({ type: 'web_search_result', url: `https://example.com.au/e-${i}`, title: `E${i}` })),
     ));
     mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({ is_trading_card_event: false, rejection_reason: 'Not an event.' })));
-    mockFetchWebpage.mockResolvedValue(`<html><body>${'text '.repeat(100)}</body></html>`);
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'trading card text '.repeat(40)}</body></html>`);
     const calls = scriptDatabase({ sources: [{ id: 's1', kind: 'search_query', value: 'card show sydney' }] });
 
     const summary = await runEventScan();
 
     const claim = calls.find((c) => c.table === 'event_scan_sources' && c.op === 'select');
     expect(claim.filters).toContainEqual(['in', 'kind', ['search_query']]);
-    expect(mockFetchWebpage).toHaveBeenCalledTimes(18);
-    expect(summary.warnings).toContain('7 found page(s) were not read this run; the daily backlog run reads them.');
+    expect(mockFetchWebpage).toHaveBeenCalledTimes(30);
+    expect(summary.warnings).toContain('10 found page(s) were not read this run; the daily backlog run reads them.');
+  });
+});
+
+describe('mentionsCollecting', () => {
+  it('recognises card and collectables pages', () => {
+    for (const text of [
+      'Perth Card Fest returns to Claremont Showground',
+      'Pokémon League Challenge this Sunday',
+      'Toy and Hobby Fair — 200 tables of collectibles',
+      'MTG prerelease weekend at our store',
+      'Swap meet for collectors, all welcome',
+      'Sports cards, memorabilia and signings',
+    ]) expect(mentionsCollecting(text), text).toBe(true);
+  });
+
+  it('turns away pages about something else', () => {
+    for (const text of [
+      'Bunnings Trade stores in Western Australia — opening hours',
+      'Queensland regional show holidays 2026 by council area',
+      'Buyers agents servicing regional WA property markets',
+      'White card construction induction training course',
+      '',
+    ]) expect(mentionsCollecting(text), text).toBe(false);
   });
 });
