@@ -11,6 +11,7 @@ import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import WhatsAppIcon from '@/components/WhatsAppIcon.jsx';
 import WhatsAppChatLink from '@/components/WhatsAppChatLink.jsx';
+import BusinessIdentityLine from '@/components/BusinessIdentityLine.jsx';
 import { WHATSAPP_NUMBER_LOCAL } from '@/utils/whatsapp.js';
 
 const validate = ({ name, email, subject, message }) => {
@@ -143,6 +144,7 @@ const ContactPage = () => {
                   PO Box 1024<br />
                   ASCOT VALE VICTORIA 3032
                 </p>
+                <BusinessIdentityLine short className="text-muted-foreground text-sm mt-1" />
               </div>
               <div>
                 <strong className="text-sm font-semibold">Business Hours</strong>

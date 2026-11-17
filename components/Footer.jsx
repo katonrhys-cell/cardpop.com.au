@@ -17,6 +17,7 @@ import XIcon from '@/components/XIcon.jsx';
 import RedditIcon from '@/components/RedditIcon.jsx';
 import WhatsAppIcon from '@/components/WhatsAppIcon.jsx';
 import WhatsAppChatLink from '@/components/WhatsAppChatLink.jsx';
+import BusinessIdentityLine from '@/components/BusinessIdentityLine.jsx';
 import { REDDIT_SUBREDDIT_URL } from '@/utils/redditLinks.js';
 
 const X_URL = 'https://x.com/cardpopaus';
@@ -151,9 +152,12 @@ const Footer = () => {
         </div>
 
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-muted-foreground text-sm font-medium">
-            © {new Date().getFullYear()} CardPop Australia™ – All Rights Reserved.
-          </p>
+          <div className="text-center sm:text-left">
+            <p className="text-muted-foreground text-sm font-medium">
+              © {new Date().getFullYear()} CardPop Australia™ – All Rights Reserved.
+            </p>
+            <BusinessIdentityLine short className="text-muted-foreground text-xs mt-1" />
+          </div>
           <p className="text-muted-foreground text-sm flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <a
               href={GITHUB_URL}

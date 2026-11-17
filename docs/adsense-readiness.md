@@ -141,9 +141,15 @@ is most likely reacting to now:
    price, set, condition), 49 organiser pages (a list of event links), 128
    price pages whose unique content is four numbers and a blurb. Ask sellers
    for descriptions; consider requiring one.
-6. **`/terms` is 150 words** — five two-sentence sections for a marketplace
-   that takes payments. Needs a real document (a legal task, not a code one).
-7. **`/about` names no legal entity or ABN**; `/contact` has no ABN either.
+6. ~~`/terms` is 150 words.~~ Replaced on 2026-11-17 with a 21-section
+   document in `data/termsOfService.js`, rendered by both the SPA page and the
+   prerender. It describes how the platform works and takes its figures from
+   the policy constants, but it was **not drafted by a lawyer** — have it
+   reviewed.
+7. ~~`/about` names no legal entity or ABN.~~ About, Contact, Terms and the
+   footer now show the legal name and ABN (`utils/businessIdentity.js`) — but
+   only once they are entered at **Admin → Invoices → Invoice details**. Until
+   a valid ABN is saved there, nothing is shown.
 8. **Copy that contradicts the FAQ**: `/pricing`, `/collections/pokemon` and
    `/community/local-traders` promise trading / "secure escrow trading" while
    the FAQ says card-for-card trading is switched off. Unverifiable

@@ -20,6 +20,7 @@ const FEATURE_LABELS = {
   event_extraction: 'Event scan: page reading',
   event_instagram_extraction: 'Event scan: Instagram posts',
   supplier_price: 'Supplier price checks',
+  store_details: 'Card shop details from website',
   organiser_message_scan: 'Organiser message screening',
 };
 
