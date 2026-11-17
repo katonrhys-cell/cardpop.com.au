@@ -13,6 +13,8 @@ import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
 
 const PAGE_LIMIT = 48;
 // Price already has its own min/max inputs in the sidebar.
@@ -25,6 +27,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const ShopSealedBoxesPage = () => {
   const { addToCart } = useCart();
+  // Admins get shortcuts to the product list and the category manager.
+  useAdminEditTarget('Edit products', adminProductsPath(), [{ label: 'Edit categories', to: adminShopCategoriesPath() }]);
 
   const [products, setProducts] = useState([]);
   const [totalItems, setTotalItems] = useState(0);

@@ -20,6 +20,8 @@ import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, matchesSearch, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
 
 const PAGE_LIMIT = 50;
 // Across the whole catalogue, Category leads; Type/pockets only make sense
@@ -27,6 +29,8 @@ const PAGE_LIMIT = 50;
 const FACET_KEYS = ['category', 'price', 'availability', 'brand', 'colour', 'sale'];
 
 const ShopPage = () => {
+  // Admins get shortcuts to the product list and the category manager.
+  useAdminEditTarget('Edit products', adminProductsPath(), [{ label: 'Edit categories', to: adminShopCategoriesPath() }]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
