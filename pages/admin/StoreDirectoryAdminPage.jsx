@@ -23,6 +23,7 @@ const StoreRow = ({ store, onAction, onEdit, onRemoveOwner }) => (
           {store.owner_id && (
             <>
               <Badge variant="outline">Owner-managed</Badge>
+              {store.membership_featured && <Badge>Featured (Ultimate)</Badge>}
               <Link to={`/admin/users/${store.owner_id}`} className="text-xs text-primary hover:underline">Owner</Link>
               <button type="button" onClick={() => onRemoveOwner(store)} className="text-xs text-muted-foreground hover:text-destructive hover:underline">
                 Remove owner

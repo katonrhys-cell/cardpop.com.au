@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { Camera, Clock, ExternalLink, Instagram, MapPin, Pencil, Phone, Store as StoreIcon, Video } from 'lucide-react';
+import { Camera, Clock, ExternalLink, Instagram, MapPin, Pencil, Phone, Star, Store as StoreIcon, Video } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import { EventPhotoGrid } from '@/components/reviews/EventReviewGallery.jsx';
 import { ReviewVideoPlayer } from '@/components/reviews/EventReviewVideo.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { toCdnUrl } from '@/utils/imageUrl.js';
-import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS, fetchStore, fetchStoreOwnerId } from '@/lib/storeDirectory.js';
+import { DIRECTORY_CITIES, STORE_CATEGORY_LABELS, fetchStore, fetchStoreStanding } from '@/lib/storeDirectory.js';
 import StoreEditorDialog from '@/components/admin/StoreEditorDialog.jsx';
 import {
   cleanStorePhotos,
@@ -39,16 +39,22 @@ const StorePage = () => {
   // undefined = not known (loading, or the ownership column isn't readable),
   // null = no owner yet, otherwise the owner's user id.
   const [ownerId, setOwnerId] = useState(undefined);
+  const [featured, setFeatured] = useState(false);
   const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     setStore(undefined);
     setOwnerId(undefined);
+    setFeatured(false);
     fetchStore(slug)
       .then((data) => { if (!cancelled) setStore(data); })
       .catch(() => { if (!cancelled) setStore(null); });
-    fetchStoreOwnerId(slug).then((id) => { if (!cancelled) setOwnerId(id); });
+    fetchStoreStanding(slug).then((standing) => {
+      if (cancelled) return;
+      setOwnerId(standing.ownerId);
+      setFeatured(standing.featured);
+    });
     return () => { cancelled = true; };
   }, [slug]);
 
@@ -58,6 +64,7 @@ const StorePage = () => {
   }, [slug]);
 
   const isOwner = Boolean(currentUser?.id) && ownerId === currentUser.id;
+  const canEdit = isOwner || isAdmin;
 
   if (!cityInfo) return <Navigate to="/card-shops" replace />;
   if (store === null) return <Navigate to={`/card-shops/${city}`} replace />;
@@ -134,7 +141,8 @@ const StorePage = () => {
               )}
               <h1 className="text-3xl md:text-4xl font-bold">{store.name}</h1>
             </div>
-            {isOwner && !isAdmin && (
+            {/* The shop's owner and admins edit the page right here. */}
+            {canEdit && (
               <button
                 type="button"
                 onClick={() => setEditing(true)}
@@ -143,15 +151,12 @@ const StorePage = () => {
                 <Pencil className="w-4 h-4" /> Edit this page
               </button>
             )}
-            {isAdmin && (
-              <Link
-                to={`/admin/store-directory?edit=${encodeURIComponent(store.slug)}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-sm font-semibold hover:border-primary/60"
-              >
-                <Pencil className="w-4 h-4" /> Edit this page
-              </Link>
-            )}
           </div>
+          {featured && (
+            <p className="inline-flex items-center gap-1.5 rounded-full bg-brand-red/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-brand-red">
+              <Star className="w-3.5 h-3.5 fill-current" aria-hidden="true" /> Featured shop
+            </p>
+          )}
           {store.status !== 'approved' && (
             <p className="inline-block rounded-full bg-muted px-3 py-1 text-xs font-semibold uppercase tracking-wide">
               {store.status} — only admins can see this page
@@ -294,11 +299,11 @@ const StorePage = () => {
           </section>
         )}
 
-        {isOwner && (
+        {canEdit && (
           <StoreEditorDialog
             open={editing}
             store={store}
-            ownerMode
+            ownerMode={!isAdmin}
             onClose={() => setEditing(false)}
             onSaved={reload}
           />

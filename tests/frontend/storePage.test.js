@@ -5,6 +5,7 @@ import {
   cleanStorePhotos,
   cleanStoreVideos,
   normalizeStoreInput,
+  sortStoresFeaturedFirst,
   storeHoursLines,
   storeIsIndexable,
   storeJsonLd,
@@ -112,6 +113,18 @@ describe('store pages', () => {
     expect(storeJsonLd(swapItt)).not.toHaveProperty('logo');
     expect(normalizeStoreInput(withLogo).logo_url).toBe(withLogo.logo_url);
     expect(normalizeStoreInput({ ...swapItt, logo_url: '' }).logo_url).toBeNull();
+  });
+
+  it('lists featured shops first, then by name', () => {
+    const rows = [
+      { name: 'Zed Cards' },
+      { name: 'alpha TCG', membership_featured: false },
+      { name: 'Mid Shop', membership_featured: true },
+      { name: 'Aardvark Hobbies', membership_featured: true },
+    ];
+    expect(sortStoresFeaturedFirst(rows).map((s) => s.name)).toEqual(['Aardvark Hobbies', 'Mid Shop', 'alpha TCG', 'Zed Cards']);
+    expect(rows[0].name).toBe('Zed Cards'); // not sorted in place
+    expect(sortStoresFeaturedFirst(null)).toEqual([]);
   });
 
   it('derives a new store slug the way the public form does', () => {

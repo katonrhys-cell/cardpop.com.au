@@ -227,7 +227,7 @@ export const PLANS = {
     key: PLAN_ULTIMATE,
     name: 'Ultimate',
     tier: 'ultimate',
-    tagline: 'For show organisers and card shop owners — every event you run, featured.',
+    tagline: 'For show organisers and card shop owners — your events and your shop, featured.',
     audience: 'Show organisers and card shop owners',
     priceAud: TIER_PRICES_AUD.ultimate,
     currency: SUBSCRIPTION_CURRENCY,
@@ -240,6 +240,7 @@ export const PLANS = {
       storefront: true,
       analytics: 'advanced',
       eventSpotlight: true,
+      featuredShop: true,
     },
     features: [
       'Everything in Pro, plus:',
@@ -247,6 +248,7 @@ export const PLANS = {
       'Unlimited listings',
       'Every display style — Rotating, Spinning Stand, Prism and the interactive Holographic showcase',
       'Featured Seller placement on the CardPop homepage',
+      'Your card shop featured in the directory — listed first in its city with a Featured badge',
     ],
   },
 };
