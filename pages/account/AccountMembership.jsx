@@ -135,6 +135,7 @@ const AccountMembership = () => {
       }
     >
       <div className="rounded-card border border-border bg-card p-6">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current plan</p>
         <div className={`flex items-center gap-2 font-bold ${meta.tone}`}>
           <Icon className="h-5 w-5" />
           {activating ? <><Loader2 className="h-4 w-4 animate-spin" /> Confirming…</> : meta.label}
