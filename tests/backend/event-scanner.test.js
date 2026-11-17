@@ -44,6 +44,8 @@ function makeQuery(table) {
     delete() { state.op = 'delete'; return query; },
     eq(col, val) { state.filters.push(['eq', col, val]); return query; },
     gte(col, val) { state.filters.push(['gte', col, val]); return query; },
+    lt(col, val) { state.filters.push(['lt', col, val]); return query; },
+    not(col, op, val) { state.filters.push(['not', col, val]); return query; },
     in(col, val) { state.filters.push(['in', col, val]); return query; },
     order() { return query; },
     limit() { return query; },
@@ -60,6 +62,8 @@ vi.mock('../../src/utils/supabaseClient.js', () => ({
 
 const {
   runEventScan,
+  runEventBacklog,
+  LISTING_EVENT_SCHEMA,
   discoverCandidates,
   extractEventFromPage,
   normalizeUrl,
@@ -126,7 +130,7 @@ const validEvent = (overrides = {}) => ({
  * duplicate check sees; everything else defaults to a clean, empty database.
  */
 function scriptDatabase(opts = {}) {
-  const { sources = [], knownCandidateUrls = [], existingEvents = [], insertedEventId = 'event-1' } = opts;
+  const { sources = [], knownCandidateUrls = [], existingEvents = [], insertedEventId = 'event-1', backlog = [] } = opts;
   const calls = [];
 
   dbHandler.current = (state) => {
@@ -144,6 +148,15 @@ function scriptDatabase(opts = {}) {
 
     if (state.table === 'event_scan_candidates') {
       if (state.op === 'select') {
+        // The backlog read asks for pending rows; everything else asks by URL.
+        if (state.filters.some(([op, col, val]) => op === 'eq' && col === 'status' && val === 'pending')) {
+          return { data: backlog, error: null };
+        }
+        const byUrl = state.filters.find(([op, col]) => op === 'eq' && col === 'url');
+        if (byUrl) {
+          const i = knownCandidateUrls.indexOf(byUrl[2]);
+          return { data: i === -1 ? [] : [{ id: `known-${i}`, url: byUrl[2] }], error: null };
+        }
         return { data: knownCandidateUrls.map((url, i) => ({ id: `known-${i}`, url })), error: null };
       }
       if (state.op === 'insert') {
@@ -473,5 +486,266 @@ describe('EVENT_SCHEMA', () => {
     const unions = Object.values(EVENT_SCHEMA.properties)
       .filter((p) => p.anyOf || Array.isArray(p.type)).length;
     expect(unions).toBeLessThanOrEqual(16);
+  });
+});
+
+// ─── Listing pages ───────────────────────────────────────────────────────────
+
+const listed = (overrides = {}) => ({
+  title: 'Perth Card Fest',
+  start_date: inDays(40),
+  end_date: '',
+  start_time: '09:00',
+  end_time: '',
+  event_type: 'card_show',
+  venue_name: 'Claremont Showground',
+  address: '',
+  suburb: 'Claremont',
+  state: 'WA',
+  organizer_name: 'Perth Card Fest',
+  url: '',
+  short_description: 'Perth card show.',
+  ...overrides,
+});
+
+/** Verdicts written on individual pages — not the bulk "retire stale finds" update. */
+const pageVerdicts = (calls) => candidateUpdates(calls).filter((u) => !String(u.reason || '').startsWith('Never read'));
+
+const eventInserts = (calls) => calls.filter((c) => c.table === 'events' && c.op === 'insert').map((c) => c.payload);
+
+describe('listing pages', () => {
+  it('asks for the other events only when reading a page as a listing', async () => {
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent()));
+
+    await extractEventFromPage('page text', 'https://example.com.au/show');
+    expect(mockAnthropicCreate.mock.calls[0][0].output_config.format.schema.properties.other_events).toBeUndefined();
+
+    await extractEventFromPage('page text', 'https://example.com.au/calendar', { listing: true });
+    const params = mockAnthropicCreate.mock.calls[1][0];
+    expect(params.output_config.format.schema).toBe(LISTING_EVENT_SCHEMA);
+    expect(params.messages[0].content).toContain('other_events');
+  });
+
+  it('adds no union-typed parameters, so the listing schema stays inside the API limit', () => {
+    const items = LISTING_EVENT_SCHEMA.properties.other_events.items;
+    expect(Object.values(items.properties).every((prop) => !prop.anyOf)).toBe(true);
+    expect(LISTING_EVENT_SCHEMA.required).toContain('other_events');
+  });
+
+  it('returns the listed events of a page that is "only an index"', async () => {
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({
+      is_trading_card_event: false,
+      rejection_reason: 'An index of several shows.',
+      other_events: [
+        listed({ url: 'https://perthcardfest.org/events/pcf-7?utm_source=x' }),
+        listed({ title: 'Listed on the same page', url: 'https://example.com.au/calendar/' }),
+        listed({ title: '   ' }),
+      ],
+    })));
+
+    const result = await extractEventFromPage('page text', 'https://example.com.au/calendar', { listing: true });
+
+    expect(result.rejected).toBe('An index of several shows.');
+    expect(result.otherEvents).toHaveLength(2);
+    expect(result.otherEvents[0]).toMatchObject({
+      title: 'Perth Card Fest',
+      state: 'WA',
+      is_free: false,
+      source_url: 'https://perthcardfest.org/events/pcf-7',
+      website_url: 'https://perthcardfest.org/events/pcf-7',
+    });
+    // A row pointing back at the listing itself has no source of its own.
+    expect(result.otherEvents[1].source_url).toBeNull();
+  });
+
+  it('files every upcoming event on a listing page as its own draft', async () => {
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'calendar '.repeat(60)}</body></html>`);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({
+      is_trading_card_event: false,
+      rejection_reason: 'An index of several shows.',
+      other_events: [
+        listed(),
+        listed({ title: 'Hobart Collectables Fair', state: 'TAS', venue_name: 'City Hall', start_date: inDays(55) }),
+        listed({ title: 'Already Happened Show', start_date: inDays(-3) }),
+        listed({ title: 'No Date Show', start_date: '' }),
+      ],
+    })));
+    const calls = scriptDatabase({ backlog: [{ id: 'cand-old', url: 'https://example.com.au/calendar', title: 'Calendar' }] });
+
+    const summary = await runEventBacklog();
+
+    expect(eventInserts(calls).map((e) => e.title)).toEqual(['Perth Card Fest', 'Hobart Collectables Fair']);
+    expect(eventInserts(calls).every((e) => e.status === 'pending_review' && e.auto_discovered)).toBe(true);
+    expect(summary.eventsCreated).toBe(2);
+    expect(candidateUpdates(calls).pop()).toMatchObject({ status: 'imported', reason: 'Listing page: 2 draft(s) created.' });
+  });
+
+  it('does not draft a listed show that is already on the site under a longer name', async () => {
+    const date = inDays(40);
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'calendar '.repeat(60)}</body></html>`);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({
+      is_trading_card_event: false,
+      rejection_reason: 'An index.',
+      other_events: [listed({ start_date: date, venue_name: '' })],
+    })));
+    const calls = scriptDatabase({
+      backlog: [{ id: 'cand-old', url: 'https://example.com.au/calendar', title: 'Calendar' }],
+      existingEvents: [{ id: 'event-7', title: 'Perth Card Fest 7th Edition', venue_name: 'Somewhere Else', start_date: date }],
+    });
+
+    const summary = await runEventBacklog();
+
+    expect(eventInserts(calls)).toEqual([]);
+    expect(summary.duplicatesSkipped).toBe(1);
+    expect(candidateUpdates(calls).pop().status).toBe('duplicate');
+  });
+});
+
+// ─── Daily backlog run ───────────────────────────────────────────────────────
+
+describe('runEventBacklog', () => {
+  const page = `<html><body>${'Sydney Card Show at Rosehill Gardens. '.repeat(20)}</body></html>`;
+
+  it('does nothing — no run row — when there is nothing to read', async () => {
+    const calls = scriptDatabase();
+
+    expect(await runEventBacklog()).toEqual({ skipped: 'nothing_to_read' });
+    expect(calls.some((c) => c.table === 'event_scan_runs')).toBe(false);
+    expect(mockAnthropicCreate).not.toHaveBeenCalled();
+  });
+
+  it('reads pages an earlier scan found but never read', async () => {
+    mockFetchWebpage.mockResolvedValue(page);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent()));
+    const calls = scriptDatabase({ backlog: [{ id: 'cand-old', url: 'https://example.com.au/show', title: 'Show' }] });
+
+    const summary = await runEventBacklog({ trigger: 'manual', triggeredBy: 'admin-1' });
+
+    expect(calls.find((c) => c.table === 'event_scan_runs' && c.op === 'insert').payload)
+      .toMatchObject({ scope: 'backlog', trigger: 'manual' });
+    expect(eventInsert(calls)).toMatchObject({ title: 'Sydney Card Show', status: 'pending_review' });
+    expect(summary).toMatchObject({ scope: 'backlog', pagesFetched: 1, eventsCreated: 1 });
+    expect(runUpdate(calls).status).toBe('completed');
+  });
+
+  it('re-reads a listing page that is already in the ledger, once it is due', async () => {
+    mockFetchWebpage.mockResolvedValue(page);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent()));
+    const calls = scriptDatabase({
+      sources: [
+        { id: 'seed-due', kind: 'seed_url', value: 'https://example.com.au/calendar/', last_scanned_at: new Date(Date.now() - 9 * 86_400_000).toISOString() },
+        { id: 'seed-fresh', kind: 'seed_url', value: 'https://other.example.com.au/events', last_scanned_at: new Date(Date.now() - 2 * 86_400_000).toISOString() },
+      ],
+      knownCandidateUrls: ['https://example.com.au/calendar'],
+    });
+
+    const summary = await runEventBacklog();
+
+    expect(mockFetchWebpage).toHaveBeenCalledTimes(1);
+    expect(mockFetchWebpage.mock.calls[0][0]).toBe('https://example.com.au/calendar');
+    expect(summary.queriesRun).toBe(1);
+    const stamped = calls.filter((c) => c.table === 'event_scan_sources' && c.op === 'update')
+      .flatMap((c) => c.filters.find(([op]) => op === 'in')?.[2] ?? []);
+    expect(stamped).toEqual(['seed-due']);
+  });
+
+  it('never fetches our own site or a login-walled host out of the backlog', async () => {
+    const calls = scriptDatabase({ backlog: [
+      { id: 'c1', url: 'https://cardpop.com.au/events', title: 'CardPop' },
+      { id: 'c2', url: 'https://facebook.com/events/1', title: 'FB' },
+    ] });
+
+    await runEventBacklog();
+
+    expect(mockFetchWebpage).not.toHaveBeenCalled();
+    expect(pageVerdicts(calls).map((u) => u.status)).toEqual(['rejected', 'rejected']);
+  });
+
+  it('retires finds nobody read within four months, unread', async () => {
+    const calls = scriptDatabase();
+
+    await runEventBacklog();
+
+    const retire = calls.find((c) => c.table === 'event_scan_candidates' && c.op === 'update' && c.filters.some(([op]) => op === 'lt'));
+    expect(retire.payload.status).toBe('rejected');
+    expect(retire.filters).toContainEqual(['eq', 'status', 'pending']);
+  });
+
+  it('files one draft when two pages read at the same time describe the same show', async () => {
+    mockFetchWebpage.mockResolvedValue(page);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent()));
+    // A database that remembers what the run inserted, so the second page's
+    // duplicate check can see the first page's draft — if it runs after it.
+    const inserted = [];
+    const calls = [];
+    dbHandler.current = (state) => {
+      calls.push(state);
+      if (state.table === 'event_scan_runs') return { data: state.op === 'insert' ? { id: 'run-1' } : null, error: null };
+      if (state.table === 'event_scan_sources') return { data: state.op === 'select' ? [] : null, error: null };
+      if (state.table === 'event_scan_candidates') {
+        const wantsPending = state.filters.some(([op, col, val]) => op === 'eq' && col === 'status' && val === 'pending');
+        if (state.op === 'select' && wantsPending) {
+          return { data: [
+            { id: 'c1', url: 'https://tickets.example.com.au/sydney-card-show', title: 'Tickets' },
+            { id: 'c2', url: 'https://organiser.example.com.au/sydney-card-show', title: 'Organiser' },
+          ], error: null };
+        }
+        return { data: state.op === 'select' ? [] : null, error: null };
+      }
+      if (state.table === 'events') {
+        if (state.op === 'insert') {
+          const row = { id: `event-${inserted.length + 1}`, ...state.payload };
+          inserted.push(row);
+          return { data: { id: row.id, slug: row.slug, title: row.title }, error: null };
+        }
+        const bySource = state.filters.find(([, col]) => col === 'source_url');
+        if (bySource) return { data: inserted.filter((e) => e.source_url === bySource[2]), error: null };
+        return { data: inserted, error: null };
+      }
+      return { data: null, error: null };
+    };
+
+    const summary = await runEventBacklog();
+
+    expect(inserted).toHaveLength(1);
+    expect(summary).toMatchObject({ eventsCreated: 1, duplicatesSkipped: 1 });
+    expect(pageVerdicts(calls).map((u) => u.status).sort()).toEqual(['duplicate', 'imported']);
+  });
+
+  it('leaves pages it had no time for pending, and says so', async () => {
+    mockFetchWebpage.mockResolvedValue(page);
+    const realNow = Date.now;
+    let jump = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => realNow() + jump);
+    mockAnthropicCreate.mockImplementation(async () => { jump = 10 * 60_000; return extractionResponse(validEvent()); });
+    const calls = scriptDatabase({
+      backlog: Array.from({ length: 8 }, (_, i) => ({ id: `c${i}`, url: `https://example.com.au/show-${i}`, title: 'Show' })),
+    });
+
+    const summary = await runEventBacklog();
+    vi.restoreAllMocks();
+
+    // Three readers start one page each; none starts a second after the deadline.
+    expect(mockAnthropicCreate).toHaveBeenCalledTimes(3);
+    expect(summary.warnings.some((w) => w.includes('5 page(s) wait for the next run'))).toBe(true);
+    expect(pageVerdicts(calls)).toHaveLength(3);
+  });
+});
+
+describe('runEventScan — weekly', () => {
+  it('claims only search queries, and tells the admin when finds are left for the backlog', async () => {
+    mockAnthropicCreate.mockResolvedValueOnce(searchResponse(
+      Array.from({ length: 25 }, (_, i) => ({ type: 'web_search_result', url: `https://example.com.au/e-${i}`, title: `E${i}` })),
+    ));
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent({ is_trading_card_event: false, rejection_reason: 'Not an event.' })));
+    mockFetchWebpage.mockResolvedValue(`<html><body>${'text '.repeat(100)}</body></html>`);
+    const calls = scriptDatabase({ sources: [{ id: 's1', kind: 'search_query', value: 'card show sydney' }] });
+
+    const summary = await runEventScan();
+
+    const claim = calls.find((c) => c.table === 'event_scan_sources' && c.op === 'select');
+    expect(claim.filters).toContainEqual(['in', 'kind', ['search_query']]);
+    expect(mockFetchWebpage).toHaveBeenCalledTimes(18);
+    expect(summary.warnings).toContain('7 found page(s) were not read this run; the daily backlog run reads them.');
   });
 });

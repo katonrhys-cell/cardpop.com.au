@@ -18,6 +18,7 @@ const FEATURE_LABELS = {
   blog_draft: 'Blog drafts',
   event_discovery: 'Event scan: search',
   event_extraction: 'Event scan: page reading',
+  event_instagram_extraction: 'Event scan: Instagram posts',
   supplier_price: 'Supplier price checks',
   organiser_message_scan: 'Organiser message screening',
 };

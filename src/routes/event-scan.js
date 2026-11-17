@@ -6,6 +6,11 @@ import { requireAdmin } from '../middleware/requireAal2.js';
 import { VALID_STATES } from '../utils/eventData.js';
 import { isFetchableHttpUrl } from '../utils/safeFetch.js';
 import { WATCHED_FIELDS, withFreeFlag } from '../utils/eventSourceWatcher.js';
+import {
+  instagramConfig,
+  cleanInstagramHandle,
+  fetchConnectedAccount,
+} from '../utils/instagramClient.js';
 
 // Admin management of the nightly event scanner's source list.
 //
@@ -19,7 +24,7 @@ import { WATCHED_FIELDS, withFreeFlag } from '../utils/eventSourceWatcher.js';
 // mounted on the 40s api/index.js function.
 
 const router = express.Router();
-const VALID_KINDS = ['search_query', 'seed_url'];
+const VALID_KINDS = ['search_query', 'seed_url', 'instagram_account'];
 
 router.use(authMiddleware);
 // Admin + MFA step-up, matching the /admin router (was a bare isAdminUser check).
@@ -39,6 +44,12 @@ function validateSource({ kind, value, state, label, priority }) {
   if (kind === 'seed_url' && !isFetchableHttpUrl(trimmed)) {
     return { error: 'A seed_url must be a valid http(s) URL' };
   }
+  // Stored as the bare lower-case handle, so "@Name", "name" and a pasted
+  // profile link are one source rather than three.
+  const handle = kind === 'instagram_account' ? cleanInstagramHandle(trimmed) : null;
+  if (kind === 'instagram_account' && !handle) {
+    return { error: 'Enter an Instagram handle (e.g. @cardshowsau) or a profile link.' };
+  }
   if (state != null && !VALID_STATES.includes(state)) {
     return { error: `state must be one of: ${VALID_STATES.join(', ')}` };
   }
@@ -50,7 +61,7 @@ function validateSource({ kind, value, state, label, priority }) {
   return {
     source: {
       kind,
-      value: trimmed,
+      value: handle ?? trimmed,
       state: state ?? null,
       label: typeof label === 'string' && label.trim() ? label.trim().slice(0, 120) : null,
       priority: parsedPriority,
@@ -78,6 +89,77 @@ router.post('/sources', async (req, res) => {
   }
 
   res.status(201).json({ source: data });
+});
+
+// ─── Instagram ──────────────────────────────────────────────────────────────
+//
+// The scan itself runs on the 300s function (/cron/event-scan?mode=instagram);
+// these only report whether the account is connected and seed the source list.
+
+// Is the token configured, and does Meta accept it? One cheap Graph call.
+router.get('/instagram/status', async (req, res) => {
+  if (!instagramConfig()) return res.json({ configured: false });
+  try {
+    const { username } = await fetchConnectedAccount();
+    res.json({ configured: true, connected: true, username });
+  } catch (error) {
+    res.json({ configured: true, connected: false, error: error.message });
+  }
+});
+
+// Add every organiser Instagram the site already knows about — organiser pages
+// and the events themselves — as an account to watch. Existing rows are left
+// alone, so this is safe to press again whenever new organisers have appeared.
+router.post('/instagram/import-organisers', async (req, res) => {
+  try {
+    const [organisers, events] = await Promise.all([
+      supabase.from('event_organisers').select('name, instagram_url').not('instagram_url', 'is', null).limit(2000),
+      supabase.from('events').select('organizer_name, instagram_url').not('instagram_url', 'is', null)
+        .order('start_date', { ascending: false }).limit(2000),
+    ]);
+    if (organisers.error || events.error) throw new Error((organisers.error || events.error).message);
+
+    const found = new Map();
+    for (const row of organisers.data ?? []) {
+      const handle = cleanInstagramHandle(row.instagram_url);
+      if (handle && !found.has(handle)) found.set(handle, row.name);
+    }
+    for (const row of events.data ?? []) {
+      const handle = cleanInstagramHandle(row.instagram_url);
+      if (handle && !found.has(handle)) found.set(handle, row.organizer_name);
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from('event_scan_sources')
+      .select('value')
+      .eq('kind', 'instagram_account');
+    if (existingError) throw new Error(existingError.message);
+    const known = new Set((existing ?? []).map((row) => row.value));
+
+    const rows = [...found.entries()]
+      .filter(([handle]) => !known.has(handle))
+      .map(([handle, name]) => ({
+        kind: 'instagram_account',
+        value: handle,
+        label: typeof name === 'string' && name.trim() ? name.trim().slice(0, 120) : null,
+        priority: 100,
+      }));
+
+    let added = [];
+    if (rows.length) {
+      const { data, error } = await supabase
+        .from('event_scan_sources')
+        .upsert(rows, { onConflict: 'kind,value', ignoreDuplicates: true })
+        .select();
+      if (error) throw new Error(error.message);
+      added = data ?? [];
+    }
+
+    res.json({ added, alreadyListed: found.size - rows.length });
+  } catch (error) {
+    logger.error(`[EVENT_SCAN] Failed to import organiser Instagram accounts: ${error.message}`);
+    res.status(500).json({ error: 'Failed to add the organisers\' Instagram accounts.' });
+  }
 });
 
 router.patch('/sources/:id', async (req, res) => {
