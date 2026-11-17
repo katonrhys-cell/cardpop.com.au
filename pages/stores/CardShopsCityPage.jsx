@@ -13,6 +13,8 @@ import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd
 import { eventRegionByState, eventRegionPath } from '@/data/eventRegions.js';
 import { storeCoverPhoto, storeLogoUrl, storePath } from '@/utils/storePage.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { ADMIN_LISTS } from '@/utils/adminEditLinks.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 
@@ -24,6 +26,8 @@ const formatEventDate = (isoDate) =>
 const CardShopsCityPage = () => {
   const { city } = useParams();
   const cityInfo = DIRECTORY_CITIES[city];
+  // Admins get a shortcut to the admin screen behind this page.
+  useAdminEditTarget('Manage shops', ADMIN_LISTS.storeDirectory);
 
   const [stores, setStores] = useState(null);
   const [events, setEvents] = useState([]);

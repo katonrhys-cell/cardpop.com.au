@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { MapPin, Store, PlusCircle } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { DIRECTORY_CITIES, fetchStores } from '@/lib/storeDirectory.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { ADMIN_LISTS } from '@/utils/adminEditLinks.js';
 
 const STATE_ORDER = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
 const STATE_LABELS = {
@@ -11,6 +13,8 @@ const STATE_LABELS = {
 };
 
 const CardShopsHubPage = () => {
+  // Admins get a shortcut to the admin screen behind this page.
+  useAdminEditTarget('Manage shops', ADMIN_LISTS.storeDirectory);
   const [stores, setStores] = useState(null);
   const [loadError, setLoadError] = useState(false);
 

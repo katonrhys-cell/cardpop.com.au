@@ -14,6 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import BackButton from '@/components/BackButton.jsx';
 import { cardThumbUrl } from '@/utils/imageUrl.js';
 import { eventPath, eventTypeLabel, eventTypeStyle, formatEventDate, formatEventLocation } from '@/lib/eventSeo.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminUserPath } from '@/utils/adminEditLinks.js';
 
 const SellerProfilePage = () => {
   const { sellerId } = useParams();
@@ -23,6 +25,8 @@ const SellerProfilePage = () => {
   const [reviews, setReviews] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  // Admins get an "Edit in admin" shortcut to this member's admin page.
+  useAdminEditTarget('Manage user', adminUserPath(seller?.id));
 
   useEffect(() => {
     let cancelled = false;
