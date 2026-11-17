@@ -10,6 +10,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import { BadgeCheck, Search, MapPin, Star, Package, ArrowRight, ShieldCheck, Store, Sparkles } from 'lucide-react';
 import { STOREFRONT_FILTER } from '@/config/plans.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { ADMIN_LISTS } from '@/utils/adminEditLinks.js';
 
 const AU_STATES = [
   { code: 'NSW', label: 'New South Wales' },
@@ -23,6 +25,8 @@ const AU_STATES = [
 ];
 
 const LocalTradersPage = () => {
+  // Admins get a shortcut to the Sellers screen behind this directory.
+  useAdminEditTarget('Manage dealers', ADMIN_LISTS.sellers);
   const { isAuthenticated, currentUser } = useAuth();
   const [traders, setTraders] = useState([]);
   const [stores, setStores] = useState([]);

@@ -45,6 +45,9 @@ export const adminPlayerPath = (id) => (id ? `/admin/players?edit=${enc(id)}` : 
 /** A member (seller / dealer profile) → Admin → Users → that user's page. */
 export const adminUserPath = (id) => (id ? `/admin/users/${enc(id)}` : null);
 
+/** A sole trader's dealer store → Admin → Users → that member, store editor open. */
+export const adminSoleTraderStorePath = (id) => (id ? `/admin/users/${enc(id)}?editStore=1` : null);
+
 /** Giveaway → Admin → Giveaways, giveaway form open. */
 export const adminGiveawayPath = (id) => (id ? `/admin/giveaways?edit=${enc(id)}` : null);
 
@@ -54,6 +57,7 @@ export const ADMIN_LISTS = {
   storeDirectory: '/admin/store-directory',
   partners: '/admin/partners',
   collections: '/admin/collections',
+  sellers: '/admin/sellers',
 };
 
 /** Card shop → Admin → Store Directory, store editor open. */
