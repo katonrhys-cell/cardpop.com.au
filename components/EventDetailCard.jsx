@@ -159,7 +159,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
             </span>
           )}
           </div>
-          <h1 className="font-serif text-2xl md:text-5xl lg:text-6xl font-extrabold text-foreground leading-tight tracking-tight mt-4">
+          <h1 className="font-serif text-2xl md:text-3xl font-bold text-foreground leading-snug tracking-tight mt-4 text-balance">
             {event.name}
           </h1>
         </div>
@@ -185,7 +185,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
           
           {/* Main Description */}
           <div className="min-w-0 lg:col-span-2 p-6 md:p-10 lg:border-r border-border">
-            <h2 className="font-serif text-2xl font-bold mb-4">About This Event</h2>
+            <h2 className="font-serif text-lg md:text-xl font-semibold mb-3">About This Event</h2>
             <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap break-words">
               {event.description}
             </p>
@@ -221,8 +221,8 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
             {event.accessibility_info && (
               <div className="mt-10">
-                <h2 className="font-serif text-2xl font-bold mb-4 flex items-center gap-3">
-                  <Accessibility className="w-6 h-6 text-primary shrink-0" aria-hidden="true" /> Accessibility
+                <h2 className="font-serif text-lg md:text-xl font-semibold mb-3 flex items-center gap-3">
+                  <Accessibility className="w-5 h-5 text-primary shrink-0" aria-hidden="true" /> Accessibility
                 </h2>
                 <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
                   {event.accessibility_info}
@@ -232,8 +232,8 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
             {event.age_restrictions && (
               <div className="mt-10">
-                <h2 className="font-serif text-2xl font-bold mb-4 flex items-center gap-3">
-                  <ShieldAlert className="w-6 h-6 text-primary shrink-0" aria-hidden="true" /> Age Restrictions
+                <h2 className="font-serif text-lg md:text-xl font-semibold mb-3 flex items-center gap-3">
+                  <ShieldAlert className="w-5 h-5 text-primary shrink-0" aria-hidden="true" /> Age Restrictions
                 </h2>
                 <p className="text-muted-foreground leading-relaxed text-lg whitespace-pre-wrap">
                   {event.age_restrictions}
