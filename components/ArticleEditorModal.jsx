@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,13 @@ import { Upload, FileCode, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import { CONVICTION_LEVELS, CONVICTION_TYPES, convictionTypeForCategory } from '@/utils/convictionRating.js';
 import { BLOG_CATEGORIES } from '@/data/blogCategories.js';
 import { parseVideoUrl } from '@/utils/videoEmbed.js';
+import { Checkbox } from '@/components/ui/checkbox';
+import { unsupportedVisualTags } from '@/utils/richTextSupport.js';
+import { uploadReviewImage } from '@/utils/uploadReviewImage.js';
+
+// Tiptap is heavy and only needed once the editor is open in its visual mode.
+const RichTextEditor = lazy(() => import('@/components/admin/RichTextEditor.jsx'));
+const uploadArticleImage = (file) => uploadReviewImage(file, { folder: 'blog' });
 
 // Derived from the shared blog taxonomy (data/blogCategories.js) so the editor,
 // blog grid, article page, nav dropdown, sitemap and prerenderer never drift.
@@ -89,8 +96,14 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
   const [saving, setSaving] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [importedFileName, setImportedFileName] = useState('');
+  // The body is written visually by default; "Edit HTML code" shows the markup.
+  // Content the visual editor can't hold (tables, embeds) opens as code so
+  // nothing is dropped.
+  const [codeView, setCodeView] = useState(false);
+  const visualLossTags = unsupportedVisualTags(content);
 
   useEffect(() => {
+    setCodeView(unsupportedVisualTags(article?.content ?? '').length > 0);
     setTitle(article?.title ?? '');
     setSlug(article?.slug ?? '');
     setExcerpt(article?.excerpt ?? '');
@@ -132,7 +145,10 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     reader.onload = (e) => {
       const { title: t, content: c, excerpt: ex } = parseHTMLFile(e.target.result);
       if (t) { setTitle(t); setSlug(slugify(t)); }
-      if (c) setContent(c);
+      if (c) {
+        setContent(c);
+        if (unsupportedVisualTags(c).length > 0) setCodeView(true);
+      }
       if (ex) setExcerpt(prev => prev || ex);
       setImportedFileName(file.name);
       toast.success(`Imported "${file.name}" — fill in the remaining fields below.`);
@@ -401,13 +417,36 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
                 <span className="ml-1.5 text-xs font-normal text-muted-foreground">HTML from import</span>
               )}
             </Label>
-            <Textarea
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="Write your article… (HTML is supported)"
-              rows={12}
-              className="font-mono text-xs"
-            />
+            {codeView ? (
+              <Textarea
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="Write your article… (HTML is supported)"
+                rows={12}
+                className="font-mono text-xs"
+              />
+            ) : (
+              <Suspense fallback={<div className="h-64 rounded-xl border border-border bg-muted/40 animate-pulse" />}>
+                <RichTextEditor
+                  value={content}
+                  onChange={setContent}
+                  onUploadImage={uploadArticleImage}
+                  placeholder="Write your article…"
+                  minHeight="16rem"
+                />
+              </Suspense>
+            )}
+            <label className="flex items-center gap-2 pt-1 text-sm text-muted-foreground cursor-pointer w-fit">
+              <Checkbox checked={codeView} onCheckedChange={(v) => setCodeView(v === true)} />
+              Edit HTML code
+            </label>
+            {visualLossTags.length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {codeView ? 'Opened as code because this' : 'This'} article contains {visualLossTags.includes('table') ? 'a table or other' : ''} formatting
+                the visual editor can't show ({visualLossTags.slice(0, 4).map(t => `<${t}>`).join(', ')}).
+                {codeView ? ' Unticking the box and editing would remove it.' : ' Editing here will remove it — tick the box to keep it.'}
+              </p>
+            )}
           </div>
 
           {/* ── FAQs ── */}
