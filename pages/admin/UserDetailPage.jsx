@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User, BadgeCheck, Sparkles, Store } from 'lucide-react';
+import { ChevronLeft, Mail, MapPin, Calendar, ShieldAlert, KeyRound, Trash2, CheckCircle2, AlertCircle, User, BadgeCheck, Sparkles, Store, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { useUserDetails } from '@/hooks/useUserDetails.js';
 import UserStatsCard from '@/components/admin/UserStatsCard.jsx';
 import UserActionsModal from '@/components/admin/UserActionsModal.jsx';
+import SoleTraderStoreDialog from '@/components/admin/SoleTraderStoreDialog.jsx';
 import { supabase } from '@/lib/supabaseClient.js';
 import apiServerClient from '@/lib/apiServerClient.js';
 import { isVerified } from '@/utils/verification.js';
@@ -38,6 +39,23 @@ const UserDetailPage = () => {
   const { user, vaultProducts, ordersAsBuyer, ordersAsSeller, reviews, isLoading, error, refetch } = useUserDetails(userId);
   
   const [actionModal, setActionModal] = useState({ isOpen: false, type: null });
+  const [storeDialogOpen, setStoreDialogOpen] = useState(false);
+  // "Edit store" on a dealer's public page lands here as ?editStore=1: open the
+  // store editor once the member has loaded (and only if they are a sole
+  // trader), then drop the param so a refresh doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editStoreParam = searchParams.get('editStore');
+  useEffect(() => {
+    if (!editStoreParam || isLoading) return;
+    if (user?.is_sole_trader) setStoreDialogOpen(true);
+    else toast.error('That member does not have a dealer store.');
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('editStore');
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per ?editStore= value, after the member loads
+  }, [editStoreParam, isLoading]);
   const [flagSaving, setFlagSaving] = useState(false);
   // Turnstile token for the password-reset action (Supabase CAPTCHA gates the
   // recover endpoint even for admin-triggered resets).
@@ -233,6 +251,9 @@ const UserDetailPage = () => {
               <h3 className="text-sm font-semibold text-left text-muted-foreground uppercase tracking-wider mb-2">Admin Actions</h3>
               {user.is_sole_trader && (
                 <>
+                  <Button variant="outline" className="w-full justify-start" onClick={() => setStoreDialogOpen(true)}>
+                    <Pencil className="w-4 h-4 mr-2" /> Edit Store
+                  </Button>
                   <Button
                     variant={isVerified(user.is_verified) ? 'outline' : 'default'}
                     className="w-full justify-start"
@@ -471,6 +492,13 @@ const UserDetailPage = () => {
           </Card>
         </div>
       </div>
+
+      <SoleTraderStoreDialog
+        open={storeDialogOpen}
+        onOpenChange={setStoreDialogOpen}
+        user={user}
+        onSaved={() => refetch?.()}
+      />
 
       <UserActionsModal
         isOpen={actionModal.isOpen}

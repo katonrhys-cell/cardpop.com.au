@@ -12,7 +12,7 @@ import {
   adminShopProductPath, adminEventPath, adminListingPath, adminStorePath,
   adminArticlePath, adminEventReviewPath, adminPlayerPath,
   adminProductsPath, adminShopCategoriesPath,
-  adminUserPath, adminGiveawayPath, ADMIN_LISTS,
+  adminUserPath, adminGiveawayPath, adminSoleTraderStorePath, ADMIN_LISTS,
 } from '@/utils/adminEditLinks.js';
 
 // A stand-in for a public page that registers what it shows.
@@ -49,11 +49,13 @@ describe('adminEditLinks', () => {
     expect(adminShopCategoriesPath()).toBe('/admin/products?categories=1');
     expect(adminUserPath('u1')).toBe('/admin/users/u1');
     expect(adminGiveawayPath('g1')).toBe('/admin/giveaways?edit=g1');
+    expect(adminSoleTraderStorePath('u1')).toBe('/admin/users/u1?editStore=1');
     expect(ADMIN_LISTS).toEqual({
       whatnotShows: '/admin/whatnot-shows',
       storeDirectory: '/admin/store-directory',
       partners: '/admin/partners',
       collections: '/admin/collections',
+      sellers: '/admin/sellers',
     });
   });
 
@@ -66,6 +68,7 @@ describe('adminEditLinks', () => {
     expect(adminPlayerPath('')).toBeNull();
     expect(adminUserPath(undefined)).toBeNull();
     expect(adminGiveawayPath(null)).toBeNull();
+    expect(adminSoleTraderStorePath(undefined)).toBeNull();
   });
 });
 

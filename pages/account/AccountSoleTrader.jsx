@@ -18,22 +18,9 @@ import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import AccountPageShell from '@/components/account/AccountPageShell.jsx';
 import { Link } from 'react-router-dom';
 import WorkspaceReferralCard from '@/components/WorkspaceReferralCard.jsx';
+import { STORE_CATEGORIES, TRUST_BADGES } from '@/utils/soleTraderStore.js';
 
-const CATEGORIES = [
-  'Basketball Cards', 'Football Cards', 'Pokémon Cards', 'Graded Cards',
-  'Rookie Cards', 'Autographs', 'Numbered Parallels', 'Case Hits',
-  'Sealed Wax', 'Baseball Cards', 'Soccer Cards', 'Cricket Cards',
-  'UFC Cards', 'Vintage Cards', 'Sports Memorabilia',
-];
-
-const TRUST_BADGES = [
-  { key: 'authentic',         label: '100% Authentic',       desc: 'All cards verified before listing' },
-  { key: 'safe_secure',       label: 'Safe & Secure',        desc: 'Cards packed with care and protection' },
-  { key: 'worldwide_shipping',label: 'Worldwide Shipping',   desc: 'Fast & reliable shipping Australia & Worldwide' },
-  { key: 'collector_first',   label: 'Collector First',      desc: "We're collectors too — you're in good hands" },
-  { key: 'fast_dispatch',     label: 'Fast Dispatch',        desc: 'Ships within 1–2 business days' },
-  { key: 'returns_accepted',  label: 'Returns Accepted',     desc: '7-day returns on eligible items' },
-];
+const CATEGORIES = STORE_CATEGORIES;
 
 const slugify = (s) => String(s || '')
   .toLowerCase()
