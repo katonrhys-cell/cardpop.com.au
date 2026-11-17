@@ -14,6 +14,23 @@ export const adminShopProductPath = (id) => (id ? `/admin/products?edit=${enc(id
 /** Event → Admin → Events, event form open. */
 export const adminEventPath = (id) => (id ? `/admin/events?edit=${enc(id)}` : null);
 
+/**
+ * Which of those links can be edited right on the public page instead of in
+ * the admin panel: `{ kind: 'event' | 'shopProduct', id }`, or null. Read off
+ * the link itself, so every page that registers an event or a shop product
+ * with `useAdminEditTarget` gets the in-place editor without saying more.
+ * (components/admin/AdminInPlaceEditor.jsx opens the same forms the admin
+ * screens use.)
+ */
+export const inPlaceEditFor = (to) => {
+  if (typeof to !== 'string') return null;
+  const match = to.match(/^\/admin\/(events|products)\?edit=([^&#]+)$/);
+  if (!match) return null;
+  let id;
+  try { id = decodeURIComponent(match[2]); } catch { return null; }
+  return id ? { kind: match[1] === 'events' ? 'event' : 'shopProduct', id } : null;
+};
+
 /** Marketplace listing → Admin → All Listings, listing dialog open. */
 export const adminListingPath = (id) => (id ? `/admin/all-listings?listing=${enc(id)}` : null);
 
