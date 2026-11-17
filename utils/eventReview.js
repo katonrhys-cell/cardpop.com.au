@@ -369,29 +369,6 @@ export const buildEventReviewJsonLd = ({ article, review, event, siteUrl = 'http
   };
 };
 
-// One schema.org VideoObject per review video — video rich results. Google
-// requires a thumbnail and an upload date: a YouTube video supplies its own
-// still, an upload its poster frame, anything else falls back to the article's
-// cover, and a video with none of those is skipped rather than emitted invalid.
-export const buildReviewVideoJsonLds = ({ article, videos, event, siteUrl = 'https://cardpop.com.au' } = {}) => {
-  if (!article) return [];
-  const list = cleanVideos(videos);
-  const eventName = event?.title || article.title;
-  const uploadDate = article.published_at || article.created_at;
-  if (!uploadDate) return [];
-  return list.map((v, i) => {
-    const embed = videoKind(v.url) === 'embed' ? parseVideoUrl(v.url) : null;
-    const thumb = embed?.thumbnailUrl || v.poster_url || article.featured_image_url || null;
-    if (!thumb) return null;
-    return {
-      '@context': 'https://schema.org',
-      '@type': 'VideoObject',
-      name: v.caption || `${eventName} — video${list.length > 1 ? ` ${i + 1}` : ''}`,
-      description: v.caption || article.excerpt || `Video from ${eventName}, reviewed by CardPop.`,
-      thumbnailUrl: [thumb],
-      uploadDate,
-      ...(embed ? { embedUrl: embed.embedUrl } : { contentUrl: v.url }),
-      url: `${siteUrl}/blog/${article.slug || article.id}`,
-    };
-  }).filter(Boolean);
-};
+// A review's videos carry no VideoObject on the article: an article is not a
+// watch page. Each video's markup lives on its own page — utils/videoWatch.js
+// (articleWatchSource).

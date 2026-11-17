@@ -17,7 +17,7 @@ import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
-import { cleanEventVideos, emptyVideo } from '@/utils/eventVideos.js';
+import { cleanEventVideos, emptyVideo, eventVideosForSave } from '@/utils/eventVideos.js';
 import EventSideEventsEditor from '@/components/events/EventSideEventsEditor.jsx';
 import EventPrizesEditor from '@/components/events/EventPrizesEditor.jsx';
 import { cleanSideEvents, sideEventsFormError, sideEventsToForm } from '@/utils/eventSideEvents.js';
@@ -677,7 +677,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
 
       // Videos: the list is the source of truth; youtube_url stays the first
       // video's URL for readers that predate the list (SEO, older clients).
-      const event_videos = cleanEventVideos(videos).map(v => ({ title: v.title, url: v.url }));
+      // Keeps each saved video's added_at and stamps the new ones (the upload
+      // date its watch page reports — utils/videoWatch.js).
+      const event_videos = eventVideosForSave(videos, cleanEventVideos(event?.event_videos, event?.youtube_url));
 
       // Prize photos: same drill as the gallery — new files go up now under
       // immutable paths, saved ones keep their URL, and uploaded photos become

@@ -793,6 +793,7 @@ describe('prerender events', () => {
       opening_hours: 'Monday: Closed\nSunday: 11am – 5pm',
       photos: [{ url: '/stores/swap-itt-melbourne/storefront.webp', caption: 'The entrance' }],
       videos: [{ url: '/stores/swap-itt-melbourne/street.mp4', caption: 'From the street' }],
+      updated_at: '2026-11-02T00:00:00+00:00',
     };
     state.result = { data: store };
     let { status, body } = await run('/card-shops/melbourne/swap-itt-melbourne');
@@ -802,9 +803,22 @@ describe('prerender events', () => {
     expect(body).toContain('<p>488 La Trobe St, Melbourne VIC</p>');
     expect(body).toContain('<li>Sunday: 11am – 5pm</li>');
     expect(body).toContain('<img src="https://cardpop.com.au/stores/swap-itt-melbourne/storefront.webp" alt="Swap Itt — The entrance" loading="lazy" />');
-    expect(body).toContain('<a href="https://cardpop.com.au/stores/swap-itt-melbourne/street.mp4">From the street</a>');
+    // The shop's video links to its own watch page; the shop page carries no VideoObject.
+    const watch = body.match(/<a href="https:\/\/cardpop\.com\.au(\/card-shops\/melbourne\/swap-itt-melbourne\/videos\/clip-[a-z0-9]+)">/);
+    expect(watch).not.toBeNull();
+    expect(body).toContain('Watch: From the street</a>');
+    expect(body).not.toContain('VideoObject');
     expect(body).toContain('"@type":"Store"');
     expect(body).not.toContain('noindex');
+
+    // That watch page: the uploaded clip in a <video>, first, with its VideoObject.
+    const watched = await run(watch[1]);
+    expect(watched.status).toBe(200);
+    expect(watched.body).toContain('<video src="https://cardpop.com.au/stores/swap-itt-melbourne/street.mp4"');
+    expect(watched.body.indexOf('<video ')).toBeLessThan(watched.body.indexOf('<h1>'));
+    expect(watched.body).toContain('<h1>Swap Itt — From the street</h1>');
+    expect(watched.body).toContain('"contentUrl":"https://cardpop.com.au/stores/swap-itt-melbourne/street.mp4"');
+    expect(watched.body).toContain('<a href="https://cardpop.com.au/card-shops/melbourne/swap-itt-melbourne">View the card shop page — Swap Itt</a>');
 
     // Nothing beyond the directory line: served, but not indexed.
     state.result = { data: { ...store, photos: [], videos: [], opening_hours: null } };
@@ -863,7 +877,7 @@ describe('prerender events', () => {
     expect(body).toContain('"image":["https://cdn.test/cover.jpg","https://cdn.test/25-a.jpg","https://cdn.test/24-a.jpg"]');
   });
 
-  it('emits a VideoObject and a link per event video, titled, and skips non-YouTube links', async () => {
+  it('links each event video to its watch page and emits no VideoObject on the event page', async () => {
     state.result = { data: {
       id: UUID, slug: 'video-show', title: 'Video Show', status: 'approved',
       start_date: '2026-10-01', updated_at: '2026-09-01T00:00:00+00:00',
@@ -876,24 +890,82 @@ describe('prerender events', () => {
     } };
     const { body } = await run('/events/video-show');
     expect(body).toContain('<h2>Event Videos</h2>');
-    expect(body).toContain('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">2025 recap</a>');
-    expect(body).toContain('<a href="https://www.youtube.com/watch?v=abcdefghijk">Watch video 2</a>');
+    expect(body).toContain('<a href="https://cardpop.com.au/events/video-show/videos/dQw4w9WgXcQ">');
+    expect(body).toContain('Watch: 2025 recap</a>');
+    expect(body).toContain('<a href="https://cardpop.com.au/events/video-show/videos/abcdefghijk">');
+    expect(body).toContain('Watch: Video 2</a>');
     expect(body).not.toContain('zzzzzzzzzzz');
     expect(body).not.toContain('vimeo');
-    expect(body).toContain('"@type":"VideoObject","name":"Video Show — 2025 recap"');
-    expect(body).toContain('"@type":"VideoObject","name":"Video Show — Event Video 2"');
-    expect(body).toContain('"uploadDate":"2026-09-01T00:00:00+00:00"');
+    // The event page is not a watch page: no VideoObject, no player.
+    expect(body).not.toContain('VideoObject');
+    expect(body).not.toContain('<iframe');
   });
 
-  it('still emits the legacy single youtube_url as one video when the list is empty', async () => {
+  it('still lists the legacy single youtube_url as one video when the list is empty', async () => {
     state.result = { data: {
       id: UUID, slug: 'legacy-video', title: 'Legacy Video', status: 'approved',
       start_date: '2026-10-01', youtube_url: 'https://youtu.be/dQw4w9WgXcQ',
     } };
     const { body } = await run('/events/legacy-video');
     expect(body).toContain('<h2>Event Video</h2>');
-    expect(body).toContain('<a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">Watch the event video</a>');
-    expect(body).toContain('"@type":"VideoObject","name":"Legacy Video — Event Video"');
+    expect(body).toContain('<a href="https://cardpop.com.au/events/legacy-video/videos/dQw4w9WgXcQ">');
+    expect(body).not.toContain('VideoObject');
+  });
+
+  describe('video watch pages', () => {
+    const event = {
+      id: UUID, slug: 'video-show', title: 'Video Show', status: 'approved',
+      short_description: 'Two days of trading cards.',
+      start_date: '2026-10-01', venue_name: 'Town Hall', suburb: 'Fitzroy', state: 'VIC',
+      created_at: '2026-08-01T00:00:00+00:00', updated_at: '2026-09-01T00:00:00+00:00',
+      event_videos: [
+        { title: '2025 recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', added_at: '2026-11-11T03:00:00.000Z' },
+        { title: '', url: 'https://youtu.be/abcdefghijk' },
+      ],
+    };
+
+    it('serves a watch page with the player first and the only VideoObject', async () => {
+      state.result = { data: event };
+      const { body, status } = await run('/events/video-show/videos/dQw4w9WgXcQ');
+      expect(status).toBe(200);
+      expect(body).toContain('<link rel="canonical" href="https://cardpop.com.au/events/video-show/videos/dQw4w9WgXcQ" />');
+      expect(body).toContain('<title>Video Show — 2025 recap | Watch on CardPop</title>');
+      expect(body).toContain('<h1>Video Show — 2025 recap</h1>');
+      // The video is the main content: the player comes before the heading.
+      const iframe = body.indexOf('<iframe src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"');
+      expect(iframe).toBeGreaterThan(-1);
+      expect(iframe).toBeLessThan(body.indexOf('<h1>'));
+      expect(body).toContain('"@type":"VideoObject","name":"Video Show — 2025 recap"');
+      expect(body).toContain('"embedUrl":"https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"');
+      expect(body).toContain('"thumbnailUrl":["https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"]');
+      // The day the video was added, not the day the event was last edited.
+      expect(body).toContain('"uploadDate":"2026-11-11T03:00:00.000Z"');
+      // A youtube.com/watch page is not a media file.
+      expect(body).not.toContain('"contentUrl"');
+      expect(body.match(/"@type":"VideoObject"/g)).toHaveLength(1);
+      // Back to the event, and across to the other video's own page.
+      expect(body).toContain('<a href="https://cardpop.com.au/events/video-show">View the event page — Video Show</a>');
+      expect(body).toContain('<a href="https://cardpop.com.au/events/video-show/videos/abcdefghijk">');
+    });
+
+    it('dates a video saved before added_at existed from the listing, and numbers an untitled one', async () => {
+      state.result = { data: event };
+      const { body } = await run('/events/video-show/videos/abcdefghijk');
+      expect(body).toContain('<h1>Video Show — Event Video 2</h1>');
+      expect(body).toContain('"uploadDate":"2026-08-01T00:00:00+00:00"');
+    });
+
+    it('sends a removed video to its event page and 404s when the event is not public', async () => {
+      state.result = { data: event };
+      const gone = await run('/events/video-show/videos/zzzzzzzzzzz');
+      expect(gone.status).toBe(301);
+      expect(gone.headers.Location).toBe('https://cardpop.com.au/events/video-show');
+
+      state.result = { data: { ...event, status: 'pending_review' } };
+      const hidden = await run('/events/video-show/videos/dQw4w9WgXcQ');
+      expect(hidden.status).toBe(404);
+      expect(hidden.body).not.toContain('VideoObject');
+    });
   });
 
   it('renders side events by day and the prize table for bots, with subEvent JSON-LD', async () => {

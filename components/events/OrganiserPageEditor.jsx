@@ -16,7 +16,7 @@ import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGallery
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
 import { uploadEventImage } from '@/utils/uploadEventImage.js';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
-import { cleanEventVideos, emptyVideo } from '@/utils/eventVideos.js';
+import { cleanEventVideos, emptyVideo, eventVideosForSave } from '@/utils/eventVideos.js';
 
 // The organiser's own edit of their public page. RLS lets the page's owner (or
 // an admin) update it; the guard trigger in 20261110224209 pins the name, slug
@@ -116,7 +116,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       const nextAlbums = cleanGalleryAlbums(uploadedAlbums);
       if (JSON.stringify(nextAlbums) !== JSON.stringify(savedAlbums)) row.gallery_albums = nextAlbums;
       const nextVideos = cleanEventVideos(videos).map(({ title, url }) => ({ title, url }));
-      if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = nextVideos;
+      // Written with each video's added_at (kept for saved ones, stamped for
+      // new ones) — the upload date its watch page reports.
+      if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = eventVideosForSave(videos, org.videos);
       const { data, error } = await supabase
         .from('event_organisers').update(row).eq('id', org.id).select(ORGANISER_PAGE_COLUMNS).maybeSingle();
       if (error) throw error;

@@ -20,7 +20,8 @@ import EventReviewVideo from '@/components/reviews/EventReviewVideo.jsx';
 import EventReviewDeals from '@/components/reviews/EventReviewDeals.jsx';
 import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
 import { adminArticlePath, adminEventReviewPath } from '@/utils/adminEditLinks.js';
-import { buildEventReviewJsonLd, buildReviewVideoJsonLds, hasScorecard, hasQuickFacts, cleanVideos, cleanDeals } from '@/utils/eventReview.js';
+import { buildEventReviewJsonLd, hasScorecard, hasQuickFacts, cleanVideos, cleanDeals } from '@/utils/eventReview.js';
+import { mediaVideoKey, watchVideoPath } from '@/utils/videoWatch.js';
 
 const ConvictionRating = ({ article }) => {
   const conviction = resolveConviction(article);
@@ -436,25 +437,16 @@ const BlogArticlePage = () => {
     publishingPrinciples: 'https://cardpop.com.au/blog',
   };
 
-  // Emit VideoObject when the article carries a featured video, so the embed is
-  // eligible for video rich results. thumbnailUrl prefers the auto-derived
-  // YouTube still, falling back to the article's featured image.
-  const videoStructuredData = videoInfo ? {
-    '@context': 'https://schema.org',
-    '@type': 'VideoObject',
-    name: article.seo_title || article.title,
-    description: article.seo_description || article.excerpt || article.title,
-    thumbnailUrl: videoInfo.thumbnailUrl || toCdnUrl(article.featured_image_url) || undefined,
-    uploadDate: article.published_at || article.created_at,
-    embedUrl: videoInfo.embedUrl,
-  } : null;
+  // No VideoObject here: an article is not a watch page. Each video's markup
+  // lives on its own page (/blog/<slug>/videos/<key>, utils/videoWatch.js),
+  // which the players below link to.
+  const articlePath = `/blog/${article.slug || article.id}`;
+  const featuredVideoKey = videoInfo ? mediaVideoKey(article.featured_video_url) : null;
 
   // Review rich-result markup for event reviews (null when there's no rating).
   const eventReviewStructuredData = buildEventReviewJsonLd({ article, review: eventReview, event: reviewedEvent });
 
-  const reviewVideoStructuredData = eventReview ? buildReviewVideoJsonLds({ article, videos: cleanVideos(eventReview.videos, eventReview.video), event: reviewedEvent }) : [];
-
-  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, videoStructuredData, ...reviewVideoStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
+  const structuredDataArray = [blogStructuredData, eventReviewStructuredData, faqStructuredData, breadcrumbStructuredData, organisationSchema].filter(Boolean);
 
   return (
     <article className="min-h-[100dvh] bg-background pb-24 overflow-x-hidden">
@@ -559,6 +551,13 @@ const BlogArticlePage = () => {
               allowFullScreen
             />
           </div>
+          {featuredVideoKey && (
+            <p className="mt-2 text-right text-xs">
+              <Link to={watchVideoPath(articlePath, featuredVideoKey)} className="font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline">
+                Open video page
+              </Link>
+            </p>
+          )}
         </div>
       ) : imageUrl && (
         <div className="container-default mt-4 mb-4">
@@ -631,7 +630,7 @@ const BlogArticlePage = () => {
 
       {eventReview && (cleanVideos(eventReview.videos, eventReview.video).length > 0 || cleanDeals(eventReview.deals).length > 0 || eventReview.gallery?.length > 0 || eventReview.pickups?.length > 0) && (
         <div className="container-default -mt-10 mb-16 space-y-12">
-          <EventReviewVideo videos={eventReview.videos} video={eventReview.video} />
+          <EventReviewVideo videos={eventReview.videos} video={eventReview.video} watchBase={articlePath} />
           <EventReviewGallery gallery={eventReview.gallery} />
           <EventReviewDeals deals={eventReview.deals} />
           <EventReviewPickups pickups={eventReview.pickups} />

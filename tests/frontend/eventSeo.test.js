@@ -4,8 +4,6 @@ import {
   youTubeEmbedUrl,
   youTubeThumbnailUrl,
   facebookEmbedUrl,
-  buildVideoJsonLd,
-  buildVideoJsonLds,
   buildEventJsonLd,
   formatEntryFee,
   MAX_JSON_LD_GALLERY_IMAGES,
@@ -51,54 +49,14 @@ describe('youTubeEmbedUrl / youTubeThumbnailUrl', () => {
   });
 });
 
-describe('buildVideoJsonLd', () => {
-  const event = {
-    title: 'Brisbane Card Show',
-    short_description: 'Two days of trading cards.',
-    youtube_url: 'https://youtu.be/dQw4w9WgXcQ',
-    updated_at: '2026-07-16T00:00:00+00:00',
-  };
-
-  it('builds a schema.org VideoObject from the event', () => {
-    const ld = buildVideoJsonLd(event);
-    expect(ld).toMatchObject({
-      '@context': 'https://schema.org',
-      '@type': 'VideoObject',
-      name: 'Brisbane Card Show — Event Video',
-      description: 'Two days of trading cards.',
-      thumbnailUrl: ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'],
-      uploadDate: '2026-07-16T00:00:00+00:00',
-      contentUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      embedUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
+describe('event page structured data', () => {
+  it('carries no VideoObject — an event page is not a watch page', () => {
+    const ld = buildEventJsonLd({
+      id: 'e1', slug: 'brisbane-card-show', title: 'Brisbane Card Show', start_date: '2026-10-01',
+      youtube_url: 'https://youtu.be/dQw4w9WgXcQ',
+      event_videos: [{ title: '2025 recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }],
     });
-  });
-
-  it('returns null when the event has no usable youtube_url', () => {
-    expect(buildVideoJsonLd({ ...event, youtube_url: null })).toBeNull();
-    expect(buildVideoJsonLd({ ...event, youtube_url: 'https://vimeo.com/1' })).toBeNull();
-    expect(buildVideoJsonLd(null)).toBeNull();
-  });
-
-  it('builds one VideoObject per event_videos entry, titled, and ignores youtube_url when the list is set', () => {
-    const lds = buildVideoJsonLds({
-      ...event,
-      youtube_url: 'https://youtu.be/zzzzzzzzzzz',
-      event_videos: [
-        { title: '2025 recap', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
-        { title: '', url: 'https://youtu.be/abcdefghijk' },
-        { title: 'bad', url: 'https://vimeo.com/1' },
-      ],
-    });
-    expect(lds).toHaveLength(2);
-    expect(lds[0]).toMatchObject({
-      '@type': 'VideoObject',
-      name: 'Brisbane Card Show — 2025 recap',
-      contentUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      embedUrl: 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ',
-      thumbnailUrl: ['https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg'],
-    });
-    expect(lds[1]).toMatchObject({ name: 'Brisbane Card Show — Event Video 2', contentUrl: 'https://www.youtube.com/watch?v=abcdefghijk' });
-    expect(buildVideoJsonLds({ ...event, youtube_url: null, event_videos: [] })).toEqual([]);
+    expect(JSON.stringify(ld)).not.toContain('VideoObject');
   });
 });
 

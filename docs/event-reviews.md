@@ -43,9 +43,9 @@ it:
   was started but is under 40 characters blocks publishing (finish it or clear
   it). Drafts save with anything.
 - `cleanVideos()` (ordered, de-duplicated, capped at `MAX_REVIEW_VIDEOS`; falls back
-  to the legacy `video`), `cleanDeals()` / `dealSavingPct()`, and
-  `buildReviewVideoJsonLds()` (one `VideoObject` per video, skipped without a
-  thumbnail).
+  to the legacy `video`) and `cleanDeals()` / `dealSavingPct()`. A review's
+  videos carry no `VideoObject` on the article — each has its own watch page,
+  `/blog/<slug>/videos/<key>`, which does (`docs/video-watch-pages.md`).
 - `cleanVideo()` / `videoKind()` / `reviewVideoFileError()` — the video: kept
   only when it is a `.mp4/.webm/.mov/.m4v` URL (an upload) or a link
   `utils/videoEmbed.js` can embed (YouTube / Vimeo); uploads are capped at the

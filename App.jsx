@@ -197,6 +197,8 @@ const BlogCategoryPage = lazy(() => import('@/pages/blog/BlogCategoryPage.jsx'))
 const CommunityPage = lazy(() => import('@/pages/community/CommunityPage.jsx'));
 const CommunityEventsPage = lazy(() => import('@/pages/community/CommunityEventsPage.jsx'));
 const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
+// A video's own watch page, under the page it belongs to (docs/video-watch-pages.md).
+const VideoWatchPage = lazy(() => import('@/pages/videos/VideoWatchPage.jsx'));
 const EventOrganiserPage = lazy(() => import('@/pages/community/EventOrganiserPage.jsx'));
 const ListYourEventPage = lazy(() => import('@/pages/community/ListYourEventPage.jsx'));
 const EventRegionPage = lazy(() => import('@/pages/community/EventRegionPage.jsx'));
@@ -485,6 +487,7 @@ const App = () => {
                         <Route path="/card-shops/add" element={<AddStorePage />} />
                         <Route path="/card-shops/:city" element={<CardShopsCityPage />} />
                         <Route path="/card-shops/:city/:slug" element={<StorePage />} />
+                        <Route path="/card-shops/:city/:slug/videos/:videoKey" element={<VideoWatchPage kind="store" />} />
                         <Route path="/card-market/:cardId" element={<CardMarketDetailPage />} />
                         {/* Legacy route: the old CategoryPage queried a listings.category
                             column that doesn't exist, so it always rendered empty — the
@@ -509,6 +512,7 @@ const App = () => {
                         <Route path="/blog/category/:category" element={<FeatureRoute flag="enable_blog"><BlogCategoryPage /></FeatureRoute>} />
                         <Route path="/blog/slug/:slug" element={<FeatureRoute flag="enable_blog"><BlogArticlePage /></FeatureRoute>} />
                         <Route path="/blog/:id" element={<FeatureRoute flag="enable_blog"><BlogArticlePage /></FeatureRoute>} />
+                        <Route path="/blog/:slug/videos/:videoKey" element={<FeatureRoute flag="enable_blog"><VideoWatchPage kind="article" /></FeatureRoute>} />
                         <Route path="/community" element={<CommunityPage />} />
                         <Route path="/community/forum" element={<ForumPage />} />
                         <Route path="/community/leaderboard" element={<LeaderboardPage />} />
@@ -522,9 +526,11 @@ const App = () => {
                         <Route path="/events/community-events" element={<CommunityEventsPage defaultType="community_event" />} />
                         <Route path="/events/store-events" element={<CommunityEventsPage defaultType="lgs_event" />} />
                         <Route path="/events/organisers/:slug" element={<EventOrganiserPage />} />
+                        <Route path="/events/organisers/:slug/videos/:videoKey" element={<VideoWatchPage kind="organiser" />} />
                         <Route path="/list-your-event" element={<ListYourEventPage />} />
                         <Route path="/card-shows/:city" element={<EventRegionPage />} />
                         <Route path="/events/:eventId" element={<EventDetailPage />} />
+                        <Route path="/events/:slug/videos/:videoKey" element={<VideoWatchPage kind="event" />} />
                         <Route path="/community/events" element={<Navigate to="/events" replace />} />
                         <Route path="/community/events/:eventId" element={<RedirectEventDetail />} />
                         <Route path="/community/discussion/new" element={<ProtectedRoute><CommunityDiscussionNewPage /></ProtectedRoute>} />

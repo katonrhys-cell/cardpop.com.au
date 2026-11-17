@@ -205,7 +205,7 @@ const StorePage = () => {
                   <h2 id="store-videos" className="font-heading text-xl font-bold">{videos.length > 1 ? 'Videos' : 'Video'}</h2>
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2">
-                  {videos.map((v) => <ReviewVideoPlayer key={v.url} video={v} title={`${store.name} video`} />)}
+                  {videos.map((v) => <ReviewVideoPlayer key={v.url} video={v} title={`${store.name} video`} watchBase={path} />)}
                 </div>
               </section>
             )}
