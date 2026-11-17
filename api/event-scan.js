@@ -1,7 +1,7 @@
 // Sentry (errors + agent tracing) before anything else — see src/instrument.js.
 import '../src/instrument.js';
 import crypto from 'node:crypto';
-import { runEventScan } from '../src/utils/eventScanner.js';
+import { runEventScan, runEventBacklog } from '../src/utils/eventScanner.js';
 import { runDueEventSourceScans, scanEventSource } from '../src/utils/eventSourceWatcher.js';
 import { runInstagramEventScan } from '../src/utils/instagramEventScanner.js';
 import supabase from '../src/utils/supabaseClient.js';
@@ -28,6 +28,9 @@ import { decodeAal } from '../src/middleware/requireAal2.js';
 //
 // Three jobs, picked by query string:
 //   • (none)                      — the weekly discovery scan.
+//   • ?mode=backlog               — the daily read of listing pages that have
+//                                   come due and of pages earlier scans found
+//                                   but never read.
 //   • ?mode=instagram             — the daily read of the Instagram sources
 //                                   (docs/instagram-event-scan.md). Answers
 //                                   200 `{ skipped }` to the cron when
@@ -138,6 +141,20 @@ export default async function handler(req, res) {
     } catch (error) {
       logger.error(`[EVENT_WATCH] ${error.message}`);
       return res.status(502).json({ error: 'Event website re-scan failed.' });
+    }
+  }
+
+  if (query.mode === 'backlog') {
+    if (trigger === 'manual' && await hasRunInFlight('backlog')) {
+      return res.status(409).json({ error: 'A backlog read is already running. Wait for it to finish before starting another.' });
+    }
+    try {
+      const summary = await runEventBacklog({ trigger, triggeredBy });
+      logger.info(`[EVENT_SCAN] Backlog: ${JSON.stringify(summary)}`);
+      return res.status(200).json(summary);
+    } catch (error) {
+      logger.error(`[EVENT_SCAN] Backlog: ${error.message}`);
+      return res.status(502).json({ error: 'Backlog read failed.' });
     }
   }
 

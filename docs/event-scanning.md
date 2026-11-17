@@ -106,13 +106,58 @@ A candidate is rejected (and recorded as such, with a reason) when:
 - the page has under 200 characters of readable text
 - there's no specific `start_date` — `events.start_date` is `NOT NULL`, and an
   undated page is usually a recurring "every second Sunday" listing
-- the date has already passed, or is more than 400 days out
+- the date has already passed, or is more than 550 days out
 - an event with the same `source_url` already exists
 - an event on the same date has the same comparable title (punctuation and year
   stripped) or the same venue — an organiser listing one show on three sites
   shouldn't produce three drafts
 
 ---
+
+## Daily backlog run
+
+`GET /cron/event-scan?mode=backlog` → `runEventBacklog()`. Daily, from the
+scheduler Worker's `event_backlog` job, and from **Read next batch** in the
+admin panel.
+
+The weekly search finds about a hundred pages and has time to read 18. Until
+2026-11-17 the rest were recorded as `pending` and never looked at again — 447
+of them had piled up, including most of the Humanitix, TryBooking and Eventbrite
+pages the search had turned up. The backlog run is what reads them:
+
+1. **Listing pages** — up to 10 `seed_url` sources not read in the last 7 days.
+2. **Backlog** — `pending` candidates, most recently seen first, up to 30 pages
+   a run in total, three at a time.
+3. A find nobody read within 120 days is retired unread (`rejected`): the event
+   has almost always happened, so reading it would only pay for a rejection.
+
+Each page goes through the same extraction and gates as the weekly run. The run
+row has `scope = 'backlog'`; `queries_run` is listing pages, `candidates_found`
+pages queued and `pages_fetched` pages read. With nothing to read it answers
+`200 { skipped }` and writes no row.
+
+## Listing pages
+
+Pages are read under `LISTING_EVENT_SCHEMA`: the single-event schema plus
+`other_events`, a compact row for every *other* dated, upcoming Australian event
+the page lists (25 at most). A calendar used to be rejected as "an index, not a
+single event" and every show on it was lost; now each row goes through the gates
+and becomes a draft.
+
+A draft made from a listing row is thinner than one made from an event's own
+page — title, date, venue, suburb, state, a one-line description, and the
+event's link when the listing gives one. It is filed `pending_review` like any
+other; fill it in when approving, or add the event's own page as its "Website to
+scrape" and let the weekly re-scan fill the blanks. `is_free` is always false on
+these: a listing rarely gives a price, and unknown must not read as free.
+
+Duplicates: on the same day, a title that contains (or is contained in) an
+existing event's title is the same show — a listing says "CollectFest
+Melbourne" where the event's own page says "CollectFest Melbourne — Autumn
+Edition".
+
+The per-event website re-scan (`eventSourceWatcher.js`) still uses the
+single-event schema: it is reading one known event's page.
 
 ## Cost control
 
@@ -127,7 +172,7 @@ Per-run budgets (`src/utils/eventScanner.js`):
 | Constant | Value | Why |
 |---|---|---|
 | `MAX_SOURCES_PER_RUN` | 12 | Sources rotate on `last_scanned_at`. Discovery is one batched call, so widening this adds searches inside a single request rather than extra requests — the cheap axis |
-| `MAX_CANDIDATES_PER_RUN` | 12 | One fetch + one extraction is comfortably 20s |
+| `MAX_CANDIDATES_PER_RUN` | 18 | Read three at a time (`READ_CONCURRENCY`); what is left over is read by the daily backlog run |
 | `RUN_DEADLINE_MS` | 240,000 | Stops gracefully inside the function's 300s ceiling; leftovers stay `pending` for next week |
 | `MAX_DAYS_AHEAD` | 550 | Beyond this a "date" is usually a misparse — but 400 was rejecting the national circuits, which publish a year-plus ahead |
 
@@ -171,24 +216,14 @@ Two kinds:
   organiser's calendar or a venue's "what's on" page you already know about.
   **See the limitation below before adding one.**
 
-### `seed_url` is read once, not every run
+### Listing pages (`seed_url`)
 
-The intent was that a seed page is re-read on every run. The engine doesn't do
-that, and two things stop it:
-
-- seed URLs go through `registerCandidates()` like any other candidate, and that
-  function returns only URLs it has *never* seen. After the first run the seed's
-  URL is in the ledger, so it is touched and skipped forever;
-- `extractEventFromPage()` returns a **single** event per page, so a calendar
-  listing twenty shows yields at most one of them anyway.
-
-Together those make a seed URL on an aggregator calendar close to worthless: it
-imports one event, then goes dormant. Until that changes, prefer a
-`search_query` naming the series or venue — those re-run properly every rotation.
-
-Making seed URLs behave as described needs both an exemption from the dedupe
-ledger (or a re-read window) and multi-event extraction. That's an engine
-change, not a config change.
+A `seed_url` is a calendar or an organiser's "upcoming shows" page. It is
+re-read **every 7 days** by the daily backlog run — the dedupe ledger does not
+apply to it, because the point of listing the page is to catch the next show it
+adds — and **every upcoming event on it becomes its own draft** (see *Listing
+pages* below). Good seeds are pages that list dated shows: an organiser's events
+page, a venue's what's-on page, a community calendar. A shop homepage is not.
 
 `priority` orders the rotation (lower runs first); `is_active` switches one off
 without deleting it. Seeds live in

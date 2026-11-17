@@ -2,15 +2,16 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 
-const tables = vi.hoisted(() => ({ event_scan_runs: [], event_scan_sources: [] }));
+const tables = vi.hoisted(() => ({ event_scan_runs: [], event_scan_sources: [], event_scan_candidates: [] }));
 vi.mock('@/lib/supabaseClient.js', () => ({
   supabase: {
     from: (table) => {
       const query = {
         select: () => query,
+        eq: () => query,
         order: () => query,
         limit: () => query,
-        then: (ok, err) => Promise.resolve({ data: tables[table], error: null }).then(ok, err),
+        then: (ok, err) => Promise.resolve({ data: tables[table], count: tables.unread ?? 0, error: null }).then(ok, err),
       };
       return query;
     },
@@ -89,5 +90,28 @@ describe('EventScanPanel — Instagram', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Add organisers/ }));
 
     await waitFor(() => expect(screen.getByText('@shirecollexpo')).toBeTruthy());
+  });
+});
+
+describe('EventScanPanel — backlog', () => {
+  it('shows how many found pages are unread and offers to read the next batch', async () => {
+    tables.unread = 447;
+    tables.event_scan_runs = [
+      { id: 'r3', status: 'completed', trigger: 'cron', scope: 'backlog', started_at: new Date().toISOString(), queries_run: 6, candidates_found: 30, pages_fetched: 28, events_created: 9, duplicates_skipped: 4, warnings: [] },
+    ];
+    render(<EventScanPanel isOpen onClose={() => {}} />);
+
+    expect(await screen.findByText(/447 found pages not read yet/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Read next batch' })).toBeTruthy();
+    expect(screen.getByText('6 listing pages')).toBeTruthy();
+    tables.unread = 0;
+  });
+
+  it('says nothing about a backlog when there is none', async () => {
+    tables.unread = 0;
+    render(<EventScanPanel isOpen onClose={() => {}} />);
+
+    await screen.findByText('12 queries');
+    expect(screen.queryByText(/not read yet/)).toBeNull();
   });
 });

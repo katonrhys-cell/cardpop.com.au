@@ -21,8 +21,8 @@ alter table public.event_scan_sources
   add constraint event_scan_sources_kind_check
   check (kind in ('search_query', 'seed_url', 'instagram_account', 'instagram_tagged'));
 
--- Which scan a run row belongs to: the weekly web discovery or the Instagram
--- read. The counters are shared — for an Instagram run queries_run is accounts
+-- Which scan a run row belongs to: the weekly web discovery, the daily backlog
+-- read (listing pages + found-but-unread pages) or the Instagram read. The counters are shared — for an Instagram run queries_run is accounts
 -- checked, candidates_found is new posts and pages_fetched is posts read.
 alter table public.event_scan_runs
   add column if not exists scope text not null default 'web';
@@ -32,7 +32,7 @@ alter table public.event_scan_runs
 
 alter table public.event_scan_runs
   add constraint event_scan_runs_scope_check
-  check (scope in ('web', 'instagram'));
+  check (scope in ('web', 'backlog', 'instagram'));
 
 -- The scanner's duplicate check also asks "does this organiser already have an
 -- event on this day?" by Instagram link.

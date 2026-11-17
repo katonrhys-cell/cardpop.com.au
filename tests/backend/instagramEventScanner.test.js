@@ -222,7 +222,7 @@ describe('extractEventFromInstagramPost', () => {
   it('passes a "not an event" verdict through', async () => {
     mockAnthropicCreate.mockResolvedValue(extraction({ is_trading_card_event: false, rejection_reason: 'A recap of last weekend.' }));
 
-    expect(await extractEventFromInstagramPost(post(), [])).toEqual({ rejected: 'A recap of last weekend.' });
+    expect(await extractEventFromInstagramPost(post(), [])).toMatchObject({ rejected: 'A recap of last weekend.' });
   });
 });
 

@@ -43,7 +43,7 @@ const isInstagramKind = (kind) => kind === 'instagram_account' || kind === 'inst
 
 const SOURCE_KIND_LABELS = {
   search_query: 'Search',
-  seed_url: 'Page',
+  seed_url: 'Listing page · re-read weekly',
   instagram_account: 'Instagram account',
   instagram_tagged: 'Instagram',
 };
@@ -66,6 +66,8 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isScanning, setIsScanning] = useState(false);
   const [isScanningInstagram, setIsScanningInstagram] = useState(false);
+  const [isReadingBacklog, setIsReadingBacklog] = useState(false);
+  const [unreadPages, setUnreadPages] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
   const [instagram, setInstagram] = useState(null);
   const [draft, setDraft] = useState(emptyDraft);
@@ -81,6 +83,13 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
       if (sourcesResult.error) throw sourcesResult.error;
       setRuns(runsResult.data ?? []);
       setSources(sourcesResult.data ?? []);
+      // Pages a scan found but hasn't read yet. Best effort — the count is a
+      // convenience, not something worth failing the panel for.
+      const unread = await supabase
+        .from('event_scan_candidates')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      setUnreadPages(unread.error ? null : unread.count ?? 0);
     } catch {
       toast.error('Failed to load scan history.');
     } finally {
@@ -136,6 +145,11 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
   };
 
   const handleRunNow = () => runScan({ path: '/cron/event-scan', setBusy: setIsScanning, label: 'Scan' });
+  const handleReadBacklog = () => runScan({
+    path: '/cron/event-scan?mode=backlog',
+    setBusy: setIsReadingBacklog,
+    label: 'Backlog read',
+  });
   const handleRunInstagram = () => runScan({
     path: '/cron/event-scan?mode=instagram',
     setBusy: setIsScanningInstagram,
@@ -219,7 +233,8 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
           <DialogDescription>
             Runs nightly at 3am AEST. Searches the web for upcoming Australian trading card
             events and files anything new here as a draft for you to review — nothing is
-            published automatically. Instagram accounts on the list are read once a day.
+            published automatically. Listing pages, pages a scan found but had no time to read,
+            and Instagram accounts are read once a day.
           </DialogDescription>
         </DialogHeader>
 
@@ -230,6 +245,25 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
           </TabsList>
 
           <TabsContent value="history" className="space-y-3 pt-4">
+            {unreadPages > 0 && (
+              <div className="flex flex-col gap-2 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">
+                  <span className="font-bold">{unreadPages} found page{unreadPages === 1 ? '' : 's'} not read yet.</span>{' '}
+                  <span className="text-muted-foreground">Up to 30 are read each day; you can read the next batch now.</span>
+                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReadBacklog}
+                  disabled={isReadingBacklog}
+                  className="rounded-lg shrink-0"
+                >
+                  {isReadingBacklog && <Loader2 className="w-4 h-4 mr-1.5 animate-spin" />}
+                  Read next batch
+                </Button>
+              </div>
+            )}
             {isLoading ? (
               [1, 2, 3].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)
             ) : runs.length === 0 ? (
@@ -244,6 +278,9 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                       <Badge variant="outline" className={`text-xs font-bold ${RUN_STATUS_STYLES[run.status]}`}>
                         {run.status}
                       </Badge>
+                      {run.scope === 'backlog' && (
+                        <Badge variant="outline" className="text-xs">Listing pages &amp; backlog</Badge>
+                      )}
                       {run.scope === 'instagram' && (
                         <Badge variant="outline" className="text-xs gap-1">
                           <Instagram className="w-3 h-3" /> Instagram
@@ -263,6 +300,12 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                         <span>{run.queries_run} accounts checked</span>
                         <span>{run.candidates_found} new posts</span>
                         <span>{run.pages_fetched} posts read</span>
+                      </>
+                    ) : run.scope === 'backlog' ? (
+                      <>
+                        <span>{run.queries_run} listing pages</span>
+                        <span>{run.candidates_found} pages queued</span>
+                        <span>{run.pages_fetched} pages read</span>
                       </>
                     ) : (
                       <>
@@ -305,7 +348,7 @@ const EventScanPanel = ({ isOpen, onClose, onScanFinished }) => {
                   className="h-10 rounded-lg border border-input bg-background px-3 text-sm"
                 >
                   <option value="search_query">Search</option>
-                  <option value="seed_url">Page URL</option>
+                  <option value="seed_url">Listing page (calendar)</option>
                   <option value="instagram_account">Instagram account</option>
                 </select>
                 <Input

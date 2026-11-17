@@ -5,7 +5,8 @@ vi.mock('../../src/utils/logger.js', () => ({
 }));
 
 const mockRunEventScan = vi.hoisted(() => vi.fn());
-vi.mock('../../src/utils/eventScanner.js', () => ({ runEventScan: mockRunEventScan }));
+const mockRunBacklog = vi.hoisted(() => vi.fn());
+vi.mock('../../src/utils/eventScanner.js', () => ({ runEventScan: mockRunEventScan, runEventBacklog: mockRunBacklog }));
 
 const mockRunDueWatches = vi.hoisted(() => vi.fn());
 const mockScanEventSource = vi.hoisted(() => vi.fn());
@@ -221,6 +222,34 @@ describe('/cron/event-scan?mode=watches', () => {
     const res = await call('Bearer admin-access-token', { mode: 'watches', event: EVENT_ID });
 
     expect(res.statusCode).toBe(409);
+  });
+});
+
+describe('/cron/event-scan?mode=backlog', () => {
+  it('runs the backlog read for the scheduler, not the web scan', async () => {
+    mockRunBacklog.mockResolvedValue({ runId: 'run-b', scope: 'backlog', eventsCreated: 4 });
+
+    const res = await call('Bearer super-secret', { mode: 'backlog' });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.body.eventsCreated).toBe(4);
+    expect(mockRunBacklog).toHaveBeenCalledWith({ trigger: 'cron', triggeredBy: null });
+    expect(mockRunEventScan).not.toHaveBeenCalled();
+  });
+
+  it('requires a credential', async () => {
+    const res = await call(undefined, { mode: 'backlog' });
+
+    expect(res.statusCode).toBe(401);
+    expect(mockRunBacklog).not.toHaveBeenCalled();
+  });
+
+  it('reports a failed run', async () => {
+    mockRunBacklog.mockRejectedValue(new Error('boom'));
+
+    const res = await call('Bearer super-secret', { mode: 'backlog' });
+
+    expect(res.statusCode).toBe(502);
   });
 });
 
