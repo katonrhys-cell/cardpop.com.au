@@ -19,6 +19,7 @@ import ProductReviews from '@/components/shop/ProductReviews.jsx';
 import { productReviewsLd, reviewPoolKey } from '@/utils/productReviews.js';
 import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { Badge } from '@/components/ui/badge';
+import PriceDeal, { DealRibbon } from '@/components/shop/PriceDeal.jsx';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
 import { isPurchasableStatus, isPreorder, preorderEta, lowStockCount } from '@/utils/shopStock.js';
 import LowStockMeter from '@/components/shop/LowStockMeter.jsx';
@@ -223,7 +224,10 @@ const ShopBinderProductPage = () => {
             {loading ? (
               <Skeleton className="w-full aspect-[4/5] md:aspect-square rounded-3xl" />
             ) : (
-              <ProductImageCarousel key={row?.id || 'line'} images={images} />
+              <div className="relative">
+                <ProductImageCarousel key={row?.id || 'line'} images={images} />
+                {isPurchasable && <DealRibbon price={price} rrp={rrp} />}
+              </div>
             )}
           </div>
 
@@ -241,14 +245,7 @@ const ShopBinderProductPage = () => {
                 <Skeleton className="h-9 w-28" />
               ) : isPurchasable ? (
                 <>
-                  <span className="text-3xl font-extrabold tabular-nums text-foreground">
-                    ${price.toFixed(2)}
-                  </span>
-                  {rrp != null && rrp > price && (
-                    <span className="text-lg text-muted-foreground line-through tabular-nums">
-                      ${rrp.toFixed(2)}
-                    </span>
-                  )}
+                  <PriceDeal price={price} rrp={rrp} />
                   {preorder && anyVariantInStock && !(variants.length > 0 && chosenVariant && !inStock) ? (
                     <PreorderBadge />
                   ) : (
