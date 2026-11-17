@@ -883,6 +883,18 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         }
       }
 
+      // Admin listing an event for an organiser not yet in the saved list: add
+      // them (name + logo) so they get a page. Best-effort — the event is saved.
+      const typedOrganiser = formData.organizer_name.trim();
+      if (!isUserMode && typedOrganiser && !findOrganiser(organisers, typedOrganiser)) {
+        try {
+          await saveOrganiser({ name: typedOrganiser, logoUrl: payload.organizer_logo_url || null });
+          toast.success('Organiser added to the list');
+        } catch (err) {
+          console.warn('Organiser auto-save failed:', err);
+        }
+      }
+
       if (onSaved) onSaved();
       if (isUserMode && !asDraft && !isLiveEdit && savedId && onSubmitted) onSubmitted(savedId);
       onClose();
