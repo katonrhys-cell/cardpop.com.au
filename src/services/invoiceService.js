@@ -10,7 +10,8 @@ import { getPlatformSettings, invalidatePlatformSettings } from '../utils/platfo
 import { resolveAccountMapping } from '../utils/invoiceAccounting.js';
 import { invoicesToCsv, invoicesToXeroCsv, toXeroDocument } from '../utils/invoiceExport.js';
 import { renderInvoicePdf, invoicePdfFilename, normaliseSupplier } from '../utils/invoicePdf.js';
-import { fetchOrderNumbers } from '../utils/orderNumbers.js';
+import { fetchOrderNumbers, attachOrderNumbers, orderIdForNumber } from '../utils/orderNumbers.js';
+import { normaliseOrderNumber } from '../../utils/orderRef.js';
 
 export const INVOICE_LIST_COLUMNS = [
   'id', 'order_id', 'kind', 'number', 'sequence', 'status', 'invoice_date', 'issued_at', 'due_date',
@@ -26,6 +27,8 @@ export const INVOICE_LIST_COLUMNS = [
 
 // The number of the invoice a credit note credits, for the list and exports.
 const CREDITS_EMBED = 'credits:invoices!credits_invoice_id(number)';
+
+const NIL_UUID = '00000000-0000-0000-0000-000000000000';
 
 const flattenCredits = (row) => {
   if (!row) return row;
@@ -59,16 +62,23 @@ const applyFilters = (query, { kind, status, sync, from, to, q } = {}) => {
 export async function listInvoices(filters = {}, { maxLimit = 500 } = {}) {
   const limit = Math.min(Math.max(Number(filters.limit) || 100, 1), maxLimit);
   const offset = Math.max(Number(filters.offset) || 0, 0);
+  // A typed order number (CP-000123) is resolved to its order id first; one that
+  // matches nothing becomes the nil uuid, which matches no invoice.
+  const orderNumber = normaliseOrderNumber(filters.q);
+  const effective = orderNumber
+    ? { ...filters, q: (await orderIdForNumber(orderNumber)) || NIL_UUID }
+    : filters;
   let query = supabase
     .from('invoices')
     .select(`${INVOICE_LIST_COLUMNS}, ${CREDITS_EMBED}`, { count: 'exact' });
-  query = applyFilters(query, filters)
+  query = applyFilters(query, effective)
     .order('invoice_date', { ascending: false })
     .order('sequence', { ascending: false })
     .range(offset, offset + limit - 1);
   const { data, error, count } = await query;
   if (error) throw error;
-  return { invoices: (data || []).map(flattenCredits), total: count ?? (data || []).length, limit, offset };
+  const invoices = await attachOrderNumbers((data || []).map(flattenCredits));
+  return { invoices, total: count ?? (data || []).length, limit, offset };
 }
 
 /** Counts for the stat tiles: documents issued, awaiting sync, credit notes. */
@@ -94,7 +104,9 @@ export async function getInvoice(id) {
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return flattenCredits(data);
+  if (!data) return flattenCredits(data);
+  const [withNumber] = await attachOrderNumbers([flattenCredits(data)]);
+  return withNumber;
 }
 
 /** The kind → Xero account / tax mapping in force (platform_settings over defaults). */

@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { orderRef } from '@/utils/orderRef.js';
 
 // Admin → Product Reviews. Verified-purchase shop reviews wait here as
 // `pending`; nothing shows on the storefront (or in Google's markup) until it is
@@ -102,7 +103,7 @@ const ProductReviewsAdminPage = () => {
                       {r.product?.title || 'Product'}{r.product?.colour ? ` — ${r.product.colour}` : ''}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {r.reviewer_name} · order {String(r.order_id).slice(0, 8).toUpperCase()} · {format(new Date(r.created_at), 'dd MMM yyyy, h:mm a')}
+                      {r.reviewer_name} · order {orderRef(r)} · {format(new Date(r.created_at), 'dd MMM yyyy, h:mm a')}
                     </p>
                   </div>
                   <StarRating value={r.rating} />

@@ -3,6 +3,7 @@ import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { shopItemsCents } from './partnerService.js';
 import { escapeLike } from '../utils/escapeLike.js';
+import { attachOrderNumbers } from '../utils/orderNumbers.js';
 
 /**
  * Admin-managed promo codes (Admin → Promo Codes). An admin sets any
@@ -428,7 +429,9 @@ export async function listPromoRedemptions(id) {
       .in('id', userIds);
     for (const p of rows || []) profiles.set(p.id, p);
   }
-  return (data || []).map((r) => ({
+  // The order's sequential number (CP-000123), best-effort — see orderNumbers.js.
+  const withNumbers = await attachOrderNumbers(data || []);
+  return withNumbers.map((r) => ({
     ...r,
     discount_aud: (r.discount_cents || 0) / 100,
     buyer: r.user_id ? profiles.get(r.user_id) || null : null,

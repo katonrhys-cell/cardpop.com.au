@@ -32,6 +32,7 @@ vi.mock('../../src/utils/emailService.js', () => ({ sendOrderShipped: mockSendOr
 vi.mock('../../src/utils/orderNumbers.js', () => ({
   orderRefFor: mockOrderRefFor,
   fetchOrderNumbers: vi.fn(async () => new Map()),
+  attachOrderNumbers: vi.fn(async (rows) => rows),
 }));
 // The complimentary-Ultimate half of the role change has its own test
 // (subscription-admin-complimentary.test.js); here it only needs to be called.

@@ -78,7 +78,7 @@ const FinanceTaxPage = () => {
       // dropped orders from the report. Each query has a unique tiebreak so
       // pages never overlap or skip rows.
       const [ordersRes, refundsRes, productsRes, costsRes] = await Promise.all([
-        fetchAllPages(() => supabase.from('orders').select('id, status, created_at, order_items, seller_id, shipping_aud, platform_fee_aud, processing_fee_aud, platform_gst_aud, seller_gst_aud, seller_proceeds_aud, gst_aud, gst_included_aud, total_aud').order('created_at', { ascending: false }).order('id', { ascending: true })),
+        fetchAllPages(() => supabase.from('orders').select('id, order_number, status, created_at, order_items, seller_id, shipping_aud, platform_fee_aud, processing_fee_aud, platform_gst_aud, seller_gst_aud, seller_proceeds_aud, gst_aud, gst_included_aud, total_aud').order('created_at', { ascending: false }).order('id', { ascending: true })),
         fetchAllPages(() => supabase.from('refunds').select('id, order_id, status, refund_amount_aud, processed_at').order('id', { ascending: true })),
         fetchAllPages(() => supabase.from('shop_products').select('id, sku, title, status, price_aud, stock_quantity').order('id', { ascending: true })),
         fetchAllPages(() => supabase.from('shop_product_costs').select('product_id, wholesale_ex_gst_aud, wholesale_inc_gst_aud').order('product_id', { ascending: true })),

@@ -22,6 +22,7 @@ import { getPlatformSetting } from '../utils/platformSettings.js';
 import { listPromoCodes, createPromoCode, updatePromoCode, deletePromoCode, listPromoRedemptions } from '../services/promoCodeService.js';
 import { grantAdminComplimentaryMembership, revokeAdminComplimentaryMembership } from '../services/subscriptionService.js';
 import adminInvoicesRouter from './admin-invoices.js';
+import { attachOrderNumbers } from '../utils/orderNumbers.js';
 
 const router = Router();
 
@@ -802,7 +803,7 @@ router.get('/disputes', validateRequestQuery(getDisputesSchema), async (req, res
     }
     const { data, error } = await query;
     if (error) throw error;
-    res.json({ disputes: data || [] });
+    res.json({ disputes: await attachOrderNumbers(data || []) });
   } catch (err) {
     logger.error(`[ADMIN] Failed to list disputes: ${err.message}`);
     res.status(500).json({ error: 'Failed to load disputes' });

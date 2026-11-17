@@ -21,3 +21,13 @@ export const orderRef = (order) => {
   const number = String(order?.order_number ?? '').trim();
   return number || shortOrderId(order?.id ?? order?.order_id);
 };
+
+/**
+ * A typed order number → its canonical form, or null when it isn't one.
+ * `cp-123` / `CP-000123` / ` cp 123 ` → `CP-000123`. The `CP-` prefix is required:
+ * bare digits are too ambiguous in a search box (invoice numbers, amounts…).
+ */
+export const normaliseOrderNumber = (value) => {
+  const m = /^cp[\s-]?(\d{1,9})$/i.exec(String(value ?? '').trim());
+  return m ? `CP-${m[1].padStart(6, '0')}` : null;
+};

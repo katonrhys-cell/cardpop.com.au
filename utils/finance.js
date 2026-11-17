@@ -24,6 +24,7 @@
 
 import { startOfDay, endOfDay, format } from 'date-fns';
 import { isPaidOrder, isSettledRefund } from './revenue.js';
+import { orderRef } from './orderRef.js';
 
 const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const toCents = (v) => Math.round(num(v) * 100);
@@ -159,7 +160,7 @@ export const shopSalesLines = (orders = [], costsById = new Map()) => {
     if (!isPaidOrder(o)) continue;
     for (const line of Array.isArray(o.order_items) ? o.order_items : []) {
       if (!isShopLine(line)) continue;
-      out.push({ orderId: o.id, orderRef: String(o.id || '').slice(0, 8).toUpperCase(), orderDate: o.created_at, orderStatus: o.status, ...shopLineEconomics(line, costsById) });
+      out.push({ orderId: o.id, orderRef: orderRef(o), orderDate: o.created_at, orderStatus: o.status, ...shopLineEconomics(line, costsById) });
     }
   }
   return out;
