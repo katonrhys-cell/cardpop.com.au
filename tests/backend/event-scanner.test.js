@@ -671,6 +671,47 @@ describe('runEventBacklog', () => {
     expect(retire.filters).toContainEqual(['eq', 'status', 'pending']);
   });
 
+  it('files one draft when two pages read at the same time describe the same show', async () => {
+    mockFetchWebpage.mockResolvedValue(page);
+    mockAnthropicCreate.mockResolvedValue(extractionResponse(validEvent()));
+    // A database that remembers what the run inserted, so the second page's
+    // duplicate check can see the first page's draft — if it runs after it.
+    const inserted = [];
+    const calls = [];
+    dbHandler.current = (state) => {
+      calls.push(state);
+      if (state.table === 'event_scan_runs') return { data: state.op === 'insert' ? { id: 'run-1' } : null, error: null };
+      if (state.table === 'event_scan_sources') return { data: state.op === 'select' ? [] : null, error: null };
+      if (state.table === 'event_scan_candidates') {
+        const wantsPending = state.filters.some(([op, col, val]) => op === 'eq' && col === 'status' && val === 'pending');
+        if (state.op === 'select' && wantsPending) {
+          return { data: [
+            { id: 'c1', url: 'https://tickets.example.com.au/sydney-card-show', title: 'Tickets' },
+            { id: 'c2', url: 'https://organiser.example.com.au/sydney-card-show', title: 'Organiser' },
+          ], error: null };
+        }
+        return { data: state.op === 'select' ? [] : null, error: null };
+      }
+      if (state.table === 'events') {
+        if (state.op === 'insert') {
+          const row = { id: `event-${inserted.length + 1}`, ...state.payload };
+          inserted.push(row);
+          return { data: { id: row.id, slug: row.slug, title: row.title }, error: null };
+        }
+        const bySource = state.filters.find(([, col]) => col === 'source_url');
+        if (bySource) return { data: inserted.filter((e) => e.source_url === bySource[2]), error: null };
+        return { data: inserted, error: null };
+      }
+      return { data: null, error: null };
+    };
+
+    const summary = await runEventBacklog();
+
+    expect(inserted).toHaveLength(1);
+    expect(summary).toMatchObject({ eventsCreated: 1, duplicatesSkipped: 1 });
+    expect(pageVerdicts(calls).map((u) => u.status).sort()).toEqual(['duplicate', 'imported']);
+  });
+
   it('leaves pages it had no time for pending, and says so', async () => {
     mockFetchWebpage.mockResolvedValue(page);
     const realNow = Date.now;

@@ -646,7 +646,19 @@ async function insertDraft(eventData) {
  * and, when it passes, files the `pending_review` draft. Shared by the web
  * scan and the Instagram scan so both hold a find to the same standard.
  */
-export async function fileExtraction(candidate, { eventData, rejected, otherEvents = [] }, stats) {
+export function fileExtraction(candidate, result, stats) {
+  // One at a time. Pages are fetched and extracted concurrently, but "is this
+  // event already here?" followed by "insert it" must not interleave: two pages
+  // about the same show in one batch would both see no duplicate and both file
+  // a draft (the second under a suffixed slug).
+  const filed = fileQueue.then(() => fileExtractionNow(candidate, result, stats));
+  fileQueue = filed.catch(() => {});
+  return filed;
+}
+
+let fileQueue = Promise.resolve();
+
+async function fileExtractionNow(candidate, { eventData, rejected, otherEvents = [] }, stats) {
   const main = eventData
     ? await fileEvent(eventData, stats)
     : { status: 'rejected', reason: rejected || 'Not a trading card event page.' };
