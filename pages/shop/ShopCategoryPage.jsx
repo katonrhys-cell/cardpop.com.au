@@ -24,6 +24,8 @@ import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { toast } from 'sonner';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
 const PER_PAGE = 16;
@@ -52,6 +54,13 @@ const ShopCategoryPage = () => {
   const pathInfo = getCategoryBySlug(hierarchy, categorySlug, subcategorySlug, productTypeSlug);
   const { category, subcategory, productType } = pathInfo || {};
   const categoryName = shopCategory?.name || subcategory?.name || category?.name;
+  // Admins get shortcuts to this category's products and the category manager.
+  // Only shop categories — a legacy TCG-hierarchy slug has no shop products to edit.
+  useAdminEditTarget(
+    'Edit products',
+    shopCategory ? adminProductsPath({ category: shopCategory.name }) : null,
+    shopCategory ? [{ label: 'Edit categories', to: adminShopCategoriesPath() }] : null,
+  );
 
   // Type / colour / price / availability… chips (see utils/shopFacets.js).
   const facets = useShopFacets({
@@ -337,6 +346,7 @@ const ShopCategoryPage = () => {
         </div>
 
         <ShopFilterPanel
+          loading={facets.pending}
           options={facets.options}
           rows={facets.rows}
           selection={facets.selection}

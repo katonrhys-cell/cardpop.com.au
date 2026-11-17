@@ -13,18 +13,22 @@ import { useShopFacets } from '@/hooks/useShopFacets.js';
 import { filterFacetRows, sortFacetRows, fetchShopProductsByIds, orderedShopQuery } from '@/utils/shopFacets.js';
 import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
 
 const PAGE_LIMIT = 48;
 // Price already has its own min/max inputs in the sidebar.
 const FACET_KEYS = ['category', 'availability', 'brand', 'sale'];
 import ProductCard from '@/components/ProductCard.jsx';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ProductCardSkeletons } from '@/components/ProductCardSkeleton.jsx';
 
 const ShopSinglesPage = () => {
   const { addToCart } = useCart();
+  // Admins get shortcuts to the product list and the category manager.
+  useAdminEditTarget('Edit products', adminProductsPath(), [{ label: 'Edit categories', to: adminShopCategoriesPath() }]);
 
   const [products, setProducts] = useState([]);
   const [totalItems, setTotalItems] = useState(0);
@@ -259,14 +263,7 @@ const ShopSinglesPage = () => {
           {/* Grid */}
           {loading && products.length === 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="flex flex-col space-y-4">
-                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                  <Skeleton className="h-4 w-1/3" />
-                  <Skeleton className="h-6 w-3/4" />
-                  <Skeleton className="h-10 w-full mt-2 rounded-xl" />
-                </div>
-              ))}
+              <ProductCardSkeletons count={6} />
             </div>
           ) : products.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">

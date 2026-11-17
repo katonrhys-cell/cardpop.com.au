@@ -2,7 +2,9 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
-import { Star, ShieldCheck, ZoomIn, ShoppingCart, PackageX, MessageSquare, Clock } from 'lucide-react';
+import { Star, ShieldCheck, ZoomIn, ShoppingCart, PackageX, MessageSquare, Clock, Pencil } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext.jsx';
+import { adminShopProductPath, adminListingPath } from '@/utils/adminEditLinks.js';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { slugify } from '@/lib/slugify.js';
@@ -28,6 +30,13 @@ import SoldBadge from '@/components/SoldBadge.jsx';
 const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const [zoomOpen, setZoomOpen] = useState(false);
   const [enquiryOpen, setEnquiryOpen] = useState(false);
+  // Admins get a pencil on the card straight to its editor (a shop product's
+  // form, or a marketplace listing's dialog). `useAuth()` is undefined outside
+  // the provider, so a bare render (tests, previews) simply shows none.
+  const adminEditPath = useAuth()?.isAdmin
+    ? (product.source === 'shop' ? adminShopProductPath(product.id)
+      : product.source === 'marketplace' ? adminListingPath(product.id) : null)
+    : null;
   // Shop products track stock; 0 means sold out → swap Add to Cart for an
   // Enquire button that emails admin. Marketplace/vault rows have no
   // stock_quantity and are never flagged.
@@ -67,7 +76,19 @@ const ProductCard = ({ product, onAddToCart, priority = false }) => {
   const useShowcase = product.source === 'vault' || !!product.display_style;
 
   return (
-    <div className="group flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+    <div className="group relative flex flex-col h-full bg-card rounded-2xl border border-border overflow-hidden transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
+      {adminEditPath && (
+        // Below the ribbons that sit in the image's top-right corner.
+        <Link
+          to={adminEditPath}
+          aria-label={`Edit ${product.name || product.title || 'product'} in admin`}
+          title="Edit in admin"
+          data-testid="admin-card-edit"
+          className="absolute right-3 top-12 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-brand-charcoal text-white shadow-md transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <Pencil className="h-4 w-4" aria-hidden="true" />
+        </Link>
+      )}
       <Link to={detailPath} className="block relative aspect-[4/5] bg-muted/30 overflow-hidden">
         {useShowcase ? (
           <CardShowcase

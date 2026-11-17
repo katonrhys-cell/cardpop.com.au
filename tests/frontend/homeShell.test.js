@@ -180,20 +180,29 @@ describe('static shell header for a signed-in member', () => {
     expect(bootstrap).toContain(`localStorage.getItem("${ADMIN_HINT_STORAGE_KEY}")==="1")de.classList.add("cp-admin")`);
   });
 
+  it('bootstrap leaves room for the trade icon when the cached settings have trading on', () => {
+    const settings = read('contexts/PlatformSettingsContext.jsx');
+    const key = settings.match(/const CACHE_KEY = '([^']+)'/)[1];
+    expect(bootstrap).toContain(`if(/enable_trading.:true/.test(localStorage.getItem("${key}")||""))de.classList.add("cp-trading")`);
+    expect(/enable_trading.:true/.test(JSON.stringify({ enable_trading: true }))).toBe(true);
+    expect(/enable_trading.:true/.test(JSON.stringify({ enable_trading: false }))).toBe(false);
+  });
+
   it('critical CSS shows the guest pieces by default and swaps them for a member', () => {
     const css = indexHtml.replace(/\s+/g, ' ');
     expect(css).toContain('.cps-guest { display: contents; }');
-    expect(css).toContain('.cps-member, .cps-admin { display: none; }');
+    expect(css).toContain('.cps-member, .cps-admin, .cps-trading { display: none; }');
     expect(css).toContain('.cp-member .cps-guest { display: none; }');
-    expect(css).toContain('.cp-member .cps-member, .cp-admin .cps-admin { display: contents; }');
+    expect(css).toContain('.cp-member .cps-member, .cp-admin .cps-admin, .cp-member.cp-trading .cps-trading { display: contents; }');
     // …and the build keeps those rules although nothing matches them at build time.
-    expect(viteConfig).toMatch(/allowRules: \[[^\]]*cp-\(member\|admin\)[^\]]*cps-\(guest\|member\|admin\)/);
+    expect(viteConfig).toMatch(/allowRules: \[[^\]]*cp-\(member\|admin\|trading\)[^\]]*cps-\(guest\|member\|admin\|trading\)/);
   });
 
   it('shell carries guest, member and admin variants', () => {
     expect(shell.match(/class="cps-guest"/g)).toHaveLength(2);  // theme toggle, Login/Sign up skeleton
     expect(shell.match(/class="cps-member"/g)).toHaveLength(3); // messages + bell, theme toggle, avatar
     expect(shell.match(/class="cps-admin"/g)).toHaveLength(1);
+    expect(shell.match(/class="cps-trading"/g)).toHaveLength(1);
     // Same skeleton sizes Header.jsx renders while auth is loading.
     for (const cls of ['h-9 w-[57px] rounded-xl bg-muted animate-pulse', 'h-9 w-[74px] rounded-xl bg-muted animate-pulse', 'h-10 w-10 rounded-full bg-muted animate-pulse']) {
       expect(shell).toContain(cls);

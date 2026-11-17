@@ -154,19 +154,11 @@ const Footer = () => {
         <div className="border-t border-border pt-8 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="text-center sm:text-left">
             <p className="text-muted-foreground text-sm font-medium">
-              © {new Date().getFullYear()} CardPop Australia™. All Rights Reserved.
+              © {new Date().getFullYear()} CardPop Australia™ – All Rights Reserved.
             </p>
             <BusinessIdentityLine short className="text-muted-foreground text-xs mt-1" />
           </div>
           <p className="text-muted-foreground text-sm flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
-            <WhatsAppChatLink
-              placement="footer_bar"
-              aria-label="Chat with us on WhatsApp"
-              className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-            >
-              <WhatsAppIcon className="w-4 h-4" />
-              WhatsApp
-            </WhatsAppChatLink>
             <a
               href={GITHUB_URL}
               target="_blank"
@@ -187,16 +179,6 @@ const Footer = () => {
                 Support on Patreon
               </a>
             )}
-            <a
-              href={X_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="X"
-              title="X"
-              className="inline-flex items-center hover:text-foreground transition-colors"
-            >
-              <XIcon className="w-4 h-4" />
-            </a>
           </p>
           <p className="text-muted-foreground text-sm">
             Made with ❤️ for the Australian Trading Card Community

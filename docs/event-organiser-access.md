@@ -80,3 +80,25 @@ the prerender falls back to the original four, like the SPA.
 `event_organiser_verifications` (Admin → an event → Organiser access) is a
 separate, older flag that lets an event's organiser see its vendor list. It is
 independent of page ownership; an admin sets each deliberately.
+
+
+## Social links
+
+An organiser page carries website, Instagram, Facebook, YouTube, **TikTok, X and
+Linktree** links (`event_organisers.*_url`, http(s) only by a CHECK constraint;
+TikTok / X / Linktree arrived in `20261116110000_organiser_tiktok_x_linktree_links.sql`).
+The owner edits them in **Edit page** (`components/events/OrganiserPageEditor.jsx`);
+`organiserLinks()` in `utils/organiserPage.js` is the one list the page's icon
+buttons and the prerender's `Organization.sameAs` read. To add another, extend
+`LINK_FIELDS` + `ORGANISER_PAGE_COLUMNS` there, the editor's `LINKS`, and the
+page's `LINK_ICONS`.
+
+## Messages from collectors
+
+The owner of an organiser page also receives the messages collectors send from
+it (screened first) and reads them in **Your messages** on the page —
+`docs/organiser-messages.md`.
+
+## Photos and videos on the organiser page
+
+An organiser (or an admin) can add **photo albums** and **YouTube videos** from their previous events: Edit page → *Photo Gallery* / *Event Videos*, the same editors the event form uses. They are stored in `event_organisers.gallery_albums` (`[{title, images[]}]`, normalised by `cleanGalleryAlbums()`) and `event_organisers.videos` (`[{title, url}]`, `cleanEventVideos()`), added by `20261117190000_organiser_page_photos_and_videos.sql`. They render under the header via `EventPhotoAlbums` / `EventVideos`, and `renderEventOrganiser()` in `api/prerender.js` emits them for bots. Photos upload through `uploadEventImage()` into `events/organisers/gallery/`. The owner guard trigger is unchanged — these are ordinary editable profile columns.

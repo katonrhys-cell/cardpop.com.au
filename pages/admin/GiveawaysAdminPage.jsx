@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { useSearchParams } from 'react-router-dom';
 import { Gift, Plus, RefreshCw, Pencil, Users, Dice5, Download, Trash2, Loader2, Trophy, ExternalLink } from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { apiServerClient as apiClient } from '@/lib/apiServerClient.js';
@@ -131,6 +132,23 @@ const GiveawaysAdminPage = () => {
 
   const openNew = () => { setForm(EMPTY_FORM); setEditing('new'); };
   const openEdit = (g) => { setForm(formFromRow(g)); setEditing(g); };
+
+  // "Edit giveaway" on a giveaway's public page lands here as ?edit=<id>: open
+  // that giveaway's form once the list has loaded, then drop the param.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  useEffect(() => {
+    if (!editId || loading) return;
+    const match = giveaways.find((g) => g.id === editId);
+    if (match) openEdit(match);
+    else toast.error('Could not find that giveaway to edit.');
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('edit');
+      return next;
+    }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per ?edit= value, after the list loads
+  }, [editId, loading]);
 
   const save = async (e) => {
     e.preventDefault();

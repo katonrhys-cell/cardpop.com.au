@@ -5,7 +5,7 @@ import logger from './logger.js';
 
 // Anything slabbed or described as graded is priced separately from raw copies —
 // mixing the two makes both averages meaningless.
-const GRADED_RE = /\b(psa|bgs|cgc|sgc|tag|ace\s?grad\w*|graded)\b/i;
+const GRADED_RE = /\b(psa|bgs|bccg|bvg|cgc|csg|sgc|tag|ksa|hga|gsg|pgs|mnt|rcg|cga|ags|dsg|graad|arena club|aigrading|ace\s?grad\w*|graded)\b/i;
 
 const round2 = (n) => Math.round(n * 100) / 100;
 

@@ -44,6 +44,39 @@
   size-adjust: 115%;
 }
 
+/* Bold headings get their own fallback face. The face above has no weight, so
+   a font-bold heading used to get *regular* Arial fattened by the browser —
+   only ~4% wider than plain Arial Bold, where Syne Bold is ~13% wider. The
+   homepage headline therefore wrapped onto four lines in the fallback and five
+   once Syne arrived (at ~1280px wide), pushing the hero down mid-load. A real
+   bold face at 113% matches Syne Bold's width, so the wrap is the same before
+   and after the swap. It also serves weight 800 (still narrower than Syne
+   ExtraBold, which is ~64% wider than Arial Bold — matching that would paint
+   grotesquely tall fallback glyphs — but closer than before).
+   Mirror any change into SYNE_FALLBACK_FONT_FACE in vite.config.js. */
+@font-face {
+  font-family: 'Syne Fallback';
+  font-weight: 700 800;
+  src: local('Arial Bold'), local('Arial-BoldMT'), local('Roboto Bold'), local('Roboto-Bold'),
+    local('Liberation Sans Bold'), local('LiberationSans-Bold'), local('DejaVu Sans Bold'), local('DejaVuSans-Bold');
+  ascent-override: 94%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  size-adjust: 113%;
+}
+
+/* Semibold keeps the original pairing (it was already within ~3% of Syne
+   SemiBold); without this face a 600 request would pick the bold one above. */
+@font-face {
+  font-family: 'Syne Fallback';
+  font-weight: 600;
+  src: local('Arial'), local('Roboto'), local('Liberation Sans'), local('DejaVu Sans');
+  ascent-override: 94%;
+  descent-override: 26%;
+  line-gap-override: 0%;
+  size-adjust: 115%;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -377,11 +410,6 @@
 .anim-slide-in-right { animation: anim-slide-in-right 0.22s ease-in-out both; }
 .anim-slide-in-left  { animation: anim-slide-in-left 0.22s ease-in-out both; }
 
-/* Category browse carousel — a single track that slides one tile per arrow
-   click. Only transform transitions, so icons glide without flashing. */
-.cat-carousel-track          { transition: transform 0.35s ease-in-out; will-change: transform; }
-.cat-carousel-track--instant { transition: none; }
-
 /* Below-the-fold homepage sections: let the browser skip style, layout and
    paint for them until they approach the viewport. On a mid-range phone the
    first commit of the homepage spent ~600 ms in style & layout for content
@@ -399,7 +427,6 @@
   .anim-slide-in-right, .anim-slide-in-left {
     animation: none;
   }
-  .cat-carousel-track { transition: none; }
 }
 /* ═══════════════════════════════════════════════════════
    PROSE STYLES — Generic content container spacing

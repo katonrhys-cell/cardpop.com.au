@@ -51,6 +51,8 @@ const TYPE_CONFIG = {
   organiser_request:        { icon: Megaphone,     color: 'text-primary' },
   organiser_approved:       { icon: BadgeCheck,    color: 'text-emerald-500' },
   organiser_rejected:       { icon: XCircle,       color: 'text-red-500' },
+  organiser_message:        { icon: MessageSquare, color: 'text-primary' },
+  organiser_message_review: { icon: MessageSquare, color: 'text-amber-500' },
   store_owner_request:      { icon: Store,         color: 'text-primary' },
   store_owner_approved:     { icon: BadgeCheck,    color: 'text-emerald-500' },
   store_owner_rejected:     { icon: XCircle,       color: 'text-red-500' },

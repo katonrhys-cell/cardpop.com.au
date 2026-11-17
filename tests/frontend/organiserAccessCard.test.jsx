@@ -19,6 +19,17 @@ const storeAccess = (over = {}) => ({ loading: false, requests: [], stores: [], 
 const show = (props) => render(<MemoryRouter><OrganiserAccessCard {...props} /></MemoryRouter>);
 
 describe('OrganiserAccessCard — organiser and shop owner applications', () => {
+  it('holds its place with a placeholder while either lookup is loading', () => {
+    // Rendering nothing here dropped the notice and events list by the card's
+    // height once the lookups landed.
+    const first = show({ access: organiserAccess({ loading: true }), storeAccess: storeAccess() });
+    expect(screen.getByTestId('organiser-access-placeholder')).toBeTruthy();
+    expect(screen.queryByText('Do you run card shows, events or a card shop?')).toBeNull();
+    first.unmount();
+    show({ access: organiserAccess(), storeAccess: storeAccess({ loading: true }) });
+    expect(screen.getByTestId('organiser-access-placeholder')).toBeTruthy();
+  });
+
   it('offers one application with a dropdown for what the member is applying as', () => {
     show({ access: organiserAccess(), storeAccess: storeAccess() });
     expect(screen.getByText('Do you run card shows, events or a card shop?')).toBeTruthy();

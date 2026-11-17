@@ -14,6 +14,18 @@ describe('organiserLinks', () => {
   it('handles a missing organiser', () => {
     expect(organiserLinks(null)).toEqual([]);
   });
+  it('includes TikTok, X and Linktree after YouTube, http(s) only', () => {
+    const links = organiserLinks({
+      linktree_url: 'https://linktr.ee/show',
+      x_url: 'https://x.com/show',
+      tiktok_url: 'https://tiktok.com/@show',
+      youtube_url: 'https://youtube.com/@show',
+    });
+    expect(links.map((l) => [l.key, l.label])).toEqual([
+      ['youtube_url', 'YouTube'], ['tiktok_url', 'TikTok'], ['x_url', 'X'], ['linktree_url', 'Linktree'],
+    ]);
+    expect(organiserLinks({ x_url: 'javascript:alert(1)', tiktok_url: 'ftp://x' })).toEqual([]);
+  });
 });
 
 describe('canEditOrganiserPage', () => {
@@ -61,5 +73,14 @@ describe('organiserLogos (joint organisers)', () => {
     const { organiserLogos } = await import('@/utils/organiserPage.js');
     expect(organiserLogos({ logo_url: 'https://x.test/a.png' })).toEqual(['https://x.test/a.png']);
     expect(organiserLogos(null)).toEqual([]);
+  });
+});
+
+describe('organiser page photos and videos columns', () => {
+  it('reads gallery_albums and videos only in the full column set', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_PAGE_COLUMNS).toContain('gallery_albums');
+    expect(m.ORGANISER_PAGE_COLUMNS).toContain('videos');
+    expect(m.ORGANISER_LINK_COLUMNS).not.toContain('gallery_albums');
   });
 });

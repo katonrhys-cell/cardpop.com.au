@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { apiServerClient } from '@/lib/apiServerClient';
 import { useIsMounted } from '@/hooks/useIsMounted.js';
+import { graderFromText } from '@/data/gradeOptions.js';
 
 /**
  * Sends a card image to CardSight AI and returns identification,
@@ -120,11 +121,8 @@ export function mapCardSightToFormFields(result) {
 
   // Grading slab detection + condition mapping
   if (grading) {
-    const company = (grading.company || '').toLowerCase();
-    if (company.includes('psa'))     fields.gradingCompany = 'psa';
-    else if (company.includes('bgs') || company.includes('beckett')) fields.gradingCompany = 'bgs';
-    else if (company.includes('cgc')) fields.gradingCompany = 'cgc';
-    else if (company.includes('sgc')) fields.gradingCompany = 'sgc';
+    const grader = graderFromText(grading.company);
+    if (grader) fields.gradingCompany = grader;
     if (grading.grade)  fields.grade = String(grading.grade);
 
     // Map grading condition to card condition enum

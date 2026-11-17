@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getFeaturedCards, getFeaturedSellers, getPlatformStats, getTrafficSummary } from '@/lib/homepageData.js';
 import { useMediaQuery } from '@/hooks/useMediaQuery.js';
@@ -10,6 +10,7 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import LiveActivityTicker from '@/components/LiveActivityTicker.jsx';
 import SellerCard from '@/components/SellerCard.jsx';
 import FeaturedSellersCarousel from '@/components/FeaturedSellersCarousel.jsx';
+import CategoryCarousel from '@/components/home/CategoryCarousel.jsx';
 import HomepageFeaturedEvents, { FEATURE_EVENT_PATH } from '@/components/home/HomepageFeaturedEvents.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import ErrorBoundary from '@/components/ErrorBoundary.jsx';
@@ -32,6 +33,7 @@ import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 const HeroCardShowcase = lazy(() => import('@/components/HeroCardShowcase.jsx'));
 
 import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
+import { ProductCardSkeletons } from '@/components/ProductCardSkeleton.jsx';
 
 // ─── In-view reveal (framer-motion whileInView replacement) ─────────────────
 // Returns [ref, inView]; inView flips to true once the element scrolls within
@@ -356,50 +358,6 @@ const HomePage = () => {
   // shells), where the "Join free" nudge simply shows.
   const { isAuthenticated } = useAuth() || {};
 
-  const DESK_VISIBLE = 8;
-  const total = CATEGORIES.length;
-  // Continuous sliding track: render the full list with a DESK_VISIBLE-wide
-  // buffer of duplicated tiles on each side so rotating in either direction
-  // slides the icons smoothly instead of remounting the row (which made every
-  // tile flash from opacity 0 on each click). `deskPos` is the logical start
-  // index; it may briefly overshoot into a buffer, then snaps back
-  // (transition-free) once the slide settles, giving a seamless loop.
-  const deskLoop = [
-    ...CATEGORIES.slice(total - DESK_VISIBLE),
-    ...CATEGORIES,
-    ...CATEGORIES.slice(0, DESK_VISIBLE),
-  ];
-  const DESK_N = deskLoop.length;      // total + 2 * DESK_VISIBLE
-  const deskStep = 100 / DESK_N;       // width of one tile, as a % of the track
-  const [deskPos, setDeskPos] = useState(0);
-  const [deskInstant, setDeskInstant] = useState(false);
-
-  // After a transition-free snap back into range, re-enable the transition on
-  // the next frame so the following click animates again.
-  useEffect(() => {
-    if (!deskInstant) return;
-    const id = requestAnimationFrame(() => setDeskInstant(false));
-    return () => cancelAnimationFrame(id);
-  }, [deskInstant]);
-
-  // The snap back into range waits for `transitionend`, which never fires when
-  // reduced motion turns the transition off — so wrap directly in that case.
-  // Otherwise clamp to the rendered buffer so clicking faster than the slide
-  // can't run the track past the duplicated tiles into empty space.
-  const prefersReducedMotion = () =>
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-  const goDeskNext = () =>
-    setDeskPos(p => (prefersReducedMotion() ? (p + 1) % total : Math.min(p + 1, total)));
-  const goDeskPrev = () =>
-    setDeskPos(p => (prefersReducedMotion() ? (p - 1 + total) % total : Math.max(p - 1, -DESK_VISIBLE)));
-  const onDeskSlideEnd = (e) => {
-    // Only react to the track's own transform slide, not bubbled hover
-    // transitions from the tiles inside it.
-    if (e.target !== e.currentTarget || e.propertyName !== 'transform') return;
-    if (deskPos >= total)  { setDeskInstant(true); setDeskPos(p => p - total); }
-    else if (deskPos < 0)  { setDeskInstant(true); setDeskPos(p => p + total); }
-  };
-
   // Stats strip — two panels, real counts only.
   //   "Found on Google": Search Console impressions → clicks → GA4 visitors,
   //   each last-28-days with the all-time figure underneath; every tile
@@ -418,7 +376,6 @@ const HomePage = () => {
     : [];
 
   const [statsRef, statsInView] = useRevealOnce('-80px');
-  const [categoriesRef, categoriesInView] = useRevealOnce('0px');
   const [howRef, howInView] = useRevealOnce('-60px');
   const [cardsRef, cardsInView] = useRevealOnce('-100px');
   const [sellersRef, sellersInView] = useRevealOnce('-100px');
@@ -426,12 +383,6 @@ const HomePage = () => {
   // The animated hero showcase is hidden below lg (CSS `hidden lg:block`), so
   // only desktop viewports pay for its chunk (and framer-motion inside it).
   const isDesktop = useMediaQuery('(min-width: 1024px)');
-  // The category browser has two layouts — a swipe strip on phones and an
-  // arrow carousel from `sm` up. Both used to be in the DOM with one hidden
-  // by CSS, so every visitor built 64 tiles (each with an SVG icon) for a row
-  // that shows 24 or 8 — a visible slice of the first-render long task on a
-  // mid-range phone. Only the layout for the current viewport is rendered.
-  const isSmUp = useMediaQuery('(min-width: 640px)');
 
   useEffect(() => {
     let isMounted = true;
@@ -698,13 +649,7 @@ const HomePage = () => {
 
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="space-y-4">
-                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                  <Skeleton className="h-5 w-2/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              ))}
+              <ProductCardSkeletons count={4} />
             </div>
           ) : featuredCards.length > 0 ? (
             <div
@@ -840,76 +785,8 @@ const HomePage = () => {
             </Button>
           </div>
 
-          {/* Mobile: touch swipe through all 24 */}
-          {!isSmUp && (
-          <div ref={categoriesRef} className="sm:hidden flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory scroll-px-4 scrollbar-hide -mx-4 px-4">
-            {CATEGORIES.map((cat, i) => (
-              <div
-                key={cat.name}
-                className={`flex-shrink-0 snap-start w-[88px] ${categoriesInView ? 'anim-reveal-up' : 'opacity-0'}`}
-                style={categoriesInView ? { animationDuration: '0.2s', animationDelay: `${Math.min(i, 8) * 0.03}s` } : undefined}
-              >
-                <Link
-                  to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
-                  className={`group flex flex-col items-center justify-center gap-1.5 rounded-xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 text-center leading-tight`}
-                >
-                  <cat.Icon className="w-5 h-5 drop-shadow-sm" />
-                  <span className="text-[10px] font-bold leading-tight text-white drop-shadow-sm px-1">{cat.name}</span>
-                </Link>
-              </div>
-            ))}
-          </div>
-          )}
-
-          {/* Desktop: single-row arrow carousel */}
-          {isSmUp && (
-          <div className="hidden sm:flex items-center gap-3">
-            <button
-              onClick={goDeskPrev}
-              aria-label="Previous categories"
-              className="flex-shrink-0 w-9 h-9 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-
-            <div className="flex-1 overflow-hidden">
-              {/* Continuous track — translates one tile per click. Nothing
-                  remounts, so the icons slide across instead of flashing. */}
-              <div
-                className={`flex cat-carousel-track${deskInstant ? ' cat-carousel-track--instant' : ''}`}
-                style={{
-                  width: `${(DESK_N / DESK_VISIBLE) * 100}%`,
-                  transform: `translateX(-${(deskPos + DESK_VISIBLE) * deskStep}%)`,
-                }}
-                onTransitionEnd={onDeskSlideEnd}
-              >
-                {deskLoop.map((cat, i) => (
-                  <div
-                    key={`${cat.slug}-${i}`}
-                    className="px-2"
-                    style={{ width: `${deskStep}%`, flexShrink: 0 }}
-                  >
-                    <Link
-                      to={cat.slug ? `/collections/${cat.slug}` : '/marketplace'}
-                      className={`group flex flex-col items-center justify-center gap-3 p-4 rounded-2xl bg-gradient-to-br ${cat.gradient} aspect-square shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-200 text-center leading-tight`}
-                    >
-                      <cat.Icon className="w-9 h-9 drop-shadow-sm" />
-                      <span className="text-[11px] font-bold leading-tight text-white drop-shadow-sm">{cat.name}</span>
-                    </Link>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <button
-              onClick={goDeskNext}
-              aria-label="Next categories"
-              className="flex-shrink-0 w-9 h-9 rounded-full bg-background border border-border shadow-sm flex items-center justify-center hover:bg-muted transition-colors"
-            >
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          </div>
-          )}
+          {/* One endless strip: swipe (or scroll) any way, it rotates on its own, arrows from sm up. */}
+          <CategoryCarousel categories={CATEGORIES} />
         </div>
       </section>
 

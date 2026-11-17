@@ -24,6 +24,8 @@ import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { shopProductPath } from '@/utils/shopProductUrl.js';
 import { toast } from 'sonner';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
 
 // ─── Hero floating icon animation (matches CollectionPage) ───────────────────
 const floatVariants = {
@@ -125,6 +127,13 @@ const ShopCollectionPage = () => {
     const items = groups.find((g) => g.slug === baseConfig.slug)?.items;
     return items ? { ...baseConfig, items } : baseConfig;
   }, [baseConfig, groups]);
+  // Admins get shortcuts to this section's products and the category manager.
+  const sectionLabel = baseConfig ? groups.find((g) => g.slug === baseConfig.slug)?.label : null;
+  useAdminEditTarget(
+    'Edit products',
+    sectionLabel ? adminProductsPath({ section: sectionLabel }) : null,
+    sectionLabel ? [{ label: 'Edit categories', to: adminShopCategoriesPath() }] : null,
+  );
 
   // ─── State ─────────────────────────────────────────────────────────────
   const [activeSub, setActiveSub] = useState(null);       // pill filter (item name)
@@ -542,6 +551,7 @@ const ShopCollectionPage = () => {
           )}
 
           <ShopFilterPanel
+            loading={facets.pending}
             options={facets.options}
             rows={facets.rows}
             selection={facets.selection}

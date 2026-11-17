@@ -243,6 +243,7 @@ const HeroShowcaseAdminPage = lazy(() => import('@/pages/admin/HeroShowcaseAdmin
 const CollectionSectionsAdminPage = lazy(() => import('@/pages/admin/CollectionSectionsAdminPage.jsx'));
 const ChatModerationPage = lazy(() => import('@/pages/admin/ChatModerationPage.jsx'));
 const OrganiserRequestsAdminPage = lazy(() => import('@/pages/admin/OrganiserRequestsAdminPage.jsx'));
+const OrganiserMessagesAdminPage = lazy(() => import('@/pages/admin/OrganiserMessagesAdminPage.jsx'));
 const StoreDirectoryAdminPage = lazy(() => import('@/pages/admin/StoreDirectoryAdminPage.jsx'));
 const BusinessProfilesManagementPage = lazy(() => import('@/pages/admin/BusinessProfilesManagementPage.jsx'));
 const PartnersManagementPage = lazy(() => import('@/pages/admin/PartnersManagementPage.jsx'));
@@ -318,7 +319,12 @@ const App = () => {
                   <AnnouncementBar />
                   <Header />
                   
-                  <main className="flex-grow flex flex-col">
+                  {/* At least a viewport tall (less the header), the same height
+                      the route loader holds — so the footer starts below the
+                      fold on every page instead of sliding into view under a
+                      short loading state and being pushed back out when the
+                      page's data lands. */}
+                  <main className="flex-grow flex flex-col min-h-[calc(100vh-8rem)]">
                     <RouteErrorBoundary>
                     <Suspense fallback={<PageLoader />}>
                       <MaintenanceGate>
@@ -588,6 +594,7 @@ const App = () => {
                           <Route path="messages" element={<ChatModerationPage />} />
                           <Route path="store-directory" element={<StoreDirectoryAdminPage />} />
                           <Route path="organiser-requests" element={<OrganiserRequestsAdminPage />} />
+                          <Route path="organiser-messages" element={<OrganiserMessagesAdminPage />} />
                           <Route path="business-profiles" element={<BusinessProfilesManagementPage />} />
                           <Route path="partners" element={<PartnersManagementPage />} />
                           <Route path="promo-codes" element={<PromoCodesAdminPage />} />

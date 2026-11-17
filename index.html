@@ -64,9 +64,9 @@
          The CSP bootstrap adds cp-member / cp-admin to <html> before first
          paint; without them the guest layout shows. */
       .cps-guest { display: contents; }
-      .cps-member, .cps-admin { display: none; }
+      .cps-member, .cps-admin, .cps-trading { display: none; }
       .cp-member .cps-guest { display: none; }
-      .cp-member .cps-member, .cp-admin .cps-admin { display: contents; }
+      .cp-member .cps-member, .cp-admin .cps-admin, .cp-member.cp-trading .cps-trading { display: contents; }
 
       /* Flexbox for layout stability */
       .flex { display: flex; }

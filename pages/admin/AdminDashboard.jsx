@@ -2,11 +2,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, Package, DollarSign, Activity, AlertCircle,
-  ArrowUpRight, Server, Database, HardDrive, CheckCircle2,
-  FolderTree, RefreshCw, ArrowRightLeft, Calendar,
-  Tags, BarChart3, Building2, Layers, ShieldCheck, Lock, ShoppingCart, ShoppingBag, Filter, X,
-  Settings, Image, Store, Map, FileText, Wrench, ListOrdered, Layers2, LayoutDashboard, Star, Sparkles, LayoutList, Flag, CreditCard, MessagesSquare, Handshake, Rocket, Tv2, HandCoins, TicketPercent, MessageSquareText, ClipboardPen, Gift, Megaphone, Shapes } from 'lucide-react';
+  Users, DollarSign, Activity, AlertCircle, ArrowUpRight, CheckCircle2,
+  RefreshCw, ArrowRightLeft, ShoppingCart, X, LayoutDashboard,
+} from 'lucide-react';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +21,7 @@ import VaultListingModal from '@/components/VaultListingModal.jsx';
 import { PAID_ORDER_STATUSES, SETTLED_REFUND_STATUSES, summariseRevenue, formatAud } from '@/utils/revenue.js';
 import ShopProductForm from '@/components/ShopProductForm.jsx';
 import SiteTrafficCard from '@/components/admin/SiteTrafficCard.jsx';
+import AdminDirectory from '@/components/admin/AdminDirectory.jsx';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // `to` turns the whole card into a link through to the detail view behind the
@@ -53,23 +52,6 @@ const StatCard = ({ title, value, icon: Icon, trend, description, loading, to })
 
   return to ? <Link to={to} className="block h-full rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">{card}</Link> : card;
 };
-
-const ManagementBox = ({ title, description, icon: Icon, link }) => (
-  <Card className="shadow-sm border-border hover:border-primary/40 hover:shadow-md transition-all duration-300 group h-full flex flex-col">
-    <CardHeader className="pb-3">
-      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-        <Icon className="w-6 h-6 text-primary" />
-      </div>
-      <CardTitle className="font-serif text-xl">{title}</CardTitle>
-      <CardDescription className="text-sm mt-1">{description}</CardDescription>
-    </CardHeader>
-    <CardContent className="mt-auto pt-4">
-      <Button asChild variant="outline" className="w-full rounded-xl group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-        <Link to={link}>Manage {title.split(' ')[0]}</Link>
-      </Button>
-    </CardContent>
-  </Card>
-);
 
 const AdminDashboard = () => {
   const { getSystemHealth, isAdmin } = useAdmin();
@@ -261,59 +243,9 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="space-y-6">
-        <h2 className="text-2xl font-serif font-bold text-foreground">Core Management</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <ManagementBox title="Shop Management" description="Add, edit and manage shop products." icon={ShoppingCart} link="/admin/products" />
-          <ManagementBox title="Shop Affiliate Products" description="Manage Amazon affiliate products shown at the bottom of the shop pages." icon={ShoppingBag} link="/admin/shop-affiliate-products" />
-          <ManagementBox title="Brands Management" description="Add game and sports brands." icon={Building2} link="/admin/brands" />
-          <ManagementBox title="Category Management" description="Organize top-level categories." icon={FolderTree} link="/admin/categories" />
-          <ManagementBox title="Subcategory Management" description="Manage nested subcategories." icon={Layers2} link="/admin/subcategories" />
-          <ManagementBox title="Product Lines" description="Manage product lines per brand." icon={Layers} link="/admin/product-lines" />
-          <ManagementBox title="Collections & Eras" description="Manage eras and sets per collection." icon={Layers} link="/admin/collections" />
-          <ManagementBox title="User Management" description="Review accounts and roles." icon={Users} link="/admin/users" />
-          <ManagementBox title="Sellers Management" description="Manage featured sellers and promotions." icon={Star} link="/admin/sellers" />
-          <ManagementBox title="Order Management" description="Track and manage all orders." icon={ListOrdered} link="/admin/orders" />
-          <ManagementBox title="Verification" description="Review user verification requests." icon={ShieldCheck} link="/admin/verification" />
-          <ManagementBox title="Reports & Moderation" description="Triage scam, counterfeit and abuse reports." icon={Flag} link="/admin/reports" />
-          <ManagementBox title="Chat Moderation" description="Search and review member conversations." icon={MessagesSquare} link="/admin/messages" />
-          <ManagementBox title="Offers" description="Every marketplace offer — open, awaiting payment, paid or lapsed." icon={HandCoins} link="/admin/offers" />
-          <ManagementBox title="Chargebacks" description="Review payment disputes and frozen payouts." icon={CreditCard} link="/admin/disputes" />
-          <ManagementBox title="Revenue Breakdown" description="Every sale behind total revenue — dates, amounts, fees and GST." icon={DollarSign} link="/admin/revenue" />
-          <ManagementBox title="Finance & Tax" description="Profit on shop sales, GST by BAS quarter, stock valuation and accountant exports." icon={DollarSign} link="/admin/finance" />
-          <ManagementBox title="Invoices" description="A tax invoice for every paid order and a credit note for every refund, with Xero exports and sync status." icon={FileText} link="/admin/invoices" />
-          <ManagementBox title="Commissions & Revenue" description="Manage fee rates and view revenue reports." icon={DollarSign} link="/admin/commissions" />
-          <ManagementBox title="Organiser Requests" description="Confirm members who say they run events, so they can edit their organiser page." icon={Megaphone} link="/admin/organiser-requests" />
-          <ManagementBox title="Partner Program" description="Review partner applications, set rates and pay commissions." icon={Handshake} link="/admin/partners" />
-          <ManagementBox title="Promo Codes" description="Create % off codes, set expiry and limits, note who has them and see every use." icon={TicketPercent} link="/admin/promo-codes" />
-          <ManagementBox title="Players" description="The athletes with a public player page: bios, key cards, aliases and publish state." icon={Users} link="/admin/players" />
-          <ManagementBox title="Grading Partners" description="Australian stores that submit cards to PSA, Beckett, CGC, ACE, SGC and TAG — where every “Grade with…” link lands." icon={Handshake} link="/admin/grading-partners" />
-          <ManagementBox title="Product Reviews" description="Approve verified-purchase shop reviews before they go live." icon={MessageSquareText} link="/admin/product-reviews" />
-          <ManagementBox title="Giveaways" description="Instagram giveaways: prizes, entries, comment verification and the recorded random draw." icon={Gift} link="/admin/giveaways" />
-        </div>
-      </div>
-
-      <div className="space-y-6">
-        <h2 className="text-2xl font-serif font-bold text-foreground">Content &amp; Platform</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <ManagementBox title="Marketplace" description="Manage marketplace listings." icon={Store} link="/admin/marketplace" />
-          <ManagementBox title="Business Profiles" description="Curate retail storefronts shown on the Retailers directory and map." icon={Building2} link="/admin/business-profiles" />
-          <ManagementBox title="Building Your Business" description="Manage affiliate tools shown on the Community business page." icon={Rocket} link="/admin/building-your-business" />
-          <ManagementBox title="Category Mapping" description="Map categories to collections." icon={Map} link="/admin/category-mapping" />
-          <ManagementBox title="Events Management" description="Create and manage events." icon={Calendar} link="/admin/events" />
-          <ManagementBox title="Whatnot Shows" description="Moderate member-listed Whatnot live shows." icon={Tv2} link="/admin/whatnot-shows" />
-          <ManagementBox title="Content Management" description="Edit blog, pages and articles." icon={FileText} link="/admin/content" />
-          <ManagementBox title="Event Reviews" description="Write and publish reviews of the shows CardPop attends." icon={ClipboardPen} link="/admin/event-reviews" />
-          <ManagementBox title="Hero Showcase" description="Manage cards in the homepage hero animation." icon={Sparkles} link="/admin/hero-showcase" />
-          <ManagementBox title="Menu Icons" description="Change the icon beside each item in the header’s dropdown menus — upload a picture or pick another icon." icon={Shapes} link="/admin/menu-icons" />
-          <ManagementBox title="Collection Sections" description="Pin cards to collection page strips." icon={LayoutList} link="/admin/collection-sections" />
-          <ManagementBox title="Media Library" description="Upload and manage images." icon={Image} link="/admin/media" />
-          <ManagementBox title="Card Art" description="Upload thumbnails for sports cards and override card art in analytics." icon={Image} link="/admin/card-art" />
-          <ManagementBox title="Analytics & Reports" description="View platform analytics." icon={BarChart3} link="/admin/analytics" />
-          <ManagementBox title="System Diagnostics" description="Monitor system health." icon={Wrench} link="/admin/diagnostics" />
-          <ManagementBox title="Admin Settings" description="Configure platform settings." icon={Settings} link="/admin/settings" />
-        </div>
-      </div>
+      {/* Every admin screen, grouped by job, with a search box — the list
+          lives in components/admin/adminSections.js. */}
+      <AdminDirectory />
 
       {/* User Vault Data Filtered view */}
       <Card className="border-border shadow-sm bg-card rounded-[2rem] overflow-hidden">

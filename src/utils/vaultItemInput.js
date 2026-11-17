@@ -10,12 +10,13 @@ import { validateListingForm } from '../../utils/listingValidation.js';
 import { canUseStyle, normalizeStyle, normalizeTier } from '../../lib/displayStyles.js';
 import { FOIL_VARIANT, ROOKIE_VARIANT } from '../../lib/cardVariants.js';
 import { hasVideoExtension } from '../../utils/cardVideo.js';
+import { GRADING_COMPANY_VALUES } from '../../data/gradeOptions.js';
 
 // Listing types a buyer can see. Anything else (the form's 'private', legacy
 // casings, garbage) is stored as the canonical 'Private'.
 export const PUBLIC_LISTING_TYPES = ['For Sale', 'For Trade', 'For Sale & Trade', 'Expression of Interest'];
 
-const GRADING_COMPANIES = ['raw', 'psa', 'bgs', 'cgc', 'ace', 'sgc', 'other'];
+const GRADING_COMPANIES = GRADING_COMPANY_VALUES;
 
 // ── Type coercers ────────────────────────────────────────────────────────────
 const str = (v) => {
