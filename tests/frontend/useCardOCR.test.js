@@ -576,7 +576,9 @@ describe('useCardOCR — grading service mapping', () => {
     ['SGC', 'SGC'],
     ['sgc grading', 'SGC'],
     ['ACE', 'ACE'],
-    ['HGA', 'None'], // not a supported grading service
+    ['HGA', 'HGA'],
+    ['Beckett Vintage Grading', 'BVG'],
+    ['Foo Grading Co', 'None'], // not a known grading service
     [undefined, 'None'],
   ])('maps %s → %s', async (raw, expected) => {
     const result = await runScan({ name: 'X', gradingService: raw });

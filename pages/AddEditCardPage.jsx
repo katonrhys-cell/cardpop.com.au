@@ -76,6 +76,7 @@ import { CARD_LANGUAGES } from '@/lib/cardFilters.js';
 import SellerPayoutEstimate from '@/components/SellerPayoutEstimate.jsx';
 import PlayerPicker from '@/components/PlayerPicker.jsx';
 import { SPORTS_COLLECTIONS } from '@/data/collections.js';
+import { GRADERS, NUMERIC_GRADES, SPECIAL_GRADES, graderFromText, graderLabel } from '@/data/gradeOptions.js';
 
 // ─── Grading companies ────────────────────────────────────────────────────────
 // Raw phone photos run 3–8 MB (more for ProRAW/48MP). They're resized and
@@ -83,17 +84,11 @@ import { SPORTS_COLLECTIONS } from '@/data/collections.js';
 // guards against absurd files rather than capping what ends up stored.
 const MAX_RAW_PHOTO_BYTES = 25 * 1024 * 1024;
 
-const GRADING_COMPANIES = [
-  { value: 'raw',   label: 'Raw',   sub: 'Ungraded',      activeClass: 'border-slate-500 bg-slate-500/10 text-slate-700 dark:text-slate-300' },
-  { value: 'psa',   label: 'PSA',   sub: 'PSA Grading',   activeClass: 'border-red-500 bg-red-500/10 text-red-700 dark:text-red-400' },
-  { value: 'bgs',   label: 'BGS',   sub: 'Beckett',       activeClass: 'border-blue-600 bg-blue-600/10 text-blue-700 dark:text-blue-400' },
-  { value: 'cgc',   label: 'CGC',   sub: 'CGC Cards',     activeClass: 'border-green-600 bg-green-600/10 text-green-700 dark:text-green-400' },
-  { value: 'ace',   label: 'ACE',   sub: 'ACE Grading',   activeClass: 'border-orange-500 bg-orange-500/10 text-orange-700 dark:text-orange-400' },
-  { value: 'sgc',   label: 'SGC',   sub: 'SGC',           activeClass: 'border-purple-500 bg-purple-500/10 text-purple-700 dark:text-purple-400' },
-  { value: 'other', label: 'Other', sub: 'Other service', activeClass: 'border-muted-foreground/50 bg-muted text-foreground' },
-];
-
-const COMMON_GRADES = ['10', '9.5', '9', '8.5', '8', '7', '6', '5'];
+// Raw (ungraded) plus every professional grader — one shared list, see data/gradeOptions.js.
+const GRADING_COMPANIES = [{ value: 'raw', label: 'Raw (ungraded)' }, ...GRADERS.map((g) => ({
+  value: g.value,
+  label: g.legacy ? `${g.full} (${g.label}) — no longer grading` : g.label === g.full ? g.label : `${g.full} (${g.label})`,
+}))];
 
 // ─── Listing visibility options ───────────────────────────────────────────────
 const LISTING_OPTIONS = [
@@ -903,7 +898,7 @@ const AddEditCardPage = () => {
       'Mint': 'mint', 'Near Mint': 'near_mint', 'Excellent': 'excellent',
       'Good': 'good', 'Fair': 'light_played',
     };
-    const gradingCompanyMap = { 'PSA': 'psa', 'BGS': 'bgs', 'CGC': 'cgc', 'SGC': 'sgc', 'ACE': 'ace' };
+    const readGrader = graderFromText(ocrResult.gradingService);
     // Resolved against the collection OCR just read, falling back to whatever
     // the seller had picked — a chip that doesn't exist for the game is dropped.
     const variantCollection = ocrResult.collectionType || formData.collection;
@@ -939,9 +934,7 @@ const AddEditCardPage = () => {
       } : {}),
       condition:      conditionMap[ocrResult.condition] || prev.condition,
       grade:          ocrResult.gradeScore    || prev.grade,
-      gradingCompany: ocrResult.gradingService !== 'None'
-        ? (gradingCompanyMap[ocrResult.gradingService] ?? prev.gradingCompany)
-        : prev.gradingCompany,
+      gradingCompany: readGrader || prev.gradingCompany,
       certNumber:     ocrResult.certificationNumber || prev.certNumber,
       // Tick the chips for what the card actually shows — rookie marking,
       // autograph, patch, foil treatment, serial numbering. Additive: it can
@@ -3862,25 +3855,17 @@ const AddEditCardPage = () => {
               <SectionCard title="Grading">
                 <div className="space-y-4">
                   <div>
-                    <Label className="font-bold mb-3 block">Grading Service</Label>
-                    <div className="grid grid-cols-4 gap-2 sm:grid-cols-7">
-                      {GRADING_COMPANIES.map(({ value, label, sub, activeClass }) => {
-                        const isActive = formData.gradingCompany === value;
-                        return (
-                          <button
-                            key={value}
-                            type="button"
-                            onClick={() => set('gradingCompany', value)}
-                            className={`flex flex-col items-center px-2 py-2.5 rounded-xl border-2 text-center transition-all duration-150 ${
-                              isActive ? `${activeClass} shadow-sm` : 'border-border bg-background hover:border-muted-foreground/40 text-foreground'
-                            }`}
-                          >
-                            <span className="font-extrabold text-sm leading-tight">{label}</span>
-                            <span className={`text-[9px] mt-0.5 leading-tight ${isActive ? 'opacity-70' : 'text-muted-foreground'}`}>{sub}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+                    <Label htmlFor="gradingCompany" className="font-bold mb-3 block">Professional grader</Label>
+                    <Select value={formData.gradingCompany} onValueChange={(v) => set('gradingCompany', v)}>
+                      <SelectTrigger id="gradingCompany" className="h-11 bg-background">
+                        <SelectValue placeholder="Raw (ungraded)" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-80">
+                        {GRADING_COMPANIES.map(({ value, label }) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {isGraded && (
@@ -3891,7 +3876,7 @@ const AddEditCardPage = () => {
                           <Award className="w-4 h-4 text-amber-500" /> Grade Score
                         </Label>
                         <div className="flex flex-wrap gap-1.5 mb-2">
-                          {COMMON_GRADES.map(g => (
+                          {[...NUMERIC_GRADES, ...SPECIAL_GRADES].map(g => (
                             <button
                               key={g}
                               type="button"
@@ -3926,7 +3911,7 @@ const AddEditCardPage = () => {
                           placeholder="e.g. 12345678"
                           className="h-11 bg-background"
                         />
-                        <p className="text-xs text-muted-foreground">Verify at {formData.gradingCompany.toUpperCase()}'s website</p>
+                        <p className="text-xs text-muted-foreground">Verify at {graderLabel(formData.gradingCompany)}'s website</p>
                       </div>
                     </div>
                   )}

@@ -85,7 +85,11 @@ export const identifyCallToAction = ({ photoCount, analysedImageCount = 0 }) => 
 // Form grading values → the service names the eBay price-estimate endpoint
 // expects in its query. 'raw' (ungraded) and 'other' (unrecognised service)
 // intentionally have no mapping — the lookup then omits grading terms.
-export const GRADING_SERVICE_QUERY = { psa: 'PSA', bgs: 'BGS', cgc: 'CGC', sgc: 'SGC', ace: 'ACE' };
+import { GRADERS } from '../data/gradeOptions.js';
+
+export const GRADING_SERVICE_QUERY = Object.fromEntries(
+  GRADERS.filter((g) => g.value !== 'other').map((g) => [g.value, g.label.toUpperCase()]),
+);
 
 // Build the query object useEbayPriceLookup expects (its shape comes from OCR
 // results) out of manually-typed form fields, so a seller can get a price

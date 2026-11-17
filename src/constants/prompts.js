@@ -76,7 +76,7 @@ Return ONLY valid JSON with these exact fields (use null for anything not clearl
   "releaseYear": "the year or season EXACTLY as printed somewhere in the images — a season like \\"2023-24\\" if that is what is printed, otherwise a single year like \\"2023\\". Prefer the most complete form that actually appears. NEVER infer or reconstruct a year you cannot read: null is correct and expected when no year is legible",
   "collectionType": "one of the valid collection types above or null",
   "condition": "Mint | Near Mint | Excellent | Good | Fair",
-  "gradingService": "PSA | BGS | CGC | None",
+  "gradingService": "the grader printed on the slab (PSA, BGS, BCCG, BVG, CGC, CSG, SGC, ACE, TAG, KSA, HGA, ISA, GSG, PGS, MNT, RCG, CGA, AGS, DSG, GRAAD ...) | None",
   "gradeScore": number_or_null,
   "certificationNumber": "cert or slab number if visible, else null",
   "rarity": "Common | Uncommon | Rare | Holographic | Secret Rare | null",
