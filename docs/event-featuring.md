@@ -96,9 +96,12 @@ The retired Full Feature package also set `events.homepage_featured`
 (`20261110124303_event_homepage_featured.sql`), which puts the event in the
 **Featured events** section of the homepage
 (`components/home/HomepageFeaturedEvents.jsx`, gold like the calendar cards):
-up to 3 approved events that haven't ended, soonest first, read through the
+up to 12 approved events that haven't ended, soonest first, read through the
 edge-cached homepage bundle (`queryHomepageEvents` in
-`lib/homepageQueries.js`). Each card carries the event's type, short
+`lib/homepageQueries.js`). They sit in the same swipe / arrow carousel as
+Trusted Australian Sellers (`components/PagedCarousel.jsx`: one, two or three
+cards per page, arrows wrap round) — one event is one card wide, never the full
+page. Each card carries the event's type, short
 description, date, times, venue, entry fee and organiser. The section sits
 directly under the stats strip and is always shown: with no featured event it
 says the spot is open. The **List event** button (submit form, via sign-up

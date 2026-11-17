@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, CalendarDays, Clock, MapPin, Star, Ticket, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import PagedCarousel from '@/components/PagedCarousel.jsx';
 import { useAuth } from '@/contexts/AuthContext.jsx';
 import { getHomepageEvents } from '@/lib/homepageData.js';
 import { HOMEPAGE_EVENTS_LIMIT } from '@/lib/homepageQueries.js';
@@ -22,7 +23,9 @@ export const FEATURE_EVENT_PATH = '/account/events?feature=1';
  * Homepage "Featured events": the tier above the calendar's featured strip —
  * events whose organiser bought the Full Feature package (or an admin
  * placed), events.homepage_featured. Same gold as the calendar's featured
- * cards. The section is always on the page once the read settles: with no
+ * cards. Shown in the same swipe / arrow carousel as Trusted Australian Sellers
+ * (components/PagedCarousel.jsx): one card is one card wide, never the full
+ * page, and any number of events can be paged through. The section is always on the page once the read settles: with no
  * event to show it invites organisers to take the spot, and the "List event"
  * button lives under it either way.
  */
@@ -71,17 +74,23 @@ const HomepageFeaturedEvents = () => {
               </p>
             </div>
           ) : (
-            <div className={`grid gap-4 sm:gap-6 ${events.length > 1 ? 'sm:grid-cols-2' : ''} ${events.length > 2 ? 'lg:grid-cols-3' : ''}`}>
-              {events.map((ev) => {
+            <PagedCarousel
+              items={events}
+              getKey={(ev) => ev.id}
+              animate={false}
+              trackTestId="home-featured-events-track"
+              trackLabel="Featured events"
+              prevLabel="Previous events"
+              nextLabel="Next events"
+              renderItem={(ev) => {
                 const img = cardThumbUrl(ev.image_url || null);
                 const type = eventTypeLabel(ev);
                 const hasTime = Boolean(ev.start_time);
                 const hasFee = ev.is_free || Number(ev.entry_fee_aud) > 0;
                 return (
                   <Link
-                    key={ev.id}
                     to={eventPath(ev)}
-                    className={`group flex flex-col overflow-hidden rounded-2xl bg-card transition-transform duration-200 hover:-translate-y-1 ${FEATURED_CARD_CLASS}`}
+                    className={`group flex h-full flex-col overflow-hidden rounded-2xl bg-card transition-transform duration-200 hover:-translate-y-1 ${FEATURED_CARD_CLASS}`}
                   >
                     <div className="relative h-44 w-full overflow-hidden bg-muted">
                       {img ? (
@@ -130,8 +139,8 @@ const HomepageFeaturedEvents = () => {
                     </div>
                   </Link>
                 );
-              })}
-            </div>
+              }}
+            />
           )}
 
           <div className="mt-6 flex flex-col items-center gap-3 border-t border-amber-400/40 pt-5 sm:flex-row sm:justify-between">
