@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, Clock, ExternalLink, MapPin, Phone, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, ExternalLink, MapPin, Phone, PlusCircle, Star } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import {
@@ -120,7 +120,7 @@ const CardShopsCityPage = () => {
           {stores !== null && stores.length > 0 && (
             <ul className="space-y-3">
               {stores.map((store) => (
-                <li key={store.slug} className="bg-card border border-border rounded-2xl p-5">
+                <li key={store.slug} className={`bg-card border rounded-2xl p-5 ${store.membership_featured ? 'border-brand-red/40' : 'border-border'}`}>
                   <div className="flex items-start justify-between gap-4">
                     {/* The shop's logo when it has one, else its cover photo. */}
                     {(storeLogoUrl(store) || storeCoverPhoto(store)) && (
@@ -139,6 +139,11 @@ const CardShopsCityPage = () => {
                     <div className="min-w-0 flex-1">
                       <h2 className="text-lg font-semibold">
                         <Link to={storePath(store)} className="hover:text-primary transition-colors">{store.name}</Link>
+                        {store.membership_featured && (
+                          <span className="ml-2 inline-flex items-center gap-1 align-middle rounded-full bg-brand-red/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-brand-red">
+                            <Star className="w-3 h-3 fill-current" aria-hidden="true" /> Featured
+                          </span>
+                        )}
                       </h2>
                       <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                         <MapPin className="w-3.5 h-3.5" />

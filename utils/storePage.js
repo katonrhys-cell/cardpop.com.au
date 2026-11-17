@@ -29,6 +29,16 @@ export const STORE_PAGE_COLUMNS =
 export const STORE_LIST_COLUMNS =
   'slug, name, suburb, city, state, address, phone, website, categories, description, opening_hours, logo_url, photos';
 
+/**
+ * Directory order: featured shops first (an Ultimate member's shop —
+ * `membership_featured`, database-owned), then by name. Returns a new array.
+ */
+export function sortStoresFeaturedFirst(stores) {
+  return [...(stores || [])].sort((a, b) =>
+    (Number(Boolean(b?.membership_featured)) - Number(Boolean(a?.membership_featured)))
+    || String(a?.name || '').localeCompare(String(b?.name || ''), 'en', { sensitivity: 'base' }));
+}
+
 const trimOrNull = (v) => {
   if (v == null) return null;
   const s = String(v).trim();

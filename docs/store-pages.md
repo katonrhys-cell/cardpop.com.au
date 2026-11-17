@@ -152,3 +152,33 @@ Enforced in the database (`20261116221914_store_owner_requests.sql`), not the UI
 | Member UI | `components/events/OrganiserAccessCard.jsx` (the shared form), `hooks/useStoreOwnerAccess.js`, `pages/stores/StorePage.jsx` |
 | Admin UI | `components/admin/StoreOwnerRequests.jsx` in `pages/admin/StoreDirectoryAdminPage.jsx` |
 | Tests | `tests/backend/storeOwnerRequests.test.js`, `tests/frontend/organiserAccessCard.test.jsx`, `tests/db/run-store-owner-requests-migration.sh` |
+
+## Featured shops (Ultimate)
+
+A shop whose confirmed owner holds the **Ultimate** membership is featured in
+the directory for as long as the membership lasts: it is listed **first in its
+city** (above the alphabetical list) with a **Featured** badge, and its own
+page shows **Featured shop**. It is the shop twin of the Calendar Spotlight an
+Ultimate member gets on their events.
+
+- The flag is `local_game_stores.membership_featured`, and it is
+  **database-owned** (`20261117111555_store_membership_featured.sql`): a BEFORE
+  trigger on the shop recomputes it on every write from the owner's plan, and an
+  AFTER trigger on `profiles` re-syncs a member's shops when their plan changes.
+  Nobody sets it by hand — an attempt is simply overwritten.
+- It turns on when an Ultimate member is confirmed as a shop's owner or an
+  owner upgrades, and off when the membership ends, the owner is removed, or
+  the shop passes to someone who isn't on Ultimate.
+- An admin's complimentary Ultimate never features a shop (same rule as events).
+- Order is applied by `sortStoresFeaturedFirst()` (`utils/storePage.js`) in
+  `fetchStores()` and in the prerendered city page. Both read the flag in a way
+  that falls back to the plain alphabetical list if the column can't be read.
+- The plan copy is the `features` list of `PLAN_ULTIMATE` in `config/plans.js`.
+
+Test the migration with `tests/db/run-store-membership-featured-migration.sh`.
+
+## Editing a page where you are
+
+On a shop page, **Edit this page** opens the editor on the page itself — for
+admins (every field, including name and city) and for the shop's confirmed owner
+(name and city locked). Saving refreshes the page in place.

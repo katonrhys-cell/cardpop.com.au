@@ -40,7 +40,7 @@ import { businessIdentityLine } from '../utils/businessIdentity.js';
 import { TERMS_DESCRIPTION, TERMS_INTRO, TERMS_LINKS, TERMS_SECTIONS, TERMS_TITLE, TERMS_UPDATED_LABEL } from '../data/termsOfService.js';
 import {
   STORE_PAGE_COLUMNS, absoluteMediaUrl, cleanStorePhotos, cleanStoreVideos, storeHoursLines, storeIsIndexable,
-  storeJsonLd, storeListItemLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storePhoneHref, storeExternalLink,
+  sortStoresFeaturedFirst, storeJsonLd, storeListItemLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storePhoneHref, storeExternalLink,
 } from '../utils/storePage.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
@@ -2813,12 +2813,13 @@ const STATIC_CONTENT = {
         { text: 'Advertise your Whatnot live shows on the community directory.' },
         { text: 'Your cards fill the homepage Featured Cards spots.' },
       ] },
-      { h2: 'Ultimate — $199 a year AUD', paras: ['For show organisers and card shop owners — every event you run, featured. One payment a year, GST included.'], items: [
+      { h2: 'Ultimate — $199 a year AUD', paras: ['For show organisers and card shop owners — your events and your shop, featured. One payment a year, GST included.'], items: [
         { text: 'Everything in Pro, plus:' },
         { text: 'Calendar Spotlight on every show you run — the Featured events strip, first in its month and a Featured badge.' },
         { text: 'Unlimited listings.' },
         { text: 'Every display style — Rotating, Spinning Stand, Prism and the interactive Holographic showcase.' },
         { text: 'Featured Seller placement on the CardPop homepage.' },
+        { text: 'Your card shop featured in the directory — listed first in its city with a Featured badge.' },
       ] },
       { h2: 'How it works', items: [
         { text: "Buy with no membership — anyone can check out. A card on file gives one-tap buying and is required to sell or trade, but it's never charged until you actually transact." },
@@ -4386,13 +4387,26 @@ async function renderStoresHub(supabase) {
 
 async function renderStoresCity(supabase, citySlug) {
   const cityInfo = DIRECTORY_CITIES[citySlug];
-  const { data: stores } = await supabase
+  const { data: storeRows } = await supabase
     .from('local_game_stores')
     .select('slug, name, suburb, city, state, address, phone, website, categories, description, opening_hours')
     .eq('status', 'approved')
     .eq('city', citySlug)
     .order('name')
     .limit(200);
+  // Featured shops (an Ultimate member's) lead the list, as on the SPA page.
+  // Its own best-effort query: a problem with the flag never empties the list.
+  const { data: featuredRows } = await supabase
+    .from('local_game_stores')
+    .select('slug')
+    .eq('status', 'approved')
+    .eq('city', citySlug)
+    .eq('membership_featured', true)
+    .limit(200);
+  const featuredSlugs = new Set((Array.isArray(featuredRows) ? featuredRows : []).map((r) => r.slug));
+  const stores = storeRows
+    ? sortStoresFeaturedFirst(storeRows.map((s) => ({ ...s, membership_featured: featuredSlugs.has(s.slug) })))
+    : storeRows;
 
   // Same copy as the SPA page (utils/cardShopSeo.js), and the same upcoming
   // events and FAQ — the bot document used to list the stores only.
