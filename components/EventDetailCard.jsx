@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Map, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
+import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import { organisersForEvent, organiserNameParts, organiserPath } from '@/utils/e
 import { cleanEventVideos } from '@/utils/eventVideos.js';
 import { cleanSideEvents } from '@/utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
+import EventLocationMap from '@/components/events/EventLocationMap.jsx';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
 import { ticketDestination, recordEventTicketClick } from '@/lib/eventTicketOffers.js';
@@ -278,6 +279,8 @@ const EventDetailCard = ({ event, isPast = false }) => {
                 </div>
               </div>
 
+              <EventLocationMap location={event.location} />
+
               <div className="flex gap-4 items-start">
                 <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
                   <DollarSign className="w-5 h-5 text-primary" />
@@ -379,12 +382,6 @@ const EventDetailCard = ({ event, isPast = false }) => {
                 </Button>
               )}
               
-              <Button variant="outline" className="w-full h-12 border-border hover:bg-muted font-bold" asChild>
-                <a href={`https://maps.google.com/?q=${encodeURIComponent(event.location)}`} target="_blank" rel="noopener noreferrer">
-                  <Map className="w-5 h-5 mr-2" /> Get Directions
-                </a>
-              </Button>
-
               <AddToCalendarButton event={event} />
 
               {event.vendor_application_url && (
