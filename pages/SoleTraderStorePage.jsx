@@ -40,6 +40,8 @@ import WhatnotIcon from '@/components/WhatnotIcon.jsx';
 import { hasStorefront } from '@/config/plans.js';
 import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import { cardIdentifiersLd } from '@/utils/productIdentifiers.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminUserPath } from '@/utils/adminEditLinks.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -61,6 +63,8 @@ const SoleTraderStorePage = () => {
   const [stats, setStats]     = useState({ totalListings: 0, averageRating: 0, totalReviews: 0 });
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  // Admins get an "Edit in admin" shortcut to this dealer's admin page.
+  useAdminEditTarget('Manage user', adminUserPath(dealer?.id));
 
   useEffect(() => {
     if (!routeParam) return;

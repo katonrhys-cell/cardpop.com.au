@@ -12,6 +12,7 @@ import {
   adminShopProductPath, adminEventPath, adminListingPath, adminStorePath,
   adminArticlePath, adminEventReviewPath, adminPlayerPath,
   adminProductsPath, adminShopCategoriesPath,
+  adminUserPath, adminGiveawayPath, ADMIN_LISTS,
 } from '@/utils/adminEditLinks.js';
 
 // A stand-in for a public page that registers what it shows.
@@ -46,6 +47,14 @@ describe('adminEditLinks', () => {
     expect(adminProductsPath({ category: 'Top Loaders' })).toBe('/admin/products?category=Top+Loaders&view=list');
     expect(adminProductsPath({ section: 'Protection' })).toBe('/admin/products?section=Protection&view=list');
     expect(adminShopCategoriesPath()).toBe('/admin/products?categories=1');
+    expect(adminUserPath('u1')).toBe('/admin/users/u1');
+    expect(adminGiveawayPath('g1')).toBe('/admin/giveaways?edit=g1');
+    expect(ADMIN_LISTS).toEqual({
+      whatnotShows: '/admin/whatnot-shows',
+      storeDirectory: '/admin/store-directory',
+      partners: '/admin/partners',
+      collections: '/admin/collections',
+    });
   });
 
   it('returns null without an id so nothing is registered', () => {
@@ -55,6 +64,8 @@ describe('adminEditLinks', () => {
     expect(adminArticlePath(undefined)).toBeNull();
     expect(adminEventReviewPath(null)).toBeNull();
     expect(adminPlayerPath('')).toBeNull();
+    expect(adminUserPath(undefined)).toBeNull();
+    expect(adminGiveawayPath(null)).toBeNull();
   });
 });
 

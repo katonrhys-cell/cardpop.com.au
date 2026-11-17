@@ -15,6 +15,8 @@ import { canListWhatnotShows, PLANS, WHATNOT_SHOWS_MIN_TIER } from '@/config/pla
 import WhatnotShowFormModal from '@/components/WhatnotShowFormModal.jsx';
 
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { ADMIN_LISTS } from '@/utils/adminEditLinks.js';
 
 const StarRating = ({ rating, count }) => {
   if (!rating && !count) return null;
@@ -28,6 +30,8 @@ const StarRating = ({ rating, count }) => {
 };
 
 const WhatnotShowsPage = () => {
+  // Admins get a shortcut to the admin screen behind this page.
+  useAdminEditTarget('Manage shows', ADMIN_LISTS.whatnotShows);
   const { currentUser, isAuthenticated, subscriptionTier } = useAuth();
   // Listing shows is a Premium-and-up perk (enforced by the whatnot_shows
   // insert policy — this just keeps the UI honest about it).

@@ -19,6 +19,8 @@ import VaultListingCard from '@/components/VaultListingCard.jsx';
 import MarketplaceListingCard from '@/components/MarketplaceListingCard.jsx';
 import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import WhatnotIcon from '@/components/WhatnotIcon.jsx';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { adminUserPath } from '@/utils/adminEditLinks.js';
 
 const PublicSellerProfilePage = () => {
   const { userId } = useParams();
@@ -27,6 +29,8 @@ const PublicSellerProfilePage = () => {
   const [error, setError] = useState(null);
   const [listings, setListings] = useState([]);
   const [stats, setStats] = useState({ totalListings: 0, averageRating: 0, totalReviews: 0 });
+  // Admins get an "Edit in admin" shortcut to this member's admin page.
+  useAdminEditTarget('Manage user', adminUserPath(seller?.id));
 
   useEffect(() => {
     let isMounted = true;

@@ -30,6 +30,8 @@ import { genericVariantChips, getAutographLabel } from '@/lib/cardAttributeLabel
 import { fetchPinnedSectionItems, mergePinned } from '@/lib/collectionSections.js';
 import NotFoundPage from '@/pages/NotFoundPage.jsx';
 import { cardThumbUrl } from '@/utils/imageUrl.js';
+import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
+import { ADMIN_LISTS } from '@/utils/adminEditLinks.js';
 
 // ─── Hero floating icon animation ───────────────────────────────────────────
 const floatVariants = {
@@ -299,6 +301,8 @@ const CollectionPage = () => {
   // Resolve config
   const slug = resolveCollectionSlug(rawSlug);
   const config = slug ? COLLECTION_CONFIGS[slug] : null;
+  // Admins get a shortcut to the admin screen behind this page.
+  useAdminEditTarget('Manage eras', ADMIN_LISTS.collections);
   const GradedIcon = slug === 'pokemon' ? PikachuIcon : Award;
 
   // DB-driven eras (falls back to static config if DB is empty)

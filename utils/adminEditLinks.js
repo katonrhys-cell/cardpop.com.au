@@ -42,5 +42,19 @@ export const adminEventReviewPath = (reviewId) => (reviewId ? `/admin/event-revi
 /** Player → Admin → Players, player form open. */
 export const adminPlayerPath = (id) => (id ? `/admin/players?edit=${enc(id)}` : null);
 
+/** A member (seller / dealer profile) → Admin → Users → that user's page. */
+export const adminUserPath = (id) => (id ? `/admin/users/${enc(id)}` : null);
+
+/** Giveaway → Admin → Giveaways, giveaway form open. */
+export const adminGiveawayPath = (id) => (id ? `/admin/giveaways?edit=${enc(id)}` : null);
+
+/** Admin screens that manage a whole public page's list (no single item to open). */
+export const ADMIN_LISTS = {
+  whatnotShows: '/admin/whatnot-shows',
+  storeDirectory: '/admin/store-directory',
+  partners: '/admin/partners',
+  collections: '/admin/collections',
+};
+
 /** Card shop → Admin → Store Directory, store editor open. */
 export const adminStorePath = (slug) => (slug ? `/admin/store-directory?edit=${enc(slug)}` : null);
