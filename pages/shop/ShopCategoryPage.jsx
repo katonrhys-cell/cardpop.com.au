@@ -346,6 +346,7 @@ const ShopCategoryPage = () => {
         </div>
 
         <ShopFilterPanel
+          loading={facets.pending}
           options={facets.options}
           rows={facets.rows}
           selection={facets.selection}

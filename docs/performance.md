@@ -77,10 +77,24 @@ things flashed or jumped during a load. The rules that came out of fixing them:
   (and `cp-admin` when `lib/headerHints.js` last saw an admin in this browser);
   the critical CSS in `index.html` swaps the shell's `cps-guest` pieces for the
   `cps-member` / `cps-admin` ones; and `Header.jsx` renders the same layout
-  (`memberLayout`: Messages, bell, avatar, Admin) while the session is still
+  (`memberLayout`: Messages, bell, avatar, Admin — and the trade icon when the
+  cached platform settings have trading on, `cp-trading`) while the session is still
   being checked. The admin hint only sizes the header — it never grants
   anything. Changing the bootstrap means updating its sha256 in both CSP
   headers in `vercel.json`.
+- **Skeletons are the real frame.** Grid placeholders are `ProductCardSkeleton`
+  (same bordered card, 4:5 image area and footer as `ProductCard` /
+  `MarketplaceListingCard`), and a detail page's skeleton is its own layout
+  with the text missing (see `EventDetailPage`). Don't hand-roll loose bars.
+- **The shop filter row remembers itself.** `useShopFacets` records per grid
+  whether it had filters last time (`pending`), so a grid with filters holds
+  the row's place while they load and one without doesn't get a gap.
+- **Bold headings have a bold fallback face.** `'Syne Fallback'` at weight
+  700–800 is a real bold local font at 113%, which wraps like Syne Bold; the
+  weightless face alone left the homepage headline a line short until Syne
+  arrived. Keep `index.css` and `SYNE_FALLBACK_FONT_FACE` (vite.config.js) equal.
+- **Redirecting guards keep the loader up** (`ProtectedRoute`), and the
+  announcement bar is quiet on members-only paths (`MEMBER_ONLY_PREFIXES`).
 - **The hero exists three times** — `tools/home-shell.html`, `HeroSection.jsx`
   (the "/" Suspense fallback) and the hero in `HomePage.jsx`. Spacing classes
   must be identical in all three at every breakpoint (the same test checks).

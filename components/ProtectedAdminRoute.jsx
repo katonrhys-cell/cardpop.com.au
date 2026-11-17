@@ -64,7 +64,13 @@ const ProtectedAdminRoute = ({ children }) => {
   if (loading || profileLoading) return <Spinner />;
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Loader stays up while the lazy sign-in page loads (see ProtectedRoute).
+    return (
+      <>
+        <Navigate to="/login" state={{ from: location }} replace />
+        <Spinner />
+      </>
+    );
   }
 
   if (!isAdmin) {

@@ -6,7 +6,6 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { SHOP_CARD_COLUMNS } from '@/utils/shopColumns.js';
 import ShopCategoryBrowse from '@/components/ShopCategoryBrowse.jsx';
 import { escapeLike } from '@/src/utils/escapeLike.js';
-import { Skeleton } from '@/components/ui/skeleton';
 import { PackageX, SlidersHorizontal, Search, ShoppingBag } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,6 +21,7 @@ import ShopFilterPanel from '@/components/shop/ShopFilterPanel.jsx';
 import { toast } from 'sonner';
 import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
 import { adminProductsPath, adminShopCategoriesPath } from '@/utils/adminEditLinks.js';
+import { ProductCardSkeletons } from '@/components/ProductCardSkeleton.jsx';
 
 const PAGE_LIMIT = 50;
 // Across the whole catalogue, Category leads; Type/pockets only make sense
@@ -44,7 +44,7 @@ const ShopPage = () => {
   const { addToCart } = useCart();
   const fetchRef = useRef(null);
   const pageRef = useRef(0);
-  const facets = useShopFacets({ scopeKey: 'all', keys: FACET_KEYS });
+  const facets = useShopFacets({ scopeKey: 'all', keys: FACET_KEYS, expectFilters: true });
   const selectionKey = JSON.stringify(facets.selection);
   // Only a filtered grid reads the facet rows — don't refetch the unfiltered
   // grid just because they finished loading.
@@ -201,7 +201,7 @@ const ShopPage = () => {
         {/* The whole catalogue always has filters, so hold their row's place
             while the facet rows load instead of letting the grid drop 60px. */}
         <ShopFilterPanel
-          loading={!facets.loaded}
+          loading={facets.pending}
           options={facets.options}
           rows={facets.rows}
           selection={facets.selection}
@@ -216,13 +216,7 @@ const ShopPage = () => {
           </div>
         ) : loading && products.length === 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5">
-            {Array(8).fill(0).map((_, i) => (
-              <div key={i} className="space-y-4">
-                <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                <Skeleton className="h-5 w-2/3" />
-                <Skeleton className="h-6 w-1/3" />
-              </div>
-            ))}
+            <ProductCardSkeletons count={8} />
           </div>
         ) : products.length > 0 ? (
           <>

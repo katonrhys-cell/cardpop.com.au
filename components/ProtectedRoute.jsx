@@ -21,7 +21,15 @@ const ProtectedRoute = ({ children, requireVerification = false }) => {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Keep the loader up while the redirect lands: the sign-in page is a lazy
+    // chunk and the router holds this screen until it has loaded, so with
+    // nothing rendered here the footer jumped up under the header and back.
+    return (
+      <>
+        <Navigate to="/login" state={{ from: location }} replace />
+        <Spinner />
+      </>
+    );
   }
 
   if (requireVerification && !isEmailVerified) {

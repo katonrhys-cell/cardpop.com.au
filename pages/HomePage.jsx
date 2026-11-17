@@ -32,6 +32,7 @@ import { PAYMENT_MARKS } from '@/components/checkout/PaymentMarks.jsx';
 const HeroCardShowcase = lazy(() => import('@/components/HeroCardShowcase.jsx'));
 
 import { HOMEPAGE_CATEGORIES } from '@/components/CategoryIcons.jsx';
+import { ProductCardSkeletons } from '@/components/ProductCardSkeleton.jsx';
 
 // ─── In-view reveal (framer-motion whileInView replacement) ─────────────────
 // Returns [ref, inView]; inView flips to true once the element scrolls within
@@ -698,13 +699,7 @@ const HomePage = () => {
 
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className="space-y-4">
-                  <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
-                  <Skeleton className="h-5 w-2/3" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              ))}
+              <ProductCardSkeletons count={4} />
             </div>
           ) : featuredCards.length > 0 ? (
             <div
