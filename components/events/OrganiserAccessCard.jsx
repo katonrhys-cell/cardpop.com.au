@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { BadgeCheck, Clock, Loader2, Megaphone, Store, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -178,7 +179,27 @@ export default function OrganiserAccessCard({ access, storeAccess = NO_STORE_ACC
     });
   }, [storeAccess.requests, ownedStoreIds]);
 
-  if (loading || storeAccess.loading) return null;
+  // Hold the card's place while the two lookups are out. Every member ends up
+  // with at least one card here (the apply prompt, a pending request, or the
+  // page they manage), and rendering nothing until then dropped the notice and
+  // the events list by the card's height a second into every load.
+  if (loading || storeAccess.loading) {
+    return (
+      <div className="space-y-3" aria-hidden="true" data-testid="organiser-access-placeholder">
+        <section className="rounded-2xl border border-border p-5">
+          <div className="flex items-start gap-3">
+            <Skeleton className="w-5 h-5 mt-0.5 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <Skeleton className="h-6 w-80 max-w-full" />
+              <Skeleton className="h-5 w-full mt-1" />
+              <Skeleton className="h-5 w-2/3" />
+              <Skeleton className="h-9 w-64 max-w-full mt-3 rounded-xl" />
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
   // The organiser half failing shouldn't hide a working shop half, and vice versa.
   const organiserOk = !error;
   const shopOk = !storeAccess.error && typeof storeAccess.submit === 'function';
