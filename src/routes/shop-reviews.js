@@ -7,6 +7,7 @@ import { requireAdmin } from '../middleware/requireAal2.js';
 import { validateRequestBody } from '../middleware/validateRequest.js';
 import { createShopReviewSchema, moderateShopReviewSchema } from '../schemas/shopReviewSchemas.js';
 import { alertAdminsToReview } from '../services/adminReviewAlerts.js';
+import { attachOrderNumbers } from '../utils/orderNumbers.js';
 
 // Reviews of shop (catalogue) products. Reading published reviews is public and
 // goes straight to Supabase from the browser (RLS: status = 'published'); only
@@ -86,7 +87,7 @@ router.get('/admin', authMiddleware, requireAdmin, async (req, res) => {
       .order('created_at', { ascending: status === 'pending' })
       .limit(200);
     if (error) throw error;
-    res.json({ reviews: data || [] });
+    res.json({ reviews: await attachOrderNumbers(data || []) });
   } catch (error) {
     logger.error('Error listing shop reviews for moderation:', error);
     res.status(500).json({ error: 'Failed to load reviews' });

@@ -124,6 +124,69 @@ describe('GET /admin/invoices', () => {
     expect(or).toMatch(/ilike\.%ash  x%/);
   });
 
+  describe('order numbers', () => {
+    const ORDER = INVOICE.order_id;
+    // Answer by table rather than by call order: the search adds an `orders`
+    // lookup, and the rows get their number from a second one.
+    const answerByTable = ({ idForNumber, numbers }) => {
+      const made = [];
+      let ordersCalls = 0;
+      mockSupabase.from.mockImplementation((table) => {
+        let result = { data: [INVOICE], error: null, count: 1 };
+        if (table === 'orders') {
+          ordersCalls += 1;
+          result = ordersCalls === 1 && idForNumber !== undefined
+            ? { data: idForNumber, error: null }
+            : { data: numbers, error: null };
+        }
+        const b = makeBuilder(result);
+        made.push({ table, b });
+        return b;
+      });
+      return made;
+    };
+
+    it('attaches each invoice\'s order number to the list', async () => {
+      const made = answerByTable({ numbers: [{ id: ORDER, order_number: 'CP-000123' }] });
+      const res = await request(app).get('/admin/invoices');
+      expect(res.status).toBe(200);
+      expect(res.body.invoices[0].order_number).toBe('CP-000123');
+      expect(made.some((m) => m.table === 'orders' && m.b.calls.some(([c, col]) => c === 'select' && col === 'id, order_number'))).toBe(true);
+    });
+
+    it('falls back to no number — and still lists — when the lookup fails', async () => {
+      answerByTable({ numbers: null });
+      const res = await request(app).get('/admin/invoices');
+      expect(res.status).toBe(200);
+      expect(res.body.invoices).toHaveLength(1);
+      expect(res.body.invoices[0].order_number).toBeUndefined();
+    });
+
+    it('searches by a typed order number: resolves the order, then filters the invoices on it', async () => {
+      const made = answerByTable({ idForNumber: { id: ORDER }, numbers: [{ id: ORDER, order_number: 'CP-000123' }] });
+      const res = await request(app).get('/admin/invoices?q=cp-123');
+      expect(res.status).toBe(200);
+      const lookup = made.find((m) => m.table === 'orders').b;
+      expect(lookup.calls).toContainEqual(['eq', 'order_number', 'CP-000123']);
+      const list = made.find((m) => m.table === 'invoices' && m.b.calls.some(([c]) => c === 'range')).b;
+      expect(list.calls).toContainEqual(['eq', 'order_id', ORDER]);
+      expect(list.calls.some(([c]) => c === 'or')).toBe(false); // not also a text search
+    });
+
+    it('an order number that matches no order finds no invoices', async () => {
+      const made = answerByTable({ idForNumber: null, numbers: [] });
+      await request(app).get('/admin/invoices?q=CP-999999');
+      const list = made.find((m) => m.table === 'invoices' && m.b.calls.some(([c]) => c === 'range')).b;
+      expect(list.calls).toContainEqual(['eq', 'order_id', '00000000-0000-0000-0000-000000000000']);
+    });
+
+    it('leaves a plain text search alone', async () => {
+      const made = answerByTable({ numbers: [] });
+      await request(app).get('/admin/invoices?q=ash');
+      expect(made.find((m) => m.table === 'orders' && m.b.calls.some(([c]) => c === 'maybeSingle'))).toBeUndefined();
+    });
+  });
+
   it('400s a bad filter', async () => {
     expect((await request(app).get('/admin/invoices?kind=receipt')).status).toBe(400);
     expect((await request(app).get('/admin/invoices?from=05/10/2026')).status).toBe(400);

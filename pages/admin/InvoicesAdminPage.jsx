@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { downloadInvoicePdf, orderPathForInvoice } from '@/utils/invoiceDownload.js';
+import { orderRef } from '@/utils/orderRef.js';
 import { format } from 'date-fns';
 
 // Admin → Invoices. One tax invoice per paid order and one credit note per
@@ -28,7 +29,8 @@ import { format } from 'date-fns';
 
 const fmtMoney = (n) => `$${(Number(n) || 0).toFixed(2)}`;
 const fmtDate = (d) => (d ? format(new Date(`${String(d).slice(0, 10)}T00:00:00`), 'dd MMM yyyy') : '—');
-const shortId = (id) => (id ? `${String(id).slice(0, 8)}…` : '—');
+// The order's sequential number (CP-000123); the API attaches it to every invoice row.
+const invoiceOrderRef = (inv) => orderRef({ order_number: inv?.order_number, id: inv?.order_id }) || '—';
 
 const KIND_FILTERS = [
   ['all', 'Invoices & credit notes'],
@@ -152,7 +154,7 @@ const InvoiceDialog = ({ invoiceId, mapping, onClose, onUpdated }) => {
             {inv?.number || 'Invoice'}
           </DialogTitle>
           <DialogDescription>
-            {inv ? `${inv.kind === 'credit_note' ? 'Credit note' : 'Tax invoice'} · ${fmtDate(inv.invoice_date)} · order ${inv.order_id}${inv.credits_number ? ` · credits ${inv.credits_number}` : ''}` : 'Loading…'}
+            {inv ? `${inv.kind === 'credit_note' ? 'Credit note' : 'Tax invoice'} · ${fmtDate(inv.invoice_date)} · order ${invoiceOrderRef(inv)}${inv.credits_number ? ` · credits ${inv.credits_number}` : ''}` : 'Loading…'}
           </DialogDescription>
         </DialogHeader>
 
@@ -505,7 +507,7 @@ const InvoicesAdminPage = () => {
         <Input type="date" aria-label="To date" value={to} onChange={(e) => setTo(e.target.value)} className="h-10 rounded-xl" />
         <div className="relative">
           <Search className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
-          <Input aria-label="Search invoices" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Number, customer, email or order id" className="h-10 rounded-xl pl-9" />
+          <Input aria-label="Search invoices" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Number, customer, email or order (CP-000123)" className="h-10 rounded-xl pl-9" />
         </div>
         <Button type="submit" variant="outline" className="h-10 rounded-xl">Search</Button>
       </form>
@@ -552,7 +554,7 @@ const InvoicesAdminPage = () => {
                       {inv.buyer_email && <p className="text-xs text-muted-foreground">{inv.buyer_email}</p>}
                     </TableCell>
                     <TableCell className="py-4 text-xs font-mono" title={inv.order_id}>
-                      <Link to={orderPathForInvoice(inv.order_id)} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline underline-offset-2">{shortId(inv.order_id)}</Link>
+                      <Link to={orderPathForInvoice(inv.order_id)} onClick={(e) => e.stopPropagation()} className="text-primary hover:underline underline-offset-2">{invoiceOrderRef(inv)}</Link>
                     </TableCell>
                     <TableCell className="py-4 text-right font-bold tabular-nums">{inv.kind === 'credit_note' ? `−${fmtMoney(inv.total_aud)}` : fmtMoney(inv.total_aud)}</TableCell>
                     <TableCell className="py-4 text-right tabular-nums text-muted-foreground">{fmtMoney(inv.gst_aud)}</TableCell>

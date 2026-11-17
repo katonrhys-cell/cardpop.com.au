@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { orderRef } from '@/utils/orderRef.js';
 
 // Admin → Promo Codes. Create checkout codes with any % off, a validity window,
 // a one-off or ongoing usage policy and a note of who each code was given to,
@@ -622,7 +623,7 @@ const PromoCodesAdminPage = () => {
                       <TableCell className="text-xs">
                         {r.order ? (
                           <>
-                            <p className="font-mono">#{String(r.order.id).slice(0, 8)}</p>
+                            <p className="font-mono">#{orderRef({ order_number: r.order_number, id: r.order.id })}</p>
                             <p className="text-muted-foreground">{fmtMoney(r.order.total_aud)} · {r.order.status}</p>
                           </>
                         ) : '—'}

@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { orderRef } from '@/utils/orderRef.js';
 
 // Chargeback queue — reads/resolves through the admin-gated backend. On a new
 // dispute the webhook already froze the payout; here admins release it (if the
@@ -174,7 +175,7 @@ const DisputesAdminPage = () => {
                       <TableCell className="py-4">
                         {d.order_id ? (
                           <Link to={`/admin/orders`} className="inline-flex items-center gap-1 text-xs font-mono text-primary hover:underline">
-                            {String(d.order_id).slice(0, 8)} <ExternalLink className="w-3 h-3" />
+                            {orderRef(d)} <ExternalLink className="w-3 h-3" />
                           </Link>
                         ) : <span className="text-xs text-muted-foreground">—</span>}
                       </TableCell>

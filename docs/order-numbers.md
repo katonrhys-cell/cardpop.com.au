@@ -51,6 +51,8 @@ hand-write `order.id.slice(0, 8)` into a page.
 | Order confirmation, admin "new order" notice | `emailService` looks it up (`fetchOrderNumbers`) and passes `orderNumber` to the template |
 | Shipped / delivered emails, refund-request alert | `orderRefFor(orderId)` in `shipmentService.js` / `routes/refunds.js` |
 | Tax invoice / credit note PDF | `buildInvoicePdf()` adds `order_number` to the row; prints `Order: CP-000123` |
+| Admin → Invoices, Promo Codes (usage history), Product Reviews, Disputes | the list endpoint runs its rows through `attachOrderNumbers()` (`src/utils/orderNumbers.js`: one chunked, best-effort query, rows returned untouched on failure); the page prints `orderRef(row)` |
+| Admin → Finance & Tax, Analytics, Revenue breakdown, User detail | read `orders` from the browser, so `order_number` comes with the row (Finance & Tax adds it to its explicit column list); `orderRef(order)` |
 
 Server code that selects an **explicit column list** must not add `order_number`
 to it: during the deploy window the unknown column would fail the whole read —
@@ -62,7 +64,12 @@ receipt is never held up or broken by a cosmetic lookup.
 ## Searching
 
 Admin → Order Management matches the number (`cp-000123`, or just `123`), the
-order id, buyer, checkout email and shipping name.
+order id, buyer, checkout email and shipping name. Admin → Invoices matches a
+typed order number too — `cp-123` and `CP-000123` both work
+(`normaliseOrderNumber()` in `utils/orderRef.js`; the `CP-` prefix is required,
+bare digits would collide with invoice numbers) — by resolving it to the order
+(`orderIdForNumber()`) and filtering the invoices on that order. A number that
+matches no order returns no invoices.
 
 ## Testing
 

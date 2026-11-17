@@ -49,7 +49,14 @@ beforeEach(() => {
       return json({ redemptions: [{
         id: 'r1', status: 'redeemed', discount_aud: 12.5, reserved_at: '2026-10-01T01:59:00Z',
         redeemed_at: '2026-10-01T02:00:00Z', buyer: { display_name: 'Sam', email: 'sam@example.com' },
+        // the API attaches the order's sequential number to each redemption
+        order_number: 'CP-000042',
         order: { id: 'abcdef12-0000', total_aud: 62.45, status: 'payment_confirmed' },
+      }, {
+        // an order with no number yet falls back to the short id
+        id: 'r2', status: 'reserved', discount_aud: 5, reserved_at: '2026-10-02T01:59:00Z',
+        buyer: { display_name: 'Jo', email: 'jo@example.com' },
+        order: { id: '12345678-0000', total_aud: 20, status: 'pending' },
       }] });
     }
     return json({});
@@ -109,7 +116,8 @@ describe('PromoCodesAdminPage', () => {
     render(<PromoCodesAdminPage />);
     await screen.findByText('SAM-VIP');
     await user.click(screen.getByRole('button', { name: 'Usage history for SAM-VIP' }));
-    expect(await screen.findByText('#abcdef12')).toBeInTheDocument();
+    expect(await screen.findByText('#CP-000042')).toBeInTheDocument();
+    expect(screen.getByText('#12345678')).toBeInTheDocument();
     expect(screen.getByText('redeemed')).toBeInTheDocument();
   });
 });

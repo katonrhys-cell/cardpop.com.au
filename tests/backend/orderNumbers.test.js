@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { orderRef, shortOrderId } from '../../utils/orderRef.js';
+import { orderRef, shortOrderId, normaliseOrderNumber } from '../../utils/orderRef.js';
 
 vi.mock('../../src/utils/logger.js', () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -7,7 +7,9 @@ vi.mock('../../src/utils/logger.js', () => ({
 // The default (service-role) client is never reached: every test passes its own.
 vi.mock('../../src/utils/supabaseClient.js', () => ({ supabase: {}, default: {} }));
 
-const { fetchOrderNumbers, orderRefFor, ORDER_NUMBER_LOOKUP_TIMEOUT_MS } = await import('../../src/utils/orderNumbers.js');
+const {
+  fetchOrderNumbers, orderRefFor, attachOrderNumbers, orderIdForNumber, ORDER_NUMBER_LOOKUP_TIMEOUT_MS,
+} = await import('../../src/utils/orderNumbers.js');
 
 // A client whose `from('orders').select().in()` resolves to `result` (or hangs / throws).
 const clientReturning = (result) => {
@@ -100,5 +102,80 @@ describe('orderRefFor', () => {
 
   it('returns an empty string for no id', async () => {
     expect(await orderRefFor(null, clientReturning({ data: [], error: null }).client)).toBe('');
+  });
+});
+
+describe('normaliseOrderNumber', () => {
+  it('turns what an admin types into the canonical order number', () => {
+    expect(normaliseOrderNumber('CP-000123')).toBe('CP-000123');
+    expect(normaliseOrderNumber('cp-123')).toBe('CP-000123');
+    expect(normaliseOrderNumber(' cp 7 ')).toBe('CP-000007');
+    expect(normaliseOrderNumber('CP1234567')).toBe('CP-1234567');
+  });
+
+  it('refuses anything that is not explicitly an order number', () => {
+    // bare digits are too ambiguous in a search box (invoice numbers, amounts)
+    for (const v of ['123', 'INV-000123', 'CP-', 'CP-abc', 'CP-12 34', '', null, undefined]) {
+      expect(normaliseOrderNumber(v)).toBeNull();
+    }
+  });
+});
+
+describe('attachOrderNumbers', () => {
+  it('adds order_number to the rows whose order has one, leaving the rest alone', async () => {
+    const { client } = clientReturning({ data: [{ id: 'o1', order_number: 'CP-000001' }], error: null });
+    const rows = [{ id: 'r1', order_id: 'o1' }, { id: 'r2', order_id: 'o2' }, { id: 'r3', order_id: null }];
+    const out = await attachOrderNumbers(rows, { client });
+    expect(out[0]).toEqual({ id: 'r1', order_id: 'o1', order_number: 'CP-000001' });
+    expect(out[1]).toEqual({ id: 'r2', order_id: 'o2' });
+    expect(out[2]).toEqual({ id: 'r3', order_id: null });
+    expect(rows[0]).not.toHaveProperty('order_number'); // input not mutated
+  });
+
+  it('returns the rows unchanged when the lookup fails', async () => {
+    const { client } = clientReturning({ data: null, error: { message: 'boom' } });
+    const rows = [{ id: 'r1', order_id: 'o1' }];
+    expect(await attachOrderNumbers(rows, { client })).toEqual(rows);
+  });
+
+  it('reads the id from a custom key', async () => {
+    const { client } = clientReturning({ data: [{ id: 'o9', order_number: 'CP-000009' }], error: null });
+    const out = await attachOrderNumbers([{ ref: 'o9' }], { idKey: 'ref', client });
+    expect(out[0].order_number).toBe('CP-000009');
+  });
+
+  it('copes with no rows', async () => {
+    const { client } = clientReturning({ data: [], error: null });
+    expect(await attachOrderNumbers([], { client })).toEqual([]);
+    expect(await attachOrderNumbers(undefined, { client })).toEqual([]);
+    expect(client.from).not.toHaveBeenCalled();
+  });
+
+  it('looks long lists up in chunks so the request URL stays short', async () => {
+    const { client, inFn } = clientReturning({ data: [], error: null });
+    const rows = Array.from({ length: 250 }, (_, i) => ({ order_id: `o${i}` }));
+    await attachOrderNumbers(rows, { client });
+    expect(inFn).toHaveBeenCalledTimes(3);
+    expect(inFn.mock.calls.map((c) => c[1].length)).toEqual([100, 100, 50]);
+  });
+});
+
+describe('orderIdForNumber', () => {
+  const clientFinding = (result) => {
+    const maybeSingle = vi.fn(() => Promise.resolve(result));
+    const eq = vi.fn(() => ({ maybeSingle }));
+    return { client: { from: vi.fn(() => ({ select: vi.fn(() => ({ eq })) })) }, eq };
+  };
+
+  it('finds the order behind a number', async () => {
+    const { client, eq } = clientFinding({ data: { id: 'order-1' }, error: null });
+    expect(await orderIdForNumber('CP-000123', client)).toBe('order-1');
+    expect(eq).toHaveBeenCalledWith('order_number', 'CP-000123');
+  });
+
+  it('returns null for an unknown number, an error, or no number', async () => {
+    expect(await orderIdForNumber('CP-000999', clientFinding({ data: null, error: null }).client)).toBeNull();
+    expect(await orderIdForNumber('CP-000123', clientFinding({ data: null, error: { message: 'x' } }).client)).toBeNull();
+    expect(await orderIdForNumber(null, clientFinding({ data: null, error: null }).client)).toBeNull();
   });
 });

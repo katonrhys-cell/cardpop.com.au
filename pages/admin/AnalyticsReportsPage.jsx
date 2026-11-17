@@ -29,6 +29,7 @@ import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
 import OrderDetailDialog from '@/components/admin/OrderDetailDialog.jsx';
 import { PAID_ORDER_STATUSES } from '@/utils/revenue.js';
+import { orderRef } from '@/utils/orderRef.js';
 
 // Orders sit in 'pending' until Stripe confirms payment, and can end in
 // 'payment_failed'/'cancelled' without money ever changing hands — none of
@@ -206,9 +207,9 @@ const AnalyticsReportsPage = () => {
       ['Events', stats.events],
       [],
       ['Recent Orders'],
-      ['Order ID', 'Date', 'Buyer', 'Status', 'Amount (AUD)'],
+      ['Order', 'Date', 'Buyer', 'Status', 'Amount (AUD)'],
       ...recentOrders.map((o) => [
-        o.order_number || o.id,
+        orderRef(o),
         new Date(o.created_at).toLocaleDateString('en-AU'),
         o.profiles?.display_name || o.profiles?.username || o.buyer_id || 'Unknown User',
         o.status || 'Pending',
@@ -423,7 +424,7 @@ const AnalyticsReportsPage = () => {
                         onClick={() => setViewOrderId(order.id)}
                         className="text-primary hover:underline underline-offset-2"
                       >
-                        {order.order_number || order.id}
+                        {orderRef(order)}
                       </button>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-sm">
