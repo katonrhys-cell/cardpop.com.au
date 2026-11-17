@@ -65,10 +65,8 @@ Each is priced at the manufacturer RRP. The wholesale cost from the Palms Off
 trade price list is stored in `shop_product_costs`, so Admin → Products shows
 the margin.
 
-Before stock arrives, two things need doing in Admin → Products:
+Before stock arrives, one thing needs doing in Admin → Products:
 
-- **SKUs** are placeholders (`ACRYSHIELD-…`). Replace them with Palms Off's
-  SKUs once you have them.
 - **Photos** were cropped from the supplier's listing and are small, served
   from `public/images/shop/acryshield/`. Upload the supplier's full-size
   images when you can get them.
@@ -102,8 +100,13 @@ count.
 
 The same migration refreshes the wholesale costs of the eight earlier cases
 from the supplier's November price list and records the supplier's SKU for each
-in `shop_product_costs.supplier_sku`. Their shop SKUs are still the
-`ACRYSHIELD-…` placeholders.
+in `shop_product_costs.supplier_sku`. It then swaps their placeholder shop SKUs
+(`ACRYSHIELD-…`) for the supplier's: `MC-AS-ETB-P`, `MC-AS-BB-P`,
+`MC-AS-BB-JPMS`, `MC-AS-JBB-HC`, `BOX-UPC-151`, `BOX-JPN-COL`, `BOX-TD-WOTC`
+and `PE-SPC`. The PSA Graded Card Stand keeps `ACRYSHIELD-PSA-STAND`, because
+the supplier no longer lists it. The SKU is the offer id Google Merchant Center
+reads from the product page, so Google re-lists those eight under the new ids
+on its next crawl.
 
 ## What the buyer sees
 

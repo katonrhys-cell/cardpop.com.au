@@ -45,6 +45,9 @@
 -- only touches a row still on pre-order, and a cost is only updated while it
 -- still holds the figure the earlier migration seeded. A re-run, or an admin's
 -- later edit, is left alone.
+--
+-- Last, the eight earlier cases swap their placeholder ACRYSHIELD-… SKUs for
+-- the supplier's (step 5).
 
 -- 1. Stackable cases: two lines × five base colours.
 with lines(line, family_sku, title, slug, img, fits, made_for, rrp, cost_ex, cost_inc) as (
@@ -196,8 +199,7 @@ where upper(sku) in ('ACRYSHIELD-MEW-UPC', 'ACRYSHIELD-JPN-COLLECTION')
 
 -- 4. Supplier costs for the cases already in the shop. The wholesale price list
 --    has moved by a few cents since October, and it now gives the supplier's
---    SKUs (the shop's own ACRYSHIELD-… SKUs are left as they are). A cost is
---    only replaced while it still holds the October figure.
+--    SKUs. A cost is only replaced while it still holds the October figure.
 with current_list(sku, supplier_sku, old_ex, cost_ex, cost_inc) as (
   values
     ('ACRYSHIELD-ETB',             'MC-AS-ETB-P',   24.25, 24.30, 26.73),
@@ -219,3 +221,31 @@ from current_list l
 join public.shop_products p on upper(p.sku) = l.sku
 where c.product_id = p.id
   and c.wholesale_ex_gst_aud = l.old_ex;
+
+-- 5. Swap the eight placeholder SKUs (ACRYSHIELD-…) for the supplier's own, now
+--    that the wholesale site gives them. Runs last: steps 3 and 4 find the rows
+--    by their placeholder SKU. No order has been placed under a placeholder SKU
+--    and nothing references a shop SKU by foreign key. The SKU is the offer id
+--    Google Merchant Center reads from the product markup, so Google will pick
+--    these eight up again under their new ids on its next crawl.
+--
+--    The PSA Graded Card Acrylic Stand keeps ACRYSHIELD-PSA-STAND: the supplier
+--    no longer lists it, so there is no SKU to take.
+with real_skus(old_sku, new_sku) as (
+  values
+    ('ACRYSHIELD-ETB',             'MC-AS-ETB-P'),
+    ('ACRYSHIELD-BOOSTER-BOX',     'MC-AS-BB-P'),
+    ('ACRYSHIELD-JPN-STANDARD',    'MC-AS-BB-JPMS'),
+    ('ACRYSHIELD-MEW-UPC',         'BOX-UPC-151'),
+    ('ACRYSHIELD-JPN-HIGH-CLASS',  'MC-AS-JBB-HC'),
+    ('ACRYSHIELD-PRE-SPC',         'PE-SPC'),
+    ('ACRYSHIELD-JPN-COLLECTION',  'BOX-JPN-COL'),
+    ('ACRYSHIELD-WOTC-THEME-DECK', 'BOX-TD-WOTC')
+)
+update public.shop_products p
+set sku = r.new_sku
+from real_skus r
+where upper(p.sku) = r.old_sku
+  and not exists (
+    select 1 from public.shop_products x where upper(x.sku) = r.new_sku
+  );
