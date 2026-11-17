@@ -49,7 +49,9 @@ async function countUnreviewedDrafts() {
     .from('blog_articles')
     .select('id', { count: 'exact', head: true })
     .eq('auto_generated', true)
-    .eq('is_published', false);
+    .eq('is_published', false)
+    // A draft with a publish date has been reviewed — it is queued, not waiting.
+    .is('publish_on', null);
   if (error) {
     logger.warn(`[BLOG_GEN] Could not count unreviewed drafts, generating anyway: ${error.message}`);
     return null;
