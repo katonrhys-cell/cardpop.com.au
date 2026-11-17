@@ -168,7 +168,7 @@ describe('mapCardSightToFormFields', () => {
   it('omits gradingCompany for unknown services but keeps the grade', () => {
     const fields = mapCardSightToFormFields({
       identified: true,
-      grading: { company: 'ACE Grading', grade: 9 },
+      grading: { company: 'Foo Grading Co', grade: 9 },
     });
     expect(fields.gradingCompany).toBeUndefined();
     expect(fields.grade).toBe('9');

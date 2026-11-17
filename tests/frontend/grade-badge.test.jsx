@@ -33,7 +33,7 @@ describe('GradeBadge', () => {
     // Tailwind's hex for each background shade the badges use.
     const HEX = {
       'red-600': '#dc2626', 'blue-700': '#1d4ed8', 'green-700': '#15803d',
-      'orange-700': '#c2410c', 'purple-600': '#9333ea', 'slate-600': '#475569',
+      'orange-700': '#c2410c', 'purple-600': '#9333ea', 'slate-600': '#475569', 'neutral-900': '#171717',
     };
     const lum = (hex) => {
       const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
