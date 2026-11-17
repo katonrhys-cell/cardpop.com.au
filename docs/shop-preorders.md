@@ -65,11 +65,8 @@ Each is priced at the manufacturer RRP. The wholesale cost from the Palms Off
 trade price list is stored in `shop_product_costs`, so Admin → Products shows
 the margin.
 
-Before stock arrives, one thing needs doing in Admin → Products:
-
-- **Photos** were cropped from the supplier's listing and are small, served
-  from `public/images/shop/acryshield/`. Upload the supplier's full-size
-  images when you can get them.
+The photos it seeded were small crops from the supplier's listing. They have
+since been replaced (see below).
 
 ### Stackable cases, the single-card case and sold-out lines
 
@@ -107,6 +104,18 @@ and `PE-SPC`. The PSA Graded Card Stand keeps `ACRYSHIELD-PSA-STAND`, because
 the supplier no longer lists it. The SKU is the offer id Google Merchant Center
 reads from the product page, so Google re-lists those eight under the new ids
 on its next crawl.
+
+Six of the earlier cases (Booster Box, Japanese High Class, Japanese Standard,
+Mew UPC, Prismatic Evolutions SPC and WOTC Theme Deck) swap their interim
+cropped photo for three full-size supplier photos each
+(`public/images/shop/acryshield/<case>-1.jpg` to `-3.jpg`). The Elite Trainer
+Box and Japanese Collection Box cases already had photos uploaded in Admin →
+Products and are left as they are. The old interim files stay in the folder so
+nothing 404s between the deploy and the migration; they are no longer used.
+
+The **PSA Graded Card Acrylic Stand** is no longer on the supplier's site, so
+the migration sets it to **Draft** (hidden from the shop). Set it back to
+Pre-order in Admin → Products if it can be sourced again.
 
 ## What the buyer sees
 

@@ -47,7 +47,9 @@
 -- later edit, is left alone.
 --
 -- Last, the eight earlier cases swap their placeholder ACRYSHIELD-… SKUs for
--- the supplier's (step 5).
+-- the supplier's (step 5), the six still showing an interim cropped photo get
+-- the supplier's full-size ones (step 6), and the PSA Graded Card Acrylic
+-- Stand, which the supplier no longer lists, goes to draft (step 7).
 
 -- 1. Stackable cases: two lines × five base colours.
 with lines(line, family_sku, title, slug, img, fits, made_for, rrp, cost_ex, cost_inc) as (
@@ -249,3 +251,40 @@ where upper(p.sku) = r.old_sku
   and not exists (
     select 1 from public.shop_products x where upper(x.sku) = r.new_sku
   );
+
+-- 6. Full-size supplier photos for the six cases still showing the interim
+--    crop the October migration seeded (three views each: angled, front, side).
+--    Keyed by slug, since step 5 has just changed the SKUs, and only where the
+--    lead photo is still that interim file — the Elite Trainer Box and Japanese
+--    Collection Box cases already carry photos uploaded in Admin → Products and
+--    are left alone. The WOTC case keeps its packaging shot, now last.
+with photos(slug, old_lead, img, extra) as (
+  values
+    ('acryshield-pokemon-booster-box-acrylic-case', 'booster-box', 'booster-box', null),
+    ('acryshield-japanese-high-class-booster-box-acrylic-case', 'japanese-high-class', 'japanese-high-class', null),
+    ('acryshield-japanese-standard-booster-box-acrylic-case', 'japanese-standard', 'japanese-standard', null),
+    ('acryshield-mew-ultra-premium-collection-acrylic-case', 'mew-upc', 'mew-upc', null),
+    ('acryshield-prismatic-evolutions-super-premium-collection-acrylic-case', 'prismatic-spc', 'prismatic-spc', null),
+    ('acryshield-wotc-theme-deck-display-acrylic-case', 'wotc-theme-deck_pkg', 'wotc-theme-deck', 'wotc-theme-deck_pkg')
+)
+update public.shop_products p
+set images = jsonb_build_array(
+      'https://cardpop.com.au/images/shop/acryshield/' || ph.img || '-1.jpg',
+      'https://cardpop.com.au/images/shop/acryshield/' || ph.img || '-2.jpg',
+      'https://cardpop.com.au/images/shop/acryshield/' || ph.img || '-3.jpg'
+    ) || case when ph.extra is null then '[]'::jsonb
+              else jsonb_build_array('https://cardpop.com.au/images/shop/acryshield/' || ph.extra || '.jpg') end,
+    image_url = 'https://cardpop.com.au/images/shop/acryshield/' || ph.img || '-1.jpg'
+from photos ph
+where p.slug = ph.slug
+  and p.image_url = 'https://cardpop.com.au/images/shop/acryshield/' || ph.old_lead || '.jpg';
+
+-- 7. The PSA Graded Card Acrylic Stand is no longer on the supplier's site, so
+--    it can't be offered as a pre-order: hide it (draft) until it can be
+--    sourced again. No order has been placed for it. Draft keeps the product,
+--    its page slug and its cost row; set it back to Pre-order in Admin →
+--    Products to bring it back.
+update public.shop_products
+set status = 'draft'
+where upper(sku) = 'ACRYSHIELD-PSA-STAND'
+  and status = 'preorder';
