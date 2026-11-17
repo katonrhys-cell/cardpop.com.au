@@ -12,7 +12,11 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import OrganiserPageEditor from '@/components/events/OrganiserPageEditor.jsx';
 import OrganiserMessageDialog from '@/components/events/OrganiserMessageDialog.jsx';
 import OrganiserInbox from '@/components/events/OrganiserInbox.jsx';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
+import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
+import EventVideos from '@/components/events/EventVideos.jsx';
+import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
+import { cleanEventVideos } from '@/utils/eventVideos.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -85,6 +89,7 @@ export default function EventOrganiserPage() {
         let { data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
         // The profile columns ship in a migration; fall back to the original
         // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(BASE_ORGANISER_COLUMNS));
         if (orgError) throw orgError;
@@ -139,6 +144,8 @@ export default function EventOrganiserPage() {
   // The owner reads messages here; everyone else can send one.
   const isOwner = Boolean(currentUser?.id) && org?.owner_id === currentUser.id;
   const total = upcoming.length + past.length;
+  const albums = cleanGalleryAlbums(org?.gallery_albums);
+  const videos = cleanEventVideos(org?.videos);
   const description = name
     ? `Card shows and trading card events hosted by ${name}: ${upcoming.length} upcoming and ${past.length} past event${past.length === 1 ? '' : 's'} on CardPop.`
     : '';
@@ -207,6 +214,13 @@ export default function EventOrganiserPage() {
           )}
         </div>
       </section>
+
+      {status === 'ready' && (albums.length > 0 || videos.length > 0) && (
+        <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-12 space-y-10">
+          <EventPhotoAlbums albums={albums} eventName={name} title="Photos from past events" headingId="org-photo-gallery" />
+          <EventVideos videos={videos} eventName={name} headingId="org-videos" />
+        </div>
+      )}
 
       <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 py-12 space-y-14">
         {status === 'loading' ? (

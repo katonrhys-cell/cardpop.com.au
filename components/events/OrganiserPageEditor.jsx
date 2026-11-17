@@ -12,6 +12,11 @@ import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoUrl } from '@/ut
 import { normalizeEventUrl, isValidHttpUrl } from '@/utils/eventFormValidation.js';
 import { ORGANISER_PAGE_COLUMNS, MAX_EXTRA_LOGOS } from '@/utils/organiserPage.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
+import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
+import { uploadEventImage } from '@/utils/uploadEventImage.js';
+import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
+import { cleanEventVideos, emptyVideo } from '@/utils/eventVideos.js';
 
 // The organiser's own edit of their public page. RLS lets the page's owner (or
 // an admin) update it; the guard trigger in 20261110224209 pins the name, slug
@@ -43,6 +48,13 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
   // or a newly picked file, kept in display order.
   const savedExtras = Array.isArray(org.extra_logo_urls) ? org.extra_logo_urls : [];
   const [extras, setExtras] = useState(() => savedExtras.map((url) => ({ key: url, url })));
+  // Photos and videos from past events — the same editors the event form uses.
+  const savedAlbums = cleanGalleryAlbums(org.gallery_albums);
+  const savedVideos = cleanEventVideos(org.videos).map(({ title, url }) => ({ title, url }));
+  const [albums, setAlbums] = useState(() => (savedAlbums.length
+    ? savedAlbums.map((a) => ({ title: a.title, photos: a.images.map((url) => ({ url })) }))
+    : [emptyAlbum()]));
+  const [videos, setVideos] = useState(() => (savedVideos.length ? savedVideos : [emptyVideo()]));
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -87,6 +99,24 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       if (extrasChanged) {
         row.extra_logo_urls = await Promise.all(extras.map((item) => (item.file ? uploadEventOrganiserLogo(item.file) : item.url)));
       }
+      // Photos picked this session go up now under their own immutable paths;
+      // saved ones keep their URL. Only write the columns when they changed so
+      // a save still works before the migration has landed.
+      const uploadedAlbums = [];
+      for (const [a, album] of albums.entries()) {
+        const images = [];
+        for (const [i, photo] of album.photos.entries()) {
+          images.push(photo.url || await uploadEventImage(photo.file, {
+            folder: 'organisers/gallery',
+            stem: `${Date.now()}-${a}-${i}-${Math.random().toString(36).slice(2, 7)}`,
+          }));
+        }
+        uploadedAlbums.push({ title: album.title.trim(), images });
+      }
+      const nextAlbums = cleanGalleryAlbums(uploadedAlbums);
+      if (JSON.stringify(nextAlbums) !== JSON.stringify(savedAlbums)) row.gallery_albums = nextAlbums;
+      const nextVideos = cleanEventVideos(videos).map(({ title, url }) => ({ title, url }));
+      if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = nextVideos;
       const { data, error } = await supabase
         .from('event_organisers').update(row).eq('id', org.id).select(ORGANISER_PAGE_COLUMNS).maybeSingle();
       if (error) throw error;
@@ -104,7 +134,7 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !busy && onOpenChange(v)}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit {org.name}</DialogTitle>
           <DialogDescription>
@@ -154,6 +184,8 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
             <Textarea id="org-desc" rows={5} maxLength={2000} value={form.description} onChange={set('description')} disabled={busy} placeholder="Who you are, what you run and where." />
             <p className="text-xs text-muted-foreground text-right">{form.description.length}/2000</p>
           </div>
+          <EventGalleryEditor value={albums} onChange={setAlbums} disabled={busy} />
+          <EventVideosEditor value={videos} onChange={setVideos} disabled={busy} />
           {LINKS.map(([key, label, placeholder]) => (
             <div key={key} className="space-y-1.5">
               <Label htmlFor={`org-${key}`} className="text-xs font-bold uppercase tracking-wide">{label}</Label>

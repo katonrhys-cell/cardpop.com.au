@@ -75,3 +75,12 @@ describe('organiserLogos (joint organisers)', () => {
     expect(organiserLogos(null)).toEqual([]);
   });
 });
+
+describe('organiser page photos and videos columns', () => {
+  it('reads gallery_albums and videos only in the full column set', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_PAGE_COLUMNS).toContain('gallery_albums');
+    expect(m.ORGANISER_PAGE_COLUMNS).toContain('videos');
+    expect(m.ORGANISER_LINK_COLUMNS).not.toContain('gallery_albums');
+  });
+});
