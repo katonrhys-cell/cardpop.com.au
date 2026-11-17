@@ -6,6 +6,7 @@ import { CreditCard, Loader2, ShieldCheck } from 'lucide-react';
 import { TRIAL_DAYS, TIER_PRICES_AUD, PAYMENT_PROVIDERS, normalizePaidTier } from '@/config/subscription.js';
 import { PLANS } from '@/config/plans.js';
 import { getReferralCode } from '@/lib/referral.js';
+import StripeWordmark from '@/components/StripeWordmark.jsx';
 
 /**
  * The "Join" step of a CardPop membership. `tier` picks which paid plan is
@@ -17,6 +18,9 @@ import { getReferralCode } from '@/lib/referral.js';
  * non-zero TRIAL_DAYS brings the "free, then charged" copy back.
  * `returnPath` is where the provider sends the user back to.
  */
+// GST inside a GST-inclusive price (1/11 at 10%).
+const gstOf = (price) => (price / 11).toFixed(2);
+
 const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' }) => {
   const [busy, setBusy] = useState(null); // 'stripe' | 'paypal' | null
 
@@ -74,8 +78,15 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
         <p className="mt-1 text-muted-foreground">
           {TRIAL_DAYS > 0
             ? `Add a payment method to unlock CardPop ${tierName}. You won't be charged until your trial ends, and you can cancel anytime before then from Account → Membership.`
-            : `You pay $${priceAud} today for 12 months of CardPop ${tierName} — that is the whole price, nothing is added at checkout. It renews each year until you cancel from Account → Membership, and we email you before every renewal.`}
+            : `You pay $${priceAud} today for 12 months of CardPop ${tierName} — that is the whole price, nothing is added at checkout. It renews each year until you cancel from Account → Membership, and we email you a week before every renewal.`}
         </p>
+        {TRIAL_DAYS === 0 && (
+          <p className="mt-2 text-muted-foreground">
+            <span className="font-medium text-foreground">What&apos;s in the price:</span> GST (${gstOf(priceAud)} of
+            it) is included, and CardPop pays Stripe&apos;s standard card processing fee out of it. There are no extra
+            fees or surcharges on top.
+          </p>
+        )}
       </div>
 
       {PAYMENT_PROVIDERS.includes('stripe') && (
@@ -85,7 +96,7 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
           className="h-12 w-full bg-brand-red font-bold hover:bg-brand-red/90"
         >
           {busy === 'stripe' ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-          {TRIAL_DAYS > 0 ? `Start ${tierName} trial with card` : `Join ${tierName} — pay $${priceAud}`}
+          {TRIAL_DAYS > 0 ? `Start ${tierName} trial with card` : `Join ${tierName} — $${priceAud}`}
         </Button>
       )}
 
@@ -103,8 +114,11 @@ const StartTrialOptions = ({ returnPath = '/account/membership', tier = 'pro' })
         </Button>
       )}
 
-      <p className="text-center text-xs text-muted-foreground">
-        Secured by {PAYMENT_PROVIDERS.includes('paypal') ? 'Stripe & PayPal' : 'Stripe'}. CardPop never sees your card number.
+      <p className="flex flex-wrap items-center justify-center gap-x-1.5 gap-y-1 text-center text-xs text-muted-foreground">
+        <span>Secured by</span>
+        <StripeWordmark className="h-4 w-auto text-[#635BFF]" />
+        {PAYMENT_PROVIDERS.includes('paypal') && <span>&amp; PayPal</span>}
+        <span className="ml-1">CardPop never sees your card number.</span>
       </p>
     </div>
   );
