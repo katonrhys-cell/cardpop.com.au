@@ -568,9 +568,9 @@ const CommunityEventsPage = ({ defaultType = 'all', region = null }) => {
                   <Link
                     to={eventRegionPath(r)}
                     aria-current={region?.slug === r.slug ? 'page' : undefined}
-                    className={`group flex h-full items-center justify-center gap-1.5 rounded-xl border px-3 py-3 text-sm font-semibold text-white text-center shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 ${region?.slug === r.slug ? 'border-brand-red bg-brand-red hover:bg-brand-red/90' : 'border-brand-charcoal dark:border-white/15 bg-brand-charcoal hover:bg-brand-red hover:border-brand-red'}`}
+                    className={`group flex h-full items-center justify-start gap-2 rounded-xl border px-4 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-200 [@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2 ${region?.slug === r.slug ? 'border-brand-red bg-brand-red [@media(hover:hover)]:hover:bg-brand-red/90' : 'border-brand-charcoal dark:border-white/15 bg-brand-charcoal [@media(hover:hover)]:hover:bg-brand-red [@media(hover:hover)]:hover:border-brand-red'}`}
                   >
-                    <MapPin aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 transition-colors ${region?.slug === r.slug ? 'text-white' : 'text-brand-red group-hover:text-white'}`} />
+                    <MapPin aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 transition-colors ${region?.slug === r.slug ? 'text-white' : 'text-brand-red [@media(hover:hover)]:group-hover:text-white'}`} />
                     <span className="sr-only">Card shows in </span>{r.city}
                   </Link>
                 </li>
