@@ -2,10 +2,7 @@ import { callEbayApi } from './ebayClient.js';
 import { getUsdToAudRate } from './exchangeRates.js';
 import supabase from './supabaseClient.js';
 import logger from './logger.js';
-
-// Anything slabbed or described as graded is priced separately from raw copies —
-// mixing the two makes both averages meaningless.
-const GRADED_RE = /\b(psa|bgs|bccg|bvg|cgc|csg|sgc|tag|ksa|hga|gsg|pgs|mnt|rcg|cga|ags|dsg|graad|arena club|aigrading|ace\s?grad\w*|graded)\b/i;
+import { isGradedTitle, summariseListings } from '../../utils/priceSnapshotStats.js';
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
@@ -24,25 +21,6 @@ async function searchMarketplace(query, marketplaceId, limit = 20) {
     headers: { 'X-EBAY-C-MARKETPLACE-ID': marketplaceId },
   });
   return data.itemSummaries || [];
-}
-
-// Trimmed price stats. Listing feeds are noisy — proxies, bundles, damaged
-// copies and mispriced items sit at both tails — so with enough data the top
-// and bottom 10% are dropped before averaging.
-function priceStats(pricesAud) {
-  if (pricesAud.length === 0) return { avg: null, min: null, max: null, count: 0 };
-  let sorted = [...pricesAud].sort((a, b) => a - b);
-  if (sorted.length >= 8) {
-    const cut = Math.floor(sorted.length * 0.1);
-    sorted = sorted.slice(cut, sorted.length - cut);
-  }
-  const avg = sorted.reduce((a, b) => a + b, 0) / sorted.length;
-  return {
-    avg: round2(avg),
-    min: round2(sorted[0]),
-    max: round2(sorted[sorted.length - 1]),
-    count: sorted.length,
-  };
 }
 
 /**
@@ -72,7 +50,7 @@ export async function buildSnapshotForCard(card, usdToAud) {
         title: item.title || '',
         priceAud,
         marketplace,
-        graded: GRADED_RE.test(item.title || ''),
+        graded: isGradedTitle(item.title),
         listingUrl: item.itemWebUrl || '',
         thumbnailUrl: item.image?.imageUrl || '',
       });
@@ -81,10 +59,16 @@ export async function buildSnapshotForCard(card, usdToAud) {
   collect(auResult, 'AU');
   collect(usResult, 'US');
 
-  const raw = listings.filter((l) => !l.graded);
-  const graded = listings.filter((l) => l.graded);
-  const rawStats = priceStats(raw.map((l) => l.priceAud));
-  const gradedStats = priceStats(graded.map((l) => l.priceAud));
+  // Reprints, lots, outliers and raw listings that can't be the same card as
+  // the graded ones are dropped before anything is averaged or shown as a
+  // sample (utils/priceSnapshotStats.js).
+  const { raw, graded, rawStats, gradedStats, dropped } = summariseListings(listings, {
+    cardText: `${card.name || ''} ${card.search_query || ''}`,
+  });
+  const droppedTotal = Object.values(dropped).reduce((a, b) => a + b, 0);
+  if (droppedTotal > 0) {
+    logger.info(`[PRICE_SNAPSHOTS] ${card.slug}: dropped ${droppedTotal} of ${listings.length} listings ${JSON.stringify(dropped)}`);
+  }
 
   // Keep a handful of representative live listings for the page. AU listings
   // first — they're what an Australian buyer can actually act on.
@@ -137,7 +121,7 @@ export async function refreshTrackedCards({ timeBudgetMs = 32000, concurrency = 
 
   const { data: cards, error: cardsError } = await supabase
     .from('tracked_cards')
-    .select('id, slug, search_query')
+    .select('id, slug, name, search_query')
     .eq('active', true);
   if (cardsError) throw new Error(`Failed to load tracked cards: ${cardsError.message}`);
 

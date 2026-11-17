@@ -65,7 +65,7 @@ router.post('/refresh-card', async (req, res) => {
   try {
     const { data: card, error: cardError } = await supabase
       .from('tracked_cards')
-      .select('id, slug, search_query')
+      .select('id, slug, name, search_query')
       .eq('slug', slug)
       .eq('active', true)
       .maybeSingle();

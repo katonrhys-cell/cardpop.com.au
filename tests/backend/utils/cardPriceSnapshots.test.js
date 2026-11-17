@@ -81,8 +81,8 @@ describe('buildSnapshotForCard', () => {
   });
 
   it('trims the top and bottom 10% once there are at least 8 raw prices', async () => {
-    // 10 prices 1..10: 10% trim drops the 1 and the 10, leaving 2..9 (avg 5.5).
-    const prices = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((v) => item(v, 'raw card'));
+    // 10 prices 11..20: 10% trim drops the 11 and the 20, leaving 12..19 (avg 15.5).
+    const prices = [11, 12, 13, 14, 15, 16, 17, 18, 19, 20].map((v) => item(v, 'raw card'));
     mockCallEbayApi
       .mockResolvedValueOnce({ itemSummaries: prices })
       .mockResolvedValueOnce({ itemSummaries: [] });
@@ -92,9 +92,41 @@ describe('buildSnapshotForCard', () => {
 
     const snap = await buildSnapshotForCard({ id: 'c4', slug: 's', search_query: 'q' }, 1);
     expect(snap.raw_count).toBe(8);   // 10 - 2 trimmed
-    expect(snap.raw_avg).toBe(5.5);
-    expect(snap.raw_min).toBe(2);
-    expect(snap.raw_max).toBe(9);
+    expect(snap.raw_avg).toBe(15.5);
+    expect(snap.raw_min).toBe(12);
+    expect(snap.raw_max).toBe(19);
+  });
+
+  it('keeps reprints, lots and implausible raw prices out of the figures and the samples', async () => {
+    mockCallEbayApi
+      .mockResolvedValueOnce({ itemSummaries: [
+        item(4.41, '1986 Fleer Michael Jordan #57 REPRINT'),
+        item(25, 'Michael Jordan rookie card lot of 5'),
+        item(130, '1986 Fleer Michael Jordan #57 rookie'),          // 1% of the graded median
+        item(4800, '1986 Fleer Michael Jordan #57 rookie raw'),
+        item(5200, '1986 Fleer Michael Jordan #57 rookie ungraded'),
+        item(39000, '1986 Fleer Michael Jordan #57 rookie'),         // above every graded copy
+        item(11000, '1986 Fleer Michael Jordan PSA 6'),
+        item(12000, '1986 Fleer Michael Jordan PSA 7'),
+        item(13000, '1986 Fleer Michael Jordan BGS 7.5'),
+        item(14000, '1986 Fleer Michael Jordan SGC 8'),
+        item(16000, '1986 Fleer Michael Jordan Beckett slab 8'),
+        item(259, '1986 Fleer Michael Jordan PSA 10 gem mint'),      // far below the graded median
+      ] })
+      .mockResolvedValueOnce({ itemSummaries: [] });
+
+    const { builder, captured } = captureUpsert();
+    mockSupabase.from.mockReturnValue(builder);
+
+    const snap = await buildSnapshotForCard({ id: 'c7', slug: 'mj', name: 'Michael Jordan 1986 Fleer', search_query: '1986 fleer michael jordan 57' }, 1);
+    expect(snap.raw_count).toBe(2);
+    expect(snap.raw_avg).toBe(5000);
+    expect(snap.graded_count).toBe(5);
+    expect(snap.graded_avg).toBe(13200);
+    expect(snap.raw_avg).toBeLessThan(snap.graded_avg);
+    const sampleTitles = captured.row.sample_listings.map((l) => l.title).join(' | ');
+    expect(sampleTitles).not.toMatch(/reprint|lot of/i);
+    expect(captured.row.sample_listings.every((l) => l.priceAud >= 4800)).toBe(true);
   });
 
   it('throws when BOTH marketplaces are unreachable', async () => {
