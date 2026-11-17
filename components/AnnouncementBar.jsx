@@ -11,7 +11,19 @@ import { WELCOME_DISCOUNT_PCT } from '@/config/welcomeOffer.js';
 // above the header for signed-out visitors, dismisses for the session, and
 // stays out of the way on checkout and the pre-launch page.
 const STORAGE_KEY = 'cardpop_announcement_dismissed';
-export const QUIET_PREFIXES = ['/checkout', '/checkout-success', '/success', '/launch', '/admin', '/login', '/signup', '/welcome', '/verify-identity'];
+// Members-only pages (ProtectedRoute in App.jsx). A signed-in member never sees
+// the bar, and a signed-out visitor is sent straight to /login — where the bar
+// is quiet — so showing it here only made it flash and vanish, jolting the page
+// up by its height during the redirect. (/vault itself is left out: the prefix
+// would also quiet the public /vault/welcome page.)
+export const MEMBER_ONLY_PREFIXES = [
+  '/account', '/profile', '/security', '/balance', '/verify-account', '/onboarding', '/my-vault',
+  '/vault/add', '/vault/edit', '/vault/profile', '/messaging', '/transactions', '/trade-requests',
+];
+export const QUIET_PREFIXES = [
+  '/checkout', '/checkout-success', '/success', '/launch', '/admin', '/login', '/signup', '/welcome', '/verify-identity',
+  ...MEMBER_ONLY_PREFIXES,
+];
 
 const readDismissed = () => {
   try { return window.sessionStorage.getItem(STORAGE_KEY) === '1'; } catch { return false; }
