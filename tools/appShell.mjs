@@ -19,7 +19,7 @@
 // Mirrors components/PageLoader.jsx. Inert: the spinner is an inline copy of
 // lucide's Loader2 path (lucide-react is not available at build time).
 export const APP_SHELL_MAIN =
-  '<main class="flex-grow flex flex-col">' +
+  '<main class="flex-grow flex flex-col min-h-[calc(100vh-8rem)]">' +
     '<div class="min-h-[calc(100vh-8rem)] flex flex-col items-center justify-center bg-background">' +
       '<div class="flex flex-col items-center gap-4">' +
         '<div class="relative">' +

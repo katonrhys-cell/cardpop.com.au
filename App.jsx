@@ -319,7 +319,12 @@ const App = () => {
                   <AnnouncementBar />
                   <Header />
                   
-                  <main className="flex-grow flex flex-col">
+                  {/* At least a viewport tall (less the header), the same height
+                      the route loader holds — so the footer starts below the
+                      fold on every page instead of sliding into view under a
+                      short loading state and being pushed back out when the
+                      page's data lands. */}
+                  <main className="flex-grow flex flex-col min-h-[calc(100vh-8rem)]">
                     <RouteErrorBoundary>
                     <Suspense fallback={<PageLoader />}>
                       <MaintenanceGate>
