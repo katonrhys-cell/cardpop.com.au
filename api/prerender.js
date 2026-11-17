@@ -38,7 +38,7 @@ import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
 import {
   STORE_PAGE_COLUMNS, absoluteMediaUrl, cleanStorePhotos, cleanStoreVideos, storeHoursLines, storeIsIndexable,
-  storeJsonLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storeExternalLink,
+  storeJsonLd, storeListItemLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storePhoneHref, storeExternalLink,
 } from '../utils/storePage.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
@@ -4351,7 +4351,7 @@ async function renderStoresCity(supabase, citySlug) {
   const cityInfo = DIRECTORY_CITIES[citySlug];
   const { data: stores } = await supabase
     .from('local_game_stores')
-    .select('slug, name, suburb, city, state, website, categories, description')
+    .select('slug, name, suburb, city, state, address, phone, website, categories, description, opening_hours')
     .eq('status', 'approved')
     .eq('city', citySlug)
     .order('name')
@@ -4381,10 +4381,12 @@ async function renderStoresCity(supabase, citySlug) {
   }).join('\n');
 
   const storeItems = (stores || []).map((store) => {
-    const line = [store.suburb, store.state].filter(Boolean).join(', ');
+    const line = storeLocationLine(store);
     const page = storePath(store);
     const name = page ? `<a href="${BASE_URL}${esc(page)}">${esc(store.name)}</a>` : esc(store.name);
-    return `<li><strong>${name}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
+    const phoneHref = storePhoneHref(store.phone);
+    const hours = storeHoursLines(store.opening_hours);
+    return `<li><strong>${name}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${phoneHref ? `<br/>Phone: <a href="${esc(phoneHref)}">${esc(store.phone)}</a>` : ''}${hours.length ? `<br/>Opening hours: ${esc(hours.join(' · '))}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
   }).join('\n');
 
   const jsonLd = [
@@ -4404,17 +4406,7 @@ async function renderStoresCity(supabase, citySlug) {
       itemListElement: stores.map((store, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        item: {
-          '@type': 'LocalBusiness',
-          name: store.name,
-          ...(store.website ? { url: store.website } : {}),
-          address: {
-            '@type': 'PostalAddress',
-            ...(store.suburb ? { addressLocality: store.suburb } : {}),
-            addressRegion: store.state,
-            addressCountry: 'AU',
-          },
-        },
+        item: storeListItemLd(store),
       })),
     } : null,
     faqPageLd(faqs),

@@ -52,6 +52,35 @@ iPhone note: a `.mov` straight off an iPhone is HEVC, which not every browser
 plays. If a clip shows as a black box for some visitors, export it as MP4
 (H.264) first or put it on YouTube.
 
+### Fill in from website
+
+Typing the address, phone and hours for every shop by hand is why most of the
+directory had none. In the editor, with the shop's **Website** filled in,
+**Fill in from website** asks the server to read the shop's own site
+(`POST /stores/admin/details-from-website`, admins only →
+`src/utils/storeDetails.js`):
+
+1. the homepage, then the shop's own contact / visit-us page if the homepage
+   links to one, both through the SSRF-safe fetcher (`src/utils/safeFetch.js`);
+2. machine-readable details first — schema.org JSON-LD (`address`,
+   `telephone`, `openingHoursSpecification` / `openingHours`, `sameAs`), then
+   `tel:` and Instagram links (`utils/storeDetailsExtract.js`);
+3. only if the street address or the hours are still missing, the page text
+   goes to Claude Haiku under a JSON schema (needs `ANTHROPIC_API_KEY`;
+   recorded in the AI usage ledger as `store_details`).
+
+It fills **blank fields only** and saves nothing: the admin checks the result
+against the website and presses Save. Everything a page or the model reports
+passes through `cleanStoreDetails()` (plain bounded text, a real phone number,
+an Instagram *profile* link). A site that blocks the request or states nothing
+says so in a toast. Shop owners don't get the button — they know their own
+hours.
+
+A shop's street address, phone and opening hours also show on its line of the
+city page (SPA and prerender) and the address and phone in that page's
+`ItemList` markup (`storeListItemLd()`), so filling them in improves the page
+that already ranks, not only the shop's own page.
+
 ## Database
 
 `supabase/migrations/20261114212757_store_pages_media.sql` adds the five

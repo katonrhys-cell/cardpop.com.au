@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, ExternalLink, MapPin, PlusCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, ExternalLink, MapPin, Phone, PlusCircle } from 'lucide-react';
 import SEOHead from '@/components/SEOHead.jsx';
 import BackButton from '@/components/BackButton.jsx';
 import {
@@ -11,7 +11,7 @@ import {
 } from '@/lib/storeDirectory.js';
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '@/utils/cardShopSeo.js';
 import { eventRegionByState, eventRegionPath } from '@/data/eventRegions.js';
-import { storeCoverPhoto, storeLogoUrl, storePath } from '@/utils/storePage.js';
+import { storeCoverPhoto, storeHoursLines, storeListItemLd, storeLocationLine, storeLogoUrl, storePath, storePhoneHref } from '@/utils/storePage.js';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 
 const SITE_ORIGIN = 'https://cardpop.com.au';
@@ -65,17 +65,7 @@ const CardShopsCityPage = () => {
       itemListElement: stores.map((store, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        item: {
-          '@type': 'LocalBusiness',
-          name: store.name,
-          ...(store.website ? { url: store.website } : {}),
-          address: {
-            '@type': 'PostalAddress',
-            ...(store.suburb ? { addressLocality: store.suburb } : {}),
-            addressRegion: store.state,
-            addressCountry: 'AU',
-          },
-        },
+        item: storeListItemLd(store),
       })),
     } : null,
     faqPageLd(faqs),
@@ -148,8 +138,20 @@ const CardShopsCityPage = () => {
                       </h2>
                       <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
                         <MapPin className="w-3.5 h-3.5" />
-                        {[store.suburb, store.state].filter(Boolean).join(', ')}
+                        {storeLocationLine(store)}
                       </div>
+                      {storePhoneHref(store.phone) && (
+                        <div className="text-sm text-muted-foreground flex items-center gap-1 mt-0.5">
+                          <Phone className="w-3.5 h-3.5" />
+                          <a href={storePhoneHref(store.phone)} className="hover:text-foreground hover:underline">{store.phone}</a>
+                        </div>
+                      )}
+                      {storeHoursLines(store.opening_hours).length > 0 && (
+                        <div className="text-sm text-muted-foreground flex items-start gap-1 mt-0.5">
+                          <Clock className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                          <span>{storeHoursLines(store.opening_hours).join(' · ')}</span>
+                        </div>
+                      )}
                       {store.description && (
                         <p className="text-sm text-muted-foreground mt-2">{store.description}</p>
                       )}

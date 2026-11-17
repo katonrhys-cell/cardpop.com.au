@@ -27,7 +27,7 @@ export const STORE_PAGE_COLUMNS =
 
 // What a directory list row reads (city page, hub, local map).
 export const STORE_LIST_COLUMNS =
-  'slug, name, suburb, city, state, website, categories, description, logo_url, photos';
+  'slug, name, suburb, city, state, address, phone, website, categories, description, opening_hours, logo_url, photos';
 
 const trimOrNull = (v) => {
   if (v == null) return null;
@@ -126,6 +126,36 @@ export function storePageDescription(store, cityLabel) {
   const lead = `${store?.name || 'This card shop'} in ${where}`;
   const text = own ? `${lead}: ${own}` : `${lead} — address, opening hours, photos and what it stocks.`;
   return text.length > 300 ? `${text.slice(0, 297).trimEnd()}…` : text;
+}
+
+/**
+ * The LocalBusiness node for one store inside a city page's ItemList — shared
+ * by the SPA city page and the prerender so both emit the same markup. Street
+ * address and phone appear only when the directory holds them.
+ */
+export function storeListItemLd(store) {
+  const address = trimOrNull(store?.address);
+  const suburb = trimOrNull(store?.suburb);
+  const website = storeExternalLink(store?.website);
+  return {
+    '@type': 'LocalBusiness',
+    name: store?.name,
+    ...(website ? { url: website } : {}),
+    ...(trimOrNull(store?.phone) ? { telephone: trimOrNull(store.phone) } : {}),
+    address: {
+      '@type': 'PostalAddress',
+      ...(address ? { streetAddress: address } : {}),
+      ...(suburb ? { addressLocality: suburb } : {}),
+      ...(store?.state ? { addressRegion: store.state } : {}),
+      addressCountry: 'AU',
+    },
+  };
+}
+
+/** A `tel:` href for a store's phone number, or null. */
+export function storePhoneHref(phone) {
+  const digits = String(phone ?? '').replace(/[^\d+]/g, '');
+  return digits.replace(/\D/g, '').length >= 8 ? `tel:${digits}` : null;
 }
 
 /** LocalBusiness (Store) JSON-LD for the page. */
