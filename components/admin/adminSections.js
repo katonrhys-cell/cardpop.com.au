@@ -36,7 +36,7 @@ export const ADMIN_SECTIONS = [
     summary: 'Sales, payments, fees and tax.',
     icon: Wallet,
     items: [
-      { title: 'Orders', description: 'Track, ship and manage every order.', link: '/admin/orders', icon: ListOrdered, keywords: 'order management shipping tracking refunds' },
+      { title: 'Orders', description: 'Track, ship and manage every order.', link: '/admin/orders', icon: ListOrdered, keywords: 'order management shipping tracking refunds delivery' },
       { title: 'Offers', description: 'Marketplace offers: open, unpaid, paid, lapsed.', link: '/admin/offers', icon: HandCoins, keywords: 'enquiries counter' },
       { title: 'Chargebacks', description: 'Payment disputes and frozen payouts.', link: '/admin/disputes', icon: CreditCard, keywords: 'disputes stripe' },
       { title: 'Invoices', description: 'Tax invoices, credit notes and Xero exports.', link: '/admin/invoices', icon: FileText, keywords: 'xero pdf credit note abn' },
@@ -78,7 +78,7 @@ export const ADMIN_SECTIONS = [
     summary: 'Accounts, sellers and moderation.',
     icon: Users,
     items: [
-      { title: 'Users', description: 'Accounts, roles and memberships.', link: '/admin/users', icon: Users, keywords: 'user management members admins accounts' },
+      { title: 'Users', description: 'Accounts, roles and memberships.', link: '/admin/users', icon: Users, keywords: 'user management members admins accounts emails membership ban' },
       { title: 'Sellers', description: 'Featured sellers and promotions.', link: '/admin/sellers', icon: Star, keywords: 'sellers management' },
       { title: 'Verification', description: 'Review ID verification requests.', link: '/admin/verification', icon: ShieldCheck, keywords: 'identity id kyc' },
       { title: 'Reports & Moderation', description: 'Scam, counterfeit and abuse reports.', link: '/admin/reports', icon: Flag, keywords: 'flagged fraud' },
@@ -91,7 +91,7 @@ export const ADMIN_SECTIONS = [
     summary: 'Shows, organisers and reviews.',
     icon: CalendarDays,
     items: [
-      { title: 'Events', description: 'Approve, create and edit events.', link: '/admin/events', icon: Calendar, keywords: 'events management calendar shows scan featured' },
+      { title: 'Events', description: 'Approve, create and edit events.', link: '/admin/events', icon: Calendar, keywords: 'events management calendar shows scan scanner featured rsvp ticket offers organiser edits pending' },
       { title: 'Event Reviews', description: 'Write up the shows CardPop attends.', link: '/admin/event-reviews', icon: ClipboardPen, keywords: 'articles scorecard' },
       { title: 'Organiser Requests', description: 'Confirm members who run events.', link: '/admin/organiser-requests', icon: UserCheck, keywords: 'organizer access applications' },
       { title: 'Organiser Messages', description: 'Held messages and unclaimed pages.', link: '/admin/organiser-messages', icon: Mail, keywords: 'organizer feedback screened' },
@@ -104,7 +104,7 @@ export const ADMIN_SECTIONS = [
     summary: 'Card shops, storefronts and partners.',
     icon: MapPin,
     items: [
-      { title: 'Store Directory', description: 'Card shop pages and owner requests.', link: '/admin/store-directory', icon: MapPin, keywords: 'card shops local game stores owners map' },
+      { title: 'Store Directory', description: 'Card shop pages and owner requests.', link: '/admin/store-directory', icon: MapPin, keywords: 'card shops local game stores shop owner requests claims map' },
       { title: 'Business Profiles', description: 'Retail storefronts in the directory.', link: '/admin/business-profiles', icon: Briefcase, keywords: 'retailers storefront' },
       { title: 'Grading Partners', description: 'Stores that submit to PSA, BGS, CGC…', link: '/admin/grading-partners', icon: Award, keywords: 'psa beckett cgc ace sgc tag submission' },
       { title: 'Partner Program', description: 'Applications, rates and commissions.', link: '/admin/partners', icon: Handshake, keywords: 'affiliates partner codes' },
