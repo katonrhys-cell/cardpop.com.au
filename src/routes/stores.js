@@ -7,6 +7,7 @@ import { requireAdmin } from '../middleware/requireAal2.js';
 import { sendSoleTraderChanged } from '../utils/emailService.js';
 import { getAdminNotificationEmails } from '../utils/adminNotificationRecipient.js';
 import { alertAdminsToReview } from '../services/adminReviewAlerts.js';
+import { readStoreDetails } from '../utils/storeDetails.js';
 
 const router = express.Router();
 
@@ -222,6 +223,30 @@ router.get('/admin', authMiddleware, requireAdmin, async (req, res) => {
   } catch (error) {
     logger.error(`[STORES_ADMIN] ${error.message}`);
     res.status(500).json({ error: 'Failed to load stores' });
+  }
+});
+
+/**
+ * POST /stores/admin/details-from-website   { website, name? }
+ * "Fill in from website" in the store editor: reads the shop's street
+ * address, phone, opening hours and Instagram off its own website
+ * (src/utils/storeDetails.js — SSRF-safe fetch, structured data first, page
+ * text to Claude only when the address or hours are still missing). Saves
+ * nothing: the editor shows what came back for the admin to review.
+ */
+router.post('/admin/details-from-website', authMiddleware, requireAdmin, async (req, res) => {
+  const website = clean(req.body?.website, 500);
+  if (!website) return res.status(400).json({ error: 'Enter the shop website first.' });
+  try {
+    const result = await readStoreDetails(website, {
+      storeName: clean(req.body?.name, 120),
+      userId: req.user?.id || null,
+    });
+    res.json(result);
+  } catch (error) {
+    logger.warn(`[STORES_ADMIN] details-from-website failed: ${error.message}`);
+    // A site that blocks us, times out or 404s is the admin's to see, not a 500.
+    res.status(422).json({ error: `Couldn't read that website: ${error.message}` });
   }
 });
 

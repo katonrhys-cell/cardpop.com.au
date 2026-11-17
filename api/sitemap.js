@@ -19,11 +19,15 @@ const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
 
 const BASE_URL = 'https://cardpop.com.au';
 const TODAY = new Date().toISOString().split('T')[0];
-// Keep recently-finished events in the sitemap for a short window. Their pages
-// still pull search traffic (recaps, "was there a card show in <city>") for a
-// few weeks after the date, so dropping them the instant they end wastes the
-// indexing work. Older events fall out to avoid a growing pile of stale URLs.
-const EVENTS_SINCE = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+// Finished events stay in the sitemap for two years — the same window the
+// Past Events switch on /events shows. Their pages are public, keep their
+// photos, videos and collector reviews, and are what a search for a recurring
+// show ("thornbury card show") lands on between editions; Search Console showed
+// events from three months back still earning impressions after the old
+// 30-day cut-off had dropped them from here. They are listed at a lower
+// priority than upcoming events, and older ones fall out.
+const PAST_EVENT_DAYS = 730;
+const EVENTS_SINCE = new Date(Date.now() - PAST_EVENT_DAYS * 24 * 60 * 60 * 1000)
   .toISOString()
   .split('T')[0];
 // Stable <lastmod> for structural/static pages. Stamping TODAY on every request
@@ -42,8 +46,27 @@ const xmlEscape = (str = '') => String(str)
   .replace(/"/g, '&quot;')
   .replace(/'/g, '&apos;');
 
-const xmlUrl = (loc, lastmod, changefreq, priority) =>
-  `  <url>\n    <loc>${xmlEscape(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+// Google's image sitemap extension: a page's own pictures (event flyer, product
+// photos, article cover) listed under its <url>, so Google Images can find
+// them without rendering the page. Only absolute http(s) URLs are emitted —
+// a site-relative path is resolved against BASE_URL, anything else is dropped.
+const MAX_IMAGES_PER_URL = 5;
+const imageLocs = (...candidates) => {
+  const out = [];
+  for (const raw of candidates.flat()) {
+    if (typeof raw !== 'string') continue;
+    const value = raw.trim();
+    const abs = /^https?:\/\//i.test(value) ? value : (value.startsWith('/') && !value.startsWith('//') ? `${BASE_URL}${value}` : '');
+    if (abs && !out.includes(abs)) out.push(abs);
+    if (out.length >= MAX_IMAGES_PER_URL) break;
+  }
+  return out;
+};
+
+const xmlUrl = (loc, lastmod, changefreq, priority, images = []) =>
+  `  <url>\n    <loc>${xmlEscape(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n${images.map((src) => `    <image:image>\n      <image:loc>${xmlEscape(src)}</image:loc>\n    </image:image>\n`).join('')}  </url>`;
+
+const URLSET_OPEN = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">';
 
 const slugify = (str = '') => String(str)
   .toLowerCase()
@@ -232,7 +255,7 @@ export default async function handler(req, res) {
     const dbData = await Promise.allSettled([
       fetchAll(() => supabase
         .from('blog_articles')
-        .select('id, slug, updated_at, published_at, created_at')
+        .select('id, slug, featured_image_url, updated_at, published_at, created_at')
         .eq('is_published', true)
         .not('slug', 'is', null)
         .order('published_at', { ascending: false })
@@ -255,13 +278,13 @@ export default async function handler(req, res) {
         .order('id'), MAX_ROWS.dealers),
       fetchAll(() => supabase
         .from('shop_products')
-        .select('id, title, slug, category, colour, family_sku, product_type, updated_at, created_at')
+        .select('id, title, slug, category, colour, family_sku, product_type, images, image_url, updated_at, created_at')
         .in('status', PUBLIC_SHOP_STATUSES)
         .order('created_at', { ascending: false })
         .order('id'), MAX_ROWS.products),
       fetchAll(() => supabase
         .from('events')
-        .select('id, slug, state, status, start_date, end_date, updated_at, created_at')
+        .select('id, slug, state, status, start_date, end_date, image_url, updated_at, created_at')
         .in('status', ['approved', 'completed'])
         .gte('start_date', EVENTS_SINCE)
         .order('start_date', { ascending: true })
@@ -369,13 +392,20 @@ export default async function handler(req, res) {
 
     const parts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      URLSET_OPEN,
       '',
       '  <!-- Core & static pages -->',
     ];
 
+    // The calendar pages list the events themselves, so their honest lastmod
+    // is the newest change to any event, not the static-page stamp.
+    const eventsUpdated = events
+      .map((e) => (e.updated_at || e.created_at || '').split('T')[0])
+      .sort().pop();
     for (const p of STATIC_PAGES) {
-      parts.push(xmlUrl(`${BASE_URL}${p.loc}`, p.lastmod, p.freq, p.pri));
+      const isCalendar = p.loc === '/events' || p.loc.startsWith('/events/');
+      const lastmod = isCalendar && eventsUpdated > p.lastmod ? eventsUpdated : p.lastmod;
+      parts.push(xmlUrl(`${BASE_URL}${p.loc}`, lastmod, p.freq, p.pri));
     }
 
     // Content gates shared with api/prerender.js: a shop section or a
@@ -403,7 +433,13 @@ export default async function handler(req, res) {
       parts.push('', `  <!-- Event pages (${events.length}) -->`);
       for (const event of events) {
         const lastmod = (event.updated_at || event.created_at || TODAY).split('T')[0];
-        parts.push(xmlUrl(`${BASE_URL}/events/${event.slug || event.id}`, lastmod, 'weekly', '0.6'));
+        const lastDay = String(event.end_date || event.start_date || '').split('T')[0];
+        const finished = event.status === 'completed' || (lastDay !== '' && lastDay < TODAY);
+        parts.push(xmlUrl(
+          `${BASE_URL}/events/${event.slug || event.id}`, lastmod,
+          finished ? 'yearly' : 'weekly', finished ? '0.4' : '0.7',
+          imageLocs(event.image_url),
+        ));
       }
     }
 
@@ -469,12 +505,16 @@ export default async function handler(req, res) {
       const path = shopProductBasePath(product) || legacyShopProductPath(product);
       if (listed.has(path)) continue;
       listed.add(path);
-      shopUrls.push({ path, lastmod: (product.updated_at || product.created_at || TODAY).split('T')[0] });
+      shopUrls.push({
+        path,
+        lastmod: (product.updated_at || product.created_at || TODAY).split('T')[0],
+        images: imageLocs(product.images, product.image_url),
+      });
     }
     if (shopUrls.length > 0) {
       parts.push('', `  <!-- Shop products (${shopUrls.length}) -->`);
-      for (const { path, lastmod } of shopUrls) {
-        parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.7'));
+      for (const { path, lastmod, images } of shopUrls) {
+        parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.7', images));
       }
     }
 
@@ -506,7 +546,7 @@ export default async function handler(req, res) {
       parts.push('', `  <!-- Blog articles (${articles.length}) -->`);
       for (const article of articles) {
         const lastmod = (article.updated_at || article.published_at || article.created_at || TODAY).split('T')[0];
-        parts.push(xmlUrl(`${BASE_URL}/blog/${article.slug}`, lastmod, 'weekly', '0.7'));
+        parts.push(xmlUrl(`${BASE_URL}/blog/${article.slug}`, lastmod, 'weekly', '0.7', imageLocs(article.featured_image_url)));
       }
     }
 
@@ -582,7 +622,7 @@ export default async function handler(req, res) {
     console.error('Sitemap generation error:', err);
     const fallbackParts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      URLSET_OPEN,
       ...STATIC_PAGES.map(p => xmlUrl(`${BASE_URL}${p.loc}`, p.lastmod, p.freq, p.pri)),
       '</urlset>',
     ];

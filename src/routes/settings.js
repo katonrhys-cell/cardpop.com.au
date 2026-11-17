@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../utils/supabaseClient.js';
 import logger from '../utils/logger.js';
 import { NAV_MENU_ICONS_KEY, cleanNavMenuIcons } from '../../utils/navMenuIcons.js';
+import { BUSINESS_IDENTITY_KEY, cleanBusinessIdentity } from '../../utils/businessIdentity.js';
 
 const router = Router();
 
@@ -41,6 +42,11 @@ const PUBLIC_SETTINGS = {
   // Icons): `{ "<item key>": { image, fit } | { icon } }`. Published here so the
   // menus read them from the settings request every page already makes.
   [NAV_MENU_ICONS_KEY]: {},
+  // Who operates CardPop: the legal name and ABN from Admin → Invoices →
+  // Invoice details, shown on About, Contact, Terms and the footer. The stored
+  // row also holds an address, phone, email and invoice footer note — the
+  // cleaner below publishes the name and a checksum-valid ABN and nothing else.
+  [BUSINESS_IDENTITY_KEY]: { legal_name: '', abn: '' },
 };
 
 // Settings whose value is a structure rather than a boolean/number/string:
@@ -48,6 +54,7 @@ const PUBLIC_SETTINGS = {
 // shape (dropping anything malformed) instead of going through coerce().
 const PUBLIC_SETTING_CLEANERS = {
   [NAV_MENU_ICONS_KEY]: cleanNavMenuIcons,
+  [BUSINESS_IDENTITY_KEY]: cleanBusinessIdentity,
 };
 
 // platform_settings.value is jsonb: booleans store as real JSON booleans, but

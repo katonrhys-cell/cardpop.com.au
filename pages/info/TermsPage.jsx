@@ -1,36 +1,49 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import SEOHead from '@/components/SEOHead.jsx';
 import { ScrollText } from 'lucide-react';
 import InfoPageLayout from '@/components/InfoPageLayout.jsx';
+import BusinessIdentityLine from '@/components/BusinessIdentityLine.jsx';
+import {
+  TERMS_DESCRIPTION, TERMS_INTRO, TERMS_LINKS, TERMS_SECTIONS, TERMS_TITLE, TERMS_UPDATED, TERMS_UPDATED_LABEL,
+} from '@/data/termsOfService.js';
 
-const TermsPage = () => {
-  return (
-    <InfoPageLayout
-      icon={ScrollText}
-      eyebrow="CardPop Australia™"
-      title="Terms of Service"
-      description="The rules and guidelines for using the CardPop™ platform."
-    >
-      <SEOHead title="Terms of Service | CardPop™" description="CardPop™'s terms of service — the rules and guidelines for using the platform." />
+// The wording lives in data/termsOfService.js, which api/prerender.js renders
+// too — edit it there so visitors and crawlers read the same document.
+const TermsPage = () => (
+  <InfoPageLayout
+    icon={ScrollText}
+    eyebrow="CardPop Australia™"
+    title="Terms of Service"
+    description="The agreement between you and CardPop™ when you browse, buy, sell or list on the platform."
+  >
+    <SEOHead title={TERMS_TITLE} description={TERMS_DESCRIPTION} />
 
-      <p className="text-sm text-muted-foreground mb-8">Last Updated: May 10, 2026</p>
+    <p className="text-sm text-muted-foreground mb-2">
+      Last updated: <time dateTime={TERMS_UPDATED}>{TERMS_UPDATED_LABEL}</time>
+    </p>
+    <BusinessIdentityLine className="text-sm text-muted-foreground mb-6" />
+    <p>{TERMS_INTRO}</p>
 
-      <h2>1. Acceptance of Terms</h2>
-      <p>By accessing or using CardPop™, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform.</p>
+    {TERMS_SECTIONS.map((section) => (
+      <section key={section.h2}>
+        <h2>{section.h2}</h2>
+        {section.paras?.map((para) => <p key={para}>{para}</p>)}
+        {section.items?.length > 0 && (
+          <ul>
+            {section.items.map((item) => <li key={item.text}>{item.text}</li>)}
+          </ul>
+        )}
+      </section>
+    ))}
 
-      <h2>2. User Accounts</h2>
-      <p>You must be at least 18 years old to create an account. You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
-
-      <h2>3. Marketplace Rules</h2>
-      <p>Users agree to provide accurate descriptions and images of items listed for sale. CardPop™ reserves the right to remove listings that violate our policies or appear fraudulent.</p>
-
-      <h2>4. Fees and Payments</h2>
-      <p>CardPop™ charges fees for certain services, including sales commissions. All fees are clearly displayed before you commit to a transaction. You agree to pay all applicable fees.</p>
-
-      <h2>5. Limitation of Liability</h2>
-      <p>CardPop™ is a marketplace facilitator. We are not responsible for the actions of individual users, though we provide protection programs as outlined in our Trust &amp; Safety policy.</p>
-    </InfoPageLayout>
-  );
-};
+    <h2>Related policies</h2>
+    <ul>
+      {TERMS_LINKS.map((link) => (
+        <li key={link.href}><Link to={link.href}>{link.text}</Link></li>
+      ))}
+    </ul>
+  </InfoPageLayout>
+);
 
 export default TermsPage;

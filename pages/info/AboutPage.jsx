@@ -1,4 +1,5 @@
 import React from 'react';
+import BusinessIdentityLine from '@/components/BusinessIdentityLine.jsx';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -146,6 +147,7 @@ const AboutPage = () => {
               <div className="p-6 border-t border-border">
                 <p className="font-extrabold text-foreground text-lg leading-tight">Reece Conway</p>
                 <p className="text-sm text-muted-foreground mt-1">Founder, CardPop Australia™ · Melbourne, Victoria</p>
+                <BusinessIdentityLine short className="text-sm text-muted-foreground mt-1" />
               </div>
             </div>
           </div>
@@ -225,6 +227,7 @@ const AboutPage = () => {
               educational resources, our goal remains the same: help collectors spend less
               time worrying about who they can trust, and more time enjoying the hobby they love.
             </p>
+            <BusinessIdentityLine className="font-medium text-foreground" />
           </div>
         </div>
       </section>

@@ -1775,3 +1775,27 @@ describe('prerender article provenance', () => {
     expect(body).not.toContain('How this article was produced');
   });
 });
+
+describe('prerender terms of service and operating entity', () => {
+  it('serves the full terms from the shared data file', async () => {
+    const { TERMS_SECTIONS } = await import('../../data/termsOfService.js');
+    const { status, body } = await run('/terms');
+    expect(status).toBe(200);
+    expect(body.match(/<h2>/g).length).toBeGreaterThanOrEqual(TERMS_SECTIONS.length);
+    expect(body).toContain('<h2>1. About these terms</h2>');
+    expect(body).toContain('Australian Consumer Law');
+    expect(body).toContain('binding for 48 hours');
+    // The business-identity RPC is not stubbed here: the page renders without the line.
+    expect(body).not.toContain('ABN 51');
+  });
+
+  it('states the legal name and ABN on About, Contact and Terms once one is set', async () => {
+    state.rpcResult = { data: { legal_name: 'Example Cards Pty Ltd', abn: '51824753556' }, error: null };
+    for (const path of ['/about', '/contact', '/terms']) {
+      const { body } = await run(path);
+      expect(body).toContain('CardPop Australia™ is operated by Example Cards Pty Ltd (ABN 51 824 753 556).');
+    }
+    // Other static pages do not carry it.
+    expect((await run('/faq')).body).not.toContain('ABN 51 824 753 556');
+  });
+});

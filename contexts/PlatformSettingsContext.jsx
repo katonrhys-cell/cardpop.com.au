@@ -26,6 +26,8 @@ const DEFAULTS = {
   google_workspace_referral_url: 'https://sharegoogleworkspace.advocate.impact.com/mQZonNp',
   // Admin-chosen icons for the header's dropdown items (utils/navMenuIcons.js).
   nav_menu_icons: {},
+  // Who operates CardPop — legal name + ABN (utils/businessIdentity.js).
+  invoice_supplier_details: { legal_name: '', abn: '' },
 };
 
 // The last settings this browser fetched, used as the starting point on the

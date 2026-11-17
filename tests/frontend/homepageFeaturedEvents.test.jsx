@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 
 const homeEvents = vi.hoisted(() => ({ result: { data: [], error: null } }));
@@ -9,7 +9,7 @@ vi.mock('@/lib/homepageData.js', () => ({
 }));
 
 import HomepageFeaturedEvents, { homepageEventsToShow } from '@/components/home/HomepageFeaturedEvents.jsx';
-import { queryHomepageEvents, queryHomepageBundle, bundleHasErrors } from '@/lib/homepageQueries.js';
+import { queryHomepageEvents, queryHomepageBundle, bundleHasErrors, HOMEPAGE_EVENTS_LIMIT } from '@/lib/homepageQueries.js';
 
 const TODAY = '2026-11-10';
 const ev = (over = {}) => ({
@@ -19,9 +19,12 @@ const ev = (over = {}) => ({
 });
 
 describe('homepageEventsToShow', () => {
-  it('keeps upcoming homepage-featured approved events, at most three', () => {
-    const rows = [ev({ id: 'a' }), ev({ id: 'b' }), ev({ id: 'c' }), ev({ id: 'd' })];
-    expect(homepageEventsToShow(rows, TODAY).map((e) => e.id)).toEqual(['a', 'b', 'c']);
+  it('keeps upcoming homepage-featured approved events, more than three, capped at the limit', () => {
+    const rows = Array.from({ length: HOMEPAGE_EVENTS_LIMIT + 3 }, (_, i) => ev({ id: `e${i}` }));
+    const shown = homepageEventsToShow(rows, TODAY);
+    expect(HOMEPAGE_EVENTS_LIMIT).toBeGreaterThan(3);
+    expect(shown).toHaveLength(HOMEPAGE_EVENTS_LIMIT);
+    expect(shown[0].id).toBe('e0');
   });
 
   it('drops ended, unapproved and unflagged events', () => {
@@ -77,6 +80,54 @@ describe('<HomepageFeaturedEvents />', () => {
     expect(link.className).toMatch(/border-amber-400/);
     expect(screen.getByRole('heading', { name: /Featured events/ })).toBeInTheDocument();
   });
+
+  it('lays events out in a carousel track, not a full-width grid, so one event is one card wide', async () => {
+    homeEvents.result = { data: [ev({ start_date: '2099-01-01' })], error: null };
+    render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+    const link = (await screen.findByText('Sydney Card Show')).closest('a');
+    const slot = link.parentElement;
+    expect(slot.className).toContain('snap-start');
+    expect(slot.className).toContain('lg:basis-[calc((100%_-_3rem)/3)]');
+    expect(slot.parentElement).toBe(screen.getByTestId('home-featured-events-track'));
+    // Nothing overflows with one event, so no arrows.
+    expect(screen.queryByLabelText('Next events')).toBeNull();
+  });
+
+  it('renders every featured event in the track and pages through them with arrows', async () => {
+    const clientWidth = 900;
+    const proto = HTMLElement.prototype;
+    const saved = {
+      clientWidth: Object.getOwnPropertyDescriptor(proto, 'clientWidth'),
+      scrollWidth: Object.getOwnPropertyDescriptor(proto, 'scrollWidth'),
+    };
+    Object.defineProperty(proto, 'clientWidth', { configurable: true, get: () => clientWidth });
+    Object.defineProperty(proto, 'scrollWidth', { configurable: true, get: () => 1800 });
+    try {
+      homeEvents.result = {
+        data: ['a', 'b', 'c', 'd', 'e'].map((id) => ev({ id, slug: id, title: `Show ${id}`, start_date: '2099-01-01' })),
+        error: null,
+      };
+      render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+      const track = await screen.findByTestId('home-featured-events-track');
+      expect(track.querySelectorAll('a[href^="/events/"]')).toHaveLength(5);
+
+      const scrollTo = vi.fn();
+      track.scrollTo = scrollTo;
+      track.scrollLeft = 0;
+      fireEvent.click(screen.getByLabelText('Next events'));
+      expect(scrollTo).toHaveBeenLastCalledWith({ left: 900, behavior: 'smooth' });
+      track.scrollLeft = 900; // last page → wraps round to the first
+      fireEvent.click(screen.getByLabelText('Next events'));
+      expect(scrollTo).toHaveBeenLastCalledWith({ left: 0, behavior: 'smooth' });
+      track.scrollLeft = 0; // first page → Previous wraps to the last
+      fireEvent.click(screen.getByLabelText('Previous events'));
+      expect(scrollTo).toHaveBeenLastCalledWith({ left: 900, behavior: 'smooth' });
+    } finally {
+      for (const [k, d] of Object.entries(saved)) {
+        if (d) Object.defineProperty(proto, k, d); else delete proto[k];
+      }
+    }
+  });
 });
 
 describe('queryHomepageEvents', () => {
@@ -98,7 +149,7 @@ describe('queryHomepageEvents', () => {
     expect(c.calls).toContainEqual(['from', 'events_public']);
     expect(c.calls).toContainEqual(['eq', 'homepage_featured', true]);
     expect(c.calls).toContainEqual(['eq', 'status', 'approved']);
-    expect(c.calls.find((x) => x[0] === 'limit')[1]).toBeLessThanOrEqual(6);
+    expect(c.calls.find((x) => x[0] === 'limit')[1]).toBeLessThanOrEqual(HOMEPAGE_EVENTS_LIMIT * 2);
   });
 
   it('answers empty, not failed, before the column exists', async () => {

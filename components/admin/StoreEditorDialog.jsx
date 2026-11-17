@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowDown, ArrowUp, ImagePlus, Link2, Loader2, Trash2, Video } from 'lucide-react';
+import { ArrowDown, ArrowUp, Globe, ImagePlus, Link2, Loader2, Trash2, Video } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient.js';
+import apiServerClient from '@/lib/apiServerClient.js';
+import { STORE_DETAIL_LABELS } from '@/utils/storeDetailsExtract.js';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +49,7 @@ const move = (list, i, dir) => {
 const StoreEditorDialog = ({ open, store, takenSlugs = [], ownerMode = false, onClose, onSaved }) => {
   const [form, setForm] = useState(blank);
   const [saving, setSaving] = useState(false);
+  const [readingSite, setReadingSite] = useState(false);
   const [uploading, setUploading] = useState(null); // 'logo' | 'photos' | 'video' | null
   const [videoLink, setVideoLink] = useState('');
   const logoInput = useRef(null);
@@ -121,6 +124,48 @@ const StoreEditorDialog = ({ open, store, takenSlugs = [], ownerMode = false, on
     setForm((f) => ({ ...f, videos: [...f.videos, { url, poster_url: null, caption: '' }] }));
     setVideoLink('');
     return undefined;
+  };
+
+  // "Fill in from website": the server reads the shop's own site and returns
+  // what it states. Only blank fields are filled — nothing typed here is ever
+  // overwritten — and nothing is saved until the admin presses Save.
+  const fillFromWebsite = async () => {
+    const website = form.website.trim();
+    if (!website) {
+      toast.error('Enter the shop website first.');
+      return;
+    }
+    setReadingSite(true);
+    try {
+      const res = await apiServerClient.fetch('/stores/admin/details-from-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ website, name: form.name }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || `Couldn't read the website (${res.status})`);
+      const details = body.details || {};
+      const filled = [];
+      const patch = {};
+      for (const key of Object.keys(STORE_DETAIL_LABELS)) {
+        if (details[key] && !String(form[key] || '').trim()) {
+          patch[key] = details[key];
+          filled.push(STORE_DETAIL_LABELS[key]);
+        }
+      }
+      if (filled.length) {
+        set(patch);
+        toast.success(`Filled in ${filled.join(', ')} — check them against the website, then save.`);
+      } else if (Object.keys(STORE_DETAIL_LABELS).some((key) => details[key])) {
+        toast.info('Nothing new: the website only states details this form already has.');
+      } else {
+        toast.info(body.note || 'The website doesn’t state an address, phone or opening hours.');
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setReadingSite(false);
+    }
   };
 
   const save = async () => {
@@ -210,6 +255,15 @@ const StoreEditorDialog = ({ open, store, takenSlugs = [], ownerMode = false, on
               <Label htmlFor="store-website">Website</Label>
               <Input id="store-website" value={form.website} onChange={(e) => set({ website: e.target.value })} placeholder="https://" />
             </div>
+            {!ownerMode && (
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="outline" size="sm" onClick={fillFromWebsite} disabled={readingSite || !form.website.trim()}>
+                  {readingSite ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Globe className="w-4 h-4 mr-2" />}
+                  Fill in from website
+                </Button>
+                <p className="text-xs text-muted-foreground">Reads the address, phone, opening hours and Instagram off the shop’s site into any blank fields. Check them before saving.</p>
+              </div>
+            )}
             <div className="sm:col-span-2">
               <Label htmlFor="store-instagram">Instagram link</Label>
               <Input id="store-instagram" value={form.instagram_url} onChange={(e) => set({ instagram_url: e.target.value })} placeholder="https://www.instagram.com/…" />

@@ -36,9 +36,11 @@ import { cleanGalleryAlbums, albumLabel } from '../utils/eventGallery.js';
 import { EVENT_REGIONS, eventRegionBySlug, eventRegionByState, eventRegionPath, eventRegionSeo } from '../data/eventRegions.js';
 import { NEXT_EDITION_COLUMNS, NEXT_EDITION_SCAN_LIMIT, pickNextEdition } from '../utils/eventNextEdition.js';
 import { cardShopCityTitle, cardShopCityDescription, cardShopCityFaqs, faqPageLd } from '../utils/cardShopSeo.js';
+import { businessIdentityLine } from '../utils/businessIdentity.js';
+import { TERMS_DESCRIPTION, TERMS_INTRO, TERMS_LINKS, TERMS_SECTIONS, TERMS_TITLE, TERMS_UPDATED_LABEL } from '../data/termsOfService.js';
 import {
   STORE_PAGE_COLUMNS, absoluteMediaUrl, cleanStorePhotos, cleanStoreVideos, storeHoursLines, storeIsIndexable,
-  storeJsonLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storeExternalLink,
+  storeJsonLd, storeListItemLd, storeLocationLine, storeLogoUrl, storePageDescription, storePageTitle, storePath, storePhoneHref, storeExternalLink,
 } from '../utils/storePage.js';
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
@@ -2501,19 +2503,16 @@ const STATIC_CONTENT = {
     ],
   },
 
+  // The wording is data/termsOfService.js — the same sections
+  // pages/info/TermsPage.jsx renders, so the two can't drift.
   '/terms': {
-    title: 'Terms of Service | CardPop™',
-    description: "CardPop™'s terms of service — the rules and guidelines for using the platform.",
+    title: TERMS_TITLE,
+    description: TERMS_DESCRIPTION,
     breadcrumb: [{ name: 'Home', path: '/' }, { name: 'Terms of Service', path: '/terms' }],
     h1: 'Terms of Service',
-    intro: 'The rules and guidelines for using the CardPop™ platform. Last updated 10 May 2026.',
-    sections: [
-      { h2: '1. Acceptance of terms', paras: ['By accessing or using CardPop™, you agree to be bound by these Terms of Service. If you do not agree, do not use the platform.'] },
-      { h2: '2. User accounts', paras: ['You must be at least 18 years old to create an account. You are responsible for keeping your credentials confidential and for all activity under your account.'] },
-      { h2: '3. Marketplace rules', paras: ['Users must provide accurate descriptions and images of listed items. CardPop™ may remove listings that violate policies or appear fraudulent.'] },
-      { h2: '4. Fees and payments', paras: ['CardPop™ charges fees for certain services, including sales commissions. All fees are shown before you commit to a transaction, and you agree to pay all applicable fees.'] },
-      { h2: '5. Limitation of liability', paras: ['CardPop™ is a marketplace facilitator and is not responsible for the actions of individual users, though it provides protection programs under its Trust & Safety policy.'] },
-    ],
+    intro: `Last updated ${TERMS_UPDATED_LABEL}. ${TERMS_INTRO}`,
+    sections: TERMS_SECTIONS,
+    links: TERMS_LINKS,
   },
 
   '/returns': {
@@ -2996,7 +2995,30 @@ const renderSections = (sections = []) => sections.map((s) => {
   return `  <section>\n  <h2>${esc(s.h2)}</h2>\n${[paras, list].filter(Boolean).join('\n')}\n  </section>`;
 }).join('\n');
 
-function renderStaticContent(path) {
+// Pages that state who operates CardPop (legal name + ABN), as the SPA's
+// <BusinessIdentityLine> does on the same pages.
+const BUSINESS_IDENTITY_PATHS = new Set(['/about', '/contact', '/terms']);
+const BUSINESS_IDENTITY_TTL_MS = 60_000;
+let businessIdentityCache = null;
+// Read through business_identity() (20261117092815_business_identity_rpc.sql):
+// platform_settings is admin-only and this function reads with the anon key.
+// Any failure (function not deployed yet, network) renders the page without
+// the line and isn't cached.
+async function loadBusinessIdentityLine(supabaseClient) {
+  if (businessIdentityCache && businessIdentityCache.expires > Date.now()) return businessIdentityCache.line;
+  try {
+    const { data, error } = await supabaseClient.rpc('business_identity');
+    if (error) throw error;
+    const line = businessIdentityLine(data);
+    businessIdentityCache = { line, expires: Date.now() + BUSINESS_IDENTITY_TTL_MS };
+    return line;
+  } catch (e) {
+    console.error('[prerender] business identity lookup failed:', e?.message || e);
+    return null;
+  }
+}
+
+function renderStaticContent(path, { identityLine = null } = {}) {
   const cfg = STATIC_CONTENT[path];
   const canonical = `${BASE_URL}${path}`;
   const jsonLdItems = [];
@@ -3019,7 +3041,7 @@ function renderStaticContent(path) {
   const crumbHtml = cfg.breadcrumb?.length
     ? `<nav aria-label="Breadcrumb">${cfg.breadcrumb.map((b, i) => i < cfg.breadcrumb.length - 1 ? `<a href="${BASE_URL}${esc(b.path)}">${esc(b.name)}</a> / ` : esc(b.name)).join('')}</nav>`
     : '';
-  const introHtml = cfg.intro ? `<p>${esc(cfg.intro)}</p>` : '';
+  const introHtml = `${cfg.intro ? `<p>${esc(cfg.intro)}</p>` : ''}${identityLine ? `\n  <p>${esc(identityLine)}</p>` : ''}`;
   const sectionsHtml = cfg.sections?.length ? renderSections(cfg.sections) : '';
   const faqHtml = cfg.faqs?.length
     ? `  <section>\n  <h2>Frequently Asked Questions</h2>\n${cfg.faqs.map((f) => `  <h3>${esc(f.q)}</h3>\n  <p>${esc(f.a)}</p>`).join('\n')}\n  </section>`
@@ -4366,7 +4388,7 @@ async function renderStoresCity(supabase, citySlug) {
   const cityInfo = DIRECTORY_CITIES[citySlug];
   const { data: stores } = await supabase
     .from('local_game_stores')
-    .select('slug, name, suburb, city, state, website, categories, description')
+    .select('slug, name, suburb, city, state, address, phone, website, categories, description, opening_hours')
     .eq('status', 'approved')
     .eq('city', citySlug)
     .order('name')
@@ -4396,10 +4418,12 @@ async function renderStoresCity(supabase, citySlug) {
   }).join('\n');
 
   const storeItems = (stores || []).map((store) => {
-    const line = [store.suburb, store.state].filter(Boolean).join(', ');
+    const line = storeLocationLine(store);
     const page = storePath(store);
     const name = page ? `<a href="${BASE_URL}${esc(page)}">${esc(store.name)}</a>` : esc(store.name);
-    return `<li><strong>${name}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
+    const phoneHref = storePhoneHref(store.phone);
+    const hours = storeHoursLines(store.opening_hours);
+    return `<li><strong>${name}</strong>${line ? ` — ${esc(line)}` : ''}${store.description ? `<br/>${esc(store.description)}` : ''}${phoneHref ? `<br/>Phone: <a href="${esc(phoneHref)}">${esc(store.phone)}</a>` : ''}${hours.length ? `<br/>Opening hours: ${esc(hours.join(' · '))}` : ''}${store.website ? ` <a href="${esc(store.website)}" rel="noopener">Website</a>` : ''}</li>`;
   }).join('\n');
 
   const jsonLd = [
@@ -4419,17 +4443,7 @@ async function renderStoresCity(supabase, citySlug) {
       itemListElement: stores.map((store, i) => ({
         '@type': 'ListItem',
         position: i + 1,
-        item: {
-          '@type': 'LocalBusiness',
-          name: store.name,
-          ...(store.website ? { url: store.website } : {}),
-          address: {
-            '@type': 'PostalAddress',
-            ...(store.suburb ? { addressLocality: store.suburb } : {}),
-            addressRegion: store.state,
-            addressCountry: 'AU',
-          },
-        },
+        item: storeListItemLd(store),
       })),
     } : null,
     faqPageLd(faqs),
@@ -4854,7 +4868,8 @@ export default async function handler(req, res) {
     }
 
     if (STATIC_CONTENT[rawPath]) {
-      return sendDoc(res, renderStaticContent(rawPath));
+      const identityLine = BUSINESS_IDENTITY_PATHS.has(rawPath) ? await loadBusinessIdentityLine(supabase) : null;
+      return sendDoc(res, renderStaticContent(rawPath, { identityLine }));
     }
 
     if (rawPath === '/community/forum') {

@@ -196,3 +196,49 @@ describe('sitemap city card-show pages', () => {
     expect(body).not.toContain(loc('/card-shows/darwin'));
   });
 });
+
+describe('sitemap event pages', () => {
+  it('keeps finished events at a lower priority than upcoming ones', async () => {
+    state.tables.events = [
+      { id: 'e1', slug: 'next-show', state: 'VIC', status: 'approved', start_date: '2099-01-10', updated_at: '2026-10-20T00:00:00Z' },
+      { id: 'e2', slug: 'last-show', state: 'VIC', status: 'approved', start_date: '2026-08-02', updated_at: '2026-08-05T00:00:00Z' },
+      { id: 'e3', slug: 'archived-show', state: 'NSW', status: 'completed', start_date: '2099-02-01', updated_at: '2026-08-05T00:00:00Z' },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/events/next-show')}\n    <lastmod>2026-10-20</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.7</priority>`);
+    expect(body).toContain(`${loc('/events/last-show')}\n    <lastmod>2026-08-05</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>0.4</priority>`);
+    expect(body).toContain(`${loc('/events/archived-show')}\n    <lastmod>2026-08-05</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>0.4</priority>`);
+  });
+
+  it('dates the calendar pages by the newest event change', async () => {
+    state.tables.events = [
+      { id: 'e1', slug: 'next-show', state: 'VIC', status: 'approved', start_date: '2099-01-10', updated_at: '2099-01-02T00:00:00Z' },
+    ];
+    const { body } = await run();
+    expect(body).toContain(`${loc('/events')}\n    <lastmod>2099-01-02</lastmod>`);
+    expect(body).toContain(`${loc('/events/card-shows')}\n    <lastmod>2099-01-02</lastmod>`);
+    // Other static pages keep their own stamp.
+    expect(body).not.toContain(`${loc('/about')}\n    <lastmod>2099-01-02</lastmod>`);
+  });
+});
+
+describe('sitemap image entries', () => {
+  it('lists a page\'s own pictures and drops anything that is not an http(s) URL', async () => {
+    state.tables.events = [
+      { id: 'e1', slug: 'next-show', state: 'VIC', status: 'approved', start_date: '2099-01-10', image_url: 'https://img.example/flyer.webp?a=1&b=2' },
+      { id: 'e2', slug: 'no-flyer', state: 'VIC', status: 'approved', start_date: '2099-01-11', image_url: 'javascript:alert(1)' },
+    ];
+    state.tables.shop_products = [
+      { id: 'p1', title: 'Card Tin', slug: 'card-tin', category: 'Card Tins', images: ['https://img.example/a.webp', 'https://img.example/a.webp', '/local.webp'], image_url: 'https://img.example/b.webp' },
+    ];
+    state.tables.blog_articles = [{ id: 'a1', slug: 'a-guide', featured_image_url: 'https://img.example/cover.webp' }];
+    const { body } = await run();
+    expect(body).toContain('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"');
+    expect(body).toContain('<image:loc>https://img.example/flyer.webp?a=1&amp;b=2</image:loc>');
+    expect(body).not.toContain('javascript:');
+    expect(body).toContain('<image:loc>https://img.example/cover.webp</image:loc>');
+    expect(body.match(/<image:loc>https:\/\/img\.example\/a\.webp<\/image:loc>/g)).toHaveLength(1);
+    expect(body).toContain('<image:loc>https://cardpop.com.au/local.webp</image:loc>');
+    expect(body).toContain('<image:loc>https://img.example/b.webp</image:loc>');
+  });
+});
