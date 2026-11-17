@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Search, X, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { ADMIN_SECTIONS, filterAdminSections } from '@/components/admin/adminSections.js';
@@ -7,23 +7,41 @@ import { ADMIN_SECTIONS, filterAdminSections } from '@/components/admin/adminSec
 // The dashboard's map of the admin area: every screen as one compact row,
 // grouped by job, with a search box that narrows the lot as you type (Enter
 // opens the first match).
-const AdminDirectory = () => {
+//
+// `compact` is the same list in one column for the menu drawer AdminLayout
+// puts on every admin page: no heading or jump links, the search box focused,
+// and the page you are on marked. `onNavigate` lets the drawer close itself.
+const AdminDirectory = ({ compact = false, currentLink = null, onNavigate }) => {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   const sections = useMemo(() => filterAdminSections(query), [query]);
   const searching = query.trim().length > 0;
   const firstMatch = sections[0]?.items[0];
 
+  // Arriving from a breadcrumb ("/admin#admin-events"): bring that group into
+  // view, after the route change's own scroll-to-top has run.
+  const { hash } = useLocation();
+  useEffect(() => {
+    if (compact || !hash.startsWith('#admin-')) return undefined;
+    const timer = setTimeout(() => {
+      document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start' });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [hash, compact]);
+
   const onSubmit = (e) => {
     e.preventDefault();
-    if (searching && firstMatch) navigate(firstMatch.link);
+    if (searching && firstMatch) {
+      navigate(firstMatch.link);
+      onNavigate?.();
+    }
   };
 
   return (
-    <section aria-labelledby="admin-directory-heading" className="space-y-5">
+    <section aria-label="Admin areas" className={compact ? 'space-y-4' : 'space-y-5'}>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <h2 id="admin-directory-heading" className="text-2xl font-serif font-bold text-foreground">Manage</h2>
-        <form onSubmit={onSubmit} role="search" className="relative w-full md:w-96">
+        {!compact && <h2 className="text-2xl font-serif font-bold text-foreground">Manage</h2>}
+        <form onSubmit={onSubmit} role="search" className={`relative w-full ${compact ? '' : 'md:w-96'}`}>
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <Input
             type="search"
@@ -31,6 +49,7 @@ const AdminDirectory = () => {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Find an admin area…"
             aria-label="Find an admin area"
+            autoFocus={compact}
             className="h-11 rounded-xl pl-10 pr-10 bg-card [&::-webkit-search-cancel-button]:hidden"
           />
           {searching && (
@@ -46,7 +65,7 @@ const AdminDirectory = () => {
         </form>
       </div>
 
-      {!searching && (
+      {!searching && !compact && (
         <nav aria-label="Admin groups" className="flex flex-wrap gap-2">
           {ADMIN_SECTIONS.map(({ id, title, icon: Icon }) => (
             <a
@@ -66,11 +85,11 @@ const AdminDirectory = () => {
           Nothing matches “{query.trim()}”. Try a different word.
         </p>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        <div className={compact ? 'space-y-4' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5'}>
           {sections.map(({ id, title, summary, icon: SectionIcon, items }) => (
             <div
               key={id}
-              id={`admin-${id}`}
+              id={compact ? undefined : `admin-${id}`}
               className="scroll-mt-40 rounded-2xl border border-border bg-card shadow-sm overflow-hidden flex flex-col"
             >
               <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-muted/30">
@@ -87,7 +106,9 @@ const AdminDirectory = () => {
                   <li key={link}>
                     <Link
                       to={link}
-                      className="group flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors"
+                      onClick={onNavigate}
+                      aria-current={link === currentLink ? 'page' : undefined}
+                      className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary transition-colors ${link === currentLink ? 'bg-primary/10' : ''}`}
                     >
                       <Icon className="w-[18px] h-[18px] shrink-0 text-primary" />
                       <span className="min-w-0 flex-1">

@@ -154,3 +154,18 @@ export const filterAdminSections = (query, sections = ADMIN_SECTIONS) => {
     })
     .filter((section) => section.items.length > 0);
 };
+
+// The directory entry (and its group) for an admin URL, so the layout can say
+// where you are: "/admin/event-reviews/123" → Events › Event Reviews. Longest
+// matching link wins; null for the dashboard or an unlisted path.
+export const findAdminLocation = (pathname, sections = ADMIN_SECTIONS) => {
+  const path = String(pathname || '').replace(/\/+$/, '');
+  let best = null;
+  for (const section of sections) {
+    for (const item of section.items) {
+      const hit = path === item.link || path.startsWith(`${item.link}/`);
+      if (hit && (!best || item.link.length > best.item.link.length)) best = { section, item };
+    }
+  }
+  return best;
+};
