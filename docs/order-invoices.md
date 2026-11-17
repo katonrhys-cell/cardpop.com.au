@@ -130,7 +130,13 @@ chart of accounts they want.
 ## PDF tax invoice and the order link
 
 Every document can be downloaded as a **PDF tax invoice** (credit notes as a
-**credit note**), and Order Management links straight to it:
+**credit note**). The page prints the invoice number (`INV-000042`), the
+**short order reference** (first 8 characters of the order id, upper-cased —
+the same one Account → Orders and Order Management show, `shortOrderRef()` in
+`src/utils/invoicePdf.js`) and the **last 8 characters** of the Stripe payment
+reference (`shortPaymentRef()`). The full UUID / `pi_…` id are never printed;
+they stay on the `invoices` / `orders` rows. Order Management links straight to
+the PDF:
 
 - **Order Management** (`/admin/orders`): an **Invoice** column shows the
   order's number (a link to that order's documents in Admin → Invoices) with a

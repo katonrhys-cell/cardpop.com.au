@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   renderInvoicePdf, invoicePdfFilename, formatInvoiceDate, formatAbnForPdf, normaliseSupplier, pdfSafe,
+  shortOrderRef, shortPaymentRef,
 } from '../../src/utils/invoicePdf.js';
 
 const INVOICE = {
@@ -31,6 +32,20 @@ describe('invoicePdf helpers', () => {
   it('falls back to CardPop with no ABN when the setting is empty', () => {
     expect(normaliseSupplier(undefined)).toMatchObject({ legalName: 'CardPop', abn: '' });
     expect(normaliseSupplier({ legal_name: ' CardPop Pty Ltd ', abn: '51824753556' })).toMatchObject({ legalName: 'CardPop Pty Ltd', abn: '51 824 753 556' });
+  });
+
+  it('prints the same short order reference the rest of the app shows', () => {
+    expect(shortOrderRef('0f0f0f0f-0f0f-4f0f-8f0f-0f0f0f0f0f0f')).toBe('0F0F0F0F');
+    expect(shortOrderRef('a1b2c3d4-e5f6-4789-8abc-def012345678')).toBe('A1B2C3D4');
+    expect(shortOrderRef('a1b2c3d4-e5f6-4789-8abc-def012345678'))
+      .toBe('a1b2c3d4-e5f6-4789-8abc-def012345678'.slice(0, 8).toUpperCase());
+    expect(shortOrderRef(null)).toBe('');
+  });
+
+  it('shortens the Stripe payment reference to its last 8 characters', () => {
+    expect(shortPaymentRef('pi_3Q9xKLM2eZvKYlo21AbCdEfG')).toBe('…1AbCdEfG');
+    expect(shortPaymentRef('pi_1')).toBe('pi_1');
+    expect(shortPaymentRef(null)).toBe('');
   });
 
   it('replaces characters Helvetica cannot print', () => {
