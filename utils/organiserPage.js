@@ -8,7 +8,7 @@ export const ORGANISER_PROFILE_COLUMNS = `${BASE_ORGANISER_COLUMNS}, owner_id, d
 // TikTok / X / Linktree links in 20261116110000_organiser_tiktok_x_linktree_links.sql;
 // readers try this set first and fall back to ORGANISER_PROFILE_COLUMNS, then BASE.
 export const ORGANISER_LINK_COLUMNS = `${ORGANISER_PROFILE_COLUMNS}, extra_logo_urls, tiktok_url, x_url, linktree_url`;
-// gallery_albums / videos ship in 20261117091158_organiser_page_photos_and_videos.sql;
+// gallery_albums / videos ship in 20261117190000_organiser_page_photos_and_videos.sql;
 // readers try the full set, then ORGANISER_LINK_COLUMNS, then the older tiers.
 export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums, videos`;
 
