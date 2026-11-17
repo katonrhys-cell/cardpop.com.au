@@ -73,6 +73,38 @@ Before stock arrives, two things need doing in Admin → Products:
   from `public/images/shop/acryshield/`. Upload the supplier's full-size
   images when you can get them.
 
+### Stackable cases, the single-card case and sold-out lines
+
+Migration `20261117111213_acryshield_stackable_and_single_card_cases.sql` brings
+the shop up to the supplier's full Acryshield range of nineteen cases. It adds:
+
+- **Pokémon Booster Box Stackable Acrylic Case** in five base colours (Clear,
+  Red, Blue, Green, Yellow), SKUs `AS-STK-01` to `AS-STK-05`, RRP $54.99, linked
+  by `family_sku = 'AS-STK-BB'`. Page:
+  `/shop/display-cases/acryshield-pokemon-booster-box-stackable-acrylic-case`.
+- **Pokémon Elite Trainer Box Stackable Acrylic Case** in the same five colours,
+  SKUs `AS-STK-06` to `AS-STK-10`, RRP $59.99, `family_sku = 'AS-STK-ETB'`. Page:
+  `/shop/display-cases/acryshield-pokemon-elite-trainer-box-stackable-acrylic-case`.
+- **Single Card Acrylic Display Case with Stand**, SKU `CDC-01`, RRP $15.95.
+
+The colour is the colour of the base; the case itself is clear. These eleven use
+the supplier's own SKUs and full-size photos
+(`public/images/shop/acryshield/stackable/` and `single-card-case-*.jpg`). The
+ten stackable cases are pre-orders, "Ships in 5–7 days".
+
+Three lines were sold out at the supplier on 17 November 2026 and are **not**
+on pre-order: the Mew Ultra Premium Collection case, the Japanese Collection Box
+case and the Single Card Display Case. A pre-order can never show as sold out,
+so they are **Active with stock 0**, which shows **Sold out** and an **Enquire**
+button. When the supplier has them again, set the status back to **Pre-order**
+(the estimate is still filled in on the first two) or to Active with a stock
+count.
+
+The same migration refreshes the wholesale costs of the eight earlier cases
+from the supplier's November price list and records the supplier's SKU for each
+in `shop_product_costs.supplier_sku`. Their shop SKUs are still the
+`ACRYSHIELD-…` placeholders.
+
 ## What the buyer sees
 
 | Where | What |
