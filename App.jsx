@@ -68,6 +68,8 @@ const CollectionPage = lazy(() => import('@/pages/collections/CollectionPage.jsx
 const CollectionRoute = () => { const { collectionSlug } = useParams(); return <CollectionPage key={collectionSlug} />; };
 
 // Redirects /community/events/:eventId → /events/:eventId
+// /grading/guide/:scale was a second address for /grading/scales/:scale (301 in vercel.json for full loads).
+const RedirectGradingGuide = () => { const { scale } = useParams(); return <Navigate to={`/grading/scales/${scale}`} replace />; };
 const RedirectEventDetail = () => { const { eventId } = useParams(); return <Navigate to={`/events/${eventId}`} replace />; };
 
 // Pre-launch mode: while VITE_COMING_SOON=true the homepage redirects to the
@@ -503,7 +505,7 @@ const App = () => {
                         <Route path="/grading/local" element={<Navigate to="/grading/submission-partners" replace />} />
                         <Route path="/grading/local-graders" element={<LocalGradersPage />} />
                         <Route path="/grading/submission-partners" element={<SubmissionPartnersPage />} />
-                        <Route path="/grading/guide/:scale" element={<GradingScalePage />} />
+                        <Route path="/grading/guide/:scale" element={<RedirectGradingGuide />} />
                         <Route path="/grading/estimator" element={<GradeEstimatorPage />} />
                         <Route path="/grading/roi-calculator" element={<GradingROIPage />} />
                         
@@ -549,7 +551,7 @@ const App = () => {
                         <Route path="/pricing" element={<PricingPage />} />
                         <Route path="/contact" element={<ContactPage />} />
                         <Route path="/faq" element={<FAQPage />} />
-                        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                        <Route path="/privacy" element={<Navigate to="/privacy-policy" replace />} />
                         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
                         <Route path="/returns" element={<ReturnsPage />} />
                         <Route path="/shipping" element={<ShippingPage />} />
@@ -559,7 +561,7 @@ const App = () => {
                         <Route path="/accessibility" element={<AccessibilityPage />} />
                         <Route path="/data-deletion" element={<DataDeletionPage />} />
                         <Route path="/photography-standard" element={<PhotographyStandardPage />} />
-                        <Route path="/photography-guide" element={<PhotographyStandardPage />} />
+                        <Route path="/photography-guide" element={<Navigate to="/photography-standard" replace />} />
                         <Route path="/conviction-rating" element={<ConvictionRatingPage />} />
                         
                         {/* --- PROTECTED ADMIN ROUTES (NESTED UNDER ADMINLAYOUT) --- */}

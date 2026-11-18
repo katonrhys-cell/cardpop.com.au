@@ -33,8 +33,8 @@ const GradingScalePage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Explicit canonical: this page is routed at both /grading/scales/:scale
-          and /grading/guide/:scale (and both forms are linked internally) —
+      {/* Explicit canonical: this page is reachable at /grading/scales/:scale
+          (and the old /grading/guide/:scale alias, which now redirects here) —
           pin one so the two URLs don't compete as duplicates. */}
       <SEOHead
         title={`${company.name} Grading Scale — ${company.full} | CardPop Grading Hub`}

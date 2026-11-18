@@ -85,7 +85,7 @@ const GradingCompaniesPage = () => {
             guides.map(guide => (
               <Link
                 key={guide.id}
-                to={`/grading/guide/${guide.slug || guide.id}`}
+                to={`/grading/scales/${guide.slug || guide.id}`}
                 className="block bg-card border border-border rounded-2xl p-7 hover:border-primary/50 hover:shadow-md transition-all group"
               >
                 <div className="flex items-start justify-between gap-4">

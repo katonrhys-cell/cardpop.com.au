@@ -3237,7 +3237,7 @@ async function renderProfiles(supabase) {
     name: 'CardPop Collectors',
     numberOfItems: profiles.length,
     itemListElement: profiles.map((p, i) => ({
-      '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/community/user/${p.id}`, name: p.display_name || p.username,
+      '@type': 'ListItem', position: i + 1, url: `${BASE_URL}/seller/${p.id}`, name: p.display_name || p.username,
     })),
   } : null;
 
@@ -3245,7 +3245,7 @@ async function renderProfiles(supabase) {
     const name = p.display_name || p.username;
     const bio = p.bio ? toText(p.bio, 140) : '';
     const badges = [p.is_verified ? 'Verified' : null, p.rating > 0 ? `${Number(p.rating).toFixed(1)}★` : null].filter(Boolean).join(', ');
-    return `    <li><a href="${BASE_URL}/community/user/${esc(p.id)}"><strong>${esc(name)}</strong></a>`
+    return `    <li><a href="${BASE_URL}/seller/${esc(p.id)}"><strong>${esc(name)}</strong></a>`
       + `${badges ? ` (${esc(badges)})` : ''}${bio ? ` — ${esc(bio)}` : ''}</li>`;
   }).join('\n');
 

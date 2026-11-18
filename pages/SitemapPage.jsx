@@ -39,7 +39,7 @@ const SitemapPage = () => {
           { label: 'Returns & Refunds', path: '/returns' },
           { label: 'Trust & Safety', path: '/trust-safety' },
           { label: 'Terms of Service', path: '/terms' },
-          { label: 'Privacy Policy', path: '/privacy' },
+          { label: 'Privacy Policy', path: '/privacy-policy' },
         ];
 
         const combined = [

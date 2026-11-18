@@ -173,7 +173,7 @@ const DataDeletionPage = () => {
             privacy@cardpop.com.au
           </a>{' '}
           or read our{' '}
-          <a href="/privacy" className="text-primary font-semibold">Privacy Policy</a>.
+          <a href="/privacy-policy" className="text-primary font-semibold">Privacy Policy</a>.
         </p>
       </div>
     </InfoPageLayout>

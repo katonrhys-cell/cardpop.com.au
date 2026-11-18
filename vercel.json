@@ -56,6 +56,21 @@
       "permanent": true
     },
     {
+      "source": "/privacy",
+      "destination": "/privacy-policy",
+      "permanent": true
+    },
+    {
+      "source": "/photography-guide",
+      "destination": "/photography-standard",
+      "permanent": true
+    },
+    {
+      "source": "/grading/guide/:scale",
+      "destination": "/grading/scales/:scale",
+      "permanent": true
+    },
+    {
       "source": "/community/events",
       "destination": "/events",
       "permanent": true
@@ -440,6 +455,17 @@
     },
     {
       "source": "/seller/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|facebookexternalhit|twitterbot|linkedinbot|embedly|quora|pinterest|slackbot|vkshare|w3c_validator|whatsapp|telegrambot|discordbot|applebot|redditbot|petalbot|bot|crawler|spider|gptbot|oai-searchbot|chatgpt|perplexitybot|claudebot|claude-web|anthropic|amazonbot|bytespider|google-inspectiontool|mediapartners-google|chrome-lighthouse).*"
+        }
+      ],
+      "destination": "/api/prerender?path=/seller/:id"
+    },
+    {
+      "source": "/community/user/:id",
       "has": [
         {
           "type": "header",

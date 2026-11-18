@@ -124,6 +124,8 @@ const SellerProfilePage = () => {
       <Helmet>
         <title>{`${seller.display_name || seller.username} - Seller Profile - Card Pop Australia`}</title>
         <meta name="description" content={`View ${seller.display_name || seller.username}'s trading card collection and seller profile.`} />
+        {/* One indexable address per member: /seller/<id> (prerendered, in the sitemap). */}
+        <link rel="canonical" href={`https://cardpop.com.au/seller/${seller.id}`} />
       </Helmet>
       <div className="flex flex-col font-sans bg-background min-h-screen">
         <div className="flex-1 py-12">
