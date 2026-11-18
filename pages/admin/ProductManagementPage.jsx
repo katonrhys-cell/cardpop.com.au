@@ -12,6 +12,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import ConfirmChangesDialog from '@/components/admin/ConfirmChangesDialog.jsx';
+import { buildPriceChanges, buildStatusChanges, statusLabel } from '@/utils/adminProductChanges.js';
+import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
 import { toast } from 'sonner';
@@ -198,24 +203,26 @@ const ProductManagementPage = () => {
   const leavePriceEdit = () => {
     if (dirtyCount && !window.confirm(`Discard ${dirtyCount} unsaved price change${dirtyCount === 1 ? '' : 's'}?`)) return;
     setDrafts({});
+    setPriceFocus(null);
     setPriceEdit(false);
   };
 
+  // Nothing is written until the admin has seen the list of changes and
+  // confirmed it: Save opens the review box, Confirm runs the save.
+  const [priceReview, setPriceReview] = useState(null);
+  const [priceFocus, setPriceFocus] = useState(null);
+  const startPriceEdit = (product, field) => {
+    setPriceFocus(`${product.id}:${field}`);
+    setPriceEdit(true);
+  };
+  const reviewPrices = () => {
+    const { error: invalid, changes } = buildPriceChanges(drafts, products, costs);
+    if (invalid) return toast.error(invalid);
+    if (changes.length) setPriceReview(changes);
+  };
+
   const savePrices = async () => {
-    const parsed = [];
-    for (const [id, d] of Object.entries(drafts)) {
-      const p = products.find((x) => x.id === id);
-      const row = { id, title: p?.title };
-      for (const f of ['price', 'rrp', 'cost']) {
-        if (d[f] === undefined) continue;
-        const raw = d[f].trim();
-        const n = raw === '' ? null : Number(raw);
-        if (n !== null && (Number.isNaN(n) || n < 0)) return toast.error(`"${p?.title}": ${f === 'price' ? 'sale price' : f === 'rrp' ? 'RRP' : 'cost'} must be a valid amount`);
-        if (f === 'price' && n === null) return toast.error(`"${p?.title}": a sale price is required`);
-        row[f] = n;
-      }
-      parsed.push(row);
-    }
+    const parsed = (priceReview || []).map((c) => ({ id: c.id, title: c.title, ...c.values }));
     setSaving(true);
     const failed = [];
     const now = new Date().toISOString();
@@ -253,9 +260,68 @@ const ProductManagementPage = () => {
       setCosts((prev) => ({ ...prev, ...updatedCosts }));
       setDrafts((prev) => Object.fromEntries(Object.entries(prev).filter(([id]) => failed.includes(id))));
       setSaving(false);
+      setPriceReview(null);
     }
     const saved = parsed.length - failed.length;
     if (saved) toast.success(`Saved ${saved} product${saved === 1 ? '' : 's'}.`);
+  };
+
+  // ── Selecting products and changing their status together ───────────────
+  const [selected, setSelected] = useState(() => new Set());
+  const [bulkStatus, setBulkStatus] = useState('');
+  const [statusReview, setStatusReview] = useState(null);
+  const [bulkEta, setBulkEta] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const setRowsSelected = (rows, on) => setSelected((prev) => {
+    const next = new Set(prev);
+    for (const r of rows) { if (on) next.add(r.id); else next.delete(r.id); }
+    return next;
+  });
+  // true / 'indeterminate' / false for a "select these rows" checkbox.
+  const groupChecked = (rows) => {
+    const n = rows.filter((r) => selected.has(r.id)).length;
+    return n === 0 ? false : n === rows.length ? true : 'indeterminate';
+  };
+  const selectedCount = products.filter((p) => selected.has(p.id)).length;
+
+  const reviewStatus = () => {
+    if (!bulkStatus) return toast.error('Choose the status to change to first.');
+    const review = buildStatusChanges(products, selected, bulkStatus);
+    if (!review.changes.length) return toast.info(`The selected products are already ${statusLabel(bulkStatus)}.`);
+    setBulkEta('');
+    setStatusReview({ ...review, status: bulkStatus });
+  };
+  const etaNeeded = statusReview ? statusReview.changes.filter((c) => c.needsEta).length : 0;
+
+  const applyStatus = async () => {
+    const { changes, status } = statusReview;
+    const eta = bulkEta.trim();
+    setBulkSaving(true);
+    const now = new Date().toISOString();
+    // Products missing a dispatch estimate get the one typed in the box; the
+    // rest keep their own.
+    const batches = [
+      { ids: changes.filter((c) => !c.needsEta).map((c) => c.id), patch: { status, updated_at: now } },
+      { ids: changes.filter((c) => c.needsEta).map((c) => c.id), patch: { status, preorder_eta: eta, updated_at: now } },
+    ].filter((b) => b.ids.length);
+    const done = {};
+    let failure = null;
+    for (const { ids, patch } of batches) {
+      const { error: e } = await supabase.from('shop_products').update(patch).in('id', ids);
+      if (e) { failure = e; break; }
+      for (const id of ids) done[id] = patch;
+    }
+    if (!isMounted.current) return;
+    const count = Object.keys(done).length;
+    setProducts((prev) => prev.map((p) => (done[p.id] ? { ...p, ...done[p.id] } : p)));
+    setSelected((prev) => new Set([...prev].filter((id) => !done[id])));
+    setBulkSaving(false);
+    setStatusReview(null);
+    if (failure) toast.error(`${count ? `${count} updated, the rest were not` : 'Status not changed'}: ${failure.message}`);
+    else {
+      toast.success(`${count} product${count === 1 ? '' : 's'} set to ${statusLabel(status)}.`);
+      setBulkStatus('');
+    }
   };
 
   const handleEdit = (product) => {
@@ -353,7 +419,14 @@ const ProductManagementPage = () => {
   };
 
   const renderRow = (product) => (
-    <TableRow key={product.id}>
+    <TableRow key={product.id} data-state={selected.has(product.id) ? 'selected' : undefined}>
+      <TableCell className="w-10 pr-0">
+        <Checkbox
+          aria-label={`Select ${product.title}`}
+          checked={selected.has(product.id)}
+          onCheckedChange={(on) => setRowsSelected([product], on === true)}
+        />
+      </TableCell>
       <TableCell className="font-bold text-foreground">
         <div className="flex items-center gap-2.5">
           {/* Photo indicator: a small thumbnail when at least one photo is
@@ -410,6 +483,7 @@ const ProductManagementPage = () => {
                 type="number" inputMode="decimal" min="0" step="0.01"
                 aria-label={`${field === 'price' ? 'Sale price' : field === 'rrp' ? 'RRP' : 'Cost inc GST'} for ${product.title}`}
                 className={`h-8 pl-5 pr-1 tabular-nums ${drafts[product.id]?.[field] !== undefined ? 'border-primary bg-primary/5' : ''}`}
+                autoFocus={priceFocus === `${product.id}:${field}`}
                 value={fieldValue(product, field)}
                 onChange={(e) => setDraft(product, field, e.target.value)}
               />
@@ -418,13 +492,24 @@ const ProductManagementPage = () => {
         ))
       ) : (
         <>
-          <TableCell className="tabular-nums">${Number(product.price_aud ?? 0).toFixed(2)}</TableCell>
-          <TableCell className="tabular-nums text-muted-foreground">
-            {product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—'}
-          </TableCell>
-          <TableCell className="tabular-nums text-muted-foreground">
-            {costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—'}
-          </TableCell>
+          {/* Click any price to start editing it in place. */}
+          {[
+            { field: 'price', label: 'sale price', text: `$${Number(product.price_aud ?? 0).toFixed(2)}`, cls: '' },
+            { field: 'rrp', label: 'RRP', text: product.retail_price_aud != null ? `$${Number(product.retail_price_aud).toFixed(2)}` : '—', cls: 'text-muted-foreground' },
+            { field: 'cost', label: 'cost', text: costs[product.id]?.wholesale_inc_gst_aud != null ? `$${Number(costs[product.id].wholesale_inc_gst_aud).toFixed(2)}` : '—', cls: 'text-muted-foreground' },
+          ].map(({ field, label, text, cls }) => (
+            <TableCell key={field} className={`tabular-nums ${cls}`}>
+              <button
+                type="button"
+                title={`Edit ${label}`}
+                aria-label={`Edit ${label} for ${product.title}`}
+                onClick={() => startPriceEdit(product, field)}
+                className="-mx-1.5 rounded px-1.5 py-1 text-left hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              >
+                {text}
+              </button>
+            </TableCell>
+          ))}
         </>
       )}
       <TableCell className="tabular-nums">
@@ -572,6 +657,14 @@ const ProductManagementPage = () => {
           <Table>
             <TableHeader className="bg-muted/40">
               <TableRow>
+                <TableHead className="w-10 pr-0">
+                  <Checkbox
+                    aria-label="Select all products shown"
+                    disabled={filteredProducts.length === 0}
+                    checked={groupChecked(filteredProducts)}
+                    onCheckedChange={(on) => setRowsSelected(filteredProducts, on === true)}
+                  />
+                </TableHead>
                 {COLUMNS.map((col) => {
                   const active = sortKey === col.key;
                   const Icon = !active ? ArrowUpDown : sortDir === 'asc' ? ArrowUp : ArrowDown;
@@ -591,6 +684,7 @@ const ProductManagementPage = () => {
               {loading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-20" /></TableCell>
                     <TableCell><Skeleton className="h-5 w-24" /></TableCell>
@@ -605,14 +699,14 @@ const ProductManagementPage = () => {
                 ))
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="h-48 text-center text-muted-foreground">
                     <AlertCircle className="w-10 h-10 text-destructive mb-3 mx-auto" />
                     <p>Failed to load products</p>
                   </TableCell>
                 </TableRow>
               ) : filteredProducts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={10} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={11} className="h-48 text-center text-muted-foreground">
                     <Package className="w-10 h-10 mb-3 mx-auto opacity-40" />
                     <p>No products match{activeFilterCount > 0 ? ' these filters' : ''}</p>
                     {activeFilterCount > 0 && (
@@ -624,9 +718,17 @@ const ProductManagementPage = () => {
                 view === 'sections' ? (
                   sections.map(({ section, count, categories }) => {
                     const sectionOpen = !collapsed.has(section);
+                    const sectionRows = categories.flatMap((c) => c.products);
                     return (
                       <React.Fragment key={section}>
                         <TableRow className="bg-muted/60 hover:bg-muted/80">
+                          <TableCell className="w-10 pr-0">
+                            <Checkbox
+                              aria-label={`Select all ${count} products in ${section}`}
+                              checked={groupChecked(sectionRows)}
+                              onCheckedChange={(on) => setRowsSelected(sectionRows, on === true)}
+                            />
+                          </TableCell>
                           <TableCell colSpan={10} className="p-0">
                             <button type="button" onClick={() => toggleCollapsed(section)} aria-expanded={sectionOpen}
                               className="flex w-full items-center gap-2 px-2 py-2.5 text-left font-bold uppercase tracking-wide text-foreground">
@@ -641,9 +743,16 @@ const ProductManagementPage = () => {
                           return (
                             <React.Fragment key={key}>
                               <TableRow className="bg-muted/20 hover:bg-muted/40">
+                                <TableCell className="w-10 pr-0">
+                                  <Checkbox
+                                    aria-label={`Select all ${rows.length} products in ${category}`}
+                                    checked={groupChecked(rows)}
+                                    onCheckedChange={(on) => setRowsSelected(rows, on === true)}
+                                  />
+                                </TableCell>
                                 <TableCell colSpan={10} className="p-0">
                                   <button type="button" onClick={() => toggleCategory(key)} aria-expanded={categoryOpen}
-                                    className="flex w-full items-center gap-1.5 py-1.5 pl-6 pr-2 text-left text-xs font-semibold text-muted-foreground">
+                                    className="flex w-full items-center gap-1.5 py-1.5 pl-4 pr-2 text-left text-xs font-semibold text-muted-foreground">
                                     <ChevronRight aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 transition-transform ${categoryOpen ? 'rotate-90' : ''}`} />
                                     {category} · {rows.length}
                                   </button>
@@ -665,17 +774,81 @@ const ProductManagementPage = () => {
         </div>
       </Card>
 
-      {priceEdit && (
-        <div className="sticky bottom-4 z-20 mx-auto flex w-fit max-w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
-          <span className="text-sm text-muted-foreground">
-            {dirtyCount ? `${dirtyCount} product${dirtyCount === 1 ? '' : 's'} changed` : 'Edit sale price, RRP or cost (inc GST), then save'}
-          </span>
-          <Button variant="ghost" size="sm" disabled={!dirtyCount || saving} onClick={() => setDrafts({})}>Reset</Button>
-          <Button size="sm" className="gap-1.5 font-bold" disabled={!dirtyCount || saving} onClick={savePrices}>
-            <Save className="w-4 h-4" /> {saving ? 'Saving…' : `Save ${dirtyCount || ''} change${dirtyCount === 1 ? '' : 's'}`.replace('  ', ' ')}
-          </Button>
+      {(priceEdit || selectedCount > 0) && (
+        <div className="sticky bottom-4 z-20 mx-auto flex w-fit max-w-full flex-col items-center gap-2">
+          {selectedCount > 0 && (
+            <div role="region" aria-label="Selected products" className="flex max-w-full flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
+              <span className="text-sm font-semibold text-foreground">{selectedCount} selected</span>
+              <Select value={bulkStatus} onValueChange={setBulkStatus}>
+                <SelectTrigger aria-label="Status to change the selected products to" className="h-9 w-[190px] rounded-xl bg-background">
+                  <SelectValue placeholder="Change status to…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  {STATUS_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button size="sm" className="font-bold" disabled={!bulkStatus} onClick={reviewStatus}>Change status</Button>
+              <Button variant="ghost" size="sm" className="gap-1 text-muted-foreground" onClick={() => setSelected(new Set())}>
+                <X className="w-4 h-4" /> Clear selection
+              </Button>
+            </div>
+          )}
+          {priceEdit && (
+            <div className="flex max-w-full flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg">
+              <span className="text-sm text-muted-foreground">
+                {dirtyCount ? `${dirtyCount} product${dirtyCount === 1 ? '' : 's'} changed` : 'Edit sale price, RRP or cost (inc GST), then save'}
+              </span>
+              <Button variant="ghost" size="sm" disabled={!dirtyCount || saving} onClick={() => setDrafts({})}>Reset</Button>
+              <Button size="sm" className="gap-1.5 font-bold" disabled={!dirtyCount || saving} onClick={reviewPrices}>
+                <Save className="w-4 h-4" /> {`Save ${dirtyCount || ''} change${dirtyCount === 1 ? '' : 's'}`.replace('  ', ' ')}
+              </Button>
+              <Button variant="ghost" size="sm" disabled={saving} onClick={leavePriceEdit}>Done</Button>
+            </div>
+          )}
         </div>
       )}
+
+      <ConfirmChangesDialog
+        open={!!priceReview}
+        title="Save these price changes?"
+        description={`You are about to change pricing on ${priceReview?.length ?? 0} product${priceReview?.length === 1 ? '' : 's'}. Sale price changes show in the shop straight away.`}
+        changes={priceReview || []}
+        confirmLabel="Yes, save changes"
+        busy={saving}
+        onConfirm={savePrices}
+        onCancel={() => setPriceReview(null)}
+      />
+
+      <ConfirmChangesDialog
+        open={!!statusReview}
+        title={`Change ${statusReview?.changes.length ?? 0} product${statusReview?.changes.length === 1 ? '' : 's'} to ${statusLabel(statusReview?.status)}?`}
+        description={statusReview?.unchanged
+          ? `${statusReview.unchanged} of the selected products ${statusReview.unchanged === 1 ? 'is' : 'are'} already ${statusLabel(statusReview.status)} and will be left as ${statusReview.unchanged === 1 ? 'it is' : 'they are'}.`
+          : 'Check the list below, then confirm.'}
+        changes={statusReview?.changes || []}
+        notes={statusReview?.notes || []}
+        confirmLabel="Yes, change status"
+        confirmDisabled={etaNeeded > 0 && (!bulkEta.trim() || bulkEta.trim().length > PREORDER_ETA_MAX_LENGTH)}
+        busy={bulkSaving}
+        onConfirm={applyStatus}
+        onCancel={() => setStatusReview(null)}
+      >
+        {etaNeeded > 0 && (
+          <div className="space-y-1.5">
+            <Label htmlFor="bulk-preorder-eta">Estimated dispatch *</Label>
+            <Input
+              id="bulk-preorder-eta"
+              value={bulkEta}
+              maxLength={PREORDER_ETA_MAX_LENGTH}
+              placeholder="e.g. Ships in 4–6 weeks"
+              onChange={(e) => setBulkEta(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown to buyers on {etaNeeded === 1 ? 'the 1 product that has' : `the ${etaNeeded} products that have`} no estimate yet. Products with their own estimate keep it.
+            </p>
+          </div>
+        )}
+      </ConfirmChangesDialog>
 
       <ShopCategoryManager open={isCategoriesOpen} onOpenChange={setIsCategoriesOpen} products={products} />
 
