@@ -560,7 +560,10 @@ const EventsManagementPage = () => {
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            {/* The event column takes whatever width is left (w-full + max-w-0) and
+                truncates its text, so a long title or description can never push
+                Status and Actions off the right-hand edge. */}
+            <table className="w-full min-w-[640px] md:min-w-[880px] text-sm text-left">
               <thead className="text-xs text-muted-foreground uppercase bg-muted/20 border-b border-border">
                 <tr>
                   {COLUMNS.map((col) => {
@@ -569,7 +572,7 @@ const EventsManagementPage = () => {
                     return (
                       <th
                         key={col.key}
-                        className={`px-6 py-4 font-bold whitespace-nowrap ${col.className || ''}`}
+                        className={`px-4 py-3 font-bold whitespace-nowrap ${col.className || ''}`}
                         aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
                       >
                         <button type="button" onClick={() => toggleSort(col.key)} className="inline-flex items-center gap-1 uppercase hover:text-primary">
@@ -579,7 +582,7 @@ const EventsManagementPage = () => {
                       </th>
                     );
                   })}
-                  <th className="px-6 py-4 font-bold whitespace-nowrap text-right">Actions</th>
+                  <th className="px-4 py-3 font-bold whitespace-nowrap text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -612,8 +615,8 @@ const EventsManagementPage = () => {
                     data-lingering={lingeringIds.has(event.id) ? 'true' : undefined}
                     className={`hover:bg-muted/30 transition-opacity duration-700 ${lingeringIds.has(event.id) ? 'opacity-40' : ''}`}
                   >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-4">
+                    <td className="px-4 py-3 w-full max-w-0">
+                      <div className="flex items-center gap-3">
                         <div className="w-16 h-12 bg-background rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-border shadow-sm">
                           {event.image_url ? (
                             <img src={toCdnUrl(event.image_url)} alt={event.title} className="w-full h-full object-cover" />
@@ -621,7 +624,7 @@ const EventsManagementPage = () => {
                             <ImageOff className="w-4 h-4 text-muted-foreground/50" />
                           )}
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-bold text-foreground text-base leading-tight truncate">
                               <a
@@ -661,7 +664,7 @@ const EventsManagementPage = () => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 hidden md:table-cell">
+                    <td className="px-4 py-3 hidden md:table-cell">
                       <div className="flex flex-col gap-1.5">
                         <span className="flex items-center text-foreground font-medium text-sm whitespace-nowrap">
                           <Calendar className="w-3.5 h-3.5 mr-1.5 text-muted-foreground shrink-0" />
@@ -672,11 +675,11 @@ const EventsManagementPage = () => {
                         </span>
                         <span className="flex items-center text-muted-foreground text-xs font-medium">
                           <MapPin className="w-3.5 h-3.5 mr-1.5 shrink-0" />
-                          <span className="truncate max-w-[180px]">{fmtLocation(event)}</span>
+                          <span className="truncate max-w-[200px]">{fmtLocation(event)}</span>
                         </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={event.status === 'approved'}
@@ -704,8 +707,8 @@ const EventsManagementPage = () => {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
                         <Button
                           variant="outline"
                           size="sm"
