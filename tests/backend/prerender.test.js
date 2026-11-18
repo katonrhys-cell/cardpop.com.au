@@ -1364,6 +1364,21 @@ describe('prerender seller profiles', () => {
     expect(body).not.toContain('noindex');
   });
 
+  // A listing with no stored slug must be linked at the URL its own page
+  // declares canonical (the card-name slug) — never /marketplace/<id>/listing,
+  // which Google crawled as a duplicate of every card page.
+  it('links a slug-less listing at its canonical card-name URL', async () => {
+    state.result = { data: {
+      id: UUID, display_name: 'CardShark', is_sole_trader: false, is_public: true,
+    } };
+    state.listResult = { data: [
+      { id: UUID, slug: null, price_aud: 900, vault_item: { card_name: 'Michael Jordan Fleer #57' } },
+    ] };
+    const { body } = await run(`/seller/${UUID}`);
+    expect(body).toContain(`/marketplace/${UUID}/michael-jordan-fleer-57`);
+    expect(body).not.toContain(`/marketplace/${UUID}/listing`);
+  });
+
   it('canonicalises PAID sole traders to their dealer store page', async () => {
     state.result = { data: {
       id: UUID, display_name: 'Poke Den', business_name: 'Poke Den',

@@ -191,6 +191,12 @@ const slugify = (str = '') => String(str)
   .replace(/\s+/g, '-')
   .replace(/-+/g, '-');
 
+// The slug a listing's canonical URL carries (see renderMarketplaceListing):
+// the DB slug, else the card name. Every link the prerender emits to a listing
+// must use it — linking /marketplace/<id>/listing instead sent Googlebot to a
+// duplicate of every card page ("Alternate page with proper canonical tag").
+const listingSlug = (l) => l?.slug || slugify(l?.vault_item?.card_name || 'Trading Card') || 'listing';
+
 // Inject unique anchor ids onto every <h2> in article HTML so crawlers (and
 // Google "jump to" deep links) have stable targets. Regex-based to avoid a DOM
 // dependency in the serverless function; leaves headings that already have ids.
@@ -585,7 +591,7 @@ async function renderDealer(supabase, param) {
 
   const listingItems = (listings || []).map(l => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
-    const slug = l.slug || 'listing';
+    const slug = listingSlug(l);
     return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(slug)}">${esc(cardName)}</a></li>`;
   }).join('\n');
 
@@ -593,7 +599,7 @@ async function renderDealer(supabase, param) {
   // offers/review/aggregateRating, so an unpriced listing is a plain URL item.
   const productLd = (listings || []).map((l, i) => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
-    const url = `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`;
+    const url = `${BASE_URL}/marketplace/${l.id}/${listingSlug(l)}`;
     if (!(l.price_aud > 0)) return { '@type': 'ListItem', position: i + 1, name: cardName, url };
     const imgPath = l.vault_item?.vault_images?.[0]?.storage_path || l.vault_item?.card_image;
     const img = publicImageUrl(imgPath);
@@ -1585,7 +1591,7 @@ async function renderLanding(supabase, path) {
       const image = publicImageUrl(imgPath);
       return {
         name: l.vault_item?.card_name || 'Trading Card',
-        url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
+        url: `${BASE_URL}/marketplace/${l.id}/${listingSlug(l)}`,
         price: l.price_aud,
         image,
       };
@@ -3938,7 +3944,7 @@ ${listings.map((l) => {
     const name = l.vault_item?.card_name || `${player.name} card`;
     const meta = listingMeta(l.vault_item?.year, l.vault_item?.set_name);
     const price = l.price_aud != null ? ` — ${audPrice(l.price_aud)}` : '';
-    return `  <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>${meta ? ` (${esc(meta)})` : ''}${price}</li>`;
+    return `  <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(listingSlug(l))}">${esc(name)}</a>${meta ? ` (${esc(meta)})` : ''}${price}</li>`;
   }).join('\n')}
 </ul>` : `<p>No cards tagged with ${esc(player.name)} are listed yet. <a href="${BASE_URL}/vault/add">List one</a> and pick the player in the card form.</p>`}
 </section>`;
@@ -4096,14 +4102,14 @@ async function renderCollection(supabase, rawSlug) {
         '@type': 'ListItem',
         position: i + 1,
         name: l.vault_item?.card_name || 'Trading Card',
-        url: `${BASE_URL}/marketplace/${l.id}/${l.slug || 'listing'}`,
+        url: `${BASE_URL}/marketplace/${l.id}/${listingSlug(l)}`,
       })),
     });
   }
 
   const itemsHtml = listings.map((l) => {
     const name = l.vault_item?.card_name || 'Trading Card';
-    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>`
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(listingSlug(l))}">${esc(name)}</a>`
       + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');
 
@@ -4376,7 +4382,7 @@ async function renderSeller(supabase, param) {
 
   const itemsHtml = listings.map((l) => {
     const cardName = l.vault_item?.card_name || 'Trading Card';
-    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(cardName)}</a>`
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(listingSlug(l))}">${esc(cardName)}</a>`
       + `${l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : ''}</li>`;
   }).join('\n');
 
@@ -4780,7 +4786,7 @@ async function renderHome(supabase) {
     const name = l.vault_item?.card_name || 'Trading Card';
     const collection = l.vault_item?.collection ? ` (${esc(l.vault_item.collection)})` : '';
     const price = l.price_aud > 0 ? ` — A$${esc(Number(l.price_aud).toFixed(2))}` : '';
-    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(l.slug || 'listing')}">${esc(name)}</a>${collection}${price}</li>`;
+    return `    <li><a href="${BASE_URL}/marketplace/${esc(l.id)}/${esc(listingSlug(l))}">${esc(name)}</a>${collection}${price}</li>`;
   }).join('\n');
   const articlesHtml = articles.map((a) => {
     const date = humanDate(a.published_at || a.created_at);
