@@ -23,6 +23,10 @@
     "api/event-scan.js": {
       "maxDuration": 300
     },
+    "api/site-check.js": {
+      "maxDuration": 120,
+      "includeFiles": "{vercel.json,public/robots.txt}"
+    },
     "api/grade-estimate.js": {
       "maxDuration": 300,
       "includeFiles": "node_modules/{@img/sharp-*linux-x64,pdfkit/js/data}/**"
@@ -548,6 +552,10 @@
     {
       "source": "/cron/event-scan",
       "destination": "/api/event-scan"
+    },
+    {
+      "source": "/cron/site-check",
+      "destination": "/api/site-check"
     },
     {
       "source": "/grade-estimate/:path*",

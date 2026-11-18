@@ -114,10 +114,11 @@ tracking must be off, or every navigation counts twice:
   the helpers into it (a new product surface can't ship identifier-less);
   `npm run check:merchant-listings` (`scripts/check-merchant-listings.mjs`)
   fetches a sitemap sample the way Googlebot does and reports every Product
-  with no brand/gtin/mpn or a malformed gtin — it runs weekly from
-  `.github/workflows/merchant-listings-check.yml`, which files one tracking
-  issue on failure, and is the first thing to run after a Search Console
-  email about Merchant listings. Admin → Products warns when a non-`CP-` SKU
+  with no brand/gtin/mpn or a malformed gtin. Run it by hand from your own
+  machine after a Search Console email about Merchant listings; the same
+  markup check runs every day in process as part of the daily site check
+  (below) — the weekly GitHub workflow that used to run the script was
+  blocked by Cloudflare on every run and has been removed. Admin → Products warns when a non-`CP-` SKU
   is saved with the Brand blank.
 - **Merchant listings shipping & returns**: every product-page `Offer` carries
   `shippingDetails` built by `utils/productShippingLd.js` — shop products quote
@@ -180,11 +181,36 @@ Before 2026-11 the static pages shared one constant, `2026-10-02`, and the legal
 pages a hand-typed `2026-05-31`; the Terms were rewritten on 17 November and the
 sitemap still said May.
 
-### The weekly live check
+### The daily site check
 
-`npm run check:sitemap` (`scripts/check-sitemap.mjs`, checks in
-`src/utils/sitemapCheck.js`) reads the live `/sitemap.xml` and `/robots.txt`
-and fails when:
+`/cron/site-check` (`api/site-check.js` → `src/utils/siteCheck.js`, the
+`site_check` job of the scheduler Worker's daily run) checks three things:
+the sitemap file, a sample of the pages it lists exactly as a crawler is
+served them (about 90 a day: a few from every section, more from the product
+sections), and the Product markup on the sampled product pages (every Product
+has a brand, gtin or mpn — `src/utils/merchantListingsCheck.js`).
+
+**It runs in process.** The function calls the sitemap and prerender handlers
+directly and reads `vercel.json` / `public/robots.txt` from its own bundle
+(`includeFiles` in `vercel.json`), so no request crosses Cloudflare. That is
+deliberate: the first version ran on a GitHub runner against the public site,
+and Cloudflare's **Bot Fight Mode** challenged every request (Security →
+Analytics → Events showed "Managed Challenge", service "Bot fight"). The Free
+plan has no way to exempt a caller from Bot Fight Mode, and the older
+merchant-listings workflow had been failing the same way, unread, since
+2026-10-06. What an in-process check cannot see is the edge itself — a
+Cloudflare rule, a cache, DNS.
+
+It answers 200 when clean and **502 with the problems listed** when not; the
+scheduler then emails `admin@cardpop.com.au` (`docs/scheduled-jobs.md`) and the
+full list is in the function's log (`[SITE_CHECK]`). Run it by hand with
+`POST /run/site_check` on the scheduler Worker, or
+`curl -H "Authorization: Bearer $CRON_SECRET" https://cardpop.com.au/cron/site-check`
+(`?sample=50&productSample=50` covers nearly every page).
+
+`npm run check:sitemap` (`scripts/check-sitemap.mjs`) is the same sitemap and
+page checks over HTTP, for a by-hand run from a machine Cloudflare lets through
+(a home connection usually is; a data-centre address is not). Both report:
 
 | Message | What it means | Fix |
 |---|---|---|
@@ -196,15 +222,16 @@ and fails when:
 | `invalid lastmod` / `lastmod in the future` | A bad date in the data | Fix the row |
 | `disallowed by robots.txt` / `has no "Sitemap:" line` | `public/robots.txt` and the sitemap disagree | Fix whichever is wrong |
 | `is in the sitemap but is noindex` / `names another canonical` / `answers HTTP …` / `redirects` | A sampled page (fetched with a bot user-agent, so the prerender answers) should not be listed as it stands | Apply the same content gate in `api/sitemap.js` that `api/prerender.js` uses, or fix the page |
+| `no bot rewrite sends it to the prerender` | A listed page has no bot rewrite in `vercel.json`, so crawlers get the empty app shell | Add the rewrite (and a renderer in `api/prerender.js`) |
+| `Product markup — … no global identifier` | A Product with no brand / gtin / mpn | See Merchant listings identifiers above — usually a card with no franchise or number, or a shop row with a malformed barcode |
+| `could not be read by the check` | `vercel.json` or `robots.txt` is missing from the function bundle | Restore `includeFiles` on `api/site-check.js` in `vercel.json` |
 
-It samples a few pages from every section (`--sample N`, `0` = the file only;
-`--base <url>` fetches from a preview host). The floors and required sections
-are constants at the top of `src/utils/sitemapCheck.js` — raise `MIN_URLS` as
-the site grows.
+The script samples a few pages from every section (`--sample N`, `0` = the file
+only; `--base <url>` fetches from a preview host). The floors and required
+sections are constants at the top of `src/utils/sitemapCheck.js` — raise
+`MIN_URLS` as the site grows.
 
-It runs every week as a step of `.github/workflows/merchant-listings-check.yml`
-and files one issue, **The live sitemap has problems**, when it fails. It cannot
-see what Google made of the file — that is Search Console → Indexing → Sitemaps
+Neither can see what Google made of the file — that is Search Console → Indexing → Sitemaps
 (status, discovered pages, last read).
 
 ## Google Search Console — sitemap submission (manual, one-time)

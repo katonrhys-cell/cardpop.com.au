@@ -29,7 +29,7 @@ describe('cloudflare/scheduler SCHEDULES', () => {
     expect(byKey.daily.cron).toBe('23 19 * * *');
     expect(byKey.blog.cron).toBe('7 21 * * *');
     expect(byKey['event-scan'].cron).toBe('7 17 * * SUN');
-    expect(byKey.daily.jobs).toEqual(['site_traffic', 'prices', 'event_watch', 'event_backlog', 'event_instagram', 'supplier_watch', 'delivery_sweep', 'retention_sweep']);
+    expect(byKey.daily.jobs).toEqual(['site_traffic', 'prices', 'event_watch', 'event_backlog', 'event_instagram', 'supplier_watch', 'delivery_sweep', 'retention_sweep', 'site_check']);
     // Every scheduled job exists, and every job is on some schedule.
     const scheduled = new Set(SCHEDULES.flatMap((s) => s.jobs));
     for (const name of scheduled) expect(JOBS[name]).toBeTruthy();
@@ -116,7 +116,7 @@ describe('runSchedule', () => {
     const report = await runSchedule(daily, env, { fetch, sleep: noSleep });
     expect(report.ok).toBe(false);
     expect(report.failed.sort()).toEqual(['event_watch', 'retention_sweep']);
-    expect(report.results).toHaveLength(8);
+    expect(report.results).toHaveLength(9);
     const paths = calls.map((c) => new URL(c.url).pathname + new URL(c.url).search);
     for (const name of daily.jobs) expect(paths).toContain(JOBS[name].endpoint);
   });
@@ -211,7 +211,7 @@ describe('handlers', () => {
     expect(ok.status).toBe(200);
     const report = await ok.json();
     expect(report.schedule).toBe('daily');
-    expect(report.results).toHaveLength(8);
+    expect(report.results).toHaveLength(9);
 
     // A single job by name, and an unknown target.
     const one = await handlers.fetch(new Request('https://sched.example.workers.dev/run/prices', { method: 'POST', headers: { authorization: `Bearer ${SECRET}` } }), env);

@@ -85,6 +85,11 @@ export const JOBS = Object.freeze({
   // Retention emails (docs/retention.md). Every send is stamped in the DB,
   // so a retry can't repeat one.
   retention_sweep: { endpoint: '/api/retention/sweep', maxSeconds: 50, attempts: 2 },
+  // Site check (docs/seo-analytics.md → The daily site check): the sitemap,
+  // a sample of its pages as crawlers get them, and Product markup, rendered
+  // in process by its own 120 s function. Read-only, so a retry is harmless;
+  // a 502 means it found problems and the alert email quotes them.
+  site_check: { endpoint: '/cron/site-check', maxSeconds: 130, attempts: 2 },
 
   // ── Own schedules ────────────────────────────────────────────────────────
   // Asks Stripe whether a still-'pending' order was in fact paid. Read-only
@@ -103,7 +108,7 @@ export const JOBS = Object.freeze({
 
 // One entry per Cron Trigger. The jobs of a schedule run concurrently: they
 // are independent, and the daily run's worst case (two 50 s attempts on five
-// endpoints plus three 330 s calls) would not fit the 15-minute ceiling in series.
+// endpoints, two 130 s attempts on the site check, plus three 330 s calls) would not fit the 15-minute ceiling in series.
 export const SCHEDULES = Object.freeze([
   {
     // Every 2 hours at :15 past. A stuck payment is caught within ~2 hours.
@@ -119,7 +124,7 @@ export const SCHEDULES = Object.freeze([
     cron: '23 19 * * *',
     key: 'daily',
     name: 'Daily maintenance',
-    jobs: ['site_traffic', 'prices', 'event_watch', 'event_backlog', 'event_instagram', 'supplier_watch', 'delivery_sweep', 'retention_sweep'],
+    jobs: ['site_traffic', 'prices', 'event_watch', 'event_backlog', 'event_instagram', 'supplier_watch', 'delivery_sweep', 'retention_sweep', 'site_check'],
   },
   {
     // 21:07 UTC = 07:07 AEST.

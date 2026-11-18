@@ -50,6 +50,7 @@ export const FUNCTION_MODULES = Object.freeze({
   '/api/merchant-feed': { kind: 'handler', module: '../api/merchant-feed.js' },
   '/api/blog-generate': { kind: 'handler', module: '../api/blog-generate.js' },
   '/api/event-scan': { kind: 'handler', module: '../api/event-scan.js' },
+  '/api/site-check': { kind: 'handler', module: '../api/site-check.js' },
 });
 
 // A rewrite chain stops on one of these — the functions above and the two
