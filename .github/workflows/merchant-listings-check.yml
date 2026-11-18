@@ -15,7 +15,14 @@ name: Merchant listings check
 # tracking issue when a page comes back identifier-less, so the next signal is
 # an issue in this repo rather than another Search Console email.
 #
-# Dependency-free script: no npm ci, so a run costs about a metered minute.
+# The same run also checks the live /sitemap.xml (scripts/check-sitemap.mjs):
+# the file is whole and well formed, no section has silently emptied, robots.txt
+# blocks nothing in it, and a sample of listed pages answers 200, indexable and
+# self-canonical. Each section of the sitemap fails on its own by design, which
+# leaves a valid but shorter file that nothing else would notice. It is a step
+# here, not its own workflow, because every job bills a rounded-up minute.
+#
+# Dependency-free scripts: no npm ci, so a run costs about a metered minute.
 
 on:
   schedule:
@@ -48,7 +55,7 @@ jobs:
         run: node scripts/check-merchant-listings.mjs --sample 10
 
       - name: File a tracking issue
-        if: failure()
+        if: ${{ !cancelled() && steps.check.outcome == 'failure' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           FAILURES: ${{ steps.check.outputs.failures }}
@@ -88,3 +95,44 @@ jobs:
           } > issue-body.md
 
           gh issue create --title "$title" --body-file issue-body.md
+
+      - name: Check the live sitemap
+        id: sitemap
+        if: ${{ !cancelled() }}
+        run: node scripts/check-sitemap.mjs
+
+      - name: File a sitemap tracking issue
+        if: ${{ !cancelled() && steps.sitemap.outcome == 'failure' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILURES: ${{ steps.sitemap.outputs.failures }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="The live sitemap has problems"
+
+          # One open issue is the signal — don't comment on every weekly re-run.
+          existing=$(gh issue list --state open --search "\"$title\" in:title" \
+                       --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing is already open — leaving it alone."
+            exit 0
+          fi
+
+          {
+            echo 'The weekly live check of https://cardpop.com.au/sitemap.xml found problems.'
+            echo
+            if [ -n "$FAILURES" ]; then
+              printf '%s\n' "$FAILURES"
+            else
+              echo 'The check could not report what — see the run log (the site may have'
+              echo 'been unreachable from the runner).'
+            fi
+            echo
+            echo "Failing run: $RUN_URL"
+            echo
+            echo 'What each message means and how to fix it: `docs/seo-analytics.md` →'
+            echo 'Sitemap. Re-run **Merchant listings check** (or `npm run check:sitemap`)'
+            echo 'and close this issue once it passes.'
+          } > sitemap-issue-body.md
+
+          gh issue create --title "$title" --body-file sitemap-issue-body.md

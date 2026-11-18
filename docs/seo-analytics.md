@@ -138,13 +138,74 @@ tracking must be off, or every navigation counts twice:
 - **Sitemap**: generated live at `https://cardpop.com.au/sitemap.xml`
   (`api/sitemap.js`) — static pages plus DB-driven listings, blog articles,
   products, events, sellers, price pages and store-directory cities. It is
-  advertised in `public/robots.txt`.
+  advertised in `public/robots.txt`. See **Sitemap** below for how its dates
+  are set and how the live file is checked.
 - **robots.txt**: allows public content, disallows auth/account/vault/admin/
   checkout/search, and carries AI-crawler rules (see `public/llms.txt`).
 - **Alt text**: all JSX `<img>` elements carry `alt` attributes (components
   pass card/product names through `CardImage` etc.). DB-stored blog article
   HTML gets a fallback alt (the article title) injected at render via
   `ensureImgAltInHtml` (`utils/imageUrl.js`).
+
+## Sitemap
+
+### Where each `<lastmod>` comes from
+
+Google only uses `lastmod` while it finds the dates believable, and it judges
+the sitemap as a whole — so no date in it is typed by hand and none is "today"
+unless the page changed today.
+
+- **Pages from the database** (an event, an article, a product, a listing, a
+  price page…) take that row's `updated_at`, or the latest price snapshot.
+- **Static pages** (Terms, About, the grading guides, the shop hubs…) take the
+  day their source files last changed. `data/sitemapPageSources.js` lists the
+  files behind each page — the page component, plus its direct `@/data/…` /
+  `@/config/…` imports and the policy constants, which are added automatically.
+  `npm run sitemap:dates` writes the result to `data/sitemapPageDates.js` (a
+  content hash and a date per page; a page whose hash is unchanged keeps its
+  date). **After editing a listed page, run it and commit the file** —
+  `tests/backend/sitemapPageDates.test.js` fails in CI until you do, and also
+  fails when a page in `STATIC_PAGES` has no entry in the sources file. A key
+  ending in `/*` covers a family of pages built from one template (the Palms
+  Off Gaming lines share `data/palmsOffCatalogue.js`, so they share a date).
+- **Static pages that list live rows** take whichever is newer: their file
+  date, or the newest row they show. The home page follows the newest event,
+  listing, product or article; `/shop`, the shop collection pages and a
+  catalogue line's own page follow their products; `/marketplace` and
+  `/collections/<slug>` their listings; `/blog` and each category hub their
+  articles; the `/prices` hubs the newest price snapshot on them (not the
+  current date — a night the price job doesn't run is not a change).
+
+Before 2026-11 the static pages shared one constant, `2026-10-02`, and the legal
+pages a hand-typed `2026-05-31`; the Terms were rewritten on 17 November and the
+sitemap still said May.
+
+### The weekly live check
+
+`npm run check:sitemap` (`scripts/check-sitemap.mjs`, checks in
+`src/utils/sitemapCheck.js`) reads the live `/sitemap.xml` and `/robots.txt`
+and fails when:
+
+| Message | What it means | Fix |
+|---|---|---|
+| `answered HTTP …` / `is served as …` | The function failed or the rewrite in `vercel.json` broke | Vercel runtime logs for `api/sitemap.js` |
+| `does not end with </urlset>`, `has N <url> but M </url>`, `unescaped &` | Malformed XML — Google rejects the whole file | A value reached the XML without `xmlEscape()` |
+| `lists N URLs — fewer than the floor` / `no /events/… pages are listed` | A section's query failed or timed out. Each section fails on its own, so the file stays valid and just gets shorter | Run the section's query from `api/sitemap.js` by hand; usually a renamed column |
+| `… is missing from the sitemap` | A core page was dropped from `STATIC_PAGES` | Restore it |
+| `is listed twice`, `is not on https://cardpop.com.au`, `query string`, `ends with a slash` | A URL that is not the page's canonical form | Build the URL through the shared path helper |
+| `invalid lastmod` / `lastmod in the future` | A bad date in the data | Fix the row |
+| `disallowed by robots.txt` / `has no "Sitemap:" line` | `public/robots.txt` and the sitemap disagree | Fix whichever is wrong |
+| `is in the sitemap but is noindex` / `names another canonical` / `answers HTTP …` / `redirects` | A sampled page (fetched with a bot user-agent, so the prerender answers) should not be listed as it stands | Apply the same content gate in `api/sitemap.js` that `api/prerender.js` uses, or fix the page |
+
+It samples a few pages from every section (`--sample N`, `0` = the file only;
+`--base <url>` fetches from a preview host). The floors and required sections
+are constants at the top of `src/utils/sitemapCheck.js` — raise `MIN_URLS` as
+the site grows.
+
+It runs every week as a step of `.github/workflows/merchant-listings-check.yml`
+and files one issue, **The live sitemap has problems**, when it fails. It cannot
+see what Google made of the file — that is Search Console → Indexing → Sitemaps
+(status, discovered pages, last read).
 
 ## Google Search Console — sitemap submission (manual, one-time)
 
@@ -164,9 +225,11 @@ site straight from Search Console) — one click of extra coverage.
 
 ## Ongoing checklist
 
-- After adding a new static route: add it to `STATIC_PAGES` in
-  `api/sitemap.js` and give the page a `SEOHead` with unique title,
+- After adding a new static route: add it to `STATIC_PAGE_ROWS` in
+  `api/sitemap.js` and its source files to `data/sitemapPageSources.js`, run
+  `npm run sitemap:dates`, and give the page a `SEOHead` with unique title,
   description and canonical.
+- After editing a static page that is in the sitemap: `npm run sitemap:dates`.
 - New DB-driven content types: add a query + URL block to `api/sitemap.js`.
 - Check Search Console monthly: coverage, Core Web Vitals, rich-result status.
 - Larger rendering-architecture options (SSR / edge meta injection) are

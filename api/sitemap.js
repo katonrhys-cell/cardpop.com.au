@@ -14,6 +14,8 @@ import { GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
 import { namesOrganiser, organiserPath } from '../utils/eventOrganisers.js';
 import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import { eventRegionPath, regionsWithEvents } from '../data/eventRegions.js';
+import { staticPageLastmod } from '../data/sitemapPageSources.js';
+import { STATIC_PAGE_DATES } from '../data/sitemapPageDates.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -31,11 +33,17 @@ const PAST_EVENT_DAYS = 730;
 const EVENTS_SINCE = new Date(Date.now() - PAST_EVENT_DAYS * 24 * 60 * 60 * 1000)
   .toISOString()
   .split('T')[0];
-// Stable <lastmod> for structural/static pages. Stamping TODAY on every request
-// (even when nothing changed) trains crawlers to distrust the sitemap's dates,
-// which hurts recrawl scheduling. Bump this only when the static pages actually
-// change; DB-driven URLs below keep their real updated_at timestamps.
-const SITE_UPDATED = '2026-10-02';
+// <lastmod> for a static page is the day its source files last changed
+// (data/sitemapPageSources.js → data/sitemapPageDates.js, regenerated with
+// `npm run sitemap:dates`; a test fails when it is stale). Never stamp TODAY on
+// a page that didn't change, and never hand-type a date: one shared constant
+// sat at 2026-10-02 for six weeks while the pages under it changed, and
+// crawlers stop trusting every date in a sitemap once some are wrong. Pages
+// that list live rows are lifted to the newest row in the handler (`fresh`).
+// FALLBACK_LASTMOD only covers a page with no entry, which the test forbids.
+const FALLBACK_LASTMOD = '2026-11-18';
+const staticLastmod = (loc) => staticPageLastmod(loc, STATIC_PAGE_DATES) || FALLBACK_LASTMOD;
+const dayOf = (...stamps) => String(stamps.find(Boolean) || '').split('T')[0];
 
 // Sitemap <loc> values must be XML-escaped. Slugs come straight from the DB, so
 // a stray & (or < >) in one slug would otherwise produce invalid XML and make
@@ -139,67 +147,67 @@ const MAX_ROWS = {
   organiserEvents: 5000,
 };
 
-const STATIC_PAGES = [
-  { loc: '/',                      lastmod: SITE_UPDATED,       freq: 'daily',   pri: '1.0' },
-  { loc: '/marketplace',           lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
+const STATIC_PAGE_ROWS = [
+  { loc: '/', freq: 'daily',   pri: '1.0' },
+  { loc: '/marketplace', freq: 'daily',   pri: '0.9' },
   // /search is intentionally excluded — internal search-results pages offer no
   // unique indexable content and are disallowed in robots.txt.
-  { loc: '/shop',                  lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.9' },
+  { loc: '/shop', freq: 'daily',   pri: '0.9' },
   // /shop/sealed-boxes and /shop/singles are listed below only while they
   // have a product — an empty section is noindex in the prerender.
   // Shop supply collection pages (Protection, Storage, Display, Shipping,
   // Grading) — config-driven, one per group in data/shopCollectionSeo.js.
   ...Object.keys(SHOP_COLLECTION_SEO).map((slug) => (
-    { loc: `/shop/${slug}`,        lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' }
+    { loc: `/shop/${slug}`, freq: 'weekly',  pri: '0.8' }
   )),
   // Palms Off Gaming binders: the brand hub plus one page per product. These
   // are static, config-driven URLs (data/shopBinderProducts.js), not DB rows,
   // so they belong here rather than in the shop_products block below.
-  { loc: '/shop/binders',          lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/shop/binders', freq: 'weekly',  pri: '0.8' },
   ...BINDER_SLUGS.map((slug) => (
-    { loc: `/shop/binders/${slug}`, lastmod: SITE_UPDATED,      freq: 'weekly',  pri: '0.7' }
+    { loc: `/shop/binders/${slug}`, freq: 'weekly',  pri: '0.7' }
   )),
   // Palms Off Gaming product pages, one per line, inside the normal
   // product-type taxonomy. Config-driven (data/palmsOffCatalogue.js), not DB
   // rows, so they belong here rather than in the shop_products block below.
   ...PALMS_OFF_PRODUCTS.map((p) => (
-    { loc: `/shop/${p.categorySlug}/${p.slug}`, lastmod: SITE_UPDATED, freq: 'weekly', pri: '0.7' }
+    { loc: `/shop/${p.categorySlug}/${p.slug}`, freq: 'weekly', pri: '0.7' }
   )),
-  { loc: '/analytics',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/scan',                  lastmod: SITE_UPDATED,       freq: 'monthly', pri: '0.8' },
-  // /prices pages legitimately change every day (fresh price snapshots), so
-  // TODAY is an honest lastmod here, unlike the structural pages above.
-  { loc: '/prices',                lastmod: TODAY,              freq: 'daily',   pri: '0.9' },
-  { loc: '/prices/pokemon',        lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
-  { loc: '/prices/basketball',     lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
-  { loc: '/prices/one-piece',      lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
-  { loc: '/prices/afl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
-  { loc: '/prices/nrl',            lastmod: TODAY,              freq: 'daily',   pri: '0.8' },
-  { loc: '/analytics/buying-guides', lastmod: SITE_UPDATED,     freq: 'weekly',  pri: '0.7' },
-  { loc: '/australian-markets',    lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/grading',               lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
-  { loc: '/grading/what-is-grading', lastmod: SITE_UPDATED,    freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/scales',        lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
+  { loc: '/analytics', freq: 'daily',   pri: '0.8' },
+  { loc: '/scan', freq: 'monthly', pri: '0.8' },
+  // The /prices hubs are dated in the handler by the newest price snapshot
+  // on them.
+  { loc: '/prices', freq: 'daily',   pri: '0.9' },
+  { loc: '/prices/pokemon', freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/basketball', freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/one-piece', freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/afl', freq: 'daily',   pri: '0.8' },
+  { loc: '/prices/nrl', freq: 'daily',   pri: '0.8' },
+  { loc: '/analytics/buying-guides', freq: 'weekly',  pri: '0.7' },
+  { loc: '/australian-markets', freq: 'daily',   pri: '0.8' },
+  { loc: '/grading', freq: 'weekly',  pri: '0.8' },
+  { loc: '/grading/what-is-grading', freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/scales', freq: 'monthly',  pri: '0.7' },
   // Per-company grading scale pages (data/gradingScales.js — the same list
   // the SPA page and the prerender read). /grading/guide/:scale is an alias of
   // the same page — only the canonical /grading/scales/:scale URLs are
   // advertised.
   ...GRADING_SCALE_SLUGS.map((scale) => (
-    { loc: `/grading/scales/${scale}`, lastmod: SITE_UPDATED,   freq: 'monthly',  pri: '0.6' }
+    { loc: `/grading/scales/${scale}`, freq: 'monthly',  pri: '0.6' }
   )),
-  { loc: '/grading/companies',     lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/local-graders', lastmod: SITE_UPDATED,       freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/submission-partners', lastmod: SITE_UPDATED, freq: 'monthly',  pri: '0.7' },
-  { loc: '/grading/estimator',     lastmod: SITE_UPDATED,       freq: 'weekly',   pri: '0.8' },
-  { loc: '/grading/roi-calculator', lastmod: SITE_UPDATED,      freq: 'weekly',   pri: '0.8' },
-  { loc: '/community',             lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.7' },
-  { loc: '/events',                lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/events/card-shows',     lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/events/trade-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/events/community-events', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.8' },
-  { loc: '/events/store-events',   lastmod: SITE_UPDATED,       freq: 'daily',   pri: '0.8' },
-  { loc: '/community/local-traders', lastmod: SITE_UPDATED,     freq: 'daily',   pri: '0.7' },
-  { loc: '/community/building-your-business', lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
+  { loc: '/grading/companies', freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/local-graders', freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/submission-partners', freq: 'monthly',  pri: '0.7' },
+  { loc: '/grading/estimator', freq: 'weekly',   pri: '0.8' },
+  { loc: '/grading/roi-calculator', freq: 'weekly',   pri: '0.8' },
+  { loc: '/community', freq: 'daily',   pri: '0.7' },
+  { loc: '/events', freq: 'daily',   pri: '0.8' },
+  { loc: '/events/card-shows', freq: 'daily',   pri: '0.8' },
+  { loc: '/events/trade-events', freq: 'daily',   pri: '0.8' },
+  { loc: '/events/community-events', freq: 'daily',   pri: '0.8' },
+  { loc: '/events/store-events', freq: 'daily',   pri: '0.8' },
+  { loc: '/community/local-traders', freq: 'daily',   pri: '0.7' },
+  { loc: '/community/building-your-business', freq: 'monthly', pri: '0.6' },
   // Not advertised: /community/forum is added below only once it has
   // discussions; /community/profiles, /community/leaderboard, /community/map
   // and /community/whatnot are interactive directories with little indexable
@@ -207,39 +215,43 @@ const STATIC_PAGES = [
   // show links). A sitemap that points a reviewer at empty or near-empty pages
   // is how a site earns a "low value content" verdict — see
   // docs/adsense-readiness.md.
-  { loc: '/blog',                  lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/blog', freq: 'weekly',  pri: '0.8' },
   // Blog category hubs — prerendered for bots and linked from the site header.
   ...BLOG_CATEGORIES.map((c) => (
-    { loc: `/blog/category/${c.slug}`, lastmod: SITE_UPDATED,   freq: 'weekly',  pri: '0.6' }
+    { loc: `/blog/category/${c.slug}`, freq: 'weekly',  pri: '0.6' }
   )),
   // New-release buying guides (Analytics section). Each guide's own `updated`
   // date is an honest lastmod — refreshing a guide's chase figures bumps it.
   ...BUYING_GUIDES.map((g) => (
-    { loc: `/analytics/buying-guides/${g.slug}`, lastmod: g.updated || SITE_UPDATED, freq: 'weekly', pri: '0.6' }
+    { loc: `/analytics/buying-guides/${g.slug}`, lastmod: g.updated, freq: 'weekly', pri: '0.6' }
   )),
   // /launch (the pre-launch waitlist page) is deliberately absent: the site is
   // live, and it carries noindex.
-  { loc: '/about',                 lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
-  { loc: '/partners',              lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
-  { loc: '/list-your-event',       lastmod: '2026-11-06', freq: 'monthly', pri: '0.6' },
-  { loc: '/pricing',               lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.6' },
-  { loc: '/photography-standard',  lastmod: SITE_UPDATED, freq: 'monthly', pri: '0.5' },
-  { loc: '/contact',               lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
-  { loc: '/faq',                   lastmod: '2026-05-31', freq: 'monthly', pri: '0.6' },
-  { loc: '/conviction-rating',     lastmod: '2026-07-12', freq: 'monthly', pri: '0.5' },
-  { loc: '/privacy-policy',        lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
-  { loc: '/terms',                 lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
-  { loc: '/returns',               lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
-  { loc: '/shipping',              lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
-  { loc: '/trust-safety',          lastmod: '2026-05-31', freq: 'yearly',  pri: '0.4' },
-  { loc: '/safe-buying',           lastmod: '2026-07-15', freq: 'monthly', pri: '0.7' },
-  { loc: '/accessibility',         lastmod: '2026-05-31', freq: 'yearly',  pri: '0.3' },
+  { loc: '/about', freq: 'monthly', pri: '0.6' },
+  { loc: '/partners', freq: 'monthly', pri: '0.6' },
+  { loc: '/list-your-event', freq: 'monthly', pri: '0.6' },
+  { loc: '/pricing', freq: 'monthly', pri: '0.6' },
+  { loc: '/photography-standard', freq: 'monthly', pri: '0.5' },
+  { loc: '/contact', freq: 'monthly', pri: '0.6' },
+  { loc: '/faq', freq: 'monthly', pri: '0.6' },
+  { loc: '/conviction-rating', freq: 'monthly', pri: '0.5' },
+  { loc: '/privacy-policy', freq: 'yearly',  pri: '0.4' },
+  { loc: '/terms', freq: 'yearly',  pri: '0.4' },
+  { loc: '/returns', freq: 'yearly',  pri: '0.4' },
+  { loc: '/shipping', freq: 'yearly',  pri: '0.4' },
+  { loc: '/trust-safety', freq: 'yearly',  pri: '0.4' },
+  { loc: '/safe-buying', freq: 'monthly', pri: '0.7' },
+  { loc: '/accessibility', freq: 'yearly',  pri: '0.3' },
   // Collection landing pages (config-driven, one per TCG/sport in
   // data/collectionSeo.js) — evergreen category pages worth indexing.
   // Each /collections/<slug> is listed below only while it has an active
   // listing — an empty collection is noindex in the prerender.
-  { loc: '/collections',           lastmod: SITE_UPDATED,       freq: 'weekly',  pri: '0.8' },
+  { loc: '/collections', freq: 'weekly',  pri: '0.8' },
 ];
+// Every row gets its file-derived lastmod unless it carries an honest date of
+// its own (a buying guide's `updated`).
+export const STATIC_PAGES = STATIC_PAGE_ROWS.map((p) => ({ ...p, lastmod: p.lastmod || staticLastmod(p.loc) }));
+
 
 // Shop sections that are one product_type of the catalogue.
 const SHOP_TYPE_SECTIONS = [
@@ -397,6 +409,13 @@ export default async function handler(req, res) {
         .from('event_reviews')
         .select('article_id, videos, video')
         .limit(MAX_ROWS.articles),
+      // Which category each article is filed under, to date the category
+      // hubs. Its own query so it can only cost those dates, never the articles.
+      supabase
+        .from('blog_articles')
+        .select('id, category')
+        .eq('is_published', true)
+        .limit(MAX_ROWS.articles),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -421,6 +440,7 @@ export default async function handler(req, res) {
     const organiserVideoRows = rows(14);
     const articleVideoRows = rows(15);
     const reviewVideoRows = rows(16);
+    const articleCategoryRows = rows(17);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -438,28 +458,70 @@ export default async function handler(req, res) {
       '  <!-- Core & static pages -->',
     ];
 
-    // The calendar pages list the events themselves, so their honest lastmod
-    // is the newest change to any event, not the static-page stamp.
-    const eventsUpdated = events
-      .map((e) => (e.updated_at || e.created_at || '').split('T')[0])
-      .sort().pop();
+    // Static pages that list live rows are dated by the newest row they show
+    // when that is later than their own files: `fresh` maps a loc to that day.
+    // A section whose query failed adds nothing, so the page keeps its file date.
+    const fresh = new Map();
+    const bump = (loc, day) => { if (day && day > (fresh.get(loc) || '')) fresh.set(loc, day); };
+    const lastmodFor = (loc, floor = staticLastmod(loc)) => (fresh.get(loc) > floor ? fresh.get(loc) : floor);
+
+    for (const event of events) {
+      const day = dayOf(event.updated_at, event.created_at);
+      for (const loc of ['/', '/events', '/events/card-shows', '/events/trade-events', '/events/community-events', '/events/store-events']) bump(loc, day);
+    }
+    for (const listing of listings) {
+      const day = dayOf(listing.updated_at, listing.created_at);
+      for (const loc of ['/', '/marketplace', '/collections']) bump(loc, day);
+      const collection = listing.vault_item?.collection;
+      for (const [slug, cfg] of Object.entries(COLLECTION_SEO)) {
+        if (collection && [cfg.name, ...(cfg.aliases || [])].includes(collection)) bump(`/collections/${slug}`, day);
+      }
+    }
+    for (const product of products) {
+      const day = dayOf(product.updated_at, product.created_at);
+      bump('/', day);
+      bump('/shop', day);
+      // A catalogue line's own page (listed in STATIC_PAGES) shows this row's
+      // price and stock.
+      bump(shopProductBasePath(product) || '', day);
+      for (const section of SHOP_TYPE_SECTIONS) {
+        if (product.product_type === section.productType) bump(section.loc, day);
+      }
+      for (const [slug, cfg] of Object.entries(SHOP_COLLECTION_SEO)) {
+        if ((cfg.subs || []).some((sub) => productInShopCategory(product, sub.name))) bump(`/shop/${slug}`, day);
+      }
+    }
+    const articleCategory = new Map(articleCategoryRows.map((row) => [row.id, row.category]));
+    for (const article of articles) {
+      const day = dayOf(article.updated_at, article.published_at, article.created_at);
+      bump('/', day);
+      bump('/blog', day);
+      const category = articleCategory.get(article.id);
+      if (category) bump(`/blog/category/${category}`, day);
+    }
+    // The price hubs change when a card on them is re-priced: the newest
+    // snapshot, not TODAY — a night the price job doesn't run is not a change.
+    for (const card of trackedCards) {
+      const day = dayOf(card.card_price_snapshots?.[0]?.snapshot_date);
+      bump('/prices', day);
+      bump(`/prices/${card.category}`, day);
+    }
+
     for (const p of STATIC_PAGES) {
-      const isCalendar = p.loc === '/events' || p.loc.startsWith('/events/');
-      const lastmod = isCalendar && eventsUpdated > p.lastmod ? eventsUpdated : p.lastmod;
-      parts.push(xmlUrl(`${BASE_URL}${p.loc}`, lastmod, p.freq, p.pri));
+      parts.push(xmlUrl(`${BASE_URL}${p.loc}`, lastmodFor(p.loc, p.lastmod), p.freq, p.pri));
     }
 
     // Content gates shared with api/prerender.js: a shop section or a
     // collection with nothing in it is noindex there and unlisted here.
     for (const section of SHOP_TYPE_SECTIONS) {
       if (products.some((p) => p.product_type === section.productType)) {
-        parts.push(xmlUrl(`${BASE_URL}${section.loc}`, SITE_UPDATED, 'daily', '0.8'));
+        parts.push(xmlUrl(`${BASE_URL}${section.loc}`, lastmodFor(section.loc), 'daily', '0.8'));
       }
     }
     const listedCollections = new Set(listings.map((l) => l.vault_item?.collection).filter(Boolean));
     for (const [slug, cfg] of Object.entries(COLLECTION_SEO)) {
       if ([cfg.name, ...(cfg.aliases || [])].some((name) => listedCollections.has(name))) {
-        parts.push(xmlUrl(`${BASE_URL}/collections/${slug}`, SITE_UPDATED, 'daily', '0.8'));
+        parts.push(xmlUrl(`${BASE_URL}/collections/${slug}`, lastmodFor(`/collections/${slug}`), 'daily', '0.8'));
       }
     }
 

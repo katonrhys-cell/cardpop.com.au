@@ -20,6 +20,8 @@
     "test:e2e": "playwright test",
     "check:bundle": "node tools/check-bundle-size.js",
     "check:merchant-listings": "node scripts/check-merchant-listings.mjs",
+    "check:sitemap": "node scripts/check-sitemap.mjs",
+    "sitemap:dates": "node scripts/update-sitemap-dates.mjs",
     "optimize:images": "node tools/optimize-hero-images.js"
   },
   "dependencies": {
