@@ -17,7 +17,7 @@ import { slugify } from '@/lib/slugify.js';
 import EventSourceWatchPanel, { syncEventSourceWatch, runEventSourceScan, toastScanResult } from '@/components/EventSourceWatchPanel.jsx';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
-import { cleanEventVideos, emptyVideo, eventVideosForSave } from '@/utils/eventVideos.js';
+import { cleanEventVideos, emptyVideo, eventVideosForSave, videosToForm } from '@/utils/eventVideos.js';
 import EventSideEventsEditor from '@/components/events/EventSideEventsEditor.jsx';
 import EventPrizesEditor from '@/components/events/EventPrizesEditor.jsx';
 import { cleanSideEvents, sideEventsFormError, sideEventsToForm } from '@/utils/eventSideEvents.js';
@@ -431,7 +431,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
       setRemoveExistingLogo(false);
       setGallery(cleanGalleryAlbums(event.gallery_albums, event.gallery_images)
         .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
-      setVideos(cleanEventVideos(event.event_videos, event.youtube_url).map(v => ({ title: v.title, url: v.url })));
+      setVideos(videosToForm(cleanEventVideos(event.event_videos, event.youtube_url)));
       setSideEvents(sideEventsToForm(event.side_events));
       setPrizeForm({
         pool: cleanPrizePool(event.prize_pool),

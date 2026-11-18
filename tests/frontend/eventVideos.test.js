@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   cleanEventVideos,
+  cleanVideoCreator,
+  creatorLinks,
+  creatorProfileUrl,
+  eventVideosForSave,
+  videosToForm,
   youTubeVideoId,
   videoLabel,
   MAX_EVENT_VIDEOS,
@@ -62,5 +67,53 @@ describe('youTubeVideoId / videoLabel', () => {
   it('labels a video by title or position', () => {
     expect(videoLabel({ title: 'Recap' }, 0)).toBe('Recap');
     expect(videoLabel({ title: '' }, 2)).toBe('Video 3');
+  });
+});
+
+describe('video creator credit', () => {
+  const URL = 'https://youtu.be/dQw4w9WgXcQ';
+
+  it('turns handles and pasted links into canonical profile URLs', () => {
+    expect(creatorProfileUrl('instagram', '@thenew50noob')).toBe('https://www.instagram.com/thenew50noob');
+    expect(creatorProfileUrl('instagram', 'instagram.com/thenew50noob/')).toBe('https://www.instagram.com/thenew50noob');
+    expect(creatorProfileUrl('youtube', 'SimpleSimon')).toBe('https://www.youtube.com/@SimpleSimon');
+    expect(creatorProfileUrl('youtube', 'https://www.youtube.com/channel/UC1234567890?si=x')).toBe('https://www.youtube.com/channel/UC1234567890');
+    expect(creatorProfileUrl('tiktok', 'https://m.tiktok.com/@simon')).toBe('https://www.tiktok.com/@simon');
+    expect(creatorProfileUrl('x', 'https://twitter.com/simon')).toBe('https://x.com/simon');
+  });
+
+  it('refuses a link on another host, a script URL and junk', () => {
+    expect(creatorProfileUrl('instagram', 'https://evil.example/thenew50noob')).toBe('');
+    expect(creatorProfileUrl('instagram', 'https://instagram.com.evil.example/x')).toBe('');
+    expect(creatorProfileUrl('instagram', 'javascript:alert(1)')).toBe('');
+    expect(creatorProfileUrl('facebook', 'two words')).toBe('');
+    expect(creatorProfileUrl('myspace', '@simon')).toBe('');
+  });
+
+  it('keeps only the fields that are set and drops an empty credit', () => {
+    expect(cleanVideoCreator({ name: '  Simple Simon ', instagram: '@thenew50noob', tiktok: 'https://evil.example/x', avatar_url: 'javascript:1' }))
+      .toEqual({ name: 'Simple Simon', instagram: 'https://www.instagram.com/thenew50noob' });
+    expect(cleanVideoCreator({ name: ' ', instagram: '' })).toBeNull();
+    expect(cleanVideoCreator('Simon')).toBeNull();
+  });
+
+  it('rides through cleanEventVideos, the form shape and the save shape', () => {
+    const creator = { name: 'Simple Simon', avatar_url: 'https://x.supabase.co/storage/v1/object/public/events/logos/creator-1.webp', youtube: '@SimpleSimon' };
+    const [cleaned] = cleanEventVideos([{ title: 'Recap', url: URL, creator }]);
+    expect(cleaned.creator).toEqual({ ...creator, youtube: 'https://www.youtube.com/@SimpleSimon' });
+    expect(videosToForm([cleaned])).toEqual([{ title: 'Recap', url: cleaned.url, creator: cleaned.creator }]);
+    expect(eventVideosForSave([{ title: 'Recap', url: URL, creator }], [], '2026-11-18T00:00:00.000Z'))
+      .toEqual([{ title: 'Recap', url: cleaned.url, added_at: '2026-11-18T00:00:00.000Z', creator: cleaned.creator }]);
+    // No credit → no key, so lists saved before the credit existed re-save unchanged.
+    expect(cleanEventVideos([{ title: '', url: URL }])[0]).not.toHaveProperty('creator');
+  });
+
+  it('lists the socials in display order with the handle to show', () => {
+    expect(creatorLinks({ x: 'https://x.com/simon', youtube: 'https://www.youtube.com/channel/UC123', instagram: 'https://www.instagram.com/thenew50noob' }))
+      .toEqual([
+        { key: 'instagram', label: 'Instagram', url: 'https://www.instagram.com/thenew50noob', handle: '@thenew50noob' },
+        { key: 'youtube', label: 'YouTube', url: 'https://www.youtube.com/channel/UC123', handle: '' },
+        { key: 'x', label: 'X', url: 'https://x.com/simon', handle: '@simon' },
+      ]);
   });
 });

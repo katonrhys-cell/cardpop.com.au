@@ -16,7 +16,7 @@ import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGallery
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
 import { uploadEventImage } from '@/utils/uploadEventImage.js';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
-import { cleanEventVideos, emptyVideo, eventVideosForSave } from '@/utils/eventVideos.js';
+import { cleanEventVideos, emptyVideo, eventVideosForSave, videosToForm } from '@/utils/eventVideos.js';
 
 // The organiser's own edit of their public page. RLS lets the page's owner (or
 // an admin) update it; the guard trigger in 20261110224209 pins the name, slug
@@ -50,7 +50,7 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
   const [extras, setExtras] = useState(() => savedExtras.map((url) => ({ key: url, url })));
   // Photos and videos from past events — the same editors the event form uses.
   const savedAlbums = cleanGalleryAlbums(org.gallery_albums);
-  const savedVideos = cleanEventVideos(org.videos).map(({ title, url }) => ({ title, url }));
+  const savedVideos = videosToForm(cleanEventVideos(org.videos));
   const [albums, setAlbums] = useState(() => (savedAlbums.length
     ? savedAlbums.map((a) => ({ title: a.title, photos: a.images.map((url) => ({ url })) }))
     : [emptyAlbum()]));
@@ -115,7 +115,7 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       }
       const nextAlbums = cleanGalleryAlbums(uploadedAlbums);
       if (JSON.stringify(nextAlbums) !== JSON.stringify(savedAlbums)) row.gallery_albums = nextAlbums;
-      const nextVideos = cleanEventVideos(videos).map(({ title, url }) => ({ title, url }));
+      const nextVideos = videosToForm(cleanEventVideos(videos));
       // Written with each video's added_at (kept for saved ones, stamped for
       // new ones) — the upload date its watch page reports.
       if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = eventVideosForSave(videos, org.videos);
