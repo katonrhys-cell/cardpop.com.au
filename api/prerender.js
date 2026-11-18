@@ -10,7 +10,7 @@ import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_MEDIA_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserContactUrl, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
@@ -380,8 +380,10 @@ const WATCH_SOURCE_LOADERS = {
   },
   organiser: async (supabase, { slug }) => {
     // `videos` ships in a migration; without the column there is nothing to watch.
-    const { data: org, error } = await supabase
-      .from('event_organisers').select(`${ORGANISER_PAGE_COLUMNS}, updated_at`).eq('slug', slug).maybeSingle();
+    const read = (columns) => supabase
+      .from('event_organisers').select(`${columns}, updated_at`).eq('slug', slug).maybeSingle();
+    let { data: org, error } = await read(ORGANISER_PAGE_COLUMNS);
+    if (error) ({ data: org, error } = await read(ORGANISER_MEDIA_COLUMNS));
     if (error || !org) return null;
     return organiserWatchSource(org);
   },
@@ -1955,6 +1957,7 @@ async function renderEventOrganiser(supabase, slug) {
     .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
   let { data: org, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
   // The profile columns ship in a migration; fall back to the original ones.
+  if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_MEDIA_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
   if (orgError) ({ data: org } = await readOrganiser(BASE_ORGANISER_COLUMNS));
@@ -1991,6 +1994,7 @@ async function renderEventOrganiser(supabase, slug) {
   // The organiser's own words lead the meta description once they've written some.
   const description = organiserMetaDescription(org, summary);
   const links = organiserLinks(org);
+  const contactUrl = organiserContactUrl(org);
   const logoImages = organiserLogos(org).filter((u) => !isVideoLogoUrl(u));
   const logo = logoImages[0];
 
@@ -2053,7 +2057,7 @@ async function renderEventOrganiser(supabase, slug) {
   <p>Event organiser</p>
   <h1>${esc(name)}</h1>
   <p>${esc(summary)}</p>
-${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(String(org.description).trim()).replace(/\r?\n/g, '<br />')}</p>\n  </section>\n` : ''}${links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener ugc">${esc(l.label)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}${mediaHtml}${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
+${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(String(org.description).trim()).replace(/\r?\n/g, '<br />')}</p>\n  </section>\n` : ''}${links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener ugc">${esc(l.label)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}${contactUrl ? `  <p><a href="${esc(contactUrl)}" rel="nofollow noopener ugc">Contact ${esc(name)}</a></p>\n` : ''}${mediaHtml}${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
   <p><a href="${BASE_URL}/events">Browse all trading card events in Australia</a></p>
 </main>`;
 

@@ -23,6 +23,7 @@ import { cleanEventVideos, emptyVideo, eventVideosForSave } from '@/utils/eventV
 // and owner, so this form never offers them. docs/event-organiser-access.md
 
 const LINKS = [
+  ['contact_url', 'Contact page', 'yoursite.com.au/contact', 'Where enquiries should go — your contact form. Adds a Contact button at the top of the page.'],
   ['website_url', 'Website', 'yoursite.com.au'],
   ['instagram_url', 'Instagram', 'instagram.com/yourshow'],
   ['facebook_url', 'Facebook', 'facebook.com/yourshow'],
@@ -42,6 +43,7 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     tiktok_url: org.tiktok_url || '',
     x_url: org.x_url || '',
     linktree_url: org.linktree_url || '',
+    contact_url: org.contact_url || '',
   }));
   const [logoFile, setLogoFile] = useState(null);
   // Joint organisers: more logos beside the main one. Each item is a saved URL
@@ -87,7 +89,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     for (const [key, label] of LINKS) {
       const url = normalizeEventUrl(form[key]);
       if (url && !isValidHttpUrl(url)) { toast.error(`${label} isn’t a valid link.`); return; }
-      row[key] = url || null;
+      // Only write a link that changed, so a save still works before a new
+      // link column's migration has landed.
+      if ((url || null) !== (org[key] || null)) row[key] = url || null;
     }
     setBusy(true);
     try {
@@ -188,10 +192,11 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
           </div>
           <EventGalleryEditor value={albums} onChange={setAlbums} disabled={busy} />
           <EventVideosEditor value={videos} onChange={setVideos} disabled={busy} />
-          {LINKS.map(([key, label, placeholder]) => (
+          {LINKS.map(([key, label, placeholder, hint]) => (
             <div key={key} className="space-y-1.5">
               <Label htmlFor={`org-${key}`} className="text-xs font-bold uppercase tracking-wide">{label}</Label>
               <Input id={`org-${key}`} inputMode="url" value={form[key]} onChange={set(key)} placeholder={placeholder} disabled={busy} />
+              {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
             </div>
           ))}
           <DialogFooter>

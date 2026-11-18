@@ -9,8 +9,10 @@ export const ORGANISER_PROFILE_COLUMNS = `${BASE_ORGANISER_COLUMNS}, owner_id, d
 // readers try this set first and fall back to ORGANISER_PROFILE_COLUMNS, then BASE.
 export const ORGANISER_LINK_COLUMNS = `${ORGANISER_PROFILE_COLUMNS}, extra_logo_urls, tiktok_url, x_url, linktree_url`;
 // gallery_albums / videos ship in 20261117190000_organiser_page_photos_and_videos.sql;
-// readers try the full set, then ORGANISER_LINK_COLUMNS, then the older tiers.
-export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums, videos`;
+// readers try the full set, then ORGANISER_MEDIA_COLUMNS, ORGANISER_LINK_COLUMNS, then the older tiers.
+export const ORGANISER_MEDIA_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums, videos`;
+// contact_url ships in 20261118233912_organiser_contact_url.sql.
+export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_MEDIA_COLUMNS}, contact_url`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;
@@ -43,6 +45,15 @@ export function organiserLinks(org) {
   return LINK_FIELDS
     .map(([key, label]) => ({ key, label, url: org?.[key] }))
     .filter(({ url }) => typeof url === 'string' && /^https?:\/\/[^\s]+$/i.test(url));
+}
+
+/**
+ * Where enquiries for this organiser go (their own contact form) — the
+ * "Contact" button at the top of the page. http(s) only, else ''.
+ */
+export function organiserContactUrl(org) {
+  const url = typeof org?.contact_url === 'string' ? org.contact_url.trim() : '';
+  return /^https?:\/\/[^\s]+$/i.test(url) ? url : '';
 }
 
 /**

@@ -84,3 +84,23 @@ describe('organiser page photos and videos columns', () => {
     expect(m.ORGANISER_LINK_COLUMNS).not.toContain('gallery_albums');
   });
 });
+
+describe('organiser contact link', () => {
+  it('is read only in the full column set, behind the media tier', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_PAGE_COLUMNS).toContain('contact_url');
+    expect(m.ORGANISER_MEDIA_COLUMNS).toContain('videos');
+    expect(m.ORGANISER_MEDIA_COLUMNS).not.toContain('contact_url');
+  });
+
+  it('admits http(s) links only and is not a social profile', async () => {
+    const { organiserContactUrl, organiserLinks } = await import('@/utils/organiserPage.js');
+    const url = 'https://events.ticketleap.com/event/2149932/contact';
+    expect(organiserContactUrl({ contact_url: ` ${url} ` })).toBe(url);
+    expect(organiserContactUrl({ contact_url: 'javascript:alert(1)' })).toBe('');
+    expect(organiserContactUrl({ contact_url: 'mailto:a@b.com' })).toBe('');
+    expect(organiserContactUrl({})).toBe('');
+    expect(organiserContactUrl(null)).toBe('');
+    expect(organiserLinks({ contact_url: url })).toEqual([]);
+  });
+});
