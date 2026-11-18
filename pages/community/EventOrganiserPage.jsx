@@ -20,7 +20,7 @@ import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUM
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
-import { safeLogoUrl, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
+import { safeLogoUrl, isVideoLogoUrl, logoBackdropStyle } from '@/utils/eventOrganiserLogo.js';
 import { publicImageUrl, publicVideoUrl } from '@/utils/imageUrl.js';
 import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrganisers.js';
 
@@ -40,7 +40,7 @@ const LogoTile = ({ url, name, onFail }) => (
   isVideoLogoUrl(url) ? (
     <video src={publicVideoUrl(url)} autoPlay muted loop playsInline aria-label={`${name} logo`} onError={onFail} className={LOGO_BOX} />
   ) : (
-    <img src={publicImageUrl(url)} alt={`${name} logo`} onError={onFail} className={LOGO_BOX} />
+    <img src={publicImageUrl(url)} alt={`${name} logo`} onError={onFail} className={LOGO_BOX} style={logoBackdropStyle(publicImageUrl(url))} />
   )
 );
 
