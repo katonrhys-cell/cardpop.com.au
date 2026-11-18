@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { normalizeEventUrl, isValidHttpUrl } from '@/utils/eventFormValidation.js';
-import { ORGANISER_PAGE_COLUMNS, MAX_EXTRA_LOGOS } from '@/utils/organiserPage.js';
+import { ORGANISER_PAGE_COLUMNS, ORGANISER_STYLED_COLUMNS, MAX_EXTRA_LOGOS } from '@/utils/organiserPage.js';
+import { cleanHeadingStyle } from '@/utils/organiserHeadingStyle.js';
+import OrganiserHeadingStyleField from '@/components/events/OrganiserHeadingStyleField.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
@@ -32,7 +34,7 @@ const LINKS = [
   ['linktree_url', 'Linktree', 'linktr.ee/yourshow'],
 ];
 
-export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }) {
+export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved, isAdmin = false }) {
   const [form, setForm] = useState(() => ({
     description: org.description || '',
     website_url: org.website_url || '',
@@ -55,6 +57,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     ? savedAlbums.map((a) => ({ title: a.title, photos: a.images.map((url) => ({ url })) }))
     : [emptyAlbum()]));
   const [videos, setVideos] = useState(() => (savedVideos.length ? savedVideos : [emptyVideo()]));
+  // The heading set to match the logo — an admin tool (OrganiserHeadingStyleField).
+  const savedHeadingStyle = cleanHeadingStyle(org.heading_style, org.name);
+  const [headingStyle, setHeadingStyle] = useState(savedHeadingStyle);
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -119,8 +124,14 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       // Written with each video's added_at (kept for saved ones, stamped for
       // new ones) — the upload date its watch page reports.
       if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = eventVideosForSave(videos, org.videos);
+      // Only written when an admin changed it, so every other save still works
+      // before the heading_style migration has landed.
+      const nextHeadingStyle = cleanHeadingStyle(headingStyle, org.name);
+      const headingChanged = isAdmin && JSON.stringify(nextHeadingStyle) !== JSON.stringify(savedHeadingStyle);
+      if (headingChanged) row.heading_style = nextHeadingStyle;
       const { data, error } = await supabase
-        .from('event_organisers').update(row).eq('id', org.id).select(ORGANISER_PAGE_COLUMNS).maybeSingle();
+        .from('event_organisers').update(row).eq('id', org.id)
+        .select(headingChanged ? ORGANISER_STYLED_COLUMNS : ORGANISER_PAGE_COLUMNS).maybeSingle();
       if (error) throw error;
       // RLS refusing an update returns no row and no error.
       if (!data) throw new Error('You don’t have permission to edit this page.');
@@ -153,6 +164,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
             <input id="org-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" onChange={pickLogo} disabled={busy} />
             <p className="text-xs text-muted-foreground">JPG, PNG, WebP, GIF or a short MP4/WebM loop, up to {LOGO_MAX_LABEL}.</p>
           </div>
+          {isAdmin && (
+            <OrganiserHeadingStyleField org={org} logoFile={logoFile} value={headingStyle} onChange={setHeadingStyle} disabled={busy} />
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="org-extra-logos" className="text-xs font-bold uppercase tracking-wide">More logos (joint organisers)</Label>
             {extras.length > 0 && (

@@ -22,6 +22,7 @@ const FEATURE_LABELS = {
   supplier_price: 'Supplier price checks',
   store_details: 'Card shop details from website',
   organiser_message_scan: 'Organiser message screening',
+  organiser_heading_style: 'Organiser heading matched to logo',
 };
 
 const isoDay = (d) => {

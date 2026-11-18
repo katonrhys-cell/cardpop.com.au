@@ -19,6 +19,7 @@ import eventScanRouter from './event-scan.js';
 import eventsRouter from './events.js';
 import organiserRequestsRouter from './organiser-requests.js';
 import organiserMessagesRouter from './organiser-messages.js';
+import organiserHeadingRouter from './organiser-heading.js';
 import storeOwnerRequestsRouter from './store-owner-requests.js';
 import categoriesRouter from './categories.js';
 import subcategoriesRouter from './subcategories.js';
@@ -120,6 +121,10 @@ export default () => {
     // Screened member-to-organiser messages — docs/organiser-messages.md
     router.use('/organiser-messages', apiLimiter);
     router.use('/organiser-messages', organiserMessagesRouter);
+
+    // Organiser page heading matched to the logo (admins) — docs/organiser-heading-style.md
+    router.use('/organiser-heading', apiLimiter);
+    router.use('/organiser-heading', organiserHeadingRouter);
 
     // Card shop ownership: member requests + admin confirmation — docs/store-pages.md
     router.use('/store-owner-requests', apiLimiter);

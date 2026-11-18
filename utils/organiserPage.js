@@ -11,6 +11,9 @@ export const ORGANISER_LINK_COLUMNS = `${ORGANISER_PROFILE_COLUMNS}, extra_logo_
 // gallery_albums / videos ship in 20261117190000_organiser_page_photos_and_videos.sql;
 // readers try the full set, then ORGANISER_LINK_COLUMNS, then the older tiers.
 export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums, videos`;
+// heading_style ships in 20261118234000_organiser_heading_style.sql; the SPA
+// tries this set first and falls back to ORGANISER_PAGE_COLUMNS.
+export const ORGANISER_STYLED_COLUMNS = `${ORGANISER_PAGE_COLUMNS}, heading_style`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;
