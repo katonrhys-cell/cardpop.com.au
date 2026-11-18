@@ -36,6 +36,7 @@ const functions = {
   '/api/merchant-feed': { kind: 'handler', fn: stubHandler('merchant-feed') },
   '/api/blog-generate': { kind: 'handler', fn: stubHandler('blog-generate') },
   '/api/event-scan': { kind: 'handler', fn: stubHandler('event-scan') },
+  '/api/site-check': { kind: 'handler', fn: stubHandler('site-check') },
 };
 const loadFunction = vi.fn(async (name) => {
   if (!functions[name]) throw new Error(`no stub for ${name}`);
@@ -70,7 +71,7 @@ describe('function table', () => {
   it('names every api/*.js function Vercel deployed', () => {
     expect(Object.keys(FUNCTION_MODULES).sort()).toEqual([
       '/api/blog-generate', '/api/event-scan', '/api/grade-estimate', '/api/index',
-      '/api/merchant-feed', '/api/prerender', '/api/sitemap',
+      '/api/merchant-feed', '/api/prerender', '/api/site-check', '/api/sitemap',
     ]);
   });
   it('knows when the build is missing', () => {

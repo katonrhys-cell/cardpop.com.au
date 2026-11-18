@@ -27,6 +27,7 @@ never blocks the rest, and the run is reported failed at the end if any did):
 | `supplier_watch` (each product weekly) | `/api/shop-supplier-watch/run` | 40 s | 2 attempts | `docs/supplier-price-watch.md` |
 | `delivery_sweep` | `/api/orders/delivery-sweep` | 40 s | 2 attempts | `docs/order-delivery.md` |
 | `retention_sweep` | `/api/retention/sweep` | 40 s | 2 attempts | `docs/retention.md` |
+| `site_check` (sitemap, sampled pages, Product markup) | `/cron/site-check` | 120 s | 2 attempts | `docs/seo-analytics.md` → The daily site check — answers 502 with the problems it found |
 
 Every call is one authenticated `GET` with the `CRON_SECRET` bearer, failing on
 any non-2xx; 401/403 are never retried, and neither is anything that spends on
@@ -39,10 +40,18 @@ because the runtime identifies a firing by its cron string.
 `tests/backend/schedulerWorker.test.js` checks the two stay in step.
 
 Still on GitHub Actions, because they need a runner rather than an HTTP call:
-`migration-drift.yml` (daily `supabase migration list`), `git-backup.yml`
-(daily repo archive to Drive) and `merchant-listings-check.yml` (`33 20 * * 1`,
-06:33 AEST Tuesday, checks the live Product markup with
-`scripts/check-merchant-listings.mjs` and files an issue on failure).
+`migration-drift.yml` (daily `supabase migration list`) and `git-backup.yml`
+(daily repo archive to Drive).
+
+The weekly `merchant-listings-check.yml` workflow was removed on 2026-11-18. It
+fetched the public site from a GitHub runner, and Cloudflare's Bot Fight Mode
+answered every run it ever made (six weeks of them) with a 403, so it never
+read a page and the issue it filed was a false alarm. The Free plan cannot
+exempt a caller from Bot Fight Mode, so the same checks now run in process as
+the `site_check` job of the daily run (`/cron/site-check`,
+`src/utils/siteCheck.js`) — see `docs/seo-analytics.md` → The daily site check.
+**Don't add a workflow that fetches `https://cardpop.com.au` from a runner; it
+will be challenged.**
 
 ## Why a Cloudflare Worker
 

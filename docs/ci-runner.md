@@ -11,7 +11,7 @@ hosted minutes are kept for the tiny jobs that must not depend on it.
 | Workflow | Runs on | Why |
 |---|---|---|
 | `ci.yml` (verify, incl. E2E) | self-hosted when `CI_RUNS_ON` is set | the big spender; every PR |
-| `deploy.yml`, `supabase-migrations.yml`, `migration-drift.yml`, `git-backup.yml`, `merchant-listings-check.yml` | GitHub-hosted | seconds each, ~90 min/month in total; production deploys and the schema safety net must keep working when the CI box is down |
+| `deploy.yml`, `supabase-migrations.yml`, `migration-drift.yml`, `git-backup.yml` | GitHub-hosted | seconds each, ~90 min/month in total; production deploys and the schema safety net must keep working when the CI box is down |
 
 **The switch is one repository variable, not a code change.** The `verify`
 job declares

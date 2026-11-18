@@ -13,7 +13,7 @@ const facts = (pathname, { ua = HUMAN, host = 'cardpop.com.au', query = {} } = {
 });
 
 // The functions api/*.js and the two HTML entries — what a rewrite chain can end on.
-const FUNCTIONS = new Set(['/api/index', '/api/prerender', '/api/sitemap', '/api/merchant-feed', '/api/blog-generate', '/api/event-scan', '/api/grade-estimate', '/app.html', '/index.html']);
+const FUNCTIONS = new Set(['/api/index', '/api/prerender', '/api/sitemap', '/api/merchant-feed', '/api/blog-generate', '/api/event-scan', '/api/site-check', '/api/grade-estimate', '/app.html', '/index.html']);
 const isTerminal = (p) => FUNCTIONS.has(p);
 const rewrite = (pathname, opts) => resolveRewrite(routing, facts(pathname, opts), { isTerminal });
 
@@ -91,6 +91,7 @@ describe('rewrites', () => {
     expect(rewrite('/sitemap.xml').pathname).toBe('/api/sitemap');
     expect(rewrite('/merchant-feed.tsv').pathname).toBe('/api/merchant-feed');
     expect(rewrite('/cron/blog-generate').pathname).toBe('/api/blog-generate');
+    expect(rewrite('/cron/site-check').pathname).toBe('/api/site-check');
     expect(rewrite('/cron/event-scan', { query: { mode: 'watches' } })).toEqual(expect.objectContaining({ pathname: '/api/event-scan', query: { mode: 'watches' } }));
     expect(rewrite('/grade-estimate/estimate').pathname).toBe('/api/grade-estimate');
   });
