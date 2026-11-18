@@ -1,3 +1,5 @@
+import { EVENT_TYPE_VALUES, EVENT_FEATURE_OPTIONS } from '../../utils/eventTypes.js';
+
 export const SystemPrompt = `You are an expert trading card and collectibles appraiser and analyst. Your task is to analyze images of trading cards, sports cards, and other collectibles to extract structured data.
 
 When analyzing a card image, you MUST:
@@ -102,13 +104,17 @@ IMPORTANT:
 
 export const EventScraperPrompt = `You are an expert event information extractor and SEO copywriter specialising in Australian trading card and collectibles events. Analyse the provided webpage content and extract ALL available event information, then GENERATE high-quality SEO content for fields not present in the source.
 
-TRADING CARD GAME BRANDS (used for featured_card_games):
-Pokemon, Magic: The Gathering, Yu-Gi-Oh!, One Piece, Flesh and Blood, Lorcana, Dragon Ball, Star Wars: Unlimited, MetaZoo, Digimon, Cardfight!! Vanguard
+WHAT AN EVENT FEATURES (used for featured_card_games — card games, sports cards and other collectables; use these exact spellings):
+${EVENT_FEATURE_OPTIONS.join(', ')}
 
 EVENT TYPE MAPPING (pick the closest match):
-- "card_show"       → Card fair, trading card show, collector show, card expo, card market day
-- "trade_event"     → Trade day, swap meet, trading session, buy/sell/trade event
-- "lgs_event"       → Local game store event, prerelease, tournament, Friday Night Magic, league event, store championship
+- "card_show"         → Card fair, trading card show, collector show, card expo, card market day
+- "trade_event"       → Trade day, swap meet, trading session, buy/sell/trade event
+- "comic_toy_fair"    → Comic fair, toy fair, comic & toy market
+- "collectables_fair" → General collectables fair or market (mixed collectables, memorabilia, vintage and retro)
+- "convention"        → Pop culture convention or expo (Comic-Con style, guests, cosplay, anime)
+- "tournament"        → Stand-alone tournament or championship not run as a regular store night (regionals, opens, qualifiers)
+- "lgs_event"         → Local game store event, prerelease, in-store tournament, Friday Night Magic, league event, store championship
 - "community_event" → Club meetup, community day, online event, charity event, anything else
 
 EXTRACT the following and GENERATE what cannot be found:
@@ -117,8 +123,8 @@ EXTRACT the following and GENERATE what cannot be found:
    - title: exact event name from the page
    - short_description: write a compelling 1-2 sentence teaser (max 160 chars) that would make a collector want to attend — include city/state and card games featured
    - description: full event description — use content from the page, expand with engaging copy if thin
-   - event_type: one of card_show | trade_event | lgs_event | community_event
-   - featured_card_games: array of TCG brands featured (from the list above), or null
+   - event_type: one of ${EVENT_TYPE_VALUES.join(' | ')}
+   - featured_card_games: array of what the event features (from the list above), or null
 
 2. VENUE & DATES (Australian format)
    - venue_name: venue/hall/store name only (not full address)
@@ -162,7 +168,7 @@ JSON FORMAT:
   "title": "string",
   "short_description": "string (max 160 chars)",
   "description": "string",
-  "event_type": "card_show | trade_event | lgs_event | community_event",
+  "event_type": "${EVENT_TYPE_VALUES.join(' | ')}",
   "featured_card_games": ["string"] or null,
   "venue_name": "string or null",
   "address": "string or null",

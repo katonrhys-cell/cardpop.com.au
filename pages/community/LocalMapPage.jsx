@@ -24,6 +24,10 @@ const MARKER_TYPES = {
   trade_event:     { label: 'Trade Event',         color: '#8b5cf6', icon: '🤝' },
   lgs_event:       { label: 'Store Event',         color: '#06b6d4', icon: '🏬' },
   community_event: { label: 'Community Event',     color: '#22c55e', icon: '🌟' },
+  comic_toy_fair:    { label: 'Comic & Toy Fair',       color: '#d946ef', icon: '🦸' },
+  collectables_fair: { label: 'Collectables Fair',      color: '#14b8a6', icon: '💎' },
+  convention:        { label: 'Pop Culture Convention', color: '#a855f7', icon: '🎭' },
+  tournament:        { label: 'Tournament',             color: '#eab308', icon: '🏆' },
 };
 
 const STATES = ['All States', 'NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'];
