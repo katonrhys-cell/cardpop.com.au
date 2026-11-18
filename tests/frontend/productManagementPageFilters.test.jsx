@@ -38,7 +38,7 @@ import ProductManagementPage from '@/pages/admin/ProductManagementPage.jsx';
 
 const renderPage = () => render(<MemoryRouter><ProductManagementPage /></MemoryRouter>);
 const productNames = () => screen.getAllByRole('row')
-  .map((r) => within(r).queryAllByRole('cell')[0]?.textContent)
+  .map((r) => within(r).queryAllByRole('cell')[1]?.textContent)
   .filter((t) => t && !t.includes('·'));
 
 describe('ProductManagementPage filters, sorting and sections', () => {
