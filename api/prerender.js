@@ -45,6 +45,7 @@ import {
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
+import { creatorLinks } from '../utils/eventVideos.js';
 import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
@@ -402,6 +403,19 @@ const WATCH_SOURCE_LOADERS = {
   },
 };
 
+// Who made a video (its creator credit — utils/eventVideos.js): their picture,
+// name and social profiles, under the player like on the live page.
+const videoCreatorHtml = (creator) => {
+  if (!creator) return '';
+  const links = creatorLinks(creator)
+    .map(({ label, url, handle }) => `<a href="${esc(url)}" rel="nofollow noopener">${esc(label)}${handle ? ` ${esc(handle)}` : ''}</a>`)
+    .join(' · ');
+  const picture = creator.avatar_url
+    ? `<img src="${esc(creator.avatar_url)}" alt="${esc(creator.name ? `${creator.name} profile picture` : 'Video creator profile picture')}" width="44" height="44" loading="lazy"> `
+    : '';
+  return `<p>${picture}Video by ${creator.name ? `<strong>${esc(creator.name)}</strong>` : 'the creator'}${links ? ` — ${links}` : ''}</p>`;
+};
+
 async function renderVideoWatch(supabase, kind, params, videoKey) {
   const source = await WATCH_SOURCE_LOADERS[kind](supabase, params);
   if (!source) {
@@ -422,6 +436,7 @@ async function renderVideoWatch(supabase, kind, params, videoKey) {
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}${esc(source.sectionPath)}">${esc(source.sectionName)}</a> / <a href="${esc(page.parentUrl)}">${esc(source.parentName)}</a> / ${esc(page.label)}</nav>
   ${watchPlayerHtml(page)}
   <h1>${esc(page.name)}</h1>
+  ${videoCreatorHtml(page.video.creator)}
   <p>${esc(page.longDescription)}</p>
   <section>
     <h2>From the ${esc(source.parentNoun)}: ${esc(source.parentName)}</h2>
