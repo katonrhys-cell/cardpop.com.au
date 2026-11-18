@@ -40,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # Pinned, never `latest`: Supabase CLI 3.0.0 (2026-11) changed three
       # things under the same workflow at once — [inbucket] became [local_smtp]
