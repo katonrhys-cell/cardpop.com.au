@@ -21,8 +21,8 @@ import { shopProductIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { Badge } from '@/components/ui/badge';
 import PriceDeal, { DealRibbon } from '@/components/shop/PriceDeal.jsx';
 import PreorderNotice, { PreorderBadge } from '@/components/shop/PreorderNotice.jsx';
-import { isPurchasableStatus, isPreorder, preorderEta, lowStockCount } from '@/utils/shopStock.js';
-import LowStockMeter from '@/components/shop/LowStockMeter.jsx';
+import { isPurchasableStatus, isPreorder, preorderEta, stockCount } from '@/utils/shopStock.js';
+import StockLevel from '@/components/shop/StockLevel.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useCart } from '@/hooks/useCart.jsx';
 import { toast } from 'sonner';
@@ -319,8 +319,8 @@ const ShopBinderProductPage = () => {
                 </>
               ) : isPurchasable && anyVariantInStock ? (
                 <>
-                  {/* Real scarcity only: the chosen colour's own stock, at 5 or fewer. */}
-                  <LowStockMeter count={lowStockCount(row, chosenVariant, { hasVariants: variants.length > 0 })} className="mb-4" />
+                  {/* The chosen colour's own stock: the urgency meter at 5 or fewer, a plain count above. */}
+                  <StockLevel count={stockCount(row, chosenVariant, { hasVariants: variants.length > 0 })} className="mb-4" />
                   <Button size="lg" className="w-full sm:w-auto" onClick={handleAddToCart} disabled={variants.length > 0 && !inStock}>
                     <ShoppingCart className="w-5 h-5 mr-2" />{variants.length > 0 && chosenVariant && !inStock ? `${chosenVariant.colour || 'Colour'} sold out` : preorder ? 'Pre-order now' : 'Add to cart'}
                   </Button>

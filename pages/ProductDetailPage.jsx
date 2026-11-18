@@ -36,8 +36,8 @@ import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 import RookiePill from '@/components/RookiePill.jsx';
 import PlayerLinkChip from '@/components/PlayerLinkChip.jsx';
 import ShopEnquiryDialog from '@/components/ShopEnquiryDialog.jsx';
-import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta, lowStockCount } from '@/utils/shopStock.js';
-import LowStockMeter from '@/components/shop/LowStockMeter.jsx';
+import { PUBLIC_SHOP_STATUSES, isPreorder, preorderEta, stockCount } from '@/utils/shopStock.js';
+import StockLevel from '@/components/shop/StockLevel.jsx';
 import PreorderNotice from '@/components/shop/PreorderNotice.jsx';
 import VariantPicker from '@/components/shop/VariantPicker.jsx';
 import { VARIANTS_SELECT, activeVariants, pickDefaultVariant, toCartVariant, variantInStock, variantKind, variantPrice } from '@/utils/shopVariants.js';
@@ -971,10 +971,10 @@ const ProductDetailPage = ({ source: sourceProp, id: idProp, canonicalPath }) =>
                   <ShoppingCart className="w-5 h-5 mr-2" />
                   {preorder ? 'Pre-order Now' : 'Add to Cart'}
                 </Button>
-                {/* Scarcity only when it's real: "500 available" removes urgency,
-                    "Only 3 left" creates it. Nothing is said above 5. */}
-                <LowStockMeter
-                  count={lowStockCount(product, activeVariants(product).find((v) => v.id === selectedVariantId) || null, { hasVariants: activeVariants(product).length > 0 })}
+                {/* Always the real figure: the "Only N left" meter at 5 or
+                    fewer, a plain "10 in stock" line above that. */}
+                <StockLevel
+                  count={stockCount(product, activeVariants(product).find((v) => v.id === selectedVariantId) || null, { hasVariants: activeVariants(product).length > 0 })}
                   className="mx-auto"
                 />
               </div>
