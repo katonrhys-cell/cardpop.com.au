@@ -33,7 +33,7 @@ describe('SignupPage — the shorter form', () => {
     const newsletter = boxes.find((b) => /newsletter|tips|deals|updates/i.test(b.closest('label')?.textContent || ''));
     expect(newsletter?.checked ?? false).toBe(false);
     expect(screen.getByRole('link', { name: /terms of service/i })).toHaveAttribute('href', '/terms');
-    expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute('href', '/privacy');
+    expect(screen.getByRole('link', { name: /privacy policy/i })).toHaveAttribute('href', '/privacy-policy');
     expect(screen.queryByText(/scroll to the bottom/i)).toBeNull();
   });
 

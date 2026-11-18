@@ -366,7 +366,7 @@ const SignupPage = () => {
                     Terms of Service
                   </Link>{' '}
                   and{' '}
-                  <Link to="/privacy" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
+                  <Link to="/privacy-policy" className="text-primary hover:underline font-medium" target="_blank" rel="noopener noreferrer">
                     Privacy Policy
                   </Link>.
                 </span>

@@ -57,7 +57,7 @@ const SECTIONS = [
 	]],
 	['Guides & Blog', [
 		['/blog', 'Blog', 'Articles, guides and news about trading cards and collecting.'],
-		['/photography-guide', 'Photography Guide', 'How to photograph cards well for listings.'],
+		['/photography-standard', 'Photography Guide', 'How to photograph cards well for listings.'],
 	]],
 	['Company & Policies', [
 		['/about', 'About CardPop', 'What CardPop is and who is behind it.'],

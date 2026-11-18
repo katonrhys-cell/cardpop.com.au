@@ -173,7 +173,7 @@ const Footer = () => {
                 <li><Link to="/shipping" className="hover:text-primary transition-colors">Shipping</Link></li>
                 <li><Link to="/returns" className="hover:text-primary transition-colors">Returns & Refunds</Link></li>
                 <li><Link to="/terms" className="hover:text-primary transition-colors">Terms of Service</Link></li>
-                <li><Link to="/privacy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
+                <li><Link to="/privacy-policy" className="hover:text-primary transition-colors">Privacy Policy</Link></li>
                 <li><button type="button" onClick={resetConsent} className="hover:text-primary transition-colors">Cookie settings</button></li>
                 <li><Link to="/data-deletion" className="hover:text-primary transition-colors">Data Deletion</Link></li>
                 <li><Link to="/trust-safety" className="hover:text-primary transition-colors">Buyer Protection & Safety</Link></li>

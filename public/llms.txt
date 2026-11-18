@@ -37,7 +37,7 @@
 
 ## Guides & Blog
 - [Blog](https://cardpop.com.au/blog): Articles, guides and news about trading cards and collecting.
-- [Photography Guide](https://cardpop.com.au/photography-guide): How to photograph cards well for listings.
+- [Photography Guide](https://cardpop.com.au/photography-standard): How to photograph cards well for listings.
 
 ## Company & Policies
 - [About CardPop](https://cardpop.com.au/about): What CardPop is and who is behind it.
