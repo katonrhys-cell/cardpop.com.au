@@ -135,7 +135,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
             title stops at the divider between About This Event and Event Details,
             and the logo sits in the sidebar column above Event Details. */}
         <div className={hasLogo ? 'grid grid-cols-1 lg:grid-cols-3 gap-0' : ''}>
-        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
+        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border lg:flex lg:flex-col lg:justify-center' : 'px-5 pt-5 md:px-10 md:pt-8'}>
           <div className="flex flex-wrap items-center gap-2">
           {(() => {
             const style = eventTypeStyle(event);
