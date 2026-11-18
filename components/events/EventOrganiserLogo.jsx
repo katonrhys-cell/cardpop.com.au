@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { publicImageUrl, publicVideoUrl } from '@/utils/imageUrl.js';
-import { isVideoLogoUrl, safeLogoUrl, logoAltText } from '@/utils/eventOrganiserLogo.js';
+import { isVideoLogoUrl, safeLogoUrl, logoAltText, logoBackdropStyle } from '@/utils/eventOrganiserLogo.js';
 
 // The organiser's logo on an event page (events.organizer_logo_url): a still
 // or animated image, or a short muted video loop. Renders nothing when the
@@ -76,6 +76,7 @@ export function EventOrganiserLogoTile({ event, fallback = null, className = '' 
       decoding="async"
       onError={() => setFailed(true)}
       className={`${cls} ${className}`}
+      style={logoBackdropStyle(publicImageUrl(url))}
       data-testid="organiser-logo-tile"
     />
   );

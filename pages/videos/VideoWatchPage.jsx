@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toCdnUrl } from '@/utils/imageUrl.js';
 import { buildWatchPage } from '@/utils/videoWatch.js';
+import VideoCreatorCredit from '@/components/events/VideoCreatorCredit.jsx';
 import { loadWatchSource, watchParentPath } from '@/lib/videoWatch.js';
 
 // A video's own page — `<parent page>/videos/<key>` — where the video is the
@@ -120,6 +121,7 @@ const VideoWatchPage = ({ kind }) => {
         {source.facts.length > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">{source.facts.join(' · ')}</p>
         )}
+        <VideoCreatorCredit creator={video.creator} />
 
         <section aria-labelledby="watch-about" className="mt-6 rounded-2xl border border-border bg-card p-5">
           <h2 id="watch-about" className="font-heading text-lg font-bold text-foreground">
