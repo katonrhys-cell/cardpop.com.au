@@ -11,6 +11,10 @@ export const ORGANISER_LINK_COLUMNS = `${ORGANISER_PROFILE_COLUMNS}, extra_logo_
 // gallery_albums / videos ship in 20261117190000_organiser_page_photos_and_videos.sql;
 // readers try the full set, then ORGANISER_LINK_COLUMNS, then the older tiers.
 export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums, videos`;
+// contact_name / contact_email / contact_phone ship in
+// 20261118232637_organiser_contact_details.sql; the organiser page tries this
+// set first, then ORGANISER_PAGE_COLUMNS and the older tiers.
+export const ORGANISER_CONTACT_COLUMNS = `${ORGANISER_PAGE_COLUMNS}, contact_name, contact_email, contact_phone`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;
@@ -43,6 +47,33 @@ export function organiserLinks(org) {
   return LINK_FIELDS
     .map(([key, label]) => ({ key, label, url: org?.[key] }))
     .filter(({ url }) => typeof url === 'string' && /^https?:\/\/[^\s]+$/i.test(url));
+}
+
+const CONTACT_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const CONTACT_PHONE_RE = /^\+?[0-9(][0-9 ()-]{5,23}$/;
+
+/** A contact email worth saving / linking, else ''. Same rule as the column check. */
+export function cleanContactEmail(value) {
+  const email = String(value ?? '').trim();
+  return email.length <= 254 && CONTACT_EMAIL_RE.test(email) ? email : '';
+}
+
+/** A contact phone worth saving / linking (digits, spaces, brackets, dashes, optional +), else ''. */
+export function cleanContactPhone(value) {
+  const phone = String(value ?? '').trim().replace(/\s+/g, ' ');
+  return CONTACT_PHONE_RE.test(phone) ? phone : '';
+}
+
+/**
+ * The public contact details an organiser chose to show: `{ name, email, phone,
+ * telHref }`, each '' when absent or malformed. `name` only counts alongside
+ * an email or phone — a name alone gives nobody a way to get in touch.
+ */
+export function organiserContact(org) {
+  const email = cleanContactEmail(org?.contact_email);
+  const phone = cleanContactPhone(org?.contact_phone);
+  const name = email || phone ? String(org?.contact_name ?? '').trim().slice(0, 80) : '';
+  return { name, email, phone, telHref: phone ? `tel:${phone.replace(/[^0-9+]/g, '')}` : '' };
 }
 
 /**

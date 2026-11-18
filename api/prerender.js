@@ -10,7 +10,7 @@ import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, organiserContact, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
@@ -1953,8 +1953,9 @@ async function renderEventOrganiser(supabase, slug) {
   const canonical = `${BASE_URL}/events/organisers/${encodeURIComponent(slug)}`;
   const readOrganiser = (columns) => supabase
     .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
-  let { data: org, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
+  let { data: org, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS);
   // The profile columns ship in a migration; fall back to the original ones.
+  if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
   if (orgError) ({ data: org } = await readOrganiser(BASE_ORGANISER_COLUMNS));
@@ -1991,6 +1992,7 @@ async function renderEventOrganiser(supabase, slug) {
   // The organiser's own words lead the meta description once they've written some.
   const description = organiserMetaDescription(org, summary);
   const links = organiserLinks(org);
+  const contact = organiserContact(org);
   const logoImages = organiserLogos(org).filter((u) => !isVideoLogoUrl(u));
   const logo = logoImages[0];
 
@@ -2022,6 +2024,8 @@ async function renderEventOrganiser(supabase, slug) {
     ...(logo ? { logo: logoImages.length > 1 ? logoImages : logo } : {}),
     ...(org.description ? { description: String(org.description).replace(/\s+/g, ' ').trim() } : {}),
     ...(links.length ? { sameAs: links.map((l) => l.url) } : {}),
+    ...(contact.email ? { email: contact.email } : {}),
+    ...(contact.phone ? { telephone: contact.phone } : {}),
   };
   const jsonLdItems = [breadcrumb, organisation];
   if (upcoming.length) {
@@ -2053,7 +2057,7 @@ async function renderEventOrganiser(supabase, slug) {
   <p>Event organiser</p>
   <h1>${esc(name)}</h1>
   <p>${esc(summary)}</p>
-${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(String(org.description).trim()).replace(/\r?\n/g, '<br />')}</p>\n  </section>\n` : ''}${links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener ugc">${esc(l.label)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}${mediaHtml}${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
+${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(String(org.description).trim()).replace(/\r?\n/g, '<br />')}</p>\n  </section>\n` : ''}${links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener ugc">${esc(l.label)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}${contact.email || contact.phone ? `  <section>\n  <h2>Contact ${esc(contact.name || name)}</h2>\n  <ul>${contact.email ? `<li>Email: <a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a></li>` : ''}${contact.phone ? `<li>Phone: <a href="${esc(contact.telHref)}">${esc(contact.phone)}</a></li>` : ''}</ul>\n  </section>\n` : ''}${mediaHtml}${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
   <p><a href="${BASE_URL}/events">Browse all trading card events in Australia</a></p>
 </main>`;
 

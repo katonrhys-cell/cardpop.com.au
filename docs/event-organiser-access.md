@@ -84,6 +84,13 @@ independent of page ownership; an admin sets each deliberately.
 
 ## Social links
 
+An organiser can also show **contact details** — a contact name, email and
+phone (`contact_name` / `contact_email` / `contact_phone`,
+`20261118232637_organiser_contact_details.sql`). All three are optional, entered
+in **Edit page** (never copied from the member's account) and shown publicly on
+the page as `mailto:` / `tel:` links; `organiserContact()` in
+`utils/organiserPage.js` is the one normaliser for the SPA and the prerender.
+
 An organiser page carries website, Instagram, Facebook, YouTube, **TikTok, X and
 Linktree** links (`event_organisers.*_url`, http(s) only by a CHECK constraint;
 TikTok / X / Linktree arrived in `20261116110000_organiser_tiktok_x_linktree_links.sql`).

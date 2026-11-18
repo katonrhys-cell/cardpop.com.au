@@ -84,3 +84,25 @@ describe('organiser page photos and videos columns', () => {
     expect(m.ORGANISER_LINK_COLUMNS).not.toContain('gallery_albums');
   });
 });
+
+describe('organiser contact details', () => {
+  it('returns the email and phone the organiser entered, with a dialable tel link', async () => {
+    const { organiserContact } = await import('@/utils/organiserPage.js');
+    expect(organiserContact({ contact_name: ' Sam ', contact_email: ' hello@show.com.au ', contact_phone: '(03) 5555  1234' }))
+      .toEqual({ name: 'Sam', email: 'hello@show.com.au', phone: '(03) 5555 1234', telHref: 'tel:0355551234' });
+    expect(organiserContact({ contact_phone: '+61 400 000 000' }).telHref).toBe('tel:+61400000000');
+  });
+  it('drops malformed values, and a name with no way to get in touch', async () => {
+    const { organiserContact, cleanContactEmail, cleanContactPhone } = await import('@/utils/organiserPage.js');
+    expect(organiserContact({ contact_name: 'Sam', contact_email: 'not-an-email', contact_phone: 'call me' }))
+      .toEqual({ name: '', email: '', phone: '', telHref: '' });
+    expect(organiserContact(null)).toEqual({ name: '', email: '', phone: '', telHref: '' });
+    expect(cleanContactEmail('a b@c.com')).toBe('');
+    expect(cleanContactPhone('12')).toBe('');
+  });
+  it('reads the contact columns only in their own column set', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_CONTACT_COLUMNS).toContain('contact_email');
+    expect(m.ORGANISER_PAGE_COLUMNS).not.toContain('contact_');
+  });
+});
