@@ -274,3 +274,50 @@ describe('sitemap video watch pages', () => {
     expect(body).toContain('<video:title>Vault Review — On the floor</video:title>');
   });
 });
+
+describe('sitemap static page dates', () => {
+  const lastmodOf = (body, path) => (body.split(loc(path))[1] || '').match(/<lastmod>([^<]+)/)?.[1];
+
+  it('dates a static page from its source files, not a shared constant', async () => {
+    const { STATIC_PAGE_DATES } = await import('../../data/sitemapPageDates.js');
+    const { body } = await run();
+    expect(lastmodOf(body, '/terms')).toBe(STATIC_PAGE_DATES['/terms'].lastmod);
+    expect(lastmodOf(body, '/grading/scales/psa')).toBe(STATIC_PAGE_DATES['/grading/scales/*'].lastmod);
+  });
+
+  it('lifts a page that lists live rows to the newest row it shows', async () => {
+    state.tables.shop_products = [
+      { id: 'p1', title: 'Penny Sleeves 100', slug: 'penny-sleeves-100', category: 'Penny Sleeves', updated_at: '2099-03-04T00:00:00Z' },
+    ];
+    state.tables.listings = [
+      { id: 'l1', seller_id: 's1', updated_at: '2099-02-01T00:00:00Z', vault_item: { card_name: 'Charizard', collection: 'Pokemon' } },
+    ];
+    state.tables.blog_articles = [
+      { id: 'a1', slug: 'hello', category: 'news-releases', published_at: '2099-01-05T00:00:00Z' },
+    ];
+    state.tables.tracked_cards = [
+      { id: 't1', slug: 'pikachu', category: 'pokemon', card_price_snapshots: [{ snapshot_date: '2099-01-09', raw_count: 3, graded_count: 0 }] },
+    ];
+    const { body } = await run();
+    expect(lastmodOf(body, '/shop')).toBe('2099-03-04');
+    expect(lastmodOf(body, '/shop/protection')).toBe('2099-03-04');
+    expect(lastmodOf(body, '/')).toBe('2099-03-04');
+    expect(lastmodOf(body, '/marketplace')).toBe('2099-02-01');
+    expect(lastmodOf(body, '/blog')).toBe('2099-01-05');
+    expect(lastmodOf(body, '/blog/category/news-releases')).toBe('2099-01-05');
+    expect(lastmodOf(body, '/prices')).toBe('2099-01-09');
+    expect(lastmodOf(body, '/prices/pokemon')).toBe('2099-01-09');
+    // A hub with no rows keeps its file date rather than being stamped today.
+    expect(lastmodOf(body, '/prices/afl')).not.toBe('2099-01-09');
+    expect(lastmodOf(body, '/blog/category/grading-guides')).not.toBe('2099-01-05');
+  });
+
+  it('never dates a row-listing page earlier than its own files', async () => {
+    const { STATIC_PAGE_DATES } = await import('../../data/sitemapPageDates.js');
+    state.tables.shop_products = [
+      { id: 'p1', title: 'Old', slug: 'old', category: 'Penny Sleeves', updated_at: '2001-01-01T00:00:00Z' },
+    ];
+    const { body } = await run();
+    expect(lastmodOf(body, '/shop')).toBe(STATIC_PAGE_DATES['/shop'].lastmod);
+  });
+});
