@@ -81,6 +81,33 @@ describe('<HomepageFeaturedEvents />', () => {
     expect(screen.getByRole('heading', { name: /Featured events/ })).toBeInTheDocument();
   });
 
+  it('shows the whole poster, and falls back to the full image when the thumb is missing', async () => {
+    const stored = 'https://vrfsaazuqjxotnieqlkd.supabase.co/storage/v1/object/public/events/events/1794868624345.jpg';
+    homeEvents.result = { data: [ev({ start_date: '2099-01-01', image_url: stored })], error: null };
+    render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+    const link = (await screen.findByText('Sydney Card Show')).closest('a');
+    const poster = () => link.querySelector('img.object-contain');
+    expect(poster().getAttribute('src')).toContain('.thumb.webp');
+    fireEvent.error(poster());
+    expect(poster().getAttribute('src')).toContain('1794868624345.jpg');
+    fireEvent.error(poster());
+    expect(link.querySelector('img')).toBeNull();
+  });
+
+  it('serves a poster bundled with the site from its own path', async () => {
+    homeEvents.result = { data: [ev({ start_date: '2099-01-01', image_url: '/images/events/show.jpg' })], error: null };
+    render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+    const link = (await screen.findByText('Sydney Card Show')).closest('a');
+    expect(link.querySelector('img.object-contain')).toHaveAttribute('src', '/images/events/show.jpg');
+  });
+
+  it('holds each card to its slot width however long a line in it is', async () => {
+    homeEvents.result = { data: [ev({ start_date: '2099-01-01' })], error: null };
+    render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);
+    const link = (await screen.findByText('Sydney Card Show')).closest('a');
+    expect(link.parentElement.className).toContain('min-w-0');
+  });
+
   it('lays events out in a carousel track, not a full-width grid, so one event is one card wide', async () => {
     homeEvents.result = { data: [ev({ start_date: '2099-01-01' })], error: null };
     render(<MemoryRouter><HomepageFeaturedEvents /></MemoryRouter>);

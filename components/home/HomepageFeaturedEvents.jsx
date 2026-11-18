@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext.jsx';
 import { getHomepageEvents } from '@/lib/homepageData.js';
 import { HOMEPAGE_EVENTS_LIMIT } from '@/lib/homepageQueries.js';
 import { eventPath, eventTypeLabel, formatEntryFee, formatEventDate, formatEventLocation, formatEventTime, toLocalDateStr } from '@/lib/eventSeo.js';
-import { cardThumbUrl } from '@/utils/imageUrl.js';
+import { cardThumbUrl, publicImageUrl } from '@/utils/imageUrl.js';
 import { FEATURED_CARD_CLASS, FEATURED_PILL_CLASS, isFeaturedEvent } from '@/utils/eventFeatured.js';
 
 // "List event": straight to the submit form when signed in; otherwise sign up
@@ -33,6 +33,36 @@ export const homepageEventsToShow = (rows, today) =>
   (Array.isArray(rows) ? rows : [])
     .filter((ev) => ev?.homepage_featured && isFeaturedEvent({ ...ev, is_featured: true }, today))
     .slice(0, HOMEPAGE_EVENTS_LIMIT);
+
+// The poster is shown whole (contain) over a blurred copy of itself, in a
+// 16:9 frame: a flyer's text and dates are the point of it, so it is never
+// cropped, and every card's frame is the same size whatever shape was
+// uploaded. Loads the 480 px thumb and falls back to the full poster when the
+// thumb is missing, then to the placeholder.
+const EventPoster = ({ imageUrl }) => {
+  const full = publicImageUrl(imageUrl || null);
+  const [src, setSrc] = useState(() => cardThumbUrl(imageUrl || null));
+  if (!src) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <CalendarDays className="w-10 h-10 text-muted-foreground/40" aria-hidden="true" />
+      </div>
+    );
+  }
+  return (
+    <>
+      <img src={src} alt="" aria-hidden="true" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover blur-xl opacity-70" />
+      <img
+        src={src}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        className="absolute inset-0 h-full w-full object-contain"
+        onError={() => setSrc(src !== full ? full : null)}
+      />
+    </>
+  );
+};
 
 const HomepageFeaturedEvents = () => {
   // null until the read settles, so the empty state never flashes first.
@@ -83,7 +113,6 @@ const HomepageFeaturedEvents = () => {
               prevLabel="Previous events"
               nextLabel="Next events"
               renderItem={(ev) => {
-                const img = cardThumbUrl(ev.image_url || null);
                 const type = eventTypeLabel(ev);
                 const hasTime = Boolean(ev.start_time);
                 const hasFee = ev.is_free || Number(ev.entry_fee_aud) > 0;
@@ -92,14 +121,8 @@ const HomepageFeaturedEvents = () => {
                     to={eventPath(ev)}
                     className={`group flex h-full flex-col overflow-hidden rounded-2xl bg-card transition-transform duration-200 hover:-translate-y-1 ${FEATURED_CARD_CLASS}`}
                   >
-                    <div className="relative h-44 w-full overflow-hidden bg-muted">
-                      {img ? (
-                        <img src={img} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="flex h-full items-center justify-center">
-                          <CalendarDays className="w-10 h-10 text-muted-foreground/40" aria-hidden="true" />
-                        </div>
-                      )}
+                    <div className="relative aspect-video w-full overflow-hidden bg-muted">
+                      <EventPoster imageUrl={ev.image_url} />
                       <span className={`absolute top-3 left-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-sm ${FEATURED_PILL_CLASS}`}>
                         <Star className="w-3 h-3 fill-current" aria-hidden="true" /> Featured
                       </span>
