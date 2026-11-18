@@ -6,6 +6,7 @@
 // utils/shopCategories.js, and its section is that leaf's parent group
 // (Protection, Storage, Display, Shipping, Grading). Anything whose category
 // isn't in the taxonomy lands in a trailing "Other" section so it can't hide.
+import { displayStatus } from './adminProductChanges.js';
 import { SHOP_CATEGORY_GROUPS } from '@/utils/shopCategories.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
 
@@ -41,7 +42,7 @@ function categoryLabel(product) {
 }
 
 // Status order used when sorting by status — the order an admin works through.
-const STATUS_ORDER = { active: 0, preorder: 1, coming_soon: 2, draft: 3, archived: 4 };
+const STATUS_ORDER = { active: 0, sold_out: 1, preorder: 2, coming_soon: 3, draft: 4, archived: 5 };
 
 // Value readers per sortable column. `ctx.costs` is the admin-only cost map
 // keyed by product id (shop_product_costs rows).
@@ -53,7 +54,7 @@ const SORT_VALUES = {
   rrp: (p) => numberOrNull(p.retail_price_aud),
   cost: (p, ctx) => numberOrNull(ctx.costs?.[p.id]?.wholesale_inc_gst_aud),
   margin: (p, ctx) => grossMargin(p.price_aud, ctx.costs?.[p.id]?.wholesale_ex_gst_aud),
-  status: (p) => STATUS_ORDER[p.status] ?? 99,
+  status: (p) => STATUS_ORDER[displayStatus(p)] ?? 99,
   stock: (p) => numberOrNull(p.stock_quantity),
 };
 
@@ -77,7 +78,8 @@ export function filterProducts(products, filters = {}, ctx = {}) {
   const term = String(filters.search || '').trim().toLowerCase();
   const on = (v) => v && v !== 'all';
   return (products || []).filter((p) => {
-    if (on(filters.status) && p.status !== filters.status) return false;
+    // By the status the list shows: "Active" is on sale with stock, "Sold out" is active with none.
+    if (on(filters.status) && displayStatus(p) !== filters.status) return false;
     if (on(filters.section) && sectionOf(p, ctx.groups) !== filters.section) return false;
     if (on(filters.category) && categoryLabel(p) !== filters.category) return false;
     if (on(filters.brand) && (String(p.brand || '').trim() || 'CardPop') !== filters.brand) return false;

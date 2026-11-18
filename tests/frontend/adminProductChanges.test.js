@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildPriceChanges, buildStatusChanges } from '@/utils/adminProductChanges.js';
+import { buildPriceChanges, buildStatusChanges, displayStatus, statusLabel, SOLD_OUT } from '@/utils/adminProductChanges.js';
 
 const products = [
   { id: 'a', sku: 'A-1', title: 'Sleeves', price_aud: 4.95, retail_price_aud: null, status: 'draft', stock_quantity: 0, images: [] },
@@ -50,5 +50,33 @@ describe('buildStatusChanges', () => {
   it('warns when live products are about to be hidden', () => {
     expect(buildStatusChanges(products, ['a', 'b', 'c'], 'archived').notes)
       .toEqual(['2 products are currently visible in the shop and will be hidden.']);
+  });
+});
+
+describe('sold out as a status', () => {
+  const rows = [
+    { id: 'in', title: 'In stock', sku: 'A', status: 'active', stock_quantity: 4, images: ['x'] },
+    { id: 'out', title: 'Out', sku: 'B', status: 'active', stock_quantity: 0, images: ['x'] },
+    { id: 'pre', title: 'Pre', sku: 'C', status: 'preorder', preorder_eta: 'Ships in 5–7 days', stock_quantity: 0, images: ['x'] },
+    { id: 'soon', title: 'Soon', sku: 'D', status: 'coming_soon', stock_quantity: 0, images: ['x'] },
+  ];
+
+  it('shows an active product with no stock as sold out, and nothing else', () => {
+    expect(rows.map(displayStatus)).toEqual(['active', SOLD_OUT, 'preorder', 'coming_soon']);
+    expect(statusLabel(SOLD_OUT)).toBe('Sold out');
+  });
+
+  it('leaves products that are already sold out alone and zeroes the stock of the rest', () => {
+    const r = buildStatusChanges(rows, ['in', 'out', 'pre'], SOLD_OUT);
+    expect(r.changes.map((c) => c.id)).toEqual(['in', 'pre']);
+    expect(r.unchanged).toBe(1);
+    expect(r.changes[0].lines).toEqual([
+      { label: 'Status', from: 'Active', to: 'Sold out' },
+      { label: 'Stock', from: '4', to: '0' },
+    ]);
+    expect(r.changes[1].lines).toEqual([{ label: 'Status', from: 'Pre-order', to: 'Sold out' }]);
+    expect(r.changes.some((c) => c.needsEta)).toBe(false);
+    expect(r.notes.join(' ')).toMatch(/set to 0/);
+    expect(r.notes.join(' ')).toMatch(/stop taking orders/);
   });
 });

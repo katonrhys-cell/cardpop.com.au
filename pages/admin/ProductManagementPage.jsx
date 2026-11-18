@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import ConfirmChangesDialog from '@/components/admin/ConfirmChangesDialog.jsx';
-import { buildPriceChanges, buildStatusChanges, statusLabel } from '@/utils/adminProductChanges.js';
+import { buildPriceChanges, buildStatusChanges, statusLabel, displayStatus, SOLD_OUT } from '@/utils/adminProductChanges.js';
 import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/lib/supabaseClient.js';
@@ -34,6 +34,7 @@ import {
 
 const STATUS_OPTIONS = [
   { value: 'active', label: 'Active' },
+  { value: SOLD_OUT, label: 'Sold out' },
   { value: 'preorder', label: 'Pre-order' },
   { value: 'coming_soon', label: 'Coming soon' },
   { value: 'draft', label: 'Draft' },
@@ -287,7 +288,12 @@ const ProductManagementPage = () => {
   const reviewStatus = () => {
     if (!bulkStatus) return toast.error('Choose the status to change to first.');
     const review = buildStatusChanges(products, selected, bulkStatus);
-    if (!review.changes.length) return toast.info(`The selected products are already ${statusLabel(bulkStatus)}.`);
+    if (!review.changes.length) {
+      const soldOut = bulkStatus === 'active' && products.some((p) => selected.has(p.id) && displayStatus(p) === SOLD_OUT);
+      return toast.info(soldOut
+        ? 'The selected products are already active — they show as sold out because their stock is 0. Enter stock to put them back on sale.'
+        : `The selected products are already ${statusLabel(bulkStatus)}.`);
+    }
     setBulkEta('');
     setStatusReview({ ...review, status: bulkStatus });
   };
@@ -298,14 +304,34 @@ const ProductManagementPage = () => {
     const eta = bulkEta.trim();
     setBulkSaving(true);
     const now = new Date().toISOString();
-    // Products missing a dispatch estimate get the one typed in the box; the
-    // rest keep their own.
-    const batches = [
-      { ids: changes.filter((c) => !c.needsEta).map((c) => c.id), patch: { status, updated_at: now } },
-      { ids: changes.filter((c) => c.needsEta).map((c) => c.id), patch: { status, preorder_eta: eta, updated_at: now } },
-    ].filter((b) => b.ids.length);
-    const done = {};
+    let batches;
     let failure = null;
+    if (status === SOLD_OUT) {
+      // Sold out = on sale with nothing left. A product sold by colour takes
+      // its stock from its variants (trigger), so those go to 0 first.
+      const ids = changes.map((c) => c.id);
+      const withVariants = ids.filter((id) => (variantsByProduct[id] || []).length);
+      if (withVariants.length) {
+        const { error: ve } = await supabase.from('shop_product_variants').update({ stock_quantity: 0 }).in('product_id', withVariants).eq('status', 'active');
+        if (ve) failure = ve;
+        else if (isMounted.current) {
+          setVariantsByProduct((prev) => {
+            const next = { ...prev };
+            for (const id of withVariants) next[id] = (prev[id] || []).map((v) => (v.status === 'active' ? { ...v, stock_quantity: 0 } : v));
+            return next;
+          });
+        }
+      }
+      batches = failure ? [] : [{ ids, patch: { status: 'active', stock_quantity: 0, updated_at: now } }];
+    } else {
+      // Products missing a dispatch estimate get the one typed in the box; the
+      // rest keep their own.
+      batches = [
+        { ids: changes.filter((c) => !c.needsEta).map((c) => c.id), patch: { status, updated_at: now } },
+        { ids: changes.filter((c) => c.needsEta).map((c) => c.id), patch: { status, preorder_eta: eta, updated_at: now } },
+      ].filter((b) => b.ids.length);
+    }
+    const done = {};
     for (const { ids, patch } of batches) {
       const { error: e } = await supabase.from('shop_products').update(patch).in('id', ids);
       if (e) { failure = e; break; }
@@ -411,7 +437,7 @@ const ProductManagementPage = () => {
 
   const stats = {
     total: products.length,
-    active: products.filter(p => p.status === 'active').length,
+    active: products.filter(p => displayStatus(p) === 'active').length,
     draft: products.filter(p => p.status === 'draft').length,
     comingSoon: products.filter(p => p.status === 'coming_soon').length,
     preorder: products.filter(p => p.status === 'preorder').length,
@@ -527,9 +553,15 @@ const ProductManagementPage = () => {
         })()}
       </TableCell>
       <TableCell>
-        <Badge variant="outline" className={`bg-background capitalize whitespace-nowrap ${product.status === 'active' ? 'text-emerald-600 border-emerald-500/30' : product.status === 'draft' ? 'text-blue-600 border-blue-500/30' : product.status === 'coming_soon' ? 'text-amber-600 border-amber-500/30' : product.status === 'preorder' ? 'text-brand-red border-brand-red/30' : 'text-muted-foreground'}`}>
-          {product.status === 'coming_soon' ? 'coming soon' : product.status === 'preorder' ? 'pre-order' : product.status}
-        </Badge>
+        {(() => {
+          const shown = displayStatus(product);
+          const tone = shown === 'active' ? 'text-emerald-600 border-emerald-500/30'
+            : shown === SOLD_OUT ? 'text-destructive border-destructive/30'
+            : shown === 'draft' ? 'text-blue-600 border-blue-500/30'
+            : shown === 'coming_soon' ? 'text-amber-600 border-amber-500/30'
+            : shown === 'preorder' ? 'text-brand-red border-brand-red/30' : 'text-muted-foreground';
+          return <Badge variant="outline" className={`bg-background whitespace-nowrap ${tone}`}>{statusLabel(shown)}</Badge>;
+        })()}
         {product.status === 'preorder' && product.preorder_eta && (
           <p className="mt-1 max-w-[12rem] truncate whitespace-nowrap text-[11px] leading-tight text-muted-foreground" title={product.preorder_eta}>{product.preorder_eta}</p>
         )}
