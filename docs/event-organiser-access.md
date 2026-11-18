@@ -109,6 +109,17 @@ buttons and the prerender's `Organization.sameAs` read. To add another, extend
 `LINK_FIELDS` + `ORGANISER_PAGE_COLUMNS` there, the editor's `LINKS`, and the
 page's `LINK_ICONS`.
 
+## Contact link
+
+`event_organisers.contact_url` (`20261118233912_organiser_contact_url.sql`,
+http(s) only) is where enquiries for the organiser should go — their own contact
+form. An admin or the page's owner sets it as **Contact page** in **Edit page**.
+When set, the page shows a **Contact** button at the top and in *Feedback &
+questions*, opening that page in a new tab **in place of** the on-site Message
+button; cleared, the Message flow (`docs/organiser-messages.md`) is back. Read it
+through `organiserContactUrl()`; it is not a social profile, so it stays out of
+`organiserLinks()` and `Organization.sameAs`.
+
 ## Messages from collectors
 
 The owner of an organiser page also receives the messages collectors send from

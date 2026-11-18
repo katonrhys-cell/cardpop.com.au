@@ -17,7 +17,7 @@ import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import EventVideos from '@/components/events/EventVideos.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, organiserContact, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, organiserContact, organiserContactUrl, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -87,9 +87,10 @@ export default function EventOrganiserPage() {
       try {
         const readOrganiser = (columns) => supabase
           .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
-        let { data: found, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS);
+        let { data: found, error: orgError } = await readOrganiser(ORGANISER_ENQUIRY_COLUMNS);
         // The profile columns ship in a migration; fall back to the original
         // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
@@ -143,6 +144,9 @@ export default function EventOrganiserPage() {
   const name = org?.name ?? '';
   const links = organiserLinks(org);
   const contact = organiserContact(org);
+  // The organiser's own contact form, when one is set: enquiries go there
+  // instead of through the on-site message.
+  const contactUrl = organiserContactUrl(org);
   const canEdit = canEditOrganiserPage(org, currentUser?.id, isAdmin);
   // The owner reads messages here; everyone else can send one.
   const isOwner = Boolean(currentUser?.id) && org?.owner_id === currentUser.id;
@@ -193,13 +197,20 @@ export default function EventOrganiserPage() {
                       </Button>
                     );
                   })}
-                  {!isOwner && (
+                  {contactUrl && (
+                    <Button asChild size="sm" className="rounded-full gap-1.5 font-bold">
+                      <a href={contactUrl} target="_blank" rel="noopener noreferrer nofollow ugc">
+                        <Mail className="w-3.5 h-3.5" aria-hidden="true" /> Contact
+                      </a>
+                    </Button>
+                  )}
+                  {!isOwner && !contactUrl && (
                     <Button size="sm" variant="outline" className="rounded-full gap-1.5 font-bold" onClick={() => setMessaging(true)}>
                       <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" /> Message
                     </Button>
                   )}
                   {canEdit && (
-                    <Button size="sm" className="rounded-full gap-1.5 font-bold" onClick={() => setEditing(true)}>
+                    <Button size="sm" variant={contactUrl ? 'outline' : 'default'} className="rounded-full gap-1.5 font-bold" onClick={() => setEditing(true)}>
                       <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit page
                     </Button>
                   )}
@@ -279,14 +290,29 @@ export default function EventOrganiserPage() {
                   <div className="min-w-0 flex-1">
                     <h2 id="org-feedback" className="text-2xl font-bold">Feedback &amp; questions</h2>
                     <p className="text-muted-foreground mt-2">
-                      Been to one of {name}’s events, thinking of going, or want a trader table? Send a message
-                      {org.owner_id ? ' straight to the organiser.' : ' and the CardPop team will pass it on.'}
-                      {' '}Every message is checked before it’s delivered.
+                      Been to one of {name}’s events, thinking of going, or want a trader table?{' '}
+                      {contactUrl ? (
+                        'Get in touch through the organiser’s own contact page.'
+                      ) : (
+                        <>
+                          Send a message
+                          {org.owner_id ? ' straight to the organiser.' : ' and the CardPop team will pass it on.'}
+                          {' '}Every message is checked before it’s delivered.
+                        </>
+                      )}
                     </p>
                   </div>
-                  <Button size="lg" className="rounded-full gap-2 font-bold shrink-0" onClick={() => setMessaging(true)}>
-                    <MessageSquare className="w-4 h-4" aria-hidden="true" /> Message {name.length > 28 ? 'the organiser' : name}
-                  </Button>
+                  {contactUrl ? (
+                    <Button asChild size="lg" className="rounded-full gap-2 font-bold shrink-0">
+                      <a href={contactUrl} target="_blank" rel="noopener noreferrer nofollow ugc">
+                        <Mail className="w-4 h-4" aria-hidden="true" /> Contact {name.length > 28 ? 'the organiser' : name}
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button size="lg" className="rounded-full gap-2 font-bold shrink-0" onClick={() => setMessaging(true)}>
+                      <MessageSquare className="w-4 h-4" aria-hidden="true" /> Message {name.length > 28 ? 'the organiser' : name}
+                    </Button>
+                  )}
                 </div>
               </section>
             )}

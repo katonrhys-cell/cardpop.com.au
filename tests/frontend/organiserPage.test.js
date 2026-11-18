@@ -126,3 +126,23 @@ describe('organiserBlanksFromEvent', () => {
     expect(organiserBlanksFromEvent(null, event)).toEqual({ patch: {}, labels: [] });
   });
 });
+
+describe('organiser contact page link', () => {
+  it('is read only in the top column set, behind the contact-details tier', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_ENQUIRY_COLUMNS).toContain('contact_url');
+    expect(m.ORGANISER_ENQUIRY_COLUMNS).toContain('contact_email');
+    expect(m.ORGANISER_CONTACT_COLUMNS).not.toContain('contact_url');
+  });
+
+  it('admits http(s) links only and is not a social profile', async () => {
+    const { organiserContactUrl, organiserLinks } = await import('@/utils/organiserPage.js');
+    const url = 'https://events.ticketleap.com/event/2149932/contact';
+    expect(organiserContactUrl({ contact_url: ` ${url} ` })).toBe(url);
+    expect(organiserContactUrl({ contact_url: 'javascript:alert(1)' })).toBe('');
+    expect(organiserContactUrl({ contact_url: 'mailto:a@b.com' })).toBe('');
+    expect(organiserContactUrl({})).toBe('');
+    expect(organiserContactUrl(null)).toBe('');
+    expect(organiserLinks({ contact_url: url })).toEqual([]);
+  });
+});
