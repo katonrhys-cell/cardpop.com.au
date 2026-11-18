@@ -212,7 +212,7 @@ const Footer = () => {
               </a>
             )}
           </p>
-          <p className="text-muted-foreground text-sm">
+          <p className="order-first sm:order-none text-muted-foreground text-xs min-[400px]:text-sm whitespace-nowrap text-center">
             Made with ❤️ for the Australian Trading Card Community{' '}
             <AustralianFlag />
           </p>
