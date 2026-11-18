@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Mail, Phone, Instagram, Facebook, Youtube, Music2, Link2, MessageSquare } from 'lucide-react';
+import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Mail, Phone, MessageSquare } from 'lucide-react';
 import XIcon from '@/components/XIcon.jsx';
+import { FacebookIcon, InstagramIcon, LinktreeIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import SEOHead from '@/components/SEOHead.jsx';
 import EventCard from '@/components/EventCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -30,8 +31,8 @@ import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrgan
 const EVENT_LIMIT = 200;
 
 // Social links render as icon-only round buttons; the website keeps its label.
-const LINK_ICONS = { website_url: Globe, instagram_url: Instagram, facebook_url: Facebook, youtube_url: Youtube,
-  tiktok_url: Music2, x_url: XIcon, linktree_url: Link2,
+const LINK_ICONS = { website_url: Globe, instagram_url: InstagramIcon, facebook_url: FacebookIcon, youtube_url: YouTubeIcon,
+  tiktok_url: TikTokIcon, x_url: XIcon, linktree_url: LinktreeIcon,
 };
 
 const LOGO_BOX ='w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
@@ -186,7 +187,7 @@ export default function EventOrganiserPage() {
                     return (
                       <Button key={key} asChild variant="outline" size="sm" className={Icon && key !== 'website_url' ? 'rounded-full w-9 h-9 p-0' : 'rounded-full gap-1.5'}>
                         <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label={`${name} on ${label}`} title={label}>
-                          {Icon && <Icon className="w-4 h-4" aria-hidden="true" />}
+                          {Icon && <Icon className={key === 'website_url' ? 'w-4 h-4' : 'w-5 h-5'} aria-hidden="true" />}
                           {key === 'website_url' && label}
                         </a>
                       </Button>
