@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
+import { slugify } from '@/lib/slugify.js';
 
 // Since this is a React app, we render an HTML sitemap for users,
 // but usually search engines hit /sitemap.xml which is served by a backend.
@@ -44,7 +45,7 @@ const SitemapPage = () => {
         const combined = [
           ...staticLinks,
           ...(vaultRes.data ?? []).map(i => ({ label: i.card_name || 'Vault Item', path: `/product/vault/${i.id}` })),
-          ...(shopRes.data ?? []).map(i => ({ label: i.vault_item?.card_name || 'Marketplace Listing', path: `/marketplace/${i.id}/${i.slug || 'listing'}` })),
+          ...(shopRes.data ?? []).map(i => ({ label: i.vault_item?.card_name || 'Marketplace Listing', path: `/marketplace/${i.id}/${i.slug || slugify(i.vault_item?.card_name || 'Trading Card') || 'listing'}` })),
         ];
         
         setLinks(combined);

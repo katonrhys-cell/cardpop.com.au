@@ -42,6 +42,7 @@ import { isSoldVaultItem } from '@/lib/vaultItemListing.js';
 import { cardIdentifiersLd } from '@/utils/productIdentifiers.js';
 import { useAdminEditTarget } from '@/lib/adminEditTarget.js';
 import { adminUserPath, adminSoleTraderStorePath } from '@/utils/adminEditLinks.js';
+import { slugify } from '@/lib/slugify.js';
 
 const BADGE_META = {
   authentic:          { label: '100% Authentic',     desc: 'All cards verified before listing',                   Icon: CheckCircle2 },
@@ -200,7 +201,7 @@ const SoleTraderStorePage = () => {
     const price = isMkt ? item.price_aud : item.estimated_value_aud;
     const condition = schemaItemCondition(isMkt ? item.vault_item?.condition : item.condition);
     const url = isMkt
-      ? `${SITE}/marketplace/${item.id}/${item.slug || 'listing'}`
+      ? `${SITE}/marketplace/${item.id}/${item.slug || slugify(item.vault_item?.card_name || 'Trading Card') || 'listing'}`
       : `${SITE}/product/vault/${item.id}`;
     if (!(price > 0)) return null;
     const image = resolveListingImage(item);
