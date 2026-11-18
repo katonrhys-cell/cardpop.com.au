@@ -126,3 +126,31 @@ describe('organiserBlanksFromEvent', () => {
     expect(organiserBlanksFromEvent(null, event)).toEqual({ patch: {}, labels: [] });
   });
 });
+
+describe('eventBlanksFromOrganiser', () => {
+  const org = {
+    logo_url: 'https://cdn.test/logo.png', website_url: 'https://org.test', instagram_url: 'https://instagram.com/org',
+    facebook_url: 'javascript:alert(1)', youtube_url: 'https://youtube.com/@org', tiktok_url: '', x_url: null,
+    contact_email: 'hi@org.test', contact_phone: 'call me',
+  };
+
+  it('fills only the blank form fields, with usable values', async () => {
+    const { eventBlanksFromOrganiser } = await import('@/utils/organiserPage.js');
+    const form = { organizer_logo_url: '', website_url: 'https://event.test', instagram_url: '  ', youtube_channel_url: '', organizer_email: '' };
+    expect(eventBlanksFromOrganiser(form, org)).toEqual({
+      patch: {
+        organizer_logo_url: 'https://cdn.test/logo.png',
+        instagram_url: 'https://instagram.com/org',
+        youtube_channel_url: 'https://youtube.com/@org',
+        organizer_email: 'hi@org.test',
+      },
+      labels: ['logo', 'Instagram', 'YouTube', 'contact email'],
+    });
+  });
+
+  it('is empty without an organiser or a form', async () => {
+    const { eventBlanksFromOrganiser } = await import('@/utils/organiserPage.js');
+    expect(eventBlanksFromOrganiser({}, null)).toEqual({ patch: {}, labels: [] });
+    expect(eventBlanksFromOrganiser(null, org)).toEqual({ patch: {}, labels: [] });
+  });
+});

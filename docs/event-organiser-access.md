@@ -100,6 +100,16 @@ and a toast names what was added. The **Also add these details to the
 organiser's page** tick (on by default) is the admin's check before anything is
 published there. Only an exact name match is filled — a joint "A & B" name is not.
 
+**…and the organiser's page fills the event form.** Opening an event in the
+admin form (or picking a **Saved Organiser** in either form) reads that
+organiser's page and fills the form's **blank** logo, website, Instagram,
+Facebook, YouTube, TikTok, X, contact email and contact phone
+(`loadOrganiserDetails()` + the pure `eventBlanksFromOrganiser()`). Nothing
+already on the event is replaced, a note on the Organiser tab names what was
+filled, and nothing is written until the event is saved. A name matching more
+than one organiser page (a joint "A & B") is left alone. Tickets, waitlist and
+trader-application links are per event and are never filled.
+
 An organiser page carries website, Instagram, Facebook, YouTube, **TikTok, X and
 Linktree** links (`event_organisers.*_url`, http(s) only by a CHECK constraint;
 TikTok / X / Linktree arrived in `20261116110000_organiser_tiktok_x_linktree_links.sql`).
