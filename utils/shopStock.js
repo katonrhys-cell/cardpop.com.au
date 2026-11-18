@@ -105,21 +105,20 @@ export function isAwaitingPreorderStock(order) {
 
 /**
  * Stock at or below this shows the "Only N left" meter on a product page.
- * Scarcity is only stated when it's real: "500 available" removes urgency,
- * "Only 3 left" creates it — nothing is said above the threshold.
+ * Above it the page states the plain figure ("10 in stock") with no urgency
+ * wording — see components/shop/StockLevel.jsx.
  */
 export const LOW_STOCK_THRESHOLD = 5;
 
 /**
- * Units left when a product is genuinely running low, else null. Always the
- * real stock figure — never an invented one. Null (no meter) for pre-orders
- * (unlimited), coming-soon rows, untracked stock (null quantity), sold-out
- * rows and anything above the threshold.
+ * Units a shopper can buy right now, else null. Always the real stock figure
+ * — never an invented one. Null (nothing shown) for pre-orders (unlimited),
+ * coming-soon rows, untracked stock (null quantity) and sold-out rows.
  *
  * With colour variants the buyable unit is the chosen variant, so pass it:
  * the count is then that variant's stock, and null until one is chosen.
  */
-export function lowStockCount(product, variant, { hasVariants = false } = {}) {
+export function stockCount(product, variant, { hasVariants = false } = {}) {
   if (!product || isPreorder(product) || isComingSoon(product)) return null;
   if (hasVariants && !variant) return null;
   const raw = variant
@@ -127,6 +126,15 @@ export function lowStockCount(product, variant, { hasVariants = false } = {}) {
     : (product.stock_quantity ?? product.stockQuantity);
   if (raw === null || raw === undefined || raw === '') return null;
   const n = Number(raw);
-  if (!Number.isInteger(n) || n <= 0 || n > LOW_STOCK_THRESHOLD) return null;
+  if (!Number.isInteger(n) || n <= 0) return null;
   return n;
+}
+
+/**
+ * stockCount(), but only when the product is genuinely running low (at or
+ * below LOW_STOCK_THRESHOLD) — the figure the "Only N left" meter shows.
+ */
+export function lowStockCount(product, variant, options) {
+  const n = stockCount(product, variant, options);
+  return n !== null && n <= LOW_STOCK_THRESHOLD ? n : null;
 }
