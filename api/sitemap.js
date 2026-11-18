@@ -12,6 +12,7 @@ import { PUBLIC_SHOP_STATUSES } from '../utils/shopStock.js';
 import { shopCategoryLeaves, productInShopCategory } from '../utils/shopCategoryPages.js';
 import { GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
 import { namesOrganiser, organiserPath } from '../utils/eventOrganisers.js';
+import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import { eventRegionPath, regionsWithEvents } from '../data/eventRegions.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
@@ -66,7 +67,26 @@ const imageLocs = (...candidates) => {
 const xmlUrl = (loc, lastmod, changefreq, priority, images = []) =>
   `  <url>\n    <loc>${xmlEscape(loc)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n${images.map((src) => `    <image:image>\n      <image:loc>${xmlEscape(src)}</image:loc>\n    </image:image>\n`).join('')}  </url>`;
 
-const URLSET_OPEN = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">';
+const URLSET_OPEN = '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">';
+
+// Video watch pages (<parent>/videos/<key>, utils/videoWatch.js): one <url>
+// per video, carrying Google's video sitemap extension so the video is found
+// without rendering the page. A watch page is listed only when its parent
+// page is, and gets the <video:video> block only with every required field
+// (thumbnail, title, description, player or file).
+const xmlWatchUrl = (source, link, lastmod) => {
+  const page = buildWatchPage(source, link.key, { siteUrl: BASE_URL });
+  if (!page) return '';
+  const { video } = page;
+  const media = video.contentUrl
+    ? `      <video:content_loc>${xmlEscape(video.contentUrl)}</video:content_loc>\n`
+    : (video.embedUrl ? `      <video:player_loc>${xmlEscape(video.embedUrl)}</video:player_loc>\n` : '');
+  const block = page.thumbnailUrl && media
+    ? `    <video:video>\n      <video:thumbnail_loc>${xmlEscape(page.thumbnailUrl)}</video:thumbnail_loc>\n      <video:title>${xmlEscape(page.name.slice(0, 100))}</video:title>\n      <video:description>${xmlEscape(page.longDescription)}</video:description>\n${media}    </video:video>\n`
+    : '';
+  return `  <url>\n    <loc>${xmlEscape(page.canonical)}</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.5</priority>\n${block}  </url>`;
+};
+const watchUrls = (source, lastmod) => (source ? watchLinks(source).map((link) => xmlWatchUrl(source, link, lastmod)).filter(Boolean) : []);
 
 const slugify = (str = '') => String(str)
   .toLowerCase()
@@ -255,7 +275,7 @@ export default async function handler(req, res) {
     const dbData = await Promise.allSettled([
       fetchAll(() => supabase
         .from('blog_articles')
-        .select('id, slug, featured_image_url, updated_at, published_at, created_at')
+        .select('id, slug, title, featured_image_url, updated_at, published_at, created_at')
         .eq('is_published', true)
         .not('slug', 'is', null)
         .order('published_at', { ascending: false })
@@ -284,7 +304,7 @@ export default async function handler(req, res) {
         .order('id'), MAX_ROWS.products),
       fetchAll(() => supabase
         .from('events')
-        .select('id, slug, state, status, start_date, end_date, image_url, updated_at, created_at')
+        .select('id, slug, title, short_description, state, status, start_date, end_date, image_url, event_videos, youtube_url, updated_at, created_at')
         .in('status', ['approved', 'completed'])
         .gte('start_date', EVENTS_SINCE)
         .order('start_date', { ascending: true })
@@ -356,9 +376,27 @@ export default async function handler(req, res) {
       // above) out of the sitemap with it.
       fetchAll(() => supabase
         .from('local_game_stores')
-        .select('id, slug, city, status, updated_at, opening_hours, photos, videos')
+        .select('id, slug, name, city, status, updated_at, opening_hours, photos, videos')
         .eq('status', 'approved')
         .order('id'), MAX_ROWS.stores),
+      // Videos for the watch pages (<parent>/videos/<key>). Each in its own
+      // query, so a missing column or a slow read costs only the watch URLs,
+      // never the parent pages listed above.
+      supabase
+        .from('event_organisers')
+        .select('id, name, slug, videos, updated_at')
+        .not('slug', 'is', null)
+        .limit(MAX_ROWS.organisers),
+      supabase
+        .from('blog_articles')
+        .select('id, featured_video_url')
+        .eq('is_published', true)
+        .not('featured_video_url', 'is', null)
+        .limit(MAX_ROWS.articles),
+      supabase
+        .from('event_reviews')
+        .select('article_id, videos, video')
+        .limit(MAX_ROWS.articles),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -380,6 +418,9 @@ export default async function handler(req, res) {
     const organisers = rows(11);
     const organiserEvents = rows(12);
     const storePageRows = rows(13);
+    const organiserVideoRows = rows(14);
+    const articleVideoRows = rows(15);
+    const reviewVideoRows = rows(16);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -440,6 +481,7 @@ export default async function handler(req, res) {
           finished ? 'yearly' : 'weekly', finished ? '0.4' : '0.7',
           imageLocs(event.image_url),
         ));
+        parts.push(...watchUrls(eventWatchSource(event, { siteUrl: BASE_URL }), lastmod));
       }
     }
 
@@ -477,6 +519,8 @@ export default async function handler(req, res) {
       parts.push('', `  <!-- Event organisers (${organiserUrls.length}) -->`);
       for (const { path, lastmod } of organiserUrls) {
         parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.6'));
+        const withVideos = organiserVideoRows.find((row) => organiserPath(row) === path);
+        if (withVideos) parts.push(...watchUrls(organiserWatchSource(withVideos), lastmod));
       }
     }
 
@@ -547,6 +591,14 @@ export default async function handler(req, res) {
       for (const article of articles) {
         const lastmod = (article.updated_at || article.published_at || article.created_at || TODAY).split('T')[0];
         parts.push(xmlUrl(`${BASE_URL}/blog/${article.slug}`, lastmod, 'weekly', '0.7', imageLocs(article.featured_image_url)));
+        const featured = articleVideoRows.find((row) => row.id === article.id);
+        const review = reviewVideoRows.find((row) => row.article_id === article.id);
+        if (featured || review) {
+          parts.push(...watchUrls(
+            articleWatchSource({ ...article, featured_video_url: featured?.featured_video_url }, review || null, { siteUrl: BASE_URL }),
+            lastmod,
+          ));
+        }
       }
     }
 
@@ -574,7 +626,9 @@ export default async function handler(req, res) {
       if (storePages.length > 0) {
         parts.push('', `  <!-- Card shop pages (${storePages.length}) -->`);
         for (const store of storePages) {
-          parts.push(xmlUrl(`${BASE_URL}${storePath(store)}`, (store.updated_at || TODAY).split('T')[0], 'monthly', '0.6'));
+          const lastmod = (store.updated_at || TODAY).split('T')[0];
+          parts.push(xmlUrl(`${BASE_URL}${storePath(store)}`, lastmod, 'monthly', '0.6'));
+          parts.push(...watchUrls(storeWatchSource(store, { siteUrl: BASE_URL }), lastmod));
         }
       }
     }

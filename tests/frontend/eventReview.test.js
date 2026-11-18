@@ -16,7 +16,6 @@ import {
   cleanVideos,
   cleanDeals,
   dealSavingPct,
-  buildReviewVideoJsonLds,
   MAX_REVIEW_VIDEOS,
   reviewVideoFileError,
   REVIEW_VIDEO_MAX_BYTES,
@@ -285,18 +284,6 @@ describe('several review videos', () => {
     expect(row.videos).toHaveLength(2);
     expect(row.video).toEqual(row.videos[0]);
     expect(normalizeReview({ video: yt }).videos).toHaveLength(1);
-  });
-
-  it('emits one VideoObject per video with a thumbnail', () => {
-    const article = { title: 'Vault', slug: 'vault', published_at: '2026-10-05T00:00:00Z', excerpt: 'x' };
-    const lds = buildReviewVideoJsonLds({ article, videos: [yt, upload] });
-    expect(lds).toHaveLength(2);
-    expect(lds[0].embedUrl).toMatch(/youtube-nocookie/);
-    expect(lds[0].thumbnailUrl[0]).toMatch(/ytimg/);
-    expect(lds[1].contentUrl).toBe(upload.url);
-    expect(lds[1].thumbnailUrl).toEqual([upload.poster_url]);
-    expect(buildReviewVideoJsonLds({ article: { title: 'x' }, videos: [yt] })).toEqual([]);
-    expect(buildReviewVideoJsonLds({ article, videos: [{ url: upload.url }] })).toEqual([]);
   });
 });
 

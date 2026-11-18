@@ -242,3 +242,35 @@ describe('sitemap image entries', () => {
     expect(body).toContain('<image:loc>https://img.example/b.webp</image:loc>');
   });
 });
+
+describe('sitemap video watch pages', () => {
+  it('lists one watch page per video under its parent, with the video tags', async () => {
+    state.tables.events = [
+      {
+        id: 'e1', slug: 'next-show', title: 'Next Show', state: 'VIC', status: 'approved', start_date: '2099-01-10',
+        updated_at: '2026-11-11T00:00:00Z',
+        event_videos: [
+          { title: 'Recap & more', url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+          { title: 'not youtube', url: 'https://example.com/v.mp4' },
+        ],
+      },
+      { id: 'e2', slug: 'no-videos', title: 'Quiet Show', state: 'VIC', status: 'approved', start_date: '2099-01-11' },
+    ];
+    state.tables.blog_articles = [{ id: 'a1', slug: 'vault-review', title: 'Vault Review', featured_image_url: 'https://img.example/cover.webp', featured_video_url: 'https://vimeo.com/123456789' }];
+    state.tables.event_reviews = [{ article_id: 'a1', videos: [{ url: 'https://youtu.be/abcdefghijk', caption: 'On the floor' }] }];
+    const { body } = await run();
+
+    expect(body).toContain('xmlns:video="http://www.google.com/schemas/sitemap-video/1.1"');
+    expect(body).toContain('<loc>https://cardpop.com.au/events/next-show/videos/dQw4w9WgXcQ</loc>');
+    expect(body).toContain('<video:title>Next Show — Recap &amp; more</video:title>');
+    expect(body).toContain('<video:thumbnail_loc>https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg</video:thumbnail_loc>');
+    expect(body).toContain('<video:player_loc>https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ</video:player_loc>');
+    expect(body).not.toContain('/events/no-videos/videos/');
+    expect(body.match(/\/events\/next-show\/videos\//g)).toHaveLength(1);
+
+    // An article's featured video and its review's videos.
+    expect(body).toContain('<loc>https://cardpop.com.au/blog/vault-review/videos/vimeo-123456789</loc>');
+    expect(body).toContain('<loc>https://cardpop.com.au/blog/vault-review/videos/abcdefghijk</loc>');
+    expect(body).toContain('<video:title>Vault Review — On the floor</video:title>');
+  });
+});

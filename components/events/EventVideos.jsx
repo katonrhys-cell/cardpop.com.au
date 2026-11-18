@@ -1,6 +1,8 @@
 import React, { useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { Video } from 'lucide-react';
 import { youTubeEmbedUrl, videoLabel, VIDEO_AUTOPLAY_DELAY_MS } from '@/utils/eventVideos.js';
+import { watchVideoPath } from '@/utils/videoWatch.js';
 
 // The event page's videos (events.event_videos, normalised by
 // cleanEventVideos), shown below the photo gallery: one YouTube embed per
@@ -14,7 +16,11 @@ import { youTubeEmbedUrl, videoLabel, VIDEO_AUTOPLAY_DELAY_MS } from '@/utils/ev
 // watching uninterrupted. Muted first: browsers block programmatic autoplay
 // with sound. Only the first video starts; several playing at once would be
 // noise.
-const EventVideos = ({ videos = [], fbEmbedUrl = null, eventName = '', headingId = 'event-videos' }) => {
+//
+// `watchBase` is the path of the page these videos belong to. Each video then
+// links to its own watch page (`<watchBase>/videos/<id>`, utils/videoWatch.js)
+// — the page Google indexes the video on; this one only plays it.
+const EventVideos = ({ videos = [], fbEmbedUrl = null, eventName = '', headingId = 'event-videos', watchBase = null }) => {
   const firstFrameRef = useRef(null);
   const firstId = videos[0]?.id || null;
 
@@ -60,8 +66,15 @@ const EventVideos = ({ videos = [], fbEmbedUrl = null, eventName = '', headingId
                   allowFullScreen
                 />
               </div>
-              {video.title && (
-                <figcaption className="mt-2 text-sm font-semibold text-foreground">{label}</figcaption>
+              {(video.title || watchBase) && (
+                <figcaption className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-sm">
+                  {video.title && <span className="font-semibold text-foreground">{label}</span>}
+                  {watchBase && (
+                    <Link to={watchVideoPath(watchBase, video.id)} className="text-xs font-medium text-muted-foreground underline-offset-2 hover:text-primary hover:underline">
+                      Open video page
+                    </Link>
+                  )}
+                </figcaption>
               )}
             </figure>
           );

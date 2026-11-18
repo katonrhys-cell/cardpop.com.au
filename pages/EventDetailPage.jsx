@@ -24,7 +24,6 @@ import {
   formatEventLocation,
   buildEventJsonLd,
   buildBreadcrumbJsonLd,
-  buildVideoJsonLds,
   toLocalDateStr,
 } from '@/lib/eventSeo.js';
 
@@ -162,7 +161,9 @@ const EventDetailPage = () => {
         description={seoDescription}
         canonicalUrl={`${SITE_URL}/events/${event.slug || event.id}`}
         ogImage={event.image_url || undefined}
-        structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event), ...buildVideoJsonLds(event)].filter(Boolean)}
+        // No VideoObject here: an event page is not a watch page. Each video's
+        // markup lives on its own page (/events/<slug>/videos/<id>).
+        structuredData={[buildEventJsonLd(event), buildBreadcrumbJsonLd(event)].filter(Boolean)}
       />
 
       <div className="flex-1 container-default py-4 md:py-12 w-full">

@@ -213,7 +213,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
 
             {(videos.length > 0 || fbEmbedUrl) && (
               <div className="mt-10">
-                <EventVideos videos={videos} fbEmbedUrl={fbEmbedUrl} eventName={event.name} />
+                <EventVideos videos={videos} fbEmbedUrl={fbEmbedUrl} eventName={event.name} watchBase={event.slug || event.id ? `/events/${event.slug || event.id}` : null} />
               </div>
             )}
 

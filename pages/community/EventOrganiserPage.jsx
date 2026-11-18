@@ -218,7 +218,7 @@ export default function EventOrganiserPage() {
       {status === 'ready' && (albums.length > 0 || videos.length > 0) && (
         <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16 pt-12 space-y-10">
           <EventPhotoAlbums albums={albums} eventName={name} title="Photos from past events" headingId="org-photo-gallery" />
-          <EventVideos videos={videos} eventName={name} headingId="org-videos" />
+          <EventVideos videos={videos} eventName={name} headingId="org-videos" watchBase={organiserPath(org)} />
         </div>
       )}
 

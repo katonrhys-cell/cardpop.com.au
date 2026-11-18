@@ -7,7 +7,7 @@ import { CONVICTION_LEVELS, CONVICTION_TYPES, CONVICTION_TYPE_KEYS } from '../ut
 import { partnersForCompany, partnerLineText, gradingPartnersPath } from '../utils/gradingPartners.js';
 import { SHOP_COLLECTION_SEO, resolveShopCollectionSlug } from '../data/shopCollectionSeo.js';
 import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
-import { buildEventReviewJsonLd, buildReviewVideoJsonLds, cleanVideos, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
+import { buildEventReviewJsonLd, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
 import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
@@ -45,7 +45,7 @@ import {
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
-import { cleanEventVideos, videoLabel, youTubeWatchUrl, youTubeEmbedUrl as ytEmbedUrl, youTubeThumbnailUrl as ytThumbUrl } from '../utils/eventVideos.js';
+import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
   listingMeta, PLAYERS_INDEX_SEO, formatBorn, keyCardImage,
@@ -335,6 +335,106 @@ const sendDoc = (res, doc) => {
   }
   return res.status(doc.status || 200).send(doc.html);
 };
+
+// ── Video watch pages (<parent>/videos/<key>) ────────────────────────────────
+// Google indexes a video only on a "watch page" — a page whose main content is
+// that one video. An event, organiser, article or card shop page that merely
+// plays one further down is not, and Search Console files it under "Video
+// isn't on a watch page". So each video also has a page of its own, built
+// here from the same source the SPA uses (utils/videoWatch.js): the player
+// first, then its name, what it is from and the other videos beside it. It is
+// the only document that emits a VideoObject; the parent pages link to it
+// (watchLinksHtml) and emit none. See docs/video-watch-pages.md.
+
+// A parent page's videos as links to their watch pages, thumbnails included.
+const watchLinksHtml = (links, heading) => {
+  if (!links.length) return '';
+  const items = links.map((l) =>
+    `<li><a href="${BASE_URL}${esc(l.path)}">${l.thumbnailUrl ? `<img src="${esc(l.thumbnailUrl)}" alt="" width="240" height="135" loading="lazy" /><br />` : ''}Watch: ${esc(l.label)}</a></li>`).join('');
+  return `<section><h2>${esc(heading)}</h2><ul>${items}</ul></section>`;
+};
+
+// The player. Sized by attributes and one inline rule so it is large and
+// inside the viewport on a phone and a desktop alike — Google skips a video
+// that renders too small, too tall or off-screen.
+const WATCH_PLAYER_STYLE = 'display:block;width:100%;max-width:960px;height:auto;aspect-ratio:16/9;border:0';
+const watchPlayerHtml = (page) => (page.video.embedUrl
+  ? `<iframe src="${esc(page.video.embedUrl)}" title="${esc(page.name)}" width="960" height="540" style="${WATCH_PLAYER_STYLE}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>`
+  : `<video src="${esc(page.video.contentUrl)}"${page.thumbnailUrl ? ` poster="${esc(page.thumbnailUrl)}"` : ''} width="960" height="540" style="${WATCH_PLAYER_STYLE}" controls playsinline preload="metadata"></video>`);
+
+// Loads the parent row for each kind of watch page → the shared watch source
+// (or null when the parent isn't public). Lookup failures throw (503, retried)
+// rather than reading as "no such page".
+const WATCH_SOURCE_LOADERS = {
+  event: async (supabase, { slug }) => {
+    const column = UUID_RE.test(slug) ? 'id' : 'slug';
+    const event = rowOrThrow(await supabase.from('events').select(EVENT_FIELDS).eq(column, slug).maybeSingle(), 'event');
+    if (!event || !['approved', 'completed'].includes(event.status)) return null;
+    return eventWatchSource(event, { facts: [eventDateLine(event), eventLocationLine(event)], siteUrl: BASE_URL });
+  },
+  organiser: async (supabase, { slug }) => {
+    // `videos` ships in a migration; without the column there is nothing to watch.
+    const { data: org, error } = await supabase
+      .from('event_organisers').select(`${ORGANISER_PAGE_COLUMNS}, updated_at`).eq('slug', slug).maybeSingle();
+    if (error || !org) return null;
+    return organiserWatchSource(org);
+  },
+  article: async (supabase, { slug }) => {
+    const column = UUID_RE.test(slug) ? 'id' : 'slug';
+    const article = rowOrThrow(await supabase.from('blog_articles').select('*').eq(column, slug).maybeSingle(), 'article');
+    if (!article || article.is_published === false) return null;
+    const { data: review } = await supabase.from('event_reviews').select('videos, video').eq('article_id', article.id).maybeSingle();
+    return articleWatchSource(article, review || null, { siteUrl: BASE_URL });
+  },
+  store: async (supabase, { city, slug }) => {
+    const cityInfo = DIRECTORY_CITIES[city];
+    if (!cityInfo) return null;
+    const store = rowOrThrow(await supabase
+      .from('local_game_stores').select(STORE_PAGE_COLUMNS).eq('slug', slug).eq('status', 'approved').maybeSingle(), 'store');
+    if (!store || store.city !== city) return null;
+    return storeWatchSource(store, { cityLabel: cityInfo.label, facts: [storeLocationLine(store)], siteUrl: BASE_URL });
+  },
+};
+
+async function renderVideoWatch(supabase, kind, params, videoKey) {
+  const source = await WATCH_SOURCE_LOADERS[kind](supabase, params);
+  if (!source) {
+    return notFound({
+      title: 'Video Not Found | CardPop',
+      description: 'This video could not be found on CardPop.',
+      canonical: `${BASE_URL}/events`,
+      bodyHtml: `<main><h1>Video Not Found</h1><p>This video is not available. <a href="${BASE_URL}/events">Browse card events</a>.</p></main>`,
+    });
+  }
+  const page = buildWatchPage(source, videoKey, { siteUrl: BASE_URL });
+  // A video that has since been removed: its old watch URL goes to the page it
+  // was on, rather than leaving a 404 in the index.
+  if (!page) return { status: 301, location: `${BASE_URL}${source.parentPath}` };
+
+  const facts = source.facts.map((f) => `<li>${esc(f)}</li>`).join('');
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}${esc(source.sectionPath)}">${esc(source.sectionName)}</a> / <a href="${esc(page.parentUrl)}">${esc(source.parentName)}</a> / ${esc(page.label)}</nav>
+  ${watchPlayerHtml(page)}
+  <h1>${esc(page.name)}</h1>
+  <p>${esc(page.longDescription)}</p>
+  <section>
+    <h2>From the ${esc(source.parentNoun)}: ${esc(source.parentName)}</h2>
+    ${facts ? `<ul>${facts}</ul>` : ''}
+    <p><a href="${esc(page.parentUrl)}">View the ${esc(source.parentNoun)} page — ${esc(source.parentName)}</a></p>
+  </section>
+  ${watchLinksHtml(page.others, `More videos from ${source.parentName}`)}
+</main>`;
+
+  return htmlDoc({
+    title: page.title,
+    description: page.description,
+    canonical: page.canonical,
+    ogImage: page.thumbnailUrl || undefined,
+    ogType: 'video.other',
+    jsonLdItems: page.jsonLd,
+    bodyHtml,
+  });
+}
 
 async function renderLocalTraders(supabase) {
   const { data } = await supabase
@@ -645,7 +745,7 @@ async function renderBlogArticle(supabase, param) {
   // lives in event_reviews and the reviewed event in events. Both lookups are
   // best-effort — a plain article has neither and skips this.
   let reviewLd = null;
-  let reviewVideoLds = [];
+  let reviewRowForVideos = null;
   let reviewHtml = '';
   if (article.category === 'event-reviews') {
     const { data: reviewRow } = await supabase.from('event_reviews').select('*').eq('article_id', article.id).maybeSingle();
@@ -656,10 +756,15 @@ async function renderBlogArticle(supabase, param) {
         event = ev || null;
       }
       reviewLd = buildEventReviewJsonLd({ article, review: reviewRow, event, siteUrl: BASE_URL });
-      reviewVideoLds = buildReviewVideoJsonLds({ article, videos: cleanVideos(reviewRow.videos, reviewRow.video), event, siteUrl: BASE_URL });
+      reviewRowForVideos = reviewRow;
       reviewHtml = renderEventReviewHtml(reviewRow, event);
     }
   }
+  // The article's videos (its featured video and, for a review, the review's)
+  // as links to their own watch pages — those carry the VideoObject; an
+  // article is not a watch page, so this document emits none.
+  const articleVideoLinks = watchLinks(articleWatchSource(article, reviewRowForVideos, { siteUrl: BASE_URL }));
+  const articleVideosHtml = watchLinksHtml(articleVideoLinks, reviewRowForVideos ? 'Videos from the day' : (articleVideoLinks.length > 1 ? 'Videos' : 'Video'));
 
   const bodyHtml = `<main>
   <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/blog">The Parallel Report</a> / ${esc(article.title)}</nav>
@@ -671,12 +776,13 @@ async function renderBlogArticle(supabase, param) {
     ${image ? `<img src="${esc(image)}" alt="${esc(article.title)}" />` : ''}
     ${addHeadingAnchors(bodyContent) || `<p>${esc(description)}</p>`}
     ${reviewHtml}
+    ${articleVideosHtml}
     ${tagsHtml}
   </article>
   ${faqHtml}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), ...reviewVideoLds, breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'article', headExtra, jsonLdItems: [blogPosting, ...(reviewLd ? [reviewLd] : []), breadcrumb, ...(faqPage ? [faqPage] : [])], bodyHtml });
 }
 
 // The structured half of an event review as crawlable HTML — scorecard, videos,
@@ -694,11 +800,6 @@ function renderEventReviewHtml(review, event) {
     parts.push(`<section><h2>Scorecard</h2>${formatScore(review.overall_rating) ? `<p>Overall: ${esc(formatScore(review.overall_rating))}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}${review.verdict ? `<p>${esc(review.verdict)}</p>` : ''}</section>`);
   }
 
-  const videos = cleanVideos(review.videos, review.video);
-  if (videos.length) {
-    const items = videos.map((v, i) => (v.caption ? `<li>${esc(v.caption)}</li>` : `<li>${esc(eventName)} video ${i + 1}</li>`)).join('');
-    parts.push(`<section><h2>Videos from the day</h2><ul>${items}</ul></section>`);
-  }
 
   const gallery = cleanGallery(review.gallery);
   if (gallery.length) {
@@ -1652,31 +1753,6 @@ const eventPrizesHtml = (prizes, prizePool, name) => {
   return `<section><h2>Prizes</h2>${prizePool ? `<p>Total prize pool: ${esc(prizePool)}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}</section>`;
 };
 
-// schema.org VideoObject per YouTube video (utils/eventVideos.js; a bare
-// youtube_url still counts as one) — video rich results. Google requires
-// uploadDate; the closest truthful value we hold is when the listing was
-// last updated (i.e. when the video link was added).
-function buildEventVideoLds(event) {
-  const videos = cleanEventVideos(event.event_videos, event.youtube_url);
-  if (videos.length === 0) return [];
-  const name = event.title || 'Trading Card Event';
-  const description = toText(
-    event.short_description || event.description
-      || `Video for ${name}, a trading card event listed on CardPop Australia.`,
-    500,
-  );
-  return videos.map((video, i) => ({
-    '@context': 'https://schema.org',
-    '@type': 'VideoObject',
-    name: video.title ? `${name} — ${video.title}` : `${name} — Event Video${videos.length > 1 ? ` ${i + 1}` : ''}`,
-    description,
-    thumbnailUrl: [ytThumbUrl(video.id)],
-    uploadDate: event.updated_at || event.created_at || event.start_date,
-    contentUrl: youTubeWatchUrl(video.id),
-    embedUrl: ytEmbedUrl(video.id),
-  }));
-}
-
 // Full schema.org Event for a Supabase event record. Every field Google's
 // event rich-result report checks (description, image, eventStatus, offers,
 // organizer, performer, endDate) is always present, falling back to site-level
@@ -1919,10 +1995,7 @@ async function renderEventOrganiser(supabase, slug) {
     const photos = albums.length
       ? `  <section>\n  <h2>Photos from past events</h2>${albums.map(({ a, label }) => `${label ? `<h3>${esc(label)}</h3>` : ''}${a.images.map((url, j) => `<figure><img src="${esc(url)}" alt="${esc(name)}${label ? ` — ${esc(label)}` : ''} photo ${j + 1}" loading="lazy" /></figure>`).join('')}`).join('')}</section>\n`
       : '';
-    const vids = cleanEventVideos(org.videos);
-    const videoHtml = vids.length
-      ? `  <section>\n  <h2>Videos</h2><ul>${vids.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(videoLabel(v, i))}</a></li>`).join('')}</ul></section>\n`
-      : '';
+    const videoHtml = watchLinksHtml(watchLinks(organiserWatchSource(org)), 'Videos');
     return photos + videoHtml;
   })();
 
@@ -2034,8 +2107,10 @@ async function renderEvent(supabase, param) {
   const builtEventLd = buildEventLd(event);
   const subEvents = buildSubEventLds(sideEvents, { location: builtEventLd.location });
   const eventLd = { ...builtEventLd, description: toText(description, 500), ...(subEvents.length ? { subEvent: subEvents } : {}) };
-  const videoLds = buildEventVideoLds(event);
-  const videos = cleanEventVideos(event.event_videos, event.youtube_url);
+  // The event's videos, each linked to its own watch page — the page that
+  // carries the VideoObject. An event page is not a watch page, so it emits
+  // none (Search Console: "Video isn't on a watch page").
+  const videoLinks = watchLinks(eventWatchSource(event));
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -2094,14 +2169,14 @@ async function renderEvent(supabase, param) {
   ${eventSideEventsHtml(sideEvents)}
   ${eventGalleryHtml(event, name)}
   ${eventPrizesHtml(prizes, prizePool, name)}
-  ${videos.length ? `<section><h2>${videos.length > 1 ? 'Event Videos' : 'Event Video'}</h2><ul>${videos.map((v, i) => `<li><a href="${esc(youTubeWatchUrl(v.id))}">${esc(v.title ? v.title : (videos.length > 1 ? `Watch ${videoLabel(v, i).toLowerCase()}` : 'Watch the event video'))}</a></li>`).join('')}</ul></section>` : ''}
+  ${watchLinksHtml(videoLinks, videoLinks.length > 1 ? 'Event Videos' : 'Event Video')}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
   ${ticketStatusHtml(event, isPast)}
   ${organiserLinksHtml(event)}
   ${region ? `<p><a href="${BASE_URL}${eventRegionPath(region)}">More card shows in ${esc(region.city)}</a></p>` : ''}
 </main>`;
 
-  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb, ...videoLds], bodyHtml });
+  return htmlDoc({ title, description, canonical, ogImage: image, ogType: 'website', jsonLdItems: [eventLd, breadcrumb], bodyHtml });
 }
 
 // Ranked local grader lists are shown identically on /grading/local-graders and
@@ -4522,8 +4597,7 @@ async function renderStore(supabase, citySlug, storeSlugParam) {
     const alt = p.caption ? `${store.name} — ${p.caption}` : `Inside ${store.name} (${i + 1} of ${photos.length})`;
     return `<figure><img src="${esc(absoluteMediaUrl(p.url))}" alt="${esc(alt)}" loading="lazy" />${p.caption ? `<figcaption>${esc(p.caption)}</figcaption>` : ''}</figure>`;
   }).join('\n');
-  const videoHtml = videos.map((v) =>
-    `<li><a href="${esc(absoluteMediaUrl(v.url))}">${esc(v.caption || `${store.name} video`)}</a></li>`).join('\n');
+  const videoHtml = watchLinksHtml(watchLinks(storeWatchSource(store, { siteUrl: BASE_URL })), videos.length > 1 ? 'Videos' : 'Video');
   const links = [
     website ? `<a href="${esc(website)}" rel="noopener">Website</a>` : '',
     instagram ? `<a href="${esc(instagram)}" rel="noopener">Instagram</a>` : '',
@@ -4557,7 +4631,7 @@ ${links ? `<p>${links}</p>` : ''}
 ${store.description ? `<h2>About ${esc(store.name)}</h2>\n<p>${esc(store.description)}</p>` : ''}
 ${hours.length ? `<h2>Opening hours</h2>\n<ul>${hours.map((h) => `<li>${esc(h)}</li>`).join('')}</ul>` : ''}
 ${photoHtml ? `<h2>Photos</h2>\n${photoHtml}` : ''}
-${videoHtml ? `<h2>Videos</h2>\n<ul>${videoHtml}</ul>` : ''}
+${videoHtml}
 <p><a href="${cityUrl}">More card shops in ${esc(cityInfo.label)}</a></p>
 </main>`,
   });
@@ -4812,6 +4886,17 @@ export default async function handler(req, res) {
   try {
     if (rawPath === '/' || rawPath === '') {
       return sendDoc(res, await renderHome(supabase));
+    }
+
+    // A video's own watch page, under the page it belongs to. Claimed first:
+    // the parent matchers below are prefix matches and would otherwise serve
+    // the event / article page at this URL.
+    const watchMatch = rawPath.match(/^\/(events\/organisers|events|blog|card-shops\/[^/?#]+)\/([^/?#]+)\/videos\/([^/?#]+)\/?$/);
+    if (watchMatch) {
+      const [, base, slugPart, keyPart] = watchMatch;
+      const kind = base === 'events/organisers' ? 'organiser' : base === 'events' ? 'event' : base === 'blog' ? 'article' : 'store';
+      const city = kind === 'store' ? safeDecode(base.slice('card-shops/'.length)) : undefined;
+      return sendDoc(res, await renderVideoWatch(supabase, kind, { slug: safeDecode(slugPart), city }, safeDecode(keyPart)));
     }
 
     if (rawPath === '/community/local-traders') {
