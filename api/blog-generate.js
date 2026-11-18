@@ -2,6 +2,7 @@
 import '../src/instrument.js';
 import crypto from 'node:crypto';
 import { runScheduledGeneration } from '../src/utils/blogArticleGenerator.js';
+import { publishDueArticles } from '../src/utils/blogScheduledPublish.js';
 import logger from '../src/utils/logger.js';
 
 // Dedicated serverless function for scheduled blog generation.
@@ -34,12 +35,31 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  // Scheduled drafts go live first, on their own: an article an admin has
+  // approved and dated must not wait on the model, the API key or the draft
+  // cap. A failure here is reported (non-200, so the scheduler emails the
+  // admin address) but never stops tonight's generation.
+  let scheduled = { published: [], failed: 0 };
+  let scheduleError = null;
   try {
-    const summary = await runScheduledGeneration();
+    scheduled = await publishDueArticles();
+  } catch (error) {
+    scheduleError = error.message;
+    logger.error(`[BLOG_SCHEDULE] ${error.message}`);
+  }
+  const scheduledSummary = {
+    published: scheduled.published.map((a) => a.slug),
+    failed: scheduled.failed,
+    ...(scheduleError ? { error: scheduleError } : {}),
+  };
+  const scheduleFailed = Boolean(scheduleError) || scheduled.failed > 0;
+
+  try {
+    const summary = { ...(await runScheduledGeneration()), scheduled: scheduledSummary };
     logger.info(`[BLOG_GEN] ${JSON.stringify(summary)}`);
-    return res.status(200).json(summary);
+    return res.status(scheduleFailed ? 502 : 200).json(summary);
   } catch (error) {
     logger.error(`[BLOG_GEN] ${error.message}`);
-    return res.status(502).json({ error: 'Article generation failed.' });
+    return res.status(502).json({ error: 'Article generation failed.', scheduled: scheduledSummary });
   }
 }

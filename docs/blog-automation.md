@@ -99,3 +99,37 @@ schema. If you do seed more in a migration, use `on conflict (slug) do nothing`
 and verify every `tracked_card_slugs` entry exists in `tracked_cards` first; a
 slug typo doesn't fail the migration, it just produces a topic that can never
 satisfy its data gate.
+
+## Scheduled publishing
+
+Publishing used to be an on/off switch that went live immediately, which is how
+four articles ended up stamped the same second on 5 November. A draft can now
+carry a **publish date** instead.
+
+- **Admin → Content**: under a draft's status badge, **Schedule** opens a date
+  box (`components/admin/ArticleScheduleButton.jsx`). It suggests the next free
+  date three days after the latest scheduled or published article, so a queue
+  of drafts spaces itself out; the earliest date offered is tomorrow. A
+  scheduled draft shows a **Scheduled** badge and its date, and the header
+  counts them. Clicking the badge still publishes straight away.
+- **What publishes it**: the daily blog run (`api/blog-generate.js`, 07:07
+  AEST) calls `publishDueArticles()` (`src/utils/blogScheduledPublish.js`)
+  *before* generation and independently of it — a missing `ANTHROPIC_API_KEY`
+  or a full draft queue never holds back an article that has been approved and
+  dated. Every unpublished article with `publish_on` on or before today
+  (Sydney) goes live. If a publish fails the run answers non-200, so the
+  scheduler emails the admin address.
+- **The column**: `blog_articles.publish_on` is a calendar **date** in Sydney
+  time, not a timestamp — the run happens once a day. The
+  `trg_blog_articles_clear_publish_on` trigger clears it whenever an article
+  is published by any route. Drafts are admin-only under RLS, so the date is
+  never public. Migration `…_blog_articles_publish_on.sql`; test with
+  `tests/db/run-blog-publish-on-migration.sh`.
+- **The draft cap**: a machine draft with a publish date counts as reviewed,
+  so it no longer holds up the nightly generator
+  (`BLOG_MAX_UNREVIEWED_DRAFTS`).
+- The shared rules (`sydneyDateString`, `scheduleError`, `suggestPublishOn`)
+  are in `utils/blogSchedule.js`.
+
+A date is a promise to publish, not a review: read the draft before dating it.
+

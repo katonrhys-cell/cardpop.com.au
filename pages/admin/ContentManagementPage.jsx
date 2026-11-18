@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Edit, Trash2, FileText, AlertCircle, RefreshCcw, FileCode2, Globe, EyeOff, ArrowLeft, BookOpen, PenLine } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, FileText, AlertCircle, RefreshCcw, FileCode2, Globe, EyeOff, ArrowLeft, BookOpen, PenLine, CalendarClock } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import AdminPageHeader from '@/components/admin/AdminPageHeader.jsx';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +21,8 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabaseClient.js';
 import ArticleEditorModal from '@/components/ArticleEditorModal.jsx';
+import ArticleScheduleButton from '@/components/admin/ArticleScheduleButton.jsx';
+import { cleanPublishOn, sydneyDateString } from '@/utils/blogSchedule.js';
 
 const StatPill = ({ icon: Icon, label, value, accent }) => (
   <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border shadow-sm">
@@ -132,7 +134,9 @@ const ContentManagementPage = () => {
         .update(patch)
         .eq('id', article.id);
       if (error) throw error;
-      setArticles(prev => prev.map(a => a.id === article.id ? { ...a, ...patch } : a));
+      // Publishing by hand clears any pending schedule — the table's trigger
+      // does it in the database, so it is only mirrored here, never sent.
+      setArticles(prev => prev.map(a => a.id === article.id ? { ...a, ...patch, ...(next ? { publish_on: null } : {}) } : a));
       toast.success(next ? 'Article published.' : 'Article set to draft.');
     } catch (err) {
       toast.error('Failed to update status.');
@@ -158,6 +162,15 @@ const ContentManagementPage = () => {
 
   const publishedCount = articles.filter(a => a.is_published).length;
   const draftCount = articles.filter(a => !a.is_published).length;
+  const scheduledCount = articles.filter(a => !a.is_published && cleanPublishOn(a.publish_on)).length;
+  // Every scheduled or already-published date, so the Schedule box can suggest
+  // the next free one a few days after the last (utils/blogSchedule.js).
+  const articleDates = (exceptId) => articles
+    .filter(a => a.id !== exceptId)
+    .map(a => (a.is_published
+      ? (a.published_at ? sydneyDateString(new Date(a.published_at)) : null)
+      : a.publish_on))
+    .filter(Boolean);
 
   return (
     <div className="text-foreground">
@@ -178,6 +191,7 @@ const ContentManagementPage = () => {
           <StatPill icon={BookOpen} label="Total Articles" value={articles.length} accent="bg-primary/10 text-primary" />
           <StatPill icon={Globe} label="Published" value={publishedCount} accent="bg-emerald-500/10 text-emerald-600" />
           <StatPill icon={PenLine} label="Drafts" value={draftCount} accent="bg-amber-500/10 text-amber-600" />
+          <StatPill icon={CalendarClock} label="Scheduled" value={scheduledCount} accent="bg-amber-500/10 text-amber-600" />
         </div>
 
         {/* Toolbar */}
@@ -294,12 +308,25 @@ const ContentManagementPage = () => {
                             <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-200 hover:bg-emerald-500/20 gap-1 transition-colors">
                               <Globe className="w-3 h-3" /> Published
                             </Badge>
+                          ) : cleanPublishOn(article.publish_on) ? (
+                            <Badge variant="outline" className="border-amber-300 text-amber-700 hover:border-emerald-400 hover:text-emerald-700 gap-1 transition-colors">
+                              <EyeOff className="w-3 h-3" /> Scheduled
+                            </Badge>
                           ) : (
                             <Badge variant="outline" className="text-muted-foreground hover:border-amber-400 hover:text-amber-600 gap-1 transition-colors">
                               <EyeOff className="w-3 h-3" /> Draft
                             </Badge>
                           )}
                         </button>
+                        {!article.is_published && (
+                          <div className="mt-1.5">
+                            <ArticleScheduleButton
+                              article={article}
+                              takenDates={articleDates(article.id)}
+                              onChange={(publishOn) => setArticles(prev => prev.map(a => a.id === article.id ? { ...a, publish_on: publishOn } : a))}
+                            />
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right align-top pt-3">
                         <div className="flex justify-end items-center gap-1.5">

@@ -40,7 +40,7 @@ mockSupabase.from.mockImplementation((table) => {
     return countQuery ? { count: 0, error: null } : { data: null, error: null };
   };
   const b = {};
-  for (const method of ['eq', 'in', 'order', 'limit']) b[method] = vi.fn(() => b);
+  for (const method of ['eq', 'in', 'is', 'order', 'limit']) b[method] = vi.fn(() => b);
   b.select = vi.fn((_columns, options) => {
     if (options?.head) countQuery = true;
     return b;
