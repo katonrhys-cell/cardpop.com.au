@@ -118,3 +118,16 @@ describe('option lists', () => {
     expect(brandOptions(products)).toEqual(['CardPop', 'Palms Off Gaming']);
   });
 });
+
+describe('status filter follows what the list shows', () => {
+  const rows = [
+    { id: 'in', title: 'In', status: 'active', stock_quantity: 3 },
+    { id: 'out', title: 'Out', status: 'active', stock_quantity: 0 },
+    { id: 'pre', title: 'Pre', status: 'preorder', stock_quantity: 0 },
+  ];
+  it('splits active products into Active and Sold out', () => {
+    expect(filterProducts(rows, { status: 'active' }).map((p) => p.id)).toEqual(['in']);
+    expect(filterProducts(rows, { status: 'sold_out' }).map((p) => p.id)).toEqual(['out']);
+    expect(filterProducts(rows, { status: 'preorder' }).map((p) => p.id)).toEqual(['pre']);
+  });
+});
