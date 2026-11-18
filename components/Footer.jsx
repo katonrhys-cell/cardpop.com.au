@@ -35,6 +35,38 @@ const GITHUB_URL = 'https://github.com/katonrhys-cell';
 // Support / donation link. VITE_DONATE_URL overrides it at build time; set it to an empty string to hide the link.
 const DONATE_URL = import.meta.env.VITE_DONATE_URL ?? 'https://patreon.com/cardpopaustralia';
 
+// Points for an n-pointed star centred on (cx, cy).
+const starPoints = (cx, cy, outer, inner, n) =>
+  Array.from({ length: n * 2 }, (_, i) => {
+    const r = i % 2 === 0 ? outer : inner;
+    const a = (Math.PI * i) / n - Math.PI / 2;
+    return `${(cx + r * Math.cos(a)).toFixed(2)},${(cy + r * Math.sin(a)).toFixed(2)}`;
+  }).join(' ');
+
+// Inline SVG rather than the 🇦🇺 emoji: Windows renders flag emoji as the letters "AU".
+const AustralianFlag = () => (
+  <svg
+    viewBox="0 0 60 30"
+    className="inline-block h-3.5 w-auto align-[-1px] rounded-[2px] shadow-sm ring-1 ring-black/10"
+    role="img"
+    aria-label="Australian flag"
+  >
+    <rect width="60" height="30" fill="#012169" />
+    <svg x="0" y="0" width="30" height="15" viewBox="0 0 60 30">
+      <path d="M0,0 60,30 M60,0 0,30" stroke="#fff" strokeWidth="6" />
+      <path d="M0,0 60,30 M60,0 0,30" stroke="#C8102E" strokeWidth="2.5" />
+      <path d="M30,0v30M0,15h60" stroke="#fff" strokeWidth="10" />
+      <path d="M30,0v30M0,15h60" stroke="#C8102E" strokeWidth="6" />
+    </svg>
+    <polygon points={starPoints(15, 22.5, 6, 2.6, 7)} fill="#fff" />
+    <polygon points={starPoints(45, 6, 2.6, 1.1, 7)} fill="#fff" />
+    <polygon points={starPoints(38, 14, 2.6, 1.1, 7)} fill="#fff" />
+    <polygon points={starPoints(52, 12, 2.6, 1.1, 7)} fill="#fff" />
+    <polygon points={starPoints(45, 25, 2.6, 1.1, 7)} fill="#fff" />
+    <polygon points={starPoints(47.5, 15.5, 1.5, 0.7, 5)} fill="#fff" />
+  </svg>
+);
+
 const Footer = () => {
   const { settings } = usePlatformSettings();
   return (
@@ -181,7 +213,8 @@ const Footer = () => {
             )}
           </p>
           <p className="text-muted-foreground text-sm">
-            Made with ❤️ for the Australian Trading Card Community
+            Made with ❤️ for the Australian Trading Card Community{' '}
+            <AustralianFlag />
           </p>
         </div>
       </div>
