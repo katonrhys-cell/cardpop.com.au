@@ -290,6 +290,14 @@ export function getCardImage(pathOrUrl, opts = {}) {
     return { src: null, srcSet: null, fallbackSrc: null, canonicalSrc: null, thumbSrc: null };
   }
 
+  // A site-relative path (`/images/events/<name>.jpg`) is a static asset
+  // bundled with the app, not a storage object (see publicImageUrl). Building
+  // a bucket URL from it 404s — a featured event's poster stored that way
+  // rendered as a broken image on the homepage.
+  if (isSiteRelative(pathOrUrl)) {
+    return { src: pathOrUrl, srcSet: null, fallbackSrc: pathOrUrl, canonicalSrc: pathOrUrl, thumbSrc: null };
+  }
+
   // Absolute URL: if it's a Supabase storage object URL (the shape stored in
   // DB columns like image_url), recover its bucket/path so it can be resized
   // like any storage path — DB-stored originals are full-resolution scans, and

@@ -12,7 +12,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
  * One item per page on phones, two on tablets, three on desktop (the widths
  * below must stay in step with the `gap-6` between items). Items keep that
  * width however few there are, so a single item is one card wide rather than
- * stretching across the page. The arrows only render once the track actually
+ * stretching across the page — and `min-w-0` holds it there, or one long
+ * unwrappable line (a truncated venue name) would widen its card past the
+ * others. The arrows only render once the track actually
  * overflows, so a short list stays a plain row.
  *
  * `inView` drives the reveal-up animation; the reveal wrapper stays the item's
@@ -113,7 +115,7 @@ const PagedCarousel = ({
         {items.map((item, i) => (
           <div
             key={getKey(item)}
-            className={`snap-start shrink-0 basis-full sm:basis-[calc((100%_-_1.5rem)/2)] lg:basis-[calc((100%_-_3rem)/3)] ${revealClass}`}
+            className={`snap-start shrink-0 min-w-0 basis-full sm:basis-[calc((100%_-_1.5rem)/2)] lg:basis-[calc((100%_-_3rem)/3)] ${revealClass}`}
             style={animate && inView ? { animationDelay: `${Math.min(i, 5) * 0.1}s` } : undefined}
           >
             {renderItem(item, i)}
