@@ -143,20 +143,25 @@ const AccountPlanBanner = () => {
         )}
         <Link
           to="/account/wallet"
-          className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
-            hasSavedCard
-              ? 'border-border bg-muted/30 hover:bg-muted/50'
-              : 'border-brand-red/30 bg-brand-red/5 hover:bg-brand-red/10'
-          }`}
+          className="group flex items-center gap-3 rounded-xl bg-brand-red px-4 py-3.5 text-sm text-white shadow-md transition-colors hover:bg-brand-red/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-red focus-visible:ring-offset-2"
         >
-          <CreditCard className={`h-5 w-5 shrink-0 ${hasSavedCard ? 'text-muted-foreground' : 'text-brand-red'}`} />
-          <span className="text-foreground">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
+            <CreditCard className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
             {hasSavedCard ? (
-              <><span className="font-bold">Manage your saved card</span> — used for one-tap checkout.</>
+              <>
+                <span className="block text-base font-bold leading-tight">Manage your saved card</span>
+                <span className="block text-white/85">Used for one-tap checkout.</span>
+              </>
             ) : (
-              <><span className="font-bold">Add a card on file</span> to sell or trade — never charged until you transact.</>
+              <>
+                <span className="block text-base font-bold leading-tight">Add a card on file</span>
+                <span className="block text-white/85">To sell or trade — never charged until you transact.</span>
+              </>
             )}
           </span>
+          <ArrowRight className="h-5 w-5 shrink-0 transition-transform group-hover:translate-x-0.5" />
         </Link>
       </div>
       )}
