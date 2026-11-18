@@ -13,6 +13,7 @@ import { publicImageUrl } from '@/utils/imageUrl.js';
 import useShopCategoryGroups from '@/hooks/useShopCategoryGroups.js';
 import { normalizeSku, isValidSku, suggestSku, SKU_MAX_LENGTH } from '@/utils/shopSku.js';
 import { grossMargin } from '@/src/utils/shopRrp.js';
+import { syncWholesaleCost } from '@/utils/wholesaleCost.js';
 import { variantStock } from '@/utils/shopVariants.js';
 import { PREORDER_ETA_MAX_LENGTH } from '@/utils/shopStock.js';
 import { escapeLike } from '@/src/utils/escapeLike.js';
@@ -208,6 +209,12 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   }, [shopCategories]);
 
   const handleInputChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }));
+
+  // Wholesale cost: typing either side fills in the other at 10% GST.
+  const handleCostChange = (side, value) => setFormData((prev) => {
+    const next = syncWholesaleCost({ ex: prev.wholesale_ex_gst_aud, inc: prev.wholesale_inc_gst_aud }, side, value);
+    return { ...prev, wholesale_ex_gst_aud: next.ex, wholesale_inc_gst_aud: next.inc };
+  });
 
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files || []);
@@ -614,7 +621,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                   placeholder="ex GST"
                   aria-label="Wholesale cost ex GST"
                   value={formData.wholesale_ex_gst_aud}
-                  onChange={(e) => handleInputChange('wholesale_ex_gst_aud', e.target.value)}
+                  onChange={(e) => handleCostChange('ex', e.target.value)}
                   className="bg-background tabular-nums"
                 />
                 <p className="text-[11px] text-muted-foreground">ex GST</p>
@@ -628,7 +635,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
                   placeholder="inc GST"
                   aria-label="Wholesale cost inc GST"
                   value={formData.wholesale_inc_gst_aud}
-                  onChange={(e) => handleInputChange('wholesale_inc_gst_aud', e.target.value)}
+                  onChange={(e) => handleCostChange('inc', e.target.value)}
                   className="bg-background tabular-nums"
                 />
                 <p className="text-[11px] text-muted-foreground">inc GST</p>
