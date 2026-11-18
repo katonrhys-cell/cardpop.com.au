@@ -43,3 +43,14 @@ describe('utils/eventOrganiserLogo', () => {
     expect(logoAltText({})).toBe('Event organiser logo');
   });
 });
+
+describe('logoBackdropStyle', () => {
+  it('paints the logo corner across the tile', async () => {
+    const { logoBackdropStyle } = await import('@/utils/eventOrganiserLogo.js');
+    const style = logoBackdropStyle('https://img.example/logos/a b.png');
+    expect(style.backgroundImage).toBe('url("https://img.example/logos/a b.png")');
+    expect(style.backgroundSize).toBe('10000% 10000%');
+    expect(logoBackdropStyle('')).toBeUndefined();
+    expect(logoBackdropStyle(null)).toBeUndefined();
+  });
+});

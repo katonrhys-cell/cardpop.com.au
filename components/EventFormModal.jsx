@@ -29,7 +29,7 @@ import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx'
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
-import { useEventOrganisers } from '@/hooks/useEventOrganisers.js';
+import { useEventOrganisers, fillOrganiserPageFromEvent } from '@/hooks/useEventOrganisers.js';
 import { findOrganiser } from '@/utils/eventOrganisers.js';
 import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
 import { createStepRunner, reportStalledStep, UPLOAD_STEP_TIMEOUT_MS } from '@/utils/saveSteps.js';
@@ -232,6 +232,8 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   // A saved organiser's logo picked from the list (already uploaded — no file).
   const [pickedLogoUrl, setPickedLogoUrl] = useState(null);
   const [savingOrganiser, setSavingOrganiser] = useState(false);
+  // Admin: also copy these organiser details onto the organiser's own page.
+  const [fillOrganiserPage, setFillOrganiserPage] = useState(true);
   const { organisers, saveOrganiser } = useEventOrganisers(isOpen);
   const logoInputRef = useRef(null);
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
@@ -888,12 +890,23 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
       // Admin listing an event for an organiser not yet in the saved list: add
       // them (name + logo) so they get a page. Best-effort — the event is saved.
       const typedOrganiser = formData.organizer_name.trim();
-      if (!isUserMode && typedOrganiser && !findOrganiser(organisers, typedOrganiser)) {
+      let savedOrganiser = findOrganiser(organisers, typedOrganiser);
+      if (!isUserMode && typedOrganiser && !savedOrganiser) {
         try {
-          await saveOrganiser({ name: typedOrganiser, logoUrl: payload.organizer_logo_url || null });
+          ({ organiser: savedOrganiser } = await saveOrganiser({ name: typedOrganiser, logoUrl: payload.organizer_logo_url || null }));
           toast.success('Organiser added to the list');
         } catch (err) {
           console.warn('Organiser auto-save failed:', err);
+        }
+      }
+      // …and carry the details typed here onto that organiser's page, so they
+      // aren't entered twice. Blank fields only; best-effort.
+      if (!isUserMode && fillOrganiserPage && savedOrganiser?.id) {
+        try {
+          const added = await fillOrganiserPageFromEvent(savedOrganiser.id, payload);
+          if (added.length) toast.success(`Added to ${savedOrganiser.name}’s organiser page: ${added.join(', ')}`);
+        } catch (err) {
+          console.warn('Organiser page fill failed:', err);
         }
       }
 
@@ -1248,6 +1261,24 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                         </Button>
                         <span className="text-xs text-muted-foreground">Saves this name and logo so you can pick it on any event.</span>
                       </div>
+                    )}
+                    {!isUserMode && (
+                      <label htmlFor="fill_organiser_page" className="flex items-start gap-2 pt-1 text-sm cursor-pointer">
+                        <input
+                          id="fill_organiser_page"
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 rounded border-border accent-primary"
+                          checked={fillOrganiserPage}
+                          onChange={e => setFillOrganiserPage(e.target.checked)}
+                          disabled={loading}
+                        />
+                        <span>
+                          <span className="font-semibold">Also add these details to the organiser’s page</span>
+                          <span className="block text-xs text-muted-foreground">
+                            On save, the logo, website, social links and the contact email / phone below fill any blank fields on the organiser’s page, where they are public. Nothing already there is changed. Untick to keep them on this event only.
+                          </span>
+                        </span>
+                      </label>
                     )}
                   </div>
                   <div className="space-y-2">

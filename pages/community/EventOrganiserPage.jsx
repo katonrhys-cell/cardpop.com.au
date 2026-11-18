@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Instagram, Facebook, Youtube, Music2, Link2, MessageSquare } from 'lucide-react';
+import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Mail, Phone, Instagram, Facebook, Youtube, Music2, Link2, MessageSquare } from 'lucide-react';
 import XIcon from '@/components/XIcon.jsx';
 import SEOHead from '@/components/SEOHead.jsx';
 import EventCard from '@/components/EventCard.jsx';
@@ -16,11 +16,11 @@ import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import EventVideos from '@/components/events/EventVideos.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, organiserContact, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
-import { safeLogoUrl, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
+import { safeLogoUrl, isVideoLogoUrl, logoBackdropStyle } from '@/utils/eventOrganiserLogo.js';
 import { publicImageUrl, publicVideoUrl } from '@/utils/imageUrl.js';
 import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrganisers.js';
 
@@ -40,7 +40,7 @@ const LogoTile = ({ url, name, onFail }) => (
   isVideoLogoUrl(url) ? (
     <video src={publicVideoUrl(url)} autoPlay muted loop playsInline aria-label={`${name} logo`} onError={onFail} className={LOGO_BOX} />
   ) : (
-    <img src={publicImageUrl(url)} alt={`${name} logo`} onError={onFail} className={LOGO_BOX} />
+    <img src={publicImageUrl(url)} alt={`${name} logo`} onError={onFail} className={LOGO_BOX} style={logoBackdropStyle(publicImageUrl(url))} />
   )
 );
 
@@ -86,9 +86,10 @@ export default function EventOrganiserPage() {
       try {
         const readOrganiser = (columns) => supabase
           .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
-        let { data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS);
+        let { data: found, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS);
         // The profile columns ship in a migration; fall back to the original
         // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(BASE_ORGANISER_COLUMNS));
@@ -140,6 +141,7 @@ export default function EventOrganiserPage() {
 
   const name = org?.name ?? '';
   const links = organiserLinks(org);
+  const contact = organiserContact(org);
   const canEdit = canEditOrganiserPage(org, currentUser?.id, isAdmin);
   // The owner reads messages here; everyone else can send one.
   const isOwner = Boolean(currentUser?.id) && org?.owner_id === currentUser.id;
@@ -208,6 +210,21 @@ export default function EventOrganiserPage() {
                 </p>
                 {org.description && (
                   <p className="text-sm md:text-base text-foreground/80 mt-4 whitespace-pre-line">{org.description}</p>
+                )}
+                {(contact.email || contact.phone) && (
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-4 text-sm" data-testid="organiser-contact">
+                    <span className="font-bold text-foreground">Contact{contact.name ? ` ${contact.name}` : ''}</span>
+                    {contact.email && (
+                      <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1.5 text-primary hover:underline break-all">
+                        <Mail className="w-4 h-4 shrink-0" aria-hidden="true" /> {contact.email}
+                      </a>
+                    )}
+                    {contact.phone && (
+                      <a href={contact.telHref} className="inline-flex items-center gap-1.5 text-primary hover:underline">
+                        <Phone className="w-4 h-4 shrink-0" aria-hidden="true" /> {contact.phone}
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

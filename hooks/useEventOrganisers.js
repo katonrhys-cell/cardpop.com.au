@@ -1,6 +1,29 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient.js';
 import { findOrganiser, sortOrganisers } from '@/utils/eventOrganisers.js';
+import { ORGANISER_CONTACT_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PROFILE_COLUMNS, organiserBlanksFromEvent } from '@/utils/organiserPage.js';
+
+/**
+ * Carry an event's organiser details (logo, website, socials, contact email /
+ * phone) onto the organiser's page — blank fields only, never an overwrite.
+ * Admins only (RLS). Returns the labels of what was added, [] when the page
+ * already had everything.
+ */
+export async function fillOrganiserPageFromEvent(organiserId, event) {
+  const read = (columns) => supabase.from('event_organisers').select(columns).eq('id', organiserId).maybeSingle();
+  let { data: org, error } = await read(ORGANISER_CONTACT_COLUMNS);
+  // Newer columns ship in migrations; fill what this database has.
+  if (error) ({ data: org, error } = await read(ORGANISER_LINK_COLUMNS));
+  if (error) ({ data: org, error } = await read(ORGANISER_PROFILE_COLUMNS));
+  if (error) throw error;
+  const { patch, labels } = organiserBlanksFromEvent(org, event);
+  if (labels.length === 0) return [];
+  const { data: saved, error: writeError } = await supabase
+    .from('event_organisers').update(patch).eq('id', organiserId).select('id').maybeSingle();
+  if (writeError) throw writeError;
+  // RLS refusing an update returns no row and no error.
+  return saved ? labels : [];
+}
 
 /**
  * The saved organisers list for the event form, plus `saveOrganiser` (admins:

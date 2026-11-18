@@ -11,6 +11,10 @@ export const ORGANISER_LINK_COLUMNS = `${ORGANISER_PROFILE_COLUMNS}, extra_logo_
 // gallery_albums / videos ship in 20261117190000_organiser_page_photos_and_videos.sql;
 // readers try the full set, then ORGANISER_LINK_COLUMNS, then the older tiers.
 export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums, videos`;
+// contact_name / contact_email / contact_phone ship in
+// 20261118232637_organiser_contact_details.sql; the organiser page tries this
+// set first, then ORGANISER_PAGE_COLUMNS and the older tiers.
+export const ORGANISER_CONTACT_COLUMNS = `${ORGANISER_PAGE_COLUMNS}, contact_name, contact_email, contact_phone`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;
@@ -43,6 +47,74 @@ export function organiserLinks(org) {
   return LINK_FIELDS
     .map(([key, label]) => ({ key, label, url: org?.[key] }))
     .filter(({ url }) => typeof url === 'string' && /^https?:\/\/[^\s]+$/i.test(url));
+}
+
+const CONTACT_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const CONTACT_PHONE_RE = /^\+?[0-9(][0-9 ()-]{5,23}$/;
+
+/** A contact email worth saving / linking, else ''. Same rule as the column check. */
+export function cleanContactEmail(value) {
+  const email = String(value ?? '').trim();
+  return email.length <= 254 && CONTACT_EMAIL_RE.test(email) ? email : '';
+}
+
+/** A contact phone worth saving / linking (digits, spaces, brackets, dashes, optional +), else ''. */
+export function cleanContactPhone(value) {
+  const phone = String(value ?? '').trim().replace(/\s+/g, ' ');
+  return CONTACT_PHONE_RE.test(phone) ? phone : '';
+}
+
+/**
+ * The public contact details an organiser chose to show: `{ name, email, phone,
+ * telHref }`, each '' when absent or malformed. `name` only counts alongside
+ * an email or phone — a name alone gives nobody a way to get in touch.
+ */
+export function organiserContact(org) {
+  const email = cleanContactEmail(org?.contact_email);
+  const phone = cleanContactPhone(org?.contact_phone);
+  const name = email || phone ? String(org?.contact_name ?? '').trim().slice(0, 80) : '';
+  return { name, email, phone, telHref: phone ? `tel:${phone.replace(/[^0-9+]/g, '')}` : '' };
+}
+
+// What an event's Organiser tab knows about its organiser, and the organiser
+// page column each one belongs in: [event field, organiser column, label].
+const EVENT_ORGANISER_FIELDS = [
+  ['organizer_logo_url', 'logo_url', 'logo'],
+  ['website_url', 'website_url', 'website'],
+  ['instagram_url', 'instagram_url', 'Instagram'],
+  ['facebook_url', 'facebook_url', 'Facebook'],
+  ['youtube_channel_url', 'youtube_url', 'YouTube'],
+  ['tiktok_url', 'tiktok_url', 'TikTok'],
+  ['x_url', 'x_url', 'X'],
+  ['organizer_email', 'contact_email', 'contact email'],
+  ['organizer_phone', 'contact_phone', 'contact phone'],
+];
+const HTTP_URL_RE = /^https?:\/\/[^\s]+$/i;
+
+/**
+ * The organiser-page fields an event can fill in: `{ patch, labels }`. Only a
+ * column the page row actually has (so a read made before a migration landed
+ * never writes an unknown column) and has **blank** is filled — what is already
+ * on the page is never overwritten — and only with a value the column's CHECK
+ * would accept. Typing an organiser's details on one event then carries to
+ * their page instead of being entered twice.
+ */
+export function organiserBlanksFromEvent(org, event) {
+  const patch = {};
+  const labels = [];
+  if (!org || !event) return { patch, labels };
+  for (const [eventKey, orgKey, label] of EVENT_ORGANISER_FIELDS) {
+    if (!(orgKey in org) || String(org[orgKey] ?? '').trim()) continue;
+    const raw = String(event[eventKey] ?? '').trim();
+    let value = '';
+    if (orgKey === 'contact_email') value = cleanContactEmail(raw);
+    else if (orgKey === 'contact_phone') value = cleanContactPhone(raw);
+    else if (HTTP_URL_RE.test(raw)) value = raw;
+    if (!value) continue;
+    patch[orgKey] = value;
+    labels.push(label);
+  }
+  return { patch, labels };
 }
 
 /**

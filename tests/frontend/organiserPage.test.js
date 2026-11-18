@@ -84,3 +84,45 @@ describe('organiser page photos and videos columns', () => {
     expect(m.ORGANISER_LINK_COLUMNS).not.toContain('gallery_albums');
   });
 });
+
+describe('organiser contact details', () => {
+  it('returns the email and phone the organiser entered, with a dialable tel link', async () => {
+    const { organiserContact } = await import('@/utils/organiserPage.js');
+    expect(organiserContact({ contact_name: ' Sam ', contact_email: ' hello@show.com.au ', contact_phone: '(03) 5555  1234' }))
+      .toEqual({ name: 'Sam', email: 'hello@show.com.au', phone: '(03) 5555 1234', telHref: 'tel:0355551234' });
+    expect(organiserContact({ contact_phone: '+61 400 000 000' }).telHref).toBe('tel:+61400000000');
+  });
+  it('drops malformed values, and a name with no way to get in touch', async () => {
+    const { organiserContact, cleanContactEmail, cleanContactPhone } = await import('@/utils/organiserPage.js');
+    expect(organiserContact({ contact_name: 'Sam', contact_email: 'not-an-email', contact_phone: 'call me' }))
+      .toEqual({ name: '', email: '', phone: '', telHref: '' });
+    expect(organiserContact(null)).toEqual({ name: '', email: '', phone: '', telHref: '' });
+    expect(cleanContactEmail('a b@c.com')).toBe('');
+    expect(cleanContactPhone('12')).toBe('');
+  });
+  it('reads the contact columns only in their own column set', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_CONTACT_COLUMNS).toContain('contact_email');
+    expect(m.ORGANISER_PAGE_COLUMNS).not.toContain('contact_');
+  });
+});
+
+describe('organiserBlanksFromEvent', () => {
+  const event = {
+    organizer_logo_url: 'https://x.test/logo.png', website_url: 'https://show.test', instagram_url: 'https://instagram.com/show',
+    youtube_channel_url: 'https://youtube.com/@show', organizer_email: 'hello@show.test', organizer_phone: '0400 000 000', x_url: 'javascript:alert(1)',
+  };
+  it('fills only the blank fields the page row has, mapping event fields to page columns', async () => {
+    const { organiserBlanksFromEvent } = await import('@/utils/organiserPage.js');
+    const org = { logo_url: 'https://x.test/kept.png', website_url: null, instagram_url: '', youtube_url: null, x_url: null, contact_email: null, contact_phone: 'kept' };
+    expect(organiserBlanksFromEvent(org, event)).toEqual({
+      patch: { website_url: 'https://show.test', instagram_url: 'https://instagram.com/show', youtube_url: 'https://youtube.com/@show', contact_email: 'hello@show.test' },
+      labels: ['website', 'Instagram', 'YouTube', 'contact email'],
+    });
+  });
+  it('never writes a column the row was read without, and copes with nothing to add', async () => {
+    const { organiserBlanksFromEvent } = await import('@/utils/organiserPage.js');
+    expect(organiserBlanksFromEvent({ website_url: 'https://a.test' }, event)).toEqual({ patch: {}, labels: [] });
+    expect(organiserBlanksFromEvent(null, event)).toEqual({ patch: {}, labels: [] });
+  });
+});

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { normalizeEventUrl, isValidHttpUrl } from '@/utils/eventFormValidation.js';
-import { ORGANISER_PAGE_COLUMNS, MAX_EXTRA_LOGOS } from '@/utils/organiserPage.js';
+import { ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, MAX_EXTRA_LOGOS, cleanContactEmail, cleanContactPhone } from '@/utils/organiserPage.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
@@ -42,6 +42,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     tiktok_url: org.tiktok_url || '',
     x_url: org.x_url || '',
     linktree_url: org.linktree_url || '',
+    contact_name: org.contact_name || '',
+    contact_email: org.contact_email || '',
+    contact_phone: org.contact_phone || '',
   }));
   const [logoFile, setLogoFile] = useState(null);
   // Joint organisers: more logos beside the main one. Each item is a saved URL
@@ -89,6 +92,20 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       if (url && !isValidHttpUrl(url)) { toast.error(`${label} isn’t a valid link.`); return; }
       row[key] = url || null;
     }
+    // Contact details are optional, but what's entered must be usable. Only
+    // written when changed, so a save still works before the migration lands.
+    const contact = {
+      contact_name: form.contact_name.trim().slice(0, 80) || null,
+      contact_email: form.contact_email.trim() || null,
+      contact_phone: form.contact_phone.trim() || null,
+    };
+    if (contact.contact_email && !cleanContactEmail(contact.contact_email)) { toast.error('That contact email doesn’t look right.'); return; }
+    if (contact.contact_phone) {
+      contact.contact_phone = cleanContactPhone(contact.contact_phone);
+      if (!contact.contact_phone) { toast.error('That contact phone number doesn’t look right — use digits, spaces and an optional +.'); return; }
+    }
+    const contactChanged = Object.keys(contact).some((key) => contact[key] !== (org[key] || null));
+    if (contactChanged) Object.assign(row, contact);
     setBusy(true);
     try {
       if (logoFile) row.logo_url = await uploadEventOrganiserLogo(logoFile);
@@ -119,8 +136,11 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       // Written with each video's added_at (kept for saved ones, stamped for
       // new ones) — the upload date its watch page reports.
       if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = eventVideosForSave(videos, org.videos);
-      const { data, error } = await supabase
-        .from('event_organisers').update(row).eq('id', org.id).select(ORGANISER_PAGE_COLUMNS).maybeSingle();
+      const write = (columns) => supabase
+        .from('event_organisers').update(row).eq('id', org.id).select(columns).maybeSingle();
+      let { data, error } = await write(ORGANISER_CONTACT_COLUMNS);
+      // The contact columns ship in a migration; without them, save the rest.
+      if (error && !contactChanged) ({ data, error } = await write(ORGANISER_PAGE_COLUMNS));
       if (error) throw error;
       // RLS refusing an update returns no row and no error.
       if (!data) throw new Error('You don’t have permission to edit this page.');
@@ -186,14 +206,39 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
             <Textarea id="org-desc" rows={5} maxLength={2000} value={form.description} onChange={set('description')} disabled={busy} placeholder="Who you are, what you run and where." />
             <p className="text-xs text-muted-foreground text-right">{form.description.length}/2000</p>
           </div>
+          <fieldset className="space-y-3 rounded-xl border border-border p-4">
+            <legend className="px-1 text-xs font-bold uppercase tracking-wide">Contact details</legend>
+            <p className="text-xs text-muted-foreground">
+              Optional. Anything you enter here is shown publicly on your page so traders and collectors can reach you.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="org-contact_name" className="text-xs font-bold uppercase tracking-wide">Contact name</Label>
+                <Input id="org-contact_name" maxLength={80} autoComplete="name" value={form.contact_name} onChange={set('contact_name')} placeholder="Who to ask for" disabled={busy} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="org-contact_email" className="text-xs font-bold uppercase tracking-wide">Contact email</Label>
+                <Input id="org-contact_email" type="email" inputMode="email" maxLength={254} autoComplete="email" value={form.contact_email} onChange={set('contact_email')} placeholder="hello@yourshow.com.au" disabled={busy} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="org-contact_phone" className="text-xs font-bold uppercase tracking-wide">Contact phone</Label>
+                <Input id="org-contact_phone" type="tel" inputMode="tel" maxLength={24} autoComplete="tel" value={form.contact_phone} onChange={set('contact_phone')} placeholder="0400 000 000" disabled={busy} />
+              </div>
+            </div>
+          </fieldset>
+          <fieldset className="space-y-3 rounded-xl border border-border p-4">
+            <legend className="px-1 text-xs font-bold uppercase tracking-wide">Website &amp; socials</legend>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {LINKS.map(([key, label, placeholder]) => (
+                <div key={key} className="space-y-1.5">
+                  <Label htmlFor={`org-${key}`} className="text-xs font-bold uppercase tracking-wide">{label}</Label>
+                  <Input id={`org-${key}`} inputMode="url" value={form[key]} onChange={set(key)} placeholder={placeholder} disabled={busy} />
+                </div>
+              ))}
+            </div>
+          </fieldset>
           <EventGalleryEditor value={albums} onChange={setAlbums} disabled={busy} />
           <EventVideosEditor value={videos} onChange={setVideos} disabled={busy} />
-          {LINKS.map(([key, label, placeholder]) => (
-            <div key={key} className="space-y-1.5">
-              <Label htmlFor={`org-${key}`} className="text-xs font-bold uppercase tracking-wide">{label}</Label>
-              <Input id={`org-${key}`} inputMode="url" value={form[key]} onChange={set(key)} placeholder={placeholder} disabled={busy} />
-            </div>
-          ))}
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
             <Button type="submit" disabled={busy} className="font-bold">
