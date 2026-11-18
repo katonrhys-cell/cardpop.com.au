@@ -16,11 +16,11 @@ const CardCropPreview = ({ originalUrl, croppedUrl, onApply, onAdjust, onDismiss
     <div className="grid grid-cols-2 gap-2 mb-3">
       <div>
         <p className="text-[10px] text-muted-foreground mb-1">Original</p>
-        <img src={originalUrl} alt="Original" className="w-full aspect-[5/7] object-cover rounded-lg border border-border" />
+        <img src={originalUrl} alt="Original" className="w-full aspect-[5/7] object-contain bg-muted/50 rounded-lg border border-border" />
       </div>
       <div>
         <p className="text-[10px] text-muted-foreground mb-1">Cropped</p>
-        <img src={croppedUrl} alt="Cropped card" className="w-full aspect-[5/7] object-cover rounded-lg border border-primary/40" />
+        <img src={croppedUrl} alt="Cropped card" className="w-full aspect-[5/7] object-contain bg-muted/50 rounded-lg border border-primary/40" />
       </div>
     </div>
     <div className="flex gap-2">

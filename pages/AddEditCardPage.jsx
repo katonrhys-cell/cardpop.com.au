@@ -1797,7 +1797,10 @@ const AddEditCardPage = () => {
                 <div className={`aspect-[3/4] bg-muted/50 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center relative overflow-hidden group transition-colors hover:border-primary/50 hover:bg-primary/5 ${errors.cardImage ? 'border-destructive' : 'border-border'}`}>
                   {imagePreview ? (
                     <>
-                      <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                      {/* object-contain: the whole photo, never a centre crop — a
+                          landscape photo shown with object-cover lost the card's
+                          edge and read as a broken upload. */}
+                      <img src={imagePreview} alt="Preview" className="w-full h-full object-contain" />
                       <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                         <p className="text-white font-medium flex items-center gap-2"><Upload className="w-4 h-4" /> Change Image</p>
                       </div>
