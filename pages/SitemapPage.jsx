@@ -2,70 +2,97 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/lib/supabaseClient.js';
 import SEOHead from '@/components/SEOHead.jsx';
-import { slugify } from '@/lib/slugify.js';
+import { STATIC_SECTIONS, SITE_INDEX_LIMITS, buildDynamicSections } from '@/utils/siteIndex.js';
 
-// Since this is a React app, we render an HTML sitemap for users,
-// but usually search engines hit /sitemap.xml which is served by a backend.
-// We provide this as a fallback HTML index of links.
+// The visitor-facing Site Index (linked from the footer). Search engines read
+// /sitemap.xml (api/sitemap.js); this is a page of links for people.
+// What each section holds is decided in utils/siteIndex.js.
+
+const today = () => new Date().toISOString().slice(0, 10);
+const rows = (result) => (result.status === 'fulfilled' && !result.value.error ? result.value.data ?? [] : []);
+
+async function loadSiteIndex() {
+  // Each list is bounded and reads only what its links need; one failing
+  // query leaves its section out, never the page.
+  const [listings, events, articles, players, stores] = await Promise.allSettled([
+    supabase.from('listings')
+      .select('id, slug, vault_item:vault_items(card_name, set_name, card_number, year)')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(SITE_INDEX_LIMITS.listings),
+    supabase.from('events_public')
+      .select('id, slug, title, start_date, state')
+      .eq('status', 'approved')
+      .gte('start_date', today())
+      .order('start_date', { ascending: true })
+      .limit(SITE_INDEX_LIMITS.events),
+    supabase.from('blog_articles')
+      .select('slug, title')
+      .eq('is_published', true)
+      .order('published_at', { ascending: false })
+      .limit(SITE_INDEX_LIMITS.articles),
+    supabase.from('players')
+      .select('slug, name')
+      .eq('is_published', true)
+      .order('name', { ascending: true })
+      .limit(SITE_INDEX_LIMITS.players),
+    supabase.from('local_game_stores')
+      .select('city')
+      .eq('status', 'approved')
+      .limit(SITE_INDEX_LIMITS.stores),
+  ]);
+  return buildDynamicSections({
+    listings: rows(listings), events: rows(events), articles: rows(articles), players: rows(players), stores: rows(stores),
+  });
+}
+
+const Section = ({ section }) => (
+  <section aria-labelledby={`site-index-${section.key}`} className="break-inside-avoid mb-10">
+    <h2 id={`site-index-${section.key}`} className="text-lg font-bold font-heading mb-3 border-b pb-2">
+      {section.title}
+    </h2>
+    <ul className="space-y-1">
+      {section.links.map((link) => (
+        <li key={link.path}>
+          <Link to={link.path} className="text-sm text-foreground hover:text-primary hover:underline py-1 inline-block">
+            {link.label}
+          </Link>
+          {link.note && <span className="text-xs text-muted-foreground ml-2">{link.note}</span>}
+        </li>
+      ))}
+    </ul>
+    {section.more && (
+      <Link to={section.more.path} className="text-sm font-semibold text-primary hover:underline mt-3 inline-block">
+        {section.more.label} →
+      </Link>
+    )}
+  </section>
+);
+
 const SitemapPage = () => {
-  const [links, setLinks] = useState([]);
+  const [dynamicSections, setDynamicSections] = useState([]);
 
   useEffect(() => {
-    const fetchSitemapData = async () => {
-      try {
-        const [vaultRes, shopRes] = await Promise.all([
-          supabase.from('vault_items').select('id, card_name').eq('is_public', true).limit(100),
-          supabase.from('listings').select('id, slug, vault_item_id, vault_item:vault_items(card_name)').eq('status', 'active').limit(100),
-        ]);
-
-        // Curated index of the main destinations, so the HTML sitemap is a real
-        // navigational fallback rather than just Home/Vault/Shop + listings.
-        const staticLinks = [
-          { label: 'Home', path: '/' },
-          { label: 'Marketplace', path: '/marketplace' },
-          { label: 'Shop', path: '/shop' },
-          { label: 'Analytics', path: '/analytics' },
-          { label: 'Card Prices (AUD)', path: '/prices' },
-          { label: 'Grading Hub', path: '/grading' },
-          { label: 'Card Shop Directory', path: '/card-shops' },
-          { label: 'Events', path: '/events' },
-          { label: 'Community', path: '/community' },
-          { label: 'Blog', path: '/blog' },
-          { label: 'Pricing & Plans', path: '/pricing' },
-          { label: 'About', path: '/about' },
-          { label: 'Contact', path: '/contact' },
-          { label: 'FAQ & Help', path: '/faq' },
-          { label: 'Shipping', path: '/shipping' },
-          { label: 'Returns & Refunds', path: '/returns' },
-          { label: 'Trust & Safety', path: '/trust-safety' },
-          { label: 'Terms of Service', path: '/terms' },
-          { label: 'Privacy Policy', path: '/privacy-policy' },
-        ];
-
-        const combined = [
-          ...staticLinks,
-          ...(vaultRes.data ?? []).map(i => ({ label: i.card_name || 'Vault Item', path: `/product/vault/${i.id}` })),
-          ...(shopRes.data ?? []).map(i => ({ label: i.vault_item?.card_name || 'Marketplace Listing', path: `/marketplace/${i.id}/${i.slug || slugify(i.vault_item?.card_name || 'Trading Card') || 'listing'}` })),
-        ];
-        
-        setLinks(combined);
-      } catch (err) {
-      }
-    };
-    fetchSitemapData();
+    let cancelled = false;
+    loadSiteIndex()
+      .then((sections) => { if (!cancelled) setDynamicSections(sections); })
+      .catch(() => { /* the static sections are already on screen */ });
+    return () => { cancelled = true; };
   }, []);
 
   return (
     <div className="container-default section-padding">
-      <SEOHead title="HTML Sitemap | CardPop" description="Site map for CardPop marketplace." />
-      <h1 className="text-3xl font-bold font-heading mb-8 border-b pb-4">Site Index</h1>
-      <div className="columns-1 md:columns-2 lg:columns-3 gap-8 space-y-4">
-        {links.map((link, idx) => (
-          <div key={idx} className="break-inside-avoid">
-            <Link to={link.path} className="text-primary hover:underline text-sm block py-1">
-              {link.label}
-            </Link>
-          </div>
+      <SEOHead
+        title="Site Index | CardPop"
+        description="Every section of CardPop in one place: cards for sale, card supplies, upcoming events, card shops by city, price guides, grading guides and articles."
+      />
+      <h1 className="text-3xl font-bold font-heading mb-2">Site Index</h1>
+      <p className="text-muted-foreground mb-8 border-b pb-4">
+        Every section of CardPop in one place. Cards listed here are for sale right now.
+      </p>
+      <div className="columns-1 md:columns-2 lg:columns-3 gap-10">
+        {[...STATIC_SECTIONS.slice(0, 1), ...dynamicSections, ...STATIC_SECTIONS.slice(1)].map((section) => (
+          <Section key={section.key} section={section} />
         ))}
       </div>
     </div>
