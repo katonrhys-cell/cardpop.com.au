@@ -76,6 +76,47 @@ export function organiserContact(org) {
   return { name, email, phone, telHref: phone ? `tel:${phone.replace(/[^0-9+]/g, '')}` : '' };
 }
 
+// What an event's Organiser tab knows about its organiser, and the organiser
+// page column each one belongs in: [event field, organiser column, label].
+const EVENT_ORGANISER_FIELDS = [
+  ['organizer_logo_url', 'logo_url', 'logo'],
+  ['website_url', 'website_url', 'website'],
+  ['instagram_url', 'instagram_url', 'Instagram'],
+  ['facebook_url', 'facebook_url', 'Facebook'],
+  ['youtube_channel_url', 'youtube_url', 'YouTube'],
+  ['tiktok_url', 'tiktok_url', 'TikTok'],
+  ['x_url', 'x_url', 'X'],
+  ['organizer_email', 'contact_email', 'contact email'],
+  ['organizer_phone', 'contact_phone', 'contact phone'],
+];
+const HTTP_URL_RE = /^https?:\/\/[^\s]+$/i;
+
+/**
+ * The organiser-page fields an event can fill in: `{ patch, labels }`. Only a
+ * column the page row actually has (so a read made before a migration landed
+ * never writes an unknown column) and has **blank** is filled — what is already
+ * on the page is never overwritten — and only with a value the column's CHECK
+ * would accept. Typing an organiser's details on one event then carries to
+ * their page instead of being entered twice.
+ */
+export function organiserBlanksFromEvent(org, event) {
+  const patch = {};
+  const labels = [];
+  if (!org || !event) return { patch, labels };
+  for (const [eventKey, orgKey, label] of EVENT_ORGANISER_FIELDS) {
+    if (!(orgKey in org) || String(org[orgKey] ?? '').trim()) continue;
+    const raw = String(event[eventKey] ?? '').trim();
+    let value = '';
+    if (orgKey === 'contact_email') value = cleanContactEmail(raw);
+    else if (orgKey === 'contact_phone') value = cleanContactPhone(raw);
+    else if (HTTP_URL_RE.test(raw)) value = raw;
+    if (!value) continue;
+    patch[orgKey] = value;
+    labels.push(label);
+  }
+  return { patch, labels };
+}
+
 /**
  * The page's meta description: the organiser's own words (whitespace collapsed,
  * cut to 155 characters at a word boundary) when they've written some, else
