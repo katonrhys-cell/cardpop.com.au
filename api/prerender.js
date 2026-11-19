@@ -333,6 +333,14 @@ const rowOrThrow = ({ data, error }, what) => {
   }
   return data ?? null;
 };
+// The list twin of rowOrThrow: a failed read must not pass for "no rows",
+// which pages turn into a 404 or a `noindex` (both edge-cached for an hour).
+const listOrThrow = ({ data, error }, what) => {
+  if (error && error.code !== '22P02') {
+    throw new Error(`[prerender] ${what} lookup failed: ${error.message}`);
+  }
+  return data || [];
+};
 // { status: 301, location } is a permanent redirect (e.g. a legacy
 // /product/shop/:id URL onto its canonical /shop/<category>/<slug>).
 const sendDoc = (res, doc) => {
@@ -993,14 +1001,14 @@ async function renderListing(supabase, id, slugParam) {
  */
 async function renderShopProductBySlug(supabase, categorySlug, productSlug, colour) {
   const columns = 'id, slug, category, colour, family_sku, status';
-  let { data: rows } = await supabase.from('shop_products').select(columns)
-    .in('status', PUBLIC_SHOP_STATUSES).eq('slug', productSlug);
-  if (!rows?.length) {
-    ({ data: rows } = await supabase.from('shop_products').select(columns)
+  let rows = listOrThrow(await supabase.from('shop_products').select(columns)
+    .in('status', PUBLIC_SHOP_STATUSES).eq('slug', productSlug), 'shop product slug');
+  if (!rows.length) {
+    rows = listOrThrow(await supabase.from('shop_products').select(columns)
       .in('status', PUBLIC_SHOP_STATUSES)
       .like('slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}-%`)
-      .not('family_sku', 'is', null));
-    rows = (rows || []).filter((r) => shopLineSlug(r) === productSlug);
+      .not('family_sku', 'is', null), 'shop product line')
+      .filter((r) => shopLineSlug(r) === productSlug);
   }
   if (!rows?.length) {
     // A slug the product used to have (renamed in Admin → Products, or the
@@ -1021,11 +1029,11 @@ async function renderShopProductBySlug(supabase, categorySlug, productSlug, colo
  * shopSlugRedirectTarget() does the exact line matching.
  */
 async function shopSlugRedirect(supabase, productSlug, colour) {
-  const { data } = await supabase
+  const data = listOrThrow(await supabase
     .from('shop_product_slug_redirects')
     .select('old_slug, product:shop_products(id, slug, category, colour, family_sku, status)')
-    .like('old_slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}%`);
-  const live = (data || []).filter((r) => r.product && PUBLIC_SHOP_STATUSES.includes(r.product.status));
+    .like('old_slug', `${productSlug.replace(/[%_\\]/g, '\\$&')}%`), 'shop slug redirect');
+  const live = data.filter((r) => r.product && PUBLIC_SHOP_STATUSES.includes(r.product.status));
   return shopSlugRedirectTarget(live, productSlug, colour);
 }
 
@@ -1572,9 +1580,12 @@ const LANDINGS = {
 async function shopProductSample(build) {
   const first = await build().order('availability_rank', { ascending: true }).order('created_at', { ascending: false }).limit(50);
   if (!first.error) return first.data || [];
-  if (!/availability_rank/.test(`${first.error.message || ''} ${first.error.details || ''}`)) return [];
-  const { data } = await build().order('created_at', { ascending: false }).limit(50);
-  return data || [];
+  // Only a missing availability_rank column (migration not landed) retries;
+  // any other failure is an outage, not an empty shelf.
+  if (!/availability_rank/.test(`${first.error.message || ''} ${first.error.details || ''}`)) {
+    return listOrThrow(first, 'shop products');
+  }
+  return listOrThrow(await build().order('created_at', { ascending: false }).limit(50), 'shop products');
 }
 
 async function renderLanding(supabase, path) {
@@ -1906,8 +1917,7 @@ async function renderEventsLanding(supabase, categorySlug, region = null) {
     .gte('start_date', today);
   if (cfg?.type) q = q.eq('event_type', cfg.type);
   if (region) q = q.eq('state', region.state);
-  const { data } = await q.order('start_date', { ascending: true }).limit(100);
-  const events = data || [];
+  const events = listOrThrow(await q.order('start_date', { ascending: true }).limit(100), 'events');
 
   const h1 = regionSeo ? regionSeo.heading : cfg ? cfg.h1 : 'Trading Card Events in Australia';
   const title = regionSeo ? regionSeo.title
@@ -1995,7 +2005,7 @@ async function renderEventOrganiser(supabase, slug) {
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
-  if (orgError) ({ data: org } = await readOrganiser(BASE_ORGANISER_COLUMNS));
+  if (orgError) org = rowOrThrow(await readOrganiser(BASE_ORGANISER_COLUMNS), 'organiser');
   if (!org) {
     return notFound({
       title: 'Organiser Not Found | CardPop Events',
@@ -3202,13 +3212,12 @@ async function renderForum(supabase) {
   const title = 'Community Forum | CardPop';
   const description = 'Join discussions with Australian trading card collectors. Talk market trends, trading, grading and more on CardPop.';
 
-  const { data } = await supabase
+  const posts = listOrThrow(await supabase
     .from('posts')
     .select('id, title, body, category, created_at')
     .eq('post_type', 'text')
     .order('created_at', { ascending: false })
-    .limit(40);
-  const posts = data || [];
+    .limit(40), 'forum posts');
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -3693,12 +3702,12 @@ ${sections}</main>`,
 }
 
 async function renderPriceCard(supabase, categorySlug, cardSlug) {
-  const { data: card } = await supabase
+  const card = rowOrThrow(await supabase
     .from('tracked_cards')
     .select('id, slug, name, set_name, card_number, category, blurb, image_url, player:players(slug, name)')
     .eq('slug', cardSlug)
     .eq('active', true)
-    .maybeSingle();
+    .maybeSingle(), 'price card');
 
   if (!card || card.category !== categorySlug) {
     return notFound({
@@ -3815,14 +3824,13 @@ ${faqHtml}
 // ─── Player pages (/players, /players/:slug) — docs/players.md ───────────────
 
 async function renderPlayersIndex(supabase) {
-  const { data } = await supabase
+  const players = listOrThrow(await supabase
     .from('players')
     .select('slug, name, sport, team, position, headline')
     .eq('is_published', true)
     .order('sort_order', { ascending: true })
     .order('name', { ascending: true })
-    .limit(500);
-  const players = data || [];
+    .limit(500), 'players');
   const canonical = `${BASE_URL}/players`;
   const { title, description } = PLAYERS_INDEX_SEO;
 
@@ -3880,12 +3888,12 @@ async function renderPlayer(supabase, rawSlug) {
   const slug = playerSlug(rawSlug);
   if (slug && slug !== rawSlug) return { status: 301, location: `${BASE_URL}${playerPath(slug)}` };
 
-  const { data: player } = await supabase
+  const player = rowOrThrow(await supabase
     .from('players')
     .select('id, slug, name, sport, team, position, nationality, born_on, born_year, career_span, headline, bio, collecting_notes, key_cards, image_url, created_at, updated_at')
     .eq('slug', slug)
     .eq('is_published', true)
-    .maybeSingle();
+    .maybeSingle(), 'player');
 
   if (!player) {
     return notFound({
@@ -4275,10 +4283,10 @@ ${productsHtml || '    <li>No products in stock right now — check back soon or
 // pages above link to. Built-in leaves plus the admin's shop_categories edits,
 // so a hidden category isn't served and a custom one is.
 async function renderShopCategory(supabase, rawSlug) {
-  const { data: categoryRows } = await supabase
+  const categoryRows = listOrThrow(await supabase
     .from('shop_categories')
-    .select('section_slug, name, description, hidden');
-  const leaf = shopCategoryLeaves(categoryRows || []).find((c) => c.slug === rawSlug);
+    .select('section_slug, name, description, hidden'), 'shop categories');
+  const leaf = shopCategoryLeaves(categoryRows).find((c) => c.slug === rawSlug);
   if (!leaf) return null; // Not a shop category — let the SPA handle it.
 
   const canonical = `${BASE_URL}/shop/category/${leaf.slug}`;

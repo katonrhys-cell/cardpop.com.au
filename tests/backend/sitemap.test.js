@@ -2,7 +2,7 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 
 // Each table's rows come from state.tables; paged queries are sliced by the
 // .range() they ask for, so the test can see whether paging walks past 1,000.
-const state = vi.hoisted(() => ({ tables: {}, ranges: {} }));
+const state = vi.hoisted(() => ({ tables: {}, ranges: {}, failing: new Set() }));
 
 vi.mock('@supabase/supabase-js', () => {
   const builder = (table) => {
@@ -19,6 +19,7 @@ vi.mock('@supabase/supabase-js', () => {
     b.then = (resolve, reject) => {
       const rows = state.tables[table] || [];
       const data = range ? rows.slice(range[0], range[1] + 1) : rows;
+      if (state.failing.has(table)) return Promise.resolve({ data: null, error: { message: 'timeout' } }).then(resolve, reject);
       return Promise.resolve({ data, error: null }).then(resolve, reject);
     };
     return b;
@@ -37,12 +38,12 @@ function run() {
     status(code) { this.statusCode = code; return this; },
     send(payload) { body = payload; return this; },
   };
-  return handler({ query: {} }, res).then(() => ({ status: res.statusCode, body }));
+  return handler({ query: {} }, res).then(() => ({ status: res.statusCode, body, headers: res.headers }));
 }
 
 const loc = (path) => `<loc>https://cardpop.com.au${path}</loc>`;
 
-beforeEach(() => { state.tables = {}; state.ranges = {}; });
+beforeEach(() => { state.tables = {}; state.ranges = {}; state.failing = new Set(); });
 
 describe('sitemap shop category pages', () => {
   it('lists categories that have products, with the newest product as lastmod', async () => {
@@ -319,5 +320,21 @@ describe('sitemap static page dates', () => {
     ];
     const { body } = await run();
     expect(lastmodOf(body, '/shop')).toBe(STATIC_PAGE_DATES['/shop'].lastmod);
+  });
+});
+
+describe('sitemap cache headers', () => {
+  it('is edge-cached when every section loaded', async () => {
+    const { status, headers } = await run();
+    expect(status).toBe(200);
+    expect(headers['Cache-Control']).toMatch(/s-maxage=3600/);
+  });
+
+  it('is not cached when a section failed, so the gap is not served for an hour', async () => {
+    state.failing.add('events');
+    const { status, headers, body } = await run();
+    expect(status).toBe(200);
+    expect(body).toContain('</urlset>');
+    expect(headers['Cache-Control']).toBe('no-store');
   });
 });
