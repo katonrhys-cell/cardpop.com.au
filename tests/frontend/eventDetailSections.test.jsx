@@ -365,7 +365,7 @@ describe('EventDetailCard — organiser links', () => {
   it('hides "Follow this event" and the trader button when no links are set', () => {
     renderCard(baseEvent);
     expect(screen.queryByText('Follow this event')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Apply for a Trader Table/ })).not.toBeInTheDocument();
   });
 
   it('links every organiser profile and the trader application page', () => {
@@ -382,14 +382,14 @@ describe('EventDetailCard — organiser links', () => {
     expect(screen.getByRole('link', { name: 'TikTok' })).toHaveAttribute('href', 'https://tiktok.com/@collectitcon');
     expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute('href', 'https://x.com/collectitcon');
     expect(screen.getByRole('link', { name: 'Discord' })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
-    expect(screen.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
+    expect(screen.getByRole('link', { name: /Apply for a Trader Table/ })).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
   });
 
   it('keeps the trader button off a past event', () => {
     render(
       <MemoryRouter><EventDetailCard event={{ ...baseEvent, vendor_application_url: 'https://collectitcon.com.au/traders' }} isPast /></MemoryRouter>,
     );
-    expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Apply for a Trader Table/ })).not.toBeInTheDocument();
   });
 });
 

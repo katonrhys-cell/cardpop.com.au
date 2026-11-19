@@ -1705,7 +1705,7 @@ const ORGANISER_LINKS = [
   ['tiktok_url', 'TikTok'],
   ['x_url', 'X (Twitter)'],
   ['discord_url', 'Discord'],
-  ['vendor_application_url', 'Apply for a trader table'],
+  ['vendor_application_url', 'Apply for a Trader Table'],
 ];
 const organiserLinksHtml = (event) => {
   const links = ORGANISER_LINKS

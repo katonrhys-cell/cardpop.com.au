@@ -10,7 +10,7 @@ them without parsing anything.
 |---|---|---|
 | Event Website | `website_url` | "Official Website" under Follow this event; `organizer.url` in JSON-LD; prerender |
 | Tickets / Registration URL | `ticket_url` | the **Get Tickets** button (routed through the member offer's referral link when one is set — `docs/event-ticket-offers.md`) |
-| Trader / Vendor Applications URL | `vendor_application_url` | **Apply for a trader table** button under the ticket/directions/calendar actions, upcoming events only |
+| Trader / Vendor Applications URL | `vendor_application_url` | **Apply for a Trader Table** button under the ticket/directions/calendar actions, upcoming events only |
 | Instagram URL | `instagram_url` | Follow this event; `organizer.sameAs` |
 | Facebook URL | `facebook_url` | Follow this event; `organizer.sameAs` |
 | YouTube Channel URL | `youtube_channel_url` | Follow this event; `organizer.sameAs` |
