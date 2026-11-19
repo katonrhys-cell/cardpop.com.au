@@ -1,6 +1,7 @@
 import { trackingUrl, carrierLabel, normalizeTrackingNumber } from '../../utils/shipmentTracking.js';
 import { MARKETPLACE_PROTECTION } from '../../utils/buyerProtectionPolicy.js';
 import { orderRef as formatOrderRef } from '../../utils/orderRef.js';
+import { EVENT_TYPE_LABELS } from '../../utils/eventTypes.js';
 
 /**
  * Shared HTML email template builder matching CardPop brand.
@@ -536,12 +537,6 @@ ${centred(`The refund goes back to your original payment method within ${MARKETP
 // community calendar. It's an internal heads-up, not a customer email, so it
 // links straight to the moderation queue rather than a public page.
 export function eventSubmittedEmail({ event, addedBy = null, byAdmin = false }) {
-  const EVENT_TYPE_LABELS = {
-    card_show: 'Card Show',
-    trade_event: 'Trade Event',
-    community_event: 'Community Event',
-    lgs_event: 'LGS Event',
-  };
   const STATUS_LABELS = {
     pending_review: 'Pending review',
     approved: 'Live',

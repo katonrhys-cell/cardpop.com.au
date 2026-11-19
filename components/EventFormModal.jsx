@@ -40,14 +40,14 @@ import {
   EVENT_IMAGE_ACCEPT, EVENT_URL_FIELDS,
 } from '@/utils/eventFormValidation.js';
 
+import {
+  EVENT_TYPES as SHARED_EVENT_TYPES, EVENT_FEATURE_GROUPS, EVENT_FEATURE_OPTIONS,
+  MAX_EVENT_FEATURE_LENGTH, cleanEventFeatures,
+} from '@/utils/eventTypes.js';
+
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 
-const EVENT_TYPES = [
-  { value: 'card_show',        label: 'Card Show' },
-  { value: 'trade_event',      label: 'Trade Event' },
-  { value: 'community_event',  label: 'Community Event' },
-  { value: 'lgs_event',        label: 'LGS (Local Game Store) Event' },
-];
+const EVENT_TYPES = SHARED_EVENT_TYPES.map(t => ({ value: t.value, label: t.formLabel }));
 
 const STATUS_OPTIONS = [
   { value: 'approved',       label: 'Approved (Live)' },
@@ -56,12 +56,6 @@ const STATUS_OPTIONS = [
   { value: 'cancelled',      label: 'Cancelled' },
   { value: 'completed',      label: 'Completed (archived — stays under Past Events)' },
   { value: 'rejected',       label: 'Rejected' },
-];
-
-const CARD_GAMES = [
-  'Pokémon', 'Magic: The Gathering', 'Yu-Gi-Oh!',
-  'One Piece', 'Flesh and Blood', 'Lorcana',
-  'Dragon Ball', 'Star Wars: Unlimited', 'MetaZoo',
 ];
 
 const INITIAL_STATE = {
@@ -586,6 +580,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const set = (field, value) => { markDirty(); setFormData(prev => ({ ...prev, [field]: value })); };
 
   const handleChange = (e) => set(e.target.name, e.target.value);
+
+  const [customFeature, setCustomFeature] = useState('');
+  const addCustomFeature = () => {
+    const text = customFeature.trim();
+    if (!text) return;
+    markDirty();
+    setFormData(prev => ({ ...prev, featured_card_games: cleanEventFeatures([...prev.featured_card_games, text]) }));
+    setCustomFeature('');
+  };
 
   const toggleCardGame = (game) => {
     markDirty();
@@ -1115,25 +1118,49 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                   </div>
                 )}
 
-                {/* Featured Card Games */}
-                <div className="space-y-2" role="group" aria-labelledby="featured_card_games_label">
-                  <p id="featured_card_games_label" className="text-sm font-bold leading-none">Featured Card Games</p>
-                  <div className="flex flex-wrap gap-2">
-                    {CARD_GAMES.map(game => (
-                      <button
-                        key={game} type="button"
-                        onClick={() => toggleCardGame(game)}
-                        aria-pressed={formData.featured_card_games.includes(game)}
-                        disabled={loading}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                          formData.featured_card_games.includes(game)
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted/40 text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
-                        }`}
-                      >
-                        {game}
-                      </button>
-                    ))}
+                {/* What's featured — card games, sports cards and other collectables */}
+                <div className="space-y-3" role="group" aria-labelledby="featured_card_games_label">
+                  <p id="featured_card_games_label" className="text-sm font-bold leading-none">
+                    What&rsquo;s Featured <span className="font-normal text-muted-foreground">(pick everything the event has)</span>
+                  </p>
+                  {[
+                    ...EVENT_FEATURE_GROUPS,
+                    { label: 'Added by you', options: formData.featured_card_games.filter(g => !EVENT_FEATURE_OPTIONS.includes(g)) },
+                  ].filter(group => group.options.length > 0).map(group => (
+                    <div key={group.label} className="space-y-1.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.options.map(game => (
+                          <button
+                            key={game} type="button"
+                            onClick={() => toggleCardGame(game)}
+                            aria-pressed={formData.featured_card_games.includes(game)}
+                            disabled={loading}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                              formData.featured_card_games.includes(game)
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-muted/40 text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+                            }`}
+                          >
+                            {game}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Input
+                      id="featured_custom"
+                      aria-label="Add something else the event features"
+                      value={customFeature}
+                      onChange={e => setCustomFeature(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomFeature(); } }}
+                      placeholder="Something else? Type it and press Add"
+                      maxLength={MAX_EVENT_FEATURE_LENGTH}
+                      className={inputCls}
+                      disabled={loading}
+                    />
+                    <Button type="button" variant="outline" onClick={addCustomFeature} disabled={loading || !customFeature.trim()}>Add</Button>
                   </div>
                 </div>
 
