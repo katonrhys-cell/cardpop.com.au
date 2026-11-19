@@ -164,7 +164,7 @@ export async function getOrCreateStripeCustomer(userId, email) {
  * Apply a Stripe subscription object to the owning profile. Resolves the user
  * from customer metadata first, falling back to the stored stripe_customer_id.
  */
-export async function applyStripeSubscription(subscription) {
+export async function applyStripeSubscription(subscription, { throwOnWriteError = false } = {}) {
   const customerId = subscription.customer;
   let userId = subscription.metadata?.userId;
 
@@ -226,6 +226,12 @@ export async function applyStripeSubscription(subscription) {
 
   if (error) {
     logger.error(`[SUB] Failed to apply Stripe subscription for ${userId}: ${error.message}`);
+    // From the webhook a swallowed failure is permanent: the event is recorded
+    // as processed and Stripe never redelivers it, so a member who paid stays
+    // on Hobby. Throwing answers 500 and Stripe retries (the write is
+    // idempotent). The in-app routes keep the old behaviour — the webhook
+    // that follows their Stripe call re-applies it.
+    if (throwOnWriteError) throw new Error(`profile write failed for ${userId}: ${error.message}`);
     return;
   }
   if (!updated?.length) {
@@ -250,6 +256,31 @@ export async function applyStripeSubscription(subscription) {
   }
 
   logger.info(`[SUB] ${userId} → ${status} (stripe ${subscription.id})`);
+}
+
+/**
+ * Webhook entry point for customer.subscription.created / .updated / .deleted.
+ *
+ * Stripe doesn't guarantee event order, and a yearly sign-up (charged at once,
+ * no trial) emits `created` with status `incomplete` and `updated` with
+ * `active` about a second apart. Applied as delivered, a late `created`
+ * dropped a member who had just paid to Hobby — and on a yearly plan nothing
+ * may correct it for a year. So for created/updated the subscription is read
+ * fresh from Stripe and the live state is applied, whichever event arrives
+ * last. `deleted` is final and applied as is. If the read fails the event's
+ * own copy is applied, as before.
+ */
+export async function applyStripeSubscriptionEvent(eventType, subscription) {
+  let live = subscription;
+  if (eventType !== 'customer.subscription.deleted' && subscription?.id) {
+    try {
+      live = await stripe.subscriptions.retrieve(subscription.id);
+    } catch (err) {
+      if (isStripeObjectMissing(err)) return;
+      logger.warn(`[SUB] Live read of ${subscription.id} failed, applying the event copy: ${err.message}`);
+    }
+  }
+  await applyStripeSubscription(live, { throwOnWriteError: true });
 }
 
 /** The subscription id an invoice bills — top-level before Stripe API 2025-03-31, under `parent` after. */

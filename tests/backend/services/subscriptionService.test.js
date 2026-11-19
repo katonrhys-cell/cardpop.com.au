@@ -5,7 +5,8 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 // status-mapping logic (and the thin getSubscriptionStatus reader) in isolation.
 const mockSupabase = vi.hoisted(() => ({ from: vi.fn() }));
 vi.mock('../../../src/utils/supabaseClient.js', () => ({ default: mockSupabase, supabase: mockSupabase }));
-vi.mock('../../../src/utils/stripeClient.js', () => ({ default: {} }));
+const mockStripe = vi.hoisted(() => ({ subscriptions: { retrieve: vi.fn() } }));
+vi.mock('../../../src/utils/stripeClient.js', () => ({ default: mockStripe }));
 vi.mock('../../../src/services/welcomeOfferService.js', () => ({ markTrialRedeemed: vi.fn() }));
 vi.mock('../../../src/services/partnerService.js', () => ({ recordSubscriptionReferral: vi.fn() }));
 
@@ -16,6 +17,7 @@ import {
   tierFromStripeSubscription,
   tierFromPaypalPlanId,
   applyStripeSubscription,
+  applyStripeSubscriptionEvent,
   applyPaypalSubscription,
   COMPLIMENTARY_STATUS,
 } from '../../../src/services/subscriptionService.js';
@@ -223,5 +225,45 @@ describe('complimentary memberships are never overwritten by provider events', (
       subscription_status: 'active', subscription_tier: 'pro', paypal_subscription_id: 'I-2',
     }));
     expect(markTrialRedeemed).toHaveBeenCalledWith('buyer');
+  });
+});
+
+describe('applyStripeSubscriptionEvent', () => {
+  function writer(result = { data: [{ id: 'u1' }], error: null }) {
+    const b = {
+      update: vi.fn(() => b), eq: vi.fn(() => b), neq: vi.fn(() => b),
+      select: vi.fn(() => Promise.resolve(result)),
+    };
+    mockSupabase.from.mockReturnValueOnce(b);
+    return b;
+  }
+  const incomplete = { id: 'sub_9', customer: 'cus_9', status: 'incomplete', metadata: { userId: 'u1', tier: 'pro' }, items: { data: [] } };
+
+  it('applies the live subscription, not a stale out-of-order event', async () => {
+    mockStripe.subscriptions.retrieve.mockResolvedValueOnce({ ...incomplete, status: 'active' });
+    const b = writer();
+    await applyStripeSubscriptionEvent('customer.subscription.created', incomplete);
+    expect(mockStripe.subscriptions.retrieve).toHaveBeenCalledWith('sub_9');
+    expect(b.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'active', subscription_tier: 'pro' }));
+  });
+
+  it('applies a deleted event as delivered', async () => {
+    const b = writer();
+    await applyStripeSubscriptionEvent('customer.subscription.deleted', { ...incomplete, status: 'canceled' });
+    expect(mockStripe.subscriptions.retrieve).not.toHaveBeenCalled();
+    expect(b.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'canceled', subscription_tier: 'free' }));
+  });
+
+  it('falls back to the event copy when the live read fails', async () => {
+    mockStripe.subscriptions.retrieve.mockRejectedValueOnce(new Error('timeout'));
+    const b = writer();
+    await applyStripeSubscriptionEvent('customer.subscription.updated', { ...incomplete, status: 'active' });
+    expect(b.update).toHaveBeenCalledWith(expect.objectContaining({ subscription_status: 'active' }));
+  });
+
+  it('throws when the profile write fails, so Stripe redelivers the event', async () => {
+    mockStripe.subscriptions.retrieve.mockResolvedValueOnce({ ...incomplete, status: 'active' });
+    writer({ data: null, error: { message: 'connection reset' } });
+    await expect(applyStripeSubscriptionEvent('customer.subscription.updated', incomplete)).rejects.toThrow(/profile write failed/);
   });
 });
