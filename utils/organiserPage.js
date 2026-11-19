@@ -15,6 +15,9 @@ export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums
 // 20261118232637_organiser_contact_details.sql; the organiser page tries this
 // set first, then ORGANISER_PAGE_COLUMNS and the older tiers.
 export const ORGANISER_CONTACT_COLUMNS = `${ORGANISER_PAGE_COLUMNS}, contact_name, contact_email, contact_phone`;
+// contact_url ships in 20261118233912_organiser_contact_url.sql; the organiser
+// page tries this set first, then ORGANISER_CONTACT_COLUMNS and the older tiers.
+export const ORGANISER_ENQUIRY_COLUMNS = `${ORGANISER_CONTACT_COLUMNS}, contact_url`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;
@@ -141,6 +144,15 @@ export function eventBlanksFromOrganiser(form, org) {
     labels.push(label);
   }
   return { patch, labels };
+}
+
+/**
+ * Where enquiries for this organiser go (their own contact form) — the
+ * "Contact" button at the top of the page. http(s) only, else ''.
+ */
+export function organiserContactUrl(org) {
+  const url = typeof org?.contact_url === 'string' ? org.contact_url.trim() : '';
+  return HTTP_URL_RE.test(url) ? url : '';
 }
 
 /**

@@ -1,10 +1,10 @@
 import React from 'react';
-import { Facebook, Instagram, Music2, Youtube } from 'lucide-react';
+import { FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import XIcon from '@/components/XIcon.jsx';
 import { creatorLinks } from '@/utils/eventVideos.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 
-const ICONS = { instagram: Instagram, youtube: Youtube, tiktok: Music2, facebook: Facebook, x: XIcon };
+const ICONS = { instagram: InstagramIcon, youtube: YouTubeIcon, tiktok: TikTokIcon, facebook: FacebookIcon, x: XIcon };
 
 // Who made a video — the creator's picture, name and social handles, shown
 // under the player (`creator` out of cleanVideoCreator, utils/eventVideos.js).
@@ -48,7 +48,7 @@ const VideoCreatorCredit = ({ creator }) => {
                     aria-label={`${name || 'Creator'} on ${label}${handle ? ` (${handle})` : ''}`}
                     className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-brand-red hover:text-brand-red"
                   >
-                    <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                    <Icon className="h-4 w-4 shrink-0" />
                     <span className="max-w-[11rem] truncate">{handle || label}</span>
                   </a>
                 </li>

@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { normalizeEventUrl, isValidHttpUrl } from '@/utils/eventFormValidation.js';
-import { ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, MAX_EXTRA_LOGOS, cleanContactEmail, cleanContactPhone } from '@/utils/organiserPage.js';
+import { ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, MAX_EXTRA_LOGOS, cleanContactEmail, cleanContactPhone } from '@/utils/organiserPage.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
@@ -45,6 +45,7 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     contact_name: org.contact_name || '',
     contact_email: org.contact_email || '',
     contact_phone: org.contact_phone || '',
+    contact_url: org.contact_url || '',
   }));
   const [logoFile, setLogoFile] = useState(null);
   // Joint organisers: more logos beside the main one. Each item is a saved URL
@@ -106,6 +107,12 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     }
     const contactChanged = Object.keys(contact).some((key) => contact[key] !== (org[key] || null));
     if (contactChanged) Object.assign(row, contact);
+    // The contact page (their own enquiry form) — the Contact button at the top
+    // of the page. Also only written when changed.
+    const contactUrl = normalizeEventUrl(form.contact_url) || null;
+    if (contactUrl && !isValidHttpUrl(contactUrl)) { toast.error('Contact page isn’t a valid link.'); return; }
+    const contactUrlChanged = contactUrl !== (org.contact_url || null);
+    if (contactUrlChanged) row.contact_url = contactUrl;
     setBusy(true);
     try {
       if (logoFile) row.logo_url = await uploadEventOrganiserLogo(logoFile);
@@ -138,9 +145,10 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = eventVideosForSave(videos, org.videos);
       const write = (columns) => supabase
         .from('event_organisers').update(row).eq('id', org.id).select(columns).maybeSingle();
-      let { data, error } = await write(ORGANISER_CONTACT_COLUMNS);
-      // The contact columns ship in a migration; without them, save the rest.
-      if (error && !contactChanged) ({ data, error } = await write(ORGANISER_PAGE_COLUMNS));
+      let { data, error } = await write(ORGANISER_ENQUIRY_COLUMNS);
+      // The contact columns ship in migrations; without them, save the rest.
+      if (error && !contactUrlChanged) ({ data, error } = await write(ORGANISER_CONTACT_COLUMNS));
+      if (error && !contactChanged && !contactUrlChanged) ({ data, error } = await write(ORGANISER_PAGE_COLUMNS));
       if (error) throw error;
       // RLS refusing an update returns no row and no error.
       if (!data) throw new Error('You don’t have permission to edit this page.');
@@ -223,6 +231,11 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
               <div className="space-y-1.5">
                 <Label htmlFor="org-contact_phone" className="text-xs font-bold uppercase tracking-wide">Contact phone</Label>
                 <Input id="org-contact_phone" type="tel" inputMode="tel" maxLength={24} autoComplete="tel" value={form.contact_phone} onChange={set('contact_phone')} placeholder="0400 000 000" disabled={busy} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label htmlFor="org-contact_url" className="text-xs font-bold uppercase tracking-wide">Contact page</Label>
+                <Input id="org-contact_url" inputMode="url" value={form.contact_url} onChange={set('contact_url')} placeholder="yoursite.com.au/contact" disabled={busy} />
+                <p className="text-xs text-muted-foreground">A link to your own contact form. Adds a Contact button at the top of the page that sends enquiries there, in place of the Message button.</p>
               </div>
             </div>
           </fieldset>
