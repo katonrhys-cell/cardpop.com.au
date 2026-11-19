@@ -18,6 +18,9 @@ export const ORGANISER_CONTACT_COLUMNS = `${ORGANISER_PAGE_COLUMNS}, contact_nam
 // contact_url ships in 20261118233912_organiser_contact_url.sql; the organiser
 // page tries this set first, then ORGANISER_CONTACT_COLUMNS and the older tiers.
 export const ORGANISER_ENQUIRY_COLUMNS = `${ORGANISER_CONTACT_COLUMNS}, contact_url`;
+// heading_style ships in 20261118234000_organiser_heading_style.sql; the
+// organiser page tries this set first, then ORGANISER_ENQUIRY_COLUMNS and the older tiers.
+export const ORGANISER_STYLED_COLUMNS = `${ORGANISER_ENQUIRY_COLUMNS}, heading_style`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;

@@ -17,7 +17,8 @@ import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import EventVideos from '@/components/events/EventVideos.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, organiserContact, organiserContactUrl, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
+import OrganiserHeading from '@/components/events/OrganiserHeading.jsx';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, ORGANISER_STYLED_COLUMNS, organiserContact, organiserContactUrl, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -87,9 +88,10 @@ export default function EventOrganiserPage() {
       try {
         const readOrganiser = (columns) => supabase
           .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
-        let { data: found, error: orgError } = await readOrganiser(ORGANISER_ENQUIRY_COLUMNS);
+        let { data: found, error: orgError } = await readOrganiser(ORGANISER_STYLED_COLUMNS);
         // The profile columns ship in a migration; fall back to the original
         // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_ENQUIRY_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
@@ -184,7 +186,7 @@ export default function EventOrganiserPage() {
               <OrganiserLogos org={org} />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Event organiser</p>
-                <h1 className={`font-serif font-extrabold text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`}>{name}</h1>
+                <OrganiserHeading name={name} headingStyle={org.heading_style} className={`text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`} />
                 <div className="flex flex-wrap items-center gap-2 mt-3">
                   {links.map(({ key, label, url }) => {
                     const Icon = LINK_ICONS[key];
@@ -325,7 +327,7 @@ export default function EventOrganiserPage() {
       )}
 
       {canEdit && editing && (
-        <OrganiserPageEditor org={org} open={editing} onOpenChange={setEditing} onSaved={(next) => setOrg((o) => ({ ...o, ...next }))} />
+        <OrganiserPageEditor org={org} isAdmin={isAdmin} open={editing} onOpenChange={setEditing} onSaved={(next) => setOrg((o) => ({ ...o, ...next }))} />
       )}
     </div>
   );

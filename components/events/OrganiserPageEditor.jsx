@@ -10,7 +10,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { normalizeEventUrl, isValidHttpUrl } from '@/utils/eventFormValidation.js';
-import { ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, MAX_EXTRA_LOGOS, cleanContactEmail, cleanContactPhone } from '@/utils/organiserPage.js';
+import { ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, ORGANISER_STYLED_COLUMNS, MAX_EXTRA_LOGOS, cleanContactEmail, cleanContactPhone } from '@/utils/organiserPage.js';
+import { cleanHeadingStyle } from '@/utils/organiserHeadingStyle.js';
+import OrganiserHeadingStyleField from '@/components/events/OrganiserHeadingStyleField.jsx';
 import { publicImageUrl } from '@/utils/imageUrl.js';
 import EventGalleryEditor, { emptyAlbum } from '@/components/events/EventGalleryEditor.jsx';
 import EventVideosEditor from '@/components/events/EventVideosEditor.jsx';
@@ -32,7 +34,7 @@ const LINKS = [
   ['linktree_url', 'Linktree', 'linktr.ee/yourshow'],
 ];
 
-export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }) {
+export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved, isAdmin = false }) {
   const [form, setForm] = useState(() => ({
     description: org.description || '',
     website_url: org.website_url || '',
@@ -59,6 +61,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
     ? savedAlbums.map((a) => ({ title: a.title, photos: a.images.map((url) => ({ url })) }))
     : [emptyAlbum()]));
   const [videos, setVideos] = useState(() => (savedVideos.length ? savedVideos : [emptyVideo()]));
+  // The heading set to match the logo — an admin tool (OrganiserHeadingStyleField).
+  const savedHeadingStyle = cleanHeadingStyle(org.heading_style, org.name);
+  const [headingStyle, setHeadingStyle] = useState(savedHeadingStyle);
   const [busy, setBusy] = useState(false);
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -143,9 +148,16 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
       // Written with each video's added_at (kept for saved ones, stamped for
       // new ones) — the upload date its watch page reports.
       if (JSON.stringify(nextVideos) !== JSON.stringify(savedVideos)) row.videos = eventVideosForSave(videos, org.videos);
+      // Only written when an admin changed it, so every other save still works
+      // before the heading_style migration has landed.
+      const nextHeadingStyle = cleanHeadingStyle(headingStyle, org.name);
+      const headingChanged = isAdmin && JSON.stringify(nextHeadingStyle) !== JSON.stringify(savedHeadingStyle);
+      if (headingChanged) row.heading_style = nextHeadingStyle;
       const write = (columns) => supabase
         .from('event_organisers').update(row).eq('id', org.id).select(columns).maybeSingle();
-      let { data, error } = await write(ORGANISER_ENQUIRY_COLUMNS);
+      let { data, error } = await write(headingChanged ? ORGANISER_STYLED_COLUMNS : ORGANISER_ENQUIRY_COLUMNS);
+      // A heading style can't be saved without its column, so don't retry without it.
+      if (headingChanged && error) throw error;
       // The contact columns ship in migrations; without them, save the rest.
       if (error && !contactUrlChanged) ({ data, error } = await write(ORGANISER_CONTACT_COLUMNS));
       if (error && !contactChanged && !contactUrlChanged) ({ data, error } = await write(ORGANISER_PAGE_COLUMNS));
@@ -181,6 +193,9 @@ export default function OrganiserPageEditor({ org, open, onOpenChange, onSaved }
             <input id="org-logo" type="file" accept={LOGO_ACCEPT} className="sr-only" onChange={pickLogo} disabled={busy} />
             <p className="text-xs text-muted-foreground">JPG, PNG, WebP, GIF or a short MP4/WebM loop, up to {LOGO_MAX_LABEL}.</p>
           </div>
+          {isAdmin && (
+            <OrganiserHeadingStyleField org={org} logoFile={logoFile} value={headingStyle} onChange={setHeadingStyle} disabled={busy} />
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="org-extra-logos" className="text-xs font-bold uppercase tracking-wide">More logos (joint organisers)</Label>
             {extras.length > 0 && (
