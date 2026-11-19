@@ -252,6 +252,7 @@ describe('POST /create-checkout', () => {
   it("charges the seller's counter amount, not the buyer's original offer, when checking out on a countered offer", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: null, error: null })                     // identity gate's offer read (valued from the listing)
       .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
@@ -281,6 +282,7 @@ describe('POST /create-checkout', () => {
   it('rejects an accepted offer whose seller is not the listing seller', async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: null, error: null })                     // identity gate's offer read (valued from the listing)
       .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
@@ -305,6 +307,7 @@ describe('POST /create-checkout', () => {
   it("charges the counter amount when the buyer accepted the counter first (status 'accepted', counter set)", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: null, error: null })                     // identity gate's offer read (valued from the listing)
       .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({
@@ -331,6 +334,7 @@ describe('POST /create-checkout', () => {
   it("rejects checkout on a 'pending' offer the seller never consented to", async () => {
     mockMaybeSingle
       .mockResolvedValueOnce({ data: { value: false }, error: null }) // email_verification_required (gate off)
+      .mockResolvedValueOnce({ data: null, error: null })                     // identity gate's offer read (valued from the listing)
       .mockResolvedValueOnce({ data: { value: 500 }, error: null })            // marketplace_identity_threshold_aud (identity gate)
       .mockResolvedValueOnce({ data: MOCK_LISTING, error: null }) // listing lookup
       .mockResolvedValueOnce({

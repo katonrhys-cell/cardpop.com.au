@@ -7,13 +7,15 @@ import { vi, describe, it, expect, beforeEach } from 'vitest';
 const state = vi.hoisted(() => ({
   profileResult: { data: { is_verified: true }, error: null },
   listingsResult: { data: [{ id: 'l1', price_aud: 100 }], error: null },
+  offerResult: { data: null, error: null },
   threshold: 500,
 }));
 const mockMaybeSingle = vi.hoisted(() => vi.fn(async () => state.profileResult));
+const mockOfferMaybeSingle = vi.hoisted(() => vi.fn(async () => state.offerResult));
 const mockIn = vi.hoisted(() => vi.fn(async () => state.listingsResult));
 const mockSupabase = vi.hoisted(() => ({
   from: vi.fn((table) => {
-    const chain = { select: () => chain, eq: () => chain, maybeSingle: mockMaybeSingle, in: mockIn };
+    const chain = { select: () => chain, eq: () => chain, maybeSingle: table === 'offers' ? mockOfferMaybeSingle : mockMaybeSingle, in: mockIn };
     chain.table = table;
     return chain;
   }),
@@ -58,6 +60,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   state.profileResult = { data: { is_verified: true }, error: null };
   state.listingsResult = { data: [{ id: 'l1', price_aud: 100 }], error: null };
+  state.offerResult = { data: null, error: null };
   state.threshold = 500;
 });
 
@@ -114,6 +117,30 @@ describe('requireIdentityForMarketplacePurchase', () => {
     const { res } = await run({ items: [{ type: 'listing', id: 'l1' }, { type: 'listing', id: 'l2' }, { type: 'shop', id: 's1' }] }, { id: 'u1' });
     expect(res.statusCode).toBe(403);
     expect(mockIn).toHaveBeenCalledWith('id', ['l1', 'l2']);
+  });
+
+  it('values an Expression of Interest listing at its minimum, not $0', async () => {
+    state.profileResult = { data: { is_verified: false }, error: null };
+    state.listingsResult = { data: [{ id: 'l1', price_aud: null, price_min_aud: 2000 }], error: null };
+    const { next, res } = await run({ listingId: 'l1' }, { id: 'u1' });
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('values an accepted offer at the offer amount', async () => {
+    state.profileResult = { data: { is_verified: false }, error: null };
+    state.listingsResult = { data: [{ id: 'l1', price_aud: null, price_min_aud: 100 }], error: null };
+    state.offerResult = { data: { listing_id: 'l1', amount_aud: 4000, counter_amount_aud: 5000 }, error: null };
+    const { next, res } = await run({ listingId: 'l1', offerId: 'o1' }, { id: 'u1' });
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('ignores an offer that is for a different listing', async () => {
+    state.profileResult = { data: { is_verified: false }, error: null };
+    state.offerResult = { data: { listing_id: 'other', amount_aud: 9000 }, error: null };
+    const { next } = await run({ listingId: 'l1', offerId: 'o1' }, { id: 'u1' });
+    expect(next).toHaveBeenCalledTimes(1);
   });
 
   it('a threshold of 0 requires ID on every marketplace order', async () => {

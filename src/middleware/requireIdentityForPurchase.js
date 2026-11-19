@@ -46,15 +46,37 @@ import {
 // Fails OPEN on an unexpected error so a transient DB blip never blocks an
 // otherwise-legitimate, authenticated buyer at the till.
 
-/** AUD value of the marketplace listings in the request, priced from the DB. */
-async function marketplaceValueAud(items, listingId) {
+/**
+ * AUD value of the marketplace listings in the request, priced from the DB.
+ *
+ * An Expression of Interest listing has no Buy Now price (`price_aud` is null;
+ * it carries `price_min_aud`), and an accepted offer is paid at the offer's
+ * amount, not the listing's. Pricing those as $0 let a high-value EOI sale
+ * skip the ID check entirely, so each listing counts as the largest of its
+ * Buy Now price, its EOI minimum and — when `offerId` is for that listing —
+ * the offer's (counter) amount.
+ */
+async function marketplaceValueAud(items, listingId, offerId) {
   const ids = new Set();
   for (const it of items) if (it && it.type === 'listing' && typeof it.id === 'string') ids.add(it.id);
   if (typeof listingId === 'string' && listingId) ids.add(listingId);
   if (ids.size === 0) return 0;
-  const { data, error } = await supabase.from('listings').select('id, price_aud').in('id', [...ids]);
+  const { data, error } = await supabase.from('listings').select('id, price_aud, price_min_aud').in('id', [...ids]);
   if (error) throw error;
-  return (data || []).reduce((sum, row) => sum + (Number(row.price_aud) || 0), 0);
+  const value = new Map((data || []).map((row) => [
+    row.id,
+    Math.max(Number(row.price_aud) || 0, Number(row.price_min_aud) || 0),
+  ]));
+  if (typeof offerId === 'string' && offerId) {
+    const { data: offer, error: offerError } = await supabase
+      .from('offers').select('listing_id, amount_aud, counter_amount_aud').eq('id', offerId).maybeSingle();
+    if (offerError) throw offerError;
+    if (offer && value.has(offer.listing_id)) {
+      const offered = Math.max(Number(offer.counter_amount_aud) || 0, Number(offer.amount_aud) || 0);
+      value.set(offer.listing_id, Math.max(value.get(offer.listing_id), offered));
+    }
+  }
+  return [...value.values()].reduce((sum, v) => sum + v, 0);
 }
 
 export async function requireIdentityForMarketplacePurchase(req, res, next) {
@@ -81,7 +103,7 @@ export async function requireIdentityForMarketplacePurchase(req, res, next) {
     // the old rule), and the ID check itself fails open below.
     let value = null;
     try {
-      value = await marketplaceValueAud(items, listingId);
+      value = await marketplaceValueAud(items, listingId, req.body?.offerId);
     } catch (priceErr) {
       logger.error(`[IDENTITY_GATE] listing price read failed for ${req.user.id}: ${priceErr.message}`);
     }
