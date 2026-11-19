@@ -10,6 +10,7 @@ import {
   cleanGallery,
   cleanPickups,
   normalizeReview,
+  dealsDoneOrNull,
   reviewPublishProblems,
   videoKind,
   cleanVideo,
@@ -113,6 +114,7 @@ describe('normalizeReview', () => {
       verdict: '  Worth the trip  ',
       ticket_paid_aud: '15',
       hours_spent: '',
+      deals_done: '7',
       crowd_level: 'busy',
       headline_pickup: '',
       gallery: [],
@@ -128,6 +130,7 @@ describe('normalizeReview', () => {
       verdict: 'Worth the trip',
       ticket_paid_aud: 15,
       hours_spent: null,
+      deals_done: 7,
       crowd_level: 'busy',
       headline_pickup: null,
       gallery: [],
@@ -137,6 +140,17 @@ describe('normalizeReview', () => {
       pickups: [],
     });
     expect(row).not.toHaveProperty('extra');
+  });
+
+  it('keeps deals done as a whole number, 0 or more', () => {
+    expect(dealsDoneOrNull('')).toBeNull();
+    expect(dealsDoneOrNull(null)).toBeNull();
+    expect(dealsDoneOrNull('0')).toBe(0);
+    expect(dealsDoneOrNull('4.7')).toBe(4);
+    expect(dealsDoneOrNull(-2)).toBeNull();
+    expect(dealsDoneOrNull('lots')).toBeNull();
+    expect(normalizeReview({}).deals_done).toBeNull();
+    expect(hasQuickFacts({ deals_done: 0 })).toBe(true);
   });
 
   it('lets a hand-set overall win over the average', () => {

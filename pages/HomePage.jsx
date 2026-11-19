@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import SEOHead from '@/components/SEOHead.jsx';
 import { Link } from 'react-router-dom';
-import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard } from 'lucide-react';
+import { ArrowRight, ShieldCheck, Zap, TrendingUp, Search, Users, Package, IdCard, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { getFeaturedCards, getFeaturedSellers, getPlatformStats, getTrafficSummary } from '@/lib/homepageData.js';
 import { useMediaQuery } from '@/hooks/useMediaQuery.js';
@@ -285,14 +285,14 @@ const PANEL_COLS = { 1: 'grid-cols-1', 2: 'grid-cols-2', 3: 'grid-cols-3' };
  * signed-out visitors) a "Join free" call to action.
  */
 
-const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-white border border-border', eyebrow, title, note, period, stats, inView, cta, testId }) => {
+const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-white border border-border', eyebrow, title, note, period, stats, inView, cta, testId, className = '' }) => {
   // `cta` is one { to, label } or a list of them, all in the same style.
   const ctas = (Array.isArray(cta) ? cta : [cta]).filter(Boolean);
   const fitEm = Math.max(0, ...stats.map((stat) => statWidthEm(statFigure(stat))));
   const allTimeFitEm = Math.max(0, ...stats.map((stat) => (stat.allTime > 0 ? statWidthEm(formatCount(stat.allTime)) : 0)));
   return (
     <div
-      className="relative flex flex-col rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6 md:p-7"
+      className={`relative flex flex-col rounded-2xl border border-border bg-background p-5 shadow-sm sm:p-6 md:p-7 ${className}`}
       data-testid={testId}
     >
       <div className="flex items-start justify-between gap-4">
@@ -362,18 +362,30 @@ const HomePage = () => {
   //   "Found on Google": Search Console impressions → clicks → GA4 visitors,
   //   each last-28-days with the all-time figure underneath; every tile
   //   hides itself below its floor or when its sync is stale (utils/siteTraffic.js).
-  //   "The CardPop community": cards in vaults, members, events — zero counts skipped.
+  //   "The CardPop community": cards in vaults, live products, members.
+  //   "CardPop at events": events we attended (published reviews), events
+  //   listed, deals we did at them. Zero counts are skipped everywhere.
   const googleStats = [
     ...publicSearchStats(trafficSummary),
     publicTrafficStat(trafficSummary),
   ].filter(Boolean);
   const communityStats = platformStats
     ? [
-        { key: 'vault',   value: platformStats.vaultCards, label: 'Cards in Member Vaults' },
-        { key: 'members', value: platformStats.sellers,    label: 'Active Members' },
-        { key: 'events',  value: platformStats.events,     label: 'Events Listed' },
+        { key: 'vault',   value: platformStats.vaultCards,   label: 'Cards in Member Vaults' },
+        { key: 'live',    value: platformStats.liveProducts, label: 'Live Products Listed' },
+        { key: 'members', value: platformStats.sellers,      label: 'Active Members' },
       ].filter((s) => s.value > 0)
     : [];
+  const eventStats = platformStats
+    ? [
+        { key: 'attended', value: platformStats.eventsAttended, label: 'Events We Attended' },
+        { key: 'events',   value: platformStats.events,         label: 'Events Listed' },
+        { key: 'deals',    value: platformStats.dealsDone,      label: 'Deals Done at Events' },
+      ].filter((s) => s.value > 0)
+    : [];
+  // Panels in the strip, in order. Two to a row on desktop; an odd one out
+  // takes the full width of its row rather than leaving a hole.
+  const statPanelCount = (googleStats.length > 0 ? 1 : 0) + 1 + (eventStats.length > 0 ? 1 : 0);
 
   const [statsRef, statsInView] = useRevealOnce('-80px');
   const [howRef, howInView] = useRevealOnce('-60px');
@@ -707,7 +719,7 @@ const HomePage = () => {
       {communityStats.length >= 2 && (
         <section ref={statsRef} className="py-8 md:py-12 border-y border-border bg-card" aria-label="CardPop by the numbers">
           <div className="max-w-[90rem] mx-auto px-5 sm:px-8 lg:px-12 xl:px-16">
-            <div className={`grid gap-4 md:gap-6 ${googleStats.length ? 'lg:grid-cols-2' : ''}`}>
+            <div className={`grid gap-4 md:gap-6 ${statPanelCount > 1 ? 'lg:grid-cols-2' : ''}`}>
               {googleStats.length > 0 && (
                 <StatPanel
                   testId="stats-google"
@@ -731,6 +743,18 @@ const HomePage = () => {
                 inView={statsInView}
                 cta={isAuthenticated ? null : { to: '/signup', label: 'Join free' }}
               />
+              {eventStats.length > 0 && (
+                <StatPanel
+                  testId="stats-events"
+                  icon={CalendarDays}
+                  title="CardPop at events"
+                  note="Shows we've been to and reviewed, and every event on our calendar"
+                  stats={eventStats}
+                  inView={statsInView}
+                  cta={{ to: '/events', label: 'See events' }}
+                  className={statPanelCount % 2 === 1 ? 'lg:col-span-2' : ''}
+                />
+              )}
             </div>
           </div>
         </section>

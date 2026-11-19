@@ -3,11 +3,12 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeAll, vi } from 'vitest';
 
-// The home page stats strip is two panels: "Found on Google" (Search Console
-// impressions → clicks → GA4 visitors) and "The CardPop community" (cards in
-// vaults, members, events) with a Join free nudge for signed-out visitors.
-// Live Listings is no longer a tile. Every figure is a real count: the Google
-// panel only appears once the nightly sync has figures over the public floors.
+// The home page stats strip is up to three panels: "Found on Google" (Search
+// Console impressions → clicks → GA4 visitors), "The CardPop community" (cards
+// in vaults, live products, members) with a Join free nudge for signed-out
+// visitors, and "CardPop at events" (events we attended, events listed, deals
+// done). Every figure is a real count and zero tiles hide themselves; the
+// Google panel only appears once the nightly sync has figures over the floors.
 
 vi.mock('@/components/SEOHead.jsx', () => ({ default: () => null }));
 vi.mock('@/components/HeroCardShowcase.jsx', () => ({ default: () => null }));
@@ -17,10 +18,11 @@ vi.mock('@/components/FeaturedSellerCard.jsx', () => ({ default: () => null }));
 vi.mock('@/lib/heroShowcase.js', () => ({ fetchActiveShowcaseCards: async () => [] }));
 vi.mock('@/lib/supabaseClient.js', () => ({ supabase: {} }));
 
-const state = vi.hoisted(() => ({ traffic: null, authed: false }));
+const baseStats = { sellers: 79, vaultCards: 47, events: 86, liveProducts: 132, eventsAttended: 9, dealsDone: 214 };
+const state = vi.hoisted(() => ({ traffic: null, authed: false, stats: null }));
 vi.mock('@/lib/queryCache.js', () => ({
   cachedQuery: async (key) => {
-    if (key.includes('stats')) return { data: { sellers: 79, vaultCards: 47, events: 86 }, error: null };
+    if (key.includes('stats')) return { data: state.stats, error: null };
     if (key.includes('traffic')) return { data: state.traffic, error: null };
     return { data: [], error: null };
   },
@@ -66,6 +68,7 @@ describe('HomePage stats strip', () => {
   it('shows the Google panel beside the community panel, with no Live Listings tile', async () => {
     state.traffic = freshSummary();
     state.authed = false;
+    state.stats = baseStats;
     renderHome();
 
     const google = await screen.findByTestId('stats-google');
@@ -93,22 +96,40 @@ describe('HomePage stats strip', () => {
     const community = screen.getByTestId('stats-community');
     expect(community).toHaveTextContent('Cards in Member Vaults');
     expect(community).toHaveTextContent('Active Members');
-    expect(community).toHaveTextContent('Events Listed');
+    expect(community).toHaveTextContent('Live Products Listed');
+    expect(community).not.toHaveTextContent('Events Listed');
     expect(community).toHaveTextContent('Join free');
     expect(screen.getAllByRole('link', { name: /join free/i })[0]).toHaveAttribute('href', '/signup');
     // List event moved out of the panel, under the Featured events section.
     expect(community).not.toHaveTextContent('List event');
 
     expect(screen.queryByText('Live Listings')).toBeNull();
+
+    // Events panel: attended (published reviews), listed, deals done.
+    const events = screen.getByTestId('stats-events');
+    expect(events).toHaveTextContent('CardPop at events');
+    expect(events).toHaveTextContent('Events We Attended');
+    expect(events).toHaveTextContent('Events Listed');
+    expect(events).toHaveTextContent('Deals Done at Events');
+    // Three panels: the odd one out spans the full row on desktop.
+    expect(events.className).toContain('lg:col-span-2');
   });
 
   it('keeps the community panel on its own when there are no Google figures, and drops the nudge for members', async () => {
     state.traffic = null;
     state.authed = true;
+    state.stats = { ...baseStats, eventsAttended: 0, dealsDone: 0 };
     renderHome();
 
     const community = await screen.findByTestId('stats-community');
-    expect(community).toHaveTextContent('Events Listed');
+    expect(community).toHaveTextContent('Cards in Member Vaults');
+    // Zero tiles hide themselves; the events panel keeps Events Listed and
+    // sits beside the community panel, so it doesn't span.
+    const events = screen.getByTestId('stats-events');
+    expect(events).toHaveTextContent('Events Listed');
+    expect(events).not.toHaveTextContent('Events We Attended');
+    expect(events).not.toHaveTextContent('Deals Done');
+    expect(events.className).not.toContain('lg:col-span-2');
     expect(screen.queryByTestId('stats-google')).toBeNull();
     expect(screen.queryByText('Join free')).toBeNull();
     expect(community).not.toHaveTextContent('List event');

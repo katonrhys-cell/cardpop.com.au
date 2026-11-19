@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, MapPin, Ticket, Clock, Users, Sparkles, ArrowUpRight } from 'lucide-react';
+import { CalendarDays, MapPin, Ticket, Clock, Users, Sparkles, ArrowUpRight, Handshake } from 'lucide-react';
 import { CROWD_LEVEL_MAP, formatAud, formatHours, hasQuickFacts } from '@/utils/eventReview.js';
 import { eventPath, formatEventLocation } from '@/lib/eventSeo.js';
 
@@ -52,6 +52,7 @@ const EventReviewQuickFacts = ({ review, event }) => {
         {location && location !== 'Venue TBA' && <Fact icon={MapPin} label="Where">{location}</Fact>}
         {ticket && <Fact icon={Ticket} label="Entry paid">{ticket}</Fact>}
         {hours && <Fact icon={Clock} label="Time on the floor">{hours}</Fact>}
+        {review.deals_done != null && <Fact icon={Handshake} label="Deals done">{Number(review.deals_done).toLocaleString('en-AU')}</Fact>}
         {crowd && <Fact icon={Users} label="Crowd">{crowd.label} <span className="font-normal text-muted-foreground">· {crowd.desc}</span></Fact>}
         {review.headline_pickup && <Fact icon={Sparkles} label="Headline pickup">{review.headline_pickup}</Fact>}
       </div>

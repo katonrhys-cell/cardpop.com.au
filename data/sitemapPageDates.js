@@ -2,7 +2,7 @@
 // The day each static sitemap page's source files last changed
 // (data/sitemapPageSources.js). Regenerate after changing a listed page.
 export const STATIC_PAGE_DATES = {
-  "/": { lastmod: '2026-11-19', hash: 'c8de0cf1f75edf7d' },
+  "/": { lastmod: '2026-11-19', hash: '79c1e1c0a4e75982' },
   "/about": { lastmod: '2026-11-17', hash: 'be600e08f51af7a8' },
   "/accessibility": { lastmod: '2026-06-20', hash: '75f997898dd81a90' },
   "/analytics": { lastmod: '2026-10-17', hash: '70ab05866f4dc167' },
