@@ -35,7 +35,7 @@ import { processRefund } from '../services/refundService.js';
 import { connectOnboard, getConnectStatus, getDashboardLink, withdrawHeldBalance } from '../services/connectService.js';
 import { createIdentitySession, getIdentityStatus, applyIdentitySession } from '../services/identityService.js';
 import { reconcilePendingOrders } from '../services/pendingOrderAlertService.js';
-import { applyStripeSubscription, handleSubscriptionInvoiceFailed, sendTrialEndingReminder, sendRenewalReminder, applyMembershipCardFromSession } from '../services/subscriptionService.js';
+import { applyStripeSubscription, applyStripeSubscriptionEvent, handleSubscriptionInvoiceFailed, sendTrialEndingReminder, sendRenewalReminder, applyMembershipCardFromSession } from '../services/subscriptionService.js';
 import { ensureWalletCustomer, getWalletBalanceCents, handleWalletTopup, assertNoOpenWalletCheckout, reserveWalletCheckout, releaseWalletCheckout } from '../services/walletService.js';
 import { validateShippingAddress, checkAustralianAddress, AU_ONLY_MESSAGE } from '../utils/addressValidation.js';
 import { requireEmailVerified } from '../middleware/requireEmailVerified.js';
@@ -926,7 +926,7 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
       case 'customer.subscription.created':
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
-        await applyStripeSubscription(event.data.object);
+        await applyStripeSubscriptionEvent(event.type, event.data.object);
         break;
 
       case 'customer.subscription.trial_will_end':

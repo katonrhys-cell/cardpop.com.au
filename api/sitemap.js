@@ -431,6 +431,12 @@ export default async function handler(req, res) {
     // only, not the whole sitemap.
     const rows = (i) =>
       (dbData?.[i]?.status === 'fulfilled' ? dbData[i].value.data : null) ?? [];
+    // A section that failed or timed out is missing from this copy. It is
+    // still valid XML worth answering with, but it must not be what the edge
+    // serves for the next hour (stale for a day): every event, listing and
+    // article URL in that section would vanish from Google's view of the site.
+    const degraded = dbData.some((r) => r.status === 'rejected' || r.value?.error);
+    if (degraded) res.setHeader('Cache-Control', 'no-store');
     const articles = rows(0);
     const listings = rows(1);
     const dealers = rows(2);
@@ -767,6 +773,7 @@ export default async function handler(req, res) {
     return res.status(200).send(parts.join('\n'));
   } catch (err) {
     console.error('Sitemap generation error:', err);
+    res.setHeader('Cache-Control', 'no-store');
     const fallbackParts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       URLSET_OPEN,

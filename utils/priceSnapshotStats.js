@@ -61,9 +61,17 @@ export function isNotTheCard(title, cardText = '') {
   return false;
 }
 
+// Titles that mention grading only to say the copy is raw: "Not Graded",
+// "Ungraded", "raw", "PSA ready / worthy / candidate", "not PSA". Matched
+// first, so these cheap raw copies no longer drag the graded figures down.
+// "PSA 10 candidate" names a grade but describes a raw card.
+export const RAW_MARKER_RE = /\b(?:not|non)[\s-]?(?:graded|slabbed)\b|\bungraded\b|\braw\b|\b(?:psa|bgs|cgc|sgc|grade|grading)\s*(?:\d+(?:\.5)?\s*)?(?:ready|worthy|candidate|potential|prospect)\b|\bnot\s+(?:psa|bgs|cgc|sgc|beckett)\b/i;
+
 /** True when the title describes a graded / slabbed copy. */
 export function isGradedTitle(title) {
-  return GRADED_RE.test(String(title || ''));
+  const t = String(title || '');
+  if (RAW_MARKER_RE.test(t)) return false;
+  return GRADED_RE.test(t);
 }
 
 /** Listings within OUTLIER_FACTOR× of the group's median price. */

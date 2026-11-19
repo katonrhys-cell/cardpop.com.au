@@ -45,6 +45,16 @@ const slugify = (text) =>
     .replace(/[\s_-]+/g, '-')
     .replace(/^-+|-+$/g, '');
 
+// While typing, keep a trailing hyphen: slugify() trims it, so on every
+// keystroke "card-" snapped back to "card" and a separator could never be
+// typed (only pasted). The full slugify() runs on save.
+const slugDraft = (text) =>
+  String(text || '').toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+/, '');
+
 const parseHTMLFile = (htmlText) => {
   const parser = new DOMParser();
   const doc = parser.parseFromString(htmlText, 'text/html');
@@ -177,7 +187,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
     try {
       const payload = {
         title: title.trim(),
-        slug: slug.trim() || slugify(title.trim()),
+        slug: slugify(slug) || slugify(title.trim()),
         excerpt: excerpt.trim() || null,
         content: content.trim() || null,
         author: author.trim() || null,
@@ -299,7 +309,7 @@ const ArticleEditorModal = ({ isOpen, onClose, article, onSave }) => {
             <Label>Slug</Label>
             <Input
               value={slug}
-              onChange={e => setSlug(slugify(e.target.value))}
+              onChange={e => setSlug(slugDraft(e.target.value))}
               placeholder="url-friendly-slug"
               className="font-mono text-sm"
             />

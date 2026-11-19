@@ -69,3 +69,20 @@ describe('price snapshot listing filters', () => {
     expect(priceStats([11, 12, 13, 14, 15, 16, 17, 18, 19, 20])).toEqual({ avg: 15.5, min: 12, max: 19, count: 8 });
   });
 });
+
+describe('isGradedTitle — raw copies that mention grading', () => {
+  it.each([
+    'Charizard Base Set NM - Not Graded',
+    'Charizard raw PSA ready',
+    'Charizard PSA 10 candidate ungraded',
+    'Charizard (not PSA BGS)',
+    'Charizard non-graded near mint',
+  ])('treats "%s" as raw', (title) => {
+    expect(isGradedTitle(title)).toBe(false);
+  });
+
+  it('still recognises real slabs', () => {
+    expect(isGradedTitle('Charizard PSA 10 GEM MINT')).toBe(true);
+    expect(isGradedTitle('Graded PSA 9 Charizard straw hat')).toBe(true);
+  });
+});

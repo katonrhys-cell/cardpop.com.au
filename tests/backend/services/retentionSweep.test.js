@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldEmailAbandoned, watchlistAlertFor, parseSavedSearch, savedSearchMayHaveNew } from '../../../src/services/retentionSweepService.js';
+import { shouldEmailAbandoned, watchlistAlertFor, parseSavedSearch, savedSearchMayHaveNew, supersededBy } from '../../../src/services/retentionSweepService.js';
 
 const NOW = new Date('2026-10-04T08:00:00Z');
 const hoursAgo = (h) => new Date(NOW.getTime() - h * 3600 * 1000).toISOString();
@@ -70,5 +70,18 @@ describe('savedSearchMayHaveNew', () => {
   });
   it('checks every search when the newest listing is unknown', () => {
     expect(savedSearchMayHaveNew(search, undefined)).toBe(true);
+  });
+});
+
+describe('supersededBy (abandoned-checkout reminder)', () => {
+  const order = { id: 'a', created_at: '2026-11-18T01:00:00Z' };
+  it('skips an attempt the buyer paid for on a later checkout', () => {
+    expect(supersededBy(order, [order, { id: 'b', status: 'payment_confirmed', created_at: '2026-11-18T01:05:00Z' }])).toBe('paid later');
+  });
+  it('sends one reminder per buyer, not one per abandoned attempt', () => {
+    expect(supersededBy(order, [{ id: 'c', status: 'cancelled', created_at: '2026-11-17T23:00:00Z', abandoned_email_sent_at: '2026-11-18T00:30:00Z' }])).toBe('already reminded');
+  });
+  it('still sends when nothing later was paid', () => {
+    expect(supersededBy(order, [order, { id: 'd', status: 'payment_confirmed', created_at: '2026-11-10T00:00:00Z' }, { id: 'e', status: 'pending', created_at: '2026-11-18T02:00:00Z' }])).toBeNull();
   });
 });

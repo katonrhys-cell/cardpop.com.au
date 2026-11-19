@@ -430,6 +430,8 @@ const App = () => {
                         <Route path="/account/verification" element={<Navigate to="/verify-identity" replace />} />
                         <Route path="/account/seller-tier" element={<ProtectedRoute><AccountSellerTier /></ProtectedRoute>} />
                         <Route path="/account/orders" element={<ProtectedRoute><AccountOrders /></ProtectedRoute>} />
+                        {/* Receipts sent before 2026-11-19 linked to /orders/<id>, which never existed. */}
+                        <Route path="/orders/:orderId" element={<Navigate to="/account/orders" replace />} />
                         <Route path="/account/sales" element={<ProtectedRoute><AccountSales /></ProtectedRoute>} />
                         <Route path="/account/events" element={<ProtectedRoute><AccountEvents /></ProtectedRoute>} />
                         <Route path="/account/shows" element={<ProtectedRoute><AccountShows /></ProtectedRoute>} />

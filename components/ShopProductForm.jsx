@@ -127,6 +127,10 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
   const fileInputRef = useRef(null);
   // Stock as loaded when the form opened — see stockEdited().
   const originalStockRef = useRef(null);
+  // True once the edited product's cost row has been read. Until then the
+  // cost / supplier fields are blank because they haven't arrived, not
+  // because the admin cleared them, and Save must not delete the row.
+  const costLoadedRef = useRef(true);
   // Built-in + admin-added categories (Admin → Products → Categories).
   const { groups: categoryGroups, categories: shopCategories } = useShopCategoryGroups();
   const knownCategoryNames = shopCategories.map((c) => c.name);
@@ -172,12 +176,15 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
           setRemovedVariantIds([]);
         });
       // Cost is admin-only and in its own table; fetch it for the edit form.
+      costLoadedRef.current = false;
       supabase
         .from('shop_product_costs')
         .select('wholesale_ex_gst_aud, wholesale_inc_gst_aud, supplier, supplier_url, supplier_price_aud, supplier_price_currency, supplier_price_status, supplier_price_error, supplier_price_checked_at, supplier_price_changed_at')
         .eq('product_id', product.id)
         .maybeSingle()
-        .then(({ data }) => {
+        .then(({ data, error }) => {
+          if (error) return; // leave the cost row alone on save
+          costLoadedRef.current = true;
           setSupplierWatch(data?.supplier_url ? data : null);
           if (!data) return;
           setFormData((prev) => ({
@@ -190,6 +197,7 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
         });
     } else {
       originalStockRef.current = null;
+      costLoadedRef.current = true;
       setFormData(INITIAL_STATE);
       setSupplierWatch(null);
       setVariants([]);
@@ -452,8 +460,12 @@ const ShopProductForm = ({ product = null, onSuccess, onCancel }) => {
       }
 
       // Cost row: upsert when a cost or supplier link was entered, remove when
-      // all of them are cleared.
-      if (productId) {
+      // all of them are cleared — but only once the existing row was read
+      // (saving before it arrived, or after the read failed, deleted the
+      // wholesale cost and supplier link with no message).
+      if (productId && !costLoadedRef.current) {
+        toast.warning('Product saved. The wholesale cost and supplier link were left unchanged — they had not loaded yet.');
+      } else if (productId) {
         if (costEx !== null || supplierUrl || supplierName) {
           const costRow = {
             product_id: productId,

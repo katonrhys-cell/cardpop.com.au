@@ -16,7 +16,7 @@ import Turnstile from '@/components/Turnstile.jsx';
 import { TURNSTILE_ENABLED } from '@/lib/turnstile.js';
 import { renderSurveyOptIn } from '@/lib/googleCustomerReviews.js';
 import { trackPurchase } from '@/lib/analytics.js';
-import { takePaidLines } from '@/lib/checkoutPaidLines.js';
+import { takePaidLines, claimCheckoutSession } from '@/lib/checkoutPaidLines.js';
 import { CHECKOUT_FORM_STORAGE_KEY } from '@/pages/CheckoutPage.jsx';
 import { MARKETPLACE_PROTECTION } from '@/utils/buyerProtectionPolicy.js';
 
@@ -172,7 +172,7 @@ const CheckoutSuccessPage = () => {
           });
         }
         // Only empty the cart once payment is actually confirmed.
-        if (paid && !singleItem) {
+        if (paid && !singleItem && claimCheckoutSession(sessionId)) {
           // Remove the lines this checkout paid for; anything else (the cards
           // a shop-only checkout left behind) stays. No record → the old
           // behaviour, an empty cart.

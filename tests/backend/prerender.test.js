@@ -1911,3 +1911,28 @@ describe('prerender terms of service and operating entity', () => {
     expect((await run('/faq')).body).not.toContain('ABN 51 824 753 556');
   });
 });
+
+// Site audit 2026-11-19: these pages read the database without checking the
+// error, so a Supabase blip answered 404 (or 200 + noindex), edge-cached for an
+// hour, telling Googlebot to drop good URLs. An outage must be a 503 / no-store.
+describe('prerender during a database outage', () => {
+  it.each([
+    '/prices/pokemon/charizard-base-set',
+    '/players/luka-doncic',
+    '/players',
+    '/community/forum',
+    '/events/organisers/acme-card-shows',
+    '/card-shows/melbourne',
+    '/shop/category/penny-sleeves',
+    '/shop/sealed-boxes',
+    '/shop/penny-sleeves/cardpop-house-sleeves',
+  ])('answers 503 no-store, not a cacheable 404 / noindex, for %s', async (path) => {
+    const outage = { data: null, error: { message: 'canceling statement due to statement timeout', code: '57014' } };
+    state.result = outage;
+    state.listResult = outage;
+    state.rpcResult = outage;
+    const { status, headers } = await run(path);
+    expect(status).toBe(503);
+    expect(headers['Cache-Control']).toBe('no-store');
+  });
+});

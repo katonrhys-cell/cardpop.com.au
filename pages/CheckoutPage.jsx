@@ -301,6 +301,18 @@ const CheckoutPage = () => {
       setSavedAddresses(list);
       if (!prefilledRef.current) {
         prefilledRef.current = true;
+        // A form restored from this tab (a reload, or back from ID
+        // verification) is what the buyer typed — perhaps a gift recipient's
+        // address. Keep it, and only point the picker at the saved address it
+        // matches; overwriting it with the default sent parcels to the wrong
+        // place when the buyer didn't look again.
+        const typed = savedForm?.shippingData;
+        if (typed?.address) {
+          const same = (row) => (row.address_line1 || '').trim().toLowerCase() === String(typed.address).trim().toLowerCase()
+            && String(row.postcode || '') === String(typed.postcode || '');
+          setSelectedAddressId(list.find(same)?.id || '__new');
+          return;
+        }
         const def = list[0];
         setSelectedAddressId(def.id);
         setShippingData((prev) => ({ ...addressRowToShipping(def, currentUser.email || prev.email || '') }));
