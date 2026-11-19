@@ -69,7 +69,8 @@ describe('HomePage stats strip', () => {
     renderHome();
 
     const google = await screen.findByTestId('stats-google');
-    expect(google).toHaveTextContent('Found on Google');
+    expect(google).toHaveTextContent('Collectors find CardPop on Google');
+    expect(google).not.toHaveTextContent('Found on Google');
     // Funnel order: shown on Google → clicked → visited.
     const labels = [...google.querySelectorAll('div.text-center')].map((el) => el.textContent);
     expect(labels[0]).toContain('Google Search impressions');

@@ -303,8 +303,8 @@ const StatPanel = ({ icon: Icon, iconSrc, iconTile = 'bg-white border border-bor
               : <Icon className="h-5 w-5" aria-hidden="true" />}
           </span>
           <div className="leading-tight">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>
-            <p className="mt-0.5 text-sm font-semibold text-foreground sm:text-base">{title}</p>
+            {eyebrow && <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p>}
+            <p className={`${eyebrow ? 'mt-0.5 ' : ''}text-sm font-semibold text-foreground sm:text-base`}>{title}</p>
           </div>
         </div>
         {ctas.length > 0 && (
@@ -713,7 +713,6 @@ const HomePage = () => {
                   testId="stats-google"
                   iconSrc="/images/google-g.png"
                   iconTile="bg-white border border-border"
-                  eyebrow="Found on Google"
                   title="Collectors find CardPop on Google"
                   period={TRAFFIC_WINDOW_LABEL}
                   note="Google Search Console and Google Analytics, updated nightly"
