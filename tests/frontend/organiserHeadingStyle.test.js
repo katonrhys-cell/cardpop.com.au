@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
-import path from 'node:path';
+import { resolve } from 'node:path';
+import process from 'node:process';
 import {
   cleanHeadingStyle, headingFontFaces, headingSegmentCss, HEADING_FONTS, HEADING_FONT_KEYS,
 } from '@/utils/organiserHeadingStyle.js';
@@ -97,7 +98,7 @@ describe('heading CSS and fonts', () => {
 
   it('every font has a self-hosted file, a fallback and a description for the reader', () => {
     for (const key of HEADING_FONT_KEYS) {
-      const file = path.resolve(__dirname, '../../public/fonts/heading', `${key}.woff2`);
+      const file = resolve(process.cwd(), 'public/fonts/heading', `${key}.woff2`);
       expect(fs.existsSync(file), `${key}.woff2 is missing`).toBe(true);
       expect(fs.readFileSync(file).subarray(0, 4).toString('latin1')).toBe('wOF2');
       expect(HEADING_FONTS[key].family).toMatch(/^[A-Za-z0-9 ]+$/);
