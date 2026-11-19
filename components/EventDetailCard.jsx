@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
+import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Globe, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
 import { eventTypeStyle, facebookEmbedUrl, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import XIcon from '@/components/XIcon.jsx';
+import TraderTableIcon from '@/components/icons/TraderTableIcon.jsx';
+import { DiscordIcon, FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
@@ -75,13 +77,13 @@ const EventDetailCard = ({ event, isPast = false }) => {
   // This event's own links (the event form's Organiser tab) as icon-only
   // buttons. The organiser's own profile links live on their organiser page.
   const followLinks = [
-    { key: 'instagram', label: 'Instagram', url: event.instagram_url, Icon: Instagram, iconClass: 'text-pink-600' },
-    { key: 'facebook', label: 'Facebook', url: event.facebook_url, Icon: Facebook, iconClass: 'text-blue-600' },
-    { key: 'youtube', label: 'YouTube', url: event.youtube_channel_url, Icon: Youtube, iconClass: 'text-red-600' },
-    { key: 'tiktok', label: 'TikTok', url: event.tiktok_url, Icon: Music2, iconClass: '' },
-    { key: 'x', label: 'X', url: event.x_url, Icon: XIcon, iconClass: '' },
-    { key: 'discord', label: 'Discord', url: event.discord_url, Icon: MessageCircle, iconClass: 'text-indigo-500' },
-    { key: 'website', label: 'Event website', url: event.website_url, Icon: Globe, iconClass: 'text-primary' },
+    { key: 'instagram', label: 'Instagram', url: event.instagram_url, Icon: InstagramIcon, iconClass: 'w-5 h-5' },
+    { key: 'facebook', label: 'Facebook', url: event.facebook_url, Icon: FacebookIcon, iconClass: 'w-5 h-5' },
+    { key: 'youtube', label: 'YouTube', url: event.youtube_channel_url, Icon: YouTubeIcon, iconClass: 'w-5 h-5' },
+    { key: 'tiktok', label: 'TikTok', url: event.tiktok_url, Icon: TikTokIcon, iconClass: 'w-5 h-5' },
+    { key: 'x', label: 'X', url: event.x_url, Icon: XIcon, iconClass: 'w-4 h-4' },
+    { key: 'discord', label: 'Discord', url: event.discord_url, Icon: DiscordIcon, iconClass: 'w-5 h-5' },
+    { key: 'website', label: 'Event website', url: event.website_url, Icon: Globe, iconClass: 'w-4 h-4 text-primary' },
   ].filter((l) => l.url);
 
   const handleShare = (platform) => {
@@ -140,7 +142,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
             title stops at the divider between About This Event and Event Details,
             and the logo sits in the sidebar column above Event Details. */}
         <div className={hasLogo ? 'grid grid-cols-1 lg:grid-cols-3 gap-0' : ''}>
-        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
+        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border lg:flex lg:flex-col lg:justify-center' : 'px-5 pt-5 md:px-10 md:pt-8'}>
           <div className="flex flex-wrap items-center gap-2">
           {(() => {
             const style = eventTypeStyle(event);
@@ -417,7 +419,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
               {event.vendor_application_url && (
                 <Button variant="outline" className="w-full h-12 border-border hover:bg-muted font-bold" asChild>
                   <a href={event.vendor_application_url} target="_blank" rel="noopener noreferrer">
-                    <Store className="w-5 h-5 mr-2" /> Apply for a trader table
+                    <TraderTableIcon className="w-5 h-5 mr-2" /> Apply for a Trader Table
                   </a>
                 </Button>
               )}
@@ -431,7 +433,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
                   {followLinks.map(({ key, label, url, Icon, iconClass }) => (
                     <Button key={key} variant="outline" size="icon" className="rounded-full w-10 h-10 border-border hover:bg-muted" asChild>
                       <a href={url} target="_blank" rel="noopener noreferrer" aria-label={label} title={label}>
-                        <Icon className={`w-4 h-4 ${iconClass}`} />
+                        <Icon className={iconClass} />
                       </a>
                     </Button>
                   ))}

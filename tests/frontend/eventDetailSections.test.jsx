@@ -365,7 +365,7 @@ describe('EventDetailCard — organiser links', () => {
   it('hides "Follow this event" and the trader button when no links are set', () => {
     renderCard(baseEvent);
     expect(screen.queryByText('Follow this event')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Apply for a Trader Table/ })).not.toBeInTheDocument();
   });
 
   it('links every organiser profile and the trader application page', () => {
@@ -383,7 +383,7 @@ describe('EventDetailCard — organiser links', () => {
     expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute('href', 'https://x.com/collectitcon');
     expect(screen.getByRole('link', { name: 'Discord' })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
     // In the sidebar under the ticket button, and in the Vendor Information section.
-    const apply = screen.getAllByRole('link', { name: /Apply for a trader table/ });
+    const apply = screen.getAllByRole('link', { name: /Apply for a Trader Table/ });
     expect(apply).toHaveLength(2);
     for (const a of apply) expect(a).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
   });
@@ -406,7 +406,7 @@ describe('EventDetailCard — organiser links', () => {
     const v = within(section);
     expect(v.getByRole('heading', { name: 'Vendor Information' })).toBeInTheDocument();
     expect(v.getByText('Tables are 6ft with two chairs.')).toBeInTheDocument();
-    expect(v.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://toyfair.test/vendors');
+    expect(v.getByRole('link', { name: /Apply for a Trader Table/ })).toHaveAttribute('href', 'https://toyfair.test/vendors');
     expect(v.getByRole('link', { name: /Vendor FAQs/ })).toHaveAttribute('href', 'https://toyfair.test/faq');
     expect(v.getByRole('link', { name: /Trader Pack/ })).toHaveAttribute('href', 'https://cdn.test/vendor-info/pack.pdf');
     expect(v.getByRole('button', { name: 'Is power included?' })).toBeInTheDocument();
@@ -427,7 +427,7 @@ describe('EventDetailCard — organiser links', () => {
     render(
       <MemoryRouter><EventDetailCard event={{ ...baseEvent, vendor_application_url: 'https://collectitcon.com.au/traders' }} isPast /></MemoryRouter>,
     );
-    expect(screen.queryByRole('link', { name: /Apply for a trader table/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Apply for a Trader Table/ })).not.toBeInTheDocument();
   });
 });
 

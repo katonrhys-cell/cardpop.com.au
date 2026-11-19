@@ -126,3 +126,51 @@ describe('organiserBlanksFromEvent', () => {
     expect(organiserBlanksFromEvent(null, event)).toEqual({ patch: {}, labels: [] });
   });
 });
+
+describe('eventBlanksFromOrganiser', () => {
+  const org = {
+    logo_url: 'https://cdn.test/logo.png', website_url: 'https://org.test', instagram_url: 'https://instagram.com/org',
+    facebook_url: 'javascript:alert(1)', youtube_url: 'https://youtube.com/@org', tiktok_url: '', x_url: null,
+    contact_email: 'hi@org.test', contact_phone: 'call me',
+  };
+
+  it('fills only the blank form fields, with usable values', async () => {
+    const { eventBlanksFromOrganiser } = await import('@/utils/organiserPage.js');
+    const form = { organizer_logo_url: '', website_url: 'https://event.test', instagram_url: '  ', youtube_channel_url: '', organizer_email: '' };
+    expect(eventBlanksFromOrganiser(form, org)).toEqual({
+      patch: {
+        organizer_logo_url: 'https://cdn.test/logo.png',
+        instagram_url: 'https://instagram.com/org',
+        youtube_channel_url: 'https://youtube.com/@org',
+        organizer_email: 'hi@org.test',
+      },
+      labels: ['logo', 'Instagram', 'YouTube', 'contact email'],
+    });
+  });
+
+  it('is empty without an organiser or a form', async () => {
+    const { eventBlanksFromOrganiser } = await import('@/utils/organiserPage.js');
+    expect(eventBlanksFromOrganiser({}, null)).toEqual({ patch: {}, labels: [] });
+    expect(eventBlanksFromOrganiser(null, org)).toEqual({ patch: {}, labels: [] });
+  });
+});
+
+describe('organiser contact page link', () => {
+  it('is read only in the top column set, behind the contact-details tier', async () => {
+    const m = await import('@/utils/organiserPage.js');
+    expect(m.ORGANISER_ENQUIRY_COLUMNS).toContain('contact_url');
+    expect(m.ORGANISER_ENQUIRY_COLUMNS).toContain('contact_email');
+    expect(m.ORGANISER_CONTACT_COLUMNS).not.toContain('contact_url');
+  });
+
+  it('admits http(s) links only and is not a social profile', async () => {
+    const { organiserContactUrl, organiserLinks } = await import('@/utils/organiserPage.js');
+    const url = 'https://events.ticketleap.com/event/2149932/contact';
+    expect(organiserContactUrl({ contact_url: ` ${url} ` })).toBe(url);
+    expect(organiserContactUrl({ contact_url: 'javascript:alert(1)' })).toBe('');
+    expect(organiserContactUrl({ contact_url: 'mailto:a@b.com' })).toBe('');
+    expect(organiserContactUrl({})).toBe('');
+    expect(organiserContactUrl(null)).toBe('');
+    expect(organiserLinks({ contact_url: url })).toEqual([]);
+  });
+});

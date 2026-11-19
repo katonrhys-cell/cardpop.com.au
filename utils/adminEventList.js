@@ -3,6 +3,7 @@
 // testable without rendering the page — the same shape as
 // utils/adminProductList.js for the Shop Products table.
 import { isPastEvent } from '@/utils/eventPast.js';
+import { EVENT_TYPES } from '@/utils/eventTypes.js';
 
 export const EVENT_STATUS_OPTIONS = [
   { value: 'approved',       label: 'Live' },
@@ -13,12 +14,7 @@ export const EVENT_STATUS_OPTIONS = [
   { value: 'rejected',       label: 'Rejected' },
 ];
 
-export const EVENT_TYPE_OPTIONS = [
-  { value: 'card_show',       label: 'Card Show' },
-  { value: 'trade_event',     label: 'Trade Event' },
-  { value: 'community_event', label: 'Community Event' },
-  { value: 'lgs_event',       label: 'LGS Event' },
-];
+export const EVENT_TYPE_OPTIONS = EVENT_TYPES.map((t) => ({ value: t.value, label: t.label }));
 
 export const EVENT_STATE_OPTIONS = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA']
   .map((s) => ({ value: s, label: s }));

@@ -15,6 +15,12 @@ export const ORGANISER_PAGE_COLUMNS = `${ORGANISER_LINK_COLUMNS}, gallery_albums
 // 20261118232637_organiser_contact_details.sql; the organiser page tries this
 // set first, then ORGANISER_PAGE_COLUMNS and the older tiers.
 export const ORGANISER_CONTACT_COLUMNS = `${ORGANISER_PAGE_COLUMNS}, contact_name, contact_email, contact_phone`;
+// contact_url ships in 20261118233912_organiser_contact_url.sql; the organiser
+// page tries this set first, then ORGANISER_CONTACT_COLUMNS and the older tiers.
+export const ORGANISER_ENQUIRY_COLUMNS = `${ORGANISER_CONTACT_COLUMNS}, contact_url`;
+// heading_style ships in 20261118234000_organiser_heading_style.sql; the
+// organiser page tries this set first, then ORGANISER_ENQUIRY_COLUMNS and the older tiers.
+export const ORGANISER_STYLED_COLUMNS = `${ORGANISER_ENQUIRY_COLUMNS}, heading_style`;
 
 // A joint organiser: the primary logo plus up to this many more.
 export const MAX_EXTRA_LOGOS = 5;
@@ -115,6 +121,41 @@ export function organiserBlanksFromEvent(org, event) {
     labels.push(label);
   }
   return { patch, labels };
+}
+
+/**
+ * The other direction: the event-form fields an organiser's page can fill in,
+ * `{ patch, labels }`. Only a form field that is **blank** is filled — what is
+ * already on the event is never overwritten — and only with a value the page
+ * holds in a usable shape. `organizer_logo_url` is in the patch when the page
+ * has a logo; the form decides whether its own logo slot is empty. The form
+ * shows what was filled so it can be checked before saving.
+ */
+export function eventBlanksFromOrganiser(form, org) {
+  const patch = {};
+  const labels = [];
+  if (!org || !form) return { patch, labels };
+  for (const [eventKey, orgKey, label] of EVENT_ORGANISER_FIELDS) {
+    if (String(form[eventKey] ?? '').trim()) continue;
+    const raw = String(org[orgKey] ?? '').trim();
+    let value = '';
+    if (orgKey === 'contact_email') value = cleanContactEmail(raw);
+    else if (orgKey === 'contact_phone') value = cleanContactPhone(raw);
+    else if (HTTP_URL_RE.test(raw)) value = raw;
+    if (!value) continue;
+    patch[eventKey] = value;
+    labels.push(label);
+  }
+  return { patch, labels };
+}
+
+/**
+ * Where enquiries for this organiser go (their own contact form) — the
+ * "Contact" button at the top of the page. http(s) only, else ''.
+ */
+export function organiserContactUrl(org) {
+  const url = typeof org?.contact_url === 'string' ? org.contact_url.trim() : '';
+  return HTTP_URL_RE.test(url) ? url : '';
 }
 
 /**

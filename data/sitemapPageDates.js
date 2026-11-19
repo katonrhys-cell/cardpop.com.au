@@ -13,7 +13,7 @@ export const STATIC_PAGE_DATES = {
   "/blog/category/*": { lastmod: '2026-11-07', hash: '4a1f9e1a428c8158' },
   "/collections": { lastmod: '2026-11-11', hash: 'e5c0c89bee5a1405' },
   "/collections/*": { lastmod: '2026-11-17', hash: '98521a9b83828957' },
-  "/community": { lastmod: '2026-11-17', hash: 'a9654aadbf2b765a' },
+  "/community": { lastmod: '2026-11-19', hash: '639c895b91dcc672' },
   "/community/building-your-business": { lastmod: '2026-10-03', hash: '422362dd33493d71' },
   "/community/local-traders": { lastmod: '2026-11-17', hash: 'b5df037d27db0e07' },
   "/contact": { lastmod: '2026-11-17', hash: '7b73267cf7f78239' },

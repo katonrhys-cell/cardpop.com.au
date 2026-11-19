@@ -9,7 +9,7 @@ it in one place — admins and an event's own organiser alike.
 
 | Field | Where | Notes |
 |---|---|---|
-| Trader / Vendor Applications URL | `events.vendor_application_url` | moved here from the Organiser tab; still the "Apply for a trader table" button |
+| Trader / Vendor Applications URL | `events.vendor_application_url` | moved here from the Organiser tab; still the "Apply for a Trader Table" button |
 | Information for vendors | `vendor_info.intro` | free text, 3,000 chars |
 | Vendor documents | `vendor_info.documents` `[{ title, url }]` | PDF or image, 20 MB, up to 10 — uploaded on save into the `events` bucket at `vendor-info/<uuid>.<ext>` (`utils/uploadEventVendorFile.js`; never a `Date.now()` name, which would make the bucket look for a thumbnail) |
 | Vendor links | `vendor_info.links` `[{ label, url }]` | up to 6, http(s) only; a link with no label reads "More vendor info" |

@@ -100,6 +100,16 @@ and a toast names what was added. The **Also add these details to the
 organiser's page** tick (on by default) is the admin's check before anything is
 published there. Only an exact name match is filled — a joint "A & B" name is not.
 
+**…and the organiser's page fills the event form.** Opening an event in the
+admin form (or picking a **Saved Organiser** in either form) reads that
+organiser's page and fills the form's **blank** logo, website, Instagram,
+Facebook, YouTube, TikTok, X, contact email and contact phone
+(`loadOrganiserDetails()` + the pure `eventBlanksFromOrganiser()`). Nothing
+already on the event is replaced, a note on the Organiser tab names what was
+filled, and nothing is written until the event is saved. A name matching more
+than one organiser page (a joint "A & B") is left alone. Tickets, waitlist and
+trader-application links are per event and are never filled.
+
 An organiser page carries website, Instagram, Facebook, YouTube, **TikTok, X and
 Linktree** links (`event_organisers.*_url`, http(s) only by a CHECK constraint;
 TikTok / X / Linktree arrived in `20261116110000_organiser_tiktok_x_linktree_links.sql`).
@@ -108,6 +118,17 @@ The owner edits them in **Edit page** (`components/events/OrganiserPageEditor.js
 buttons and the prerender's `Organization.sameAs` read. To add another, extend
 `LINK_FIELDS` + `ORGANISER_PAGE_COLUMNS` there, the editor's `LINKS`, and the
 page's `LINK_ICONS`.
+
+## Contact link
+
+`event_organisers.contact_url` (`20261118233912_organiser_contact_url.sql`,
+http(s) only) is where enquiries for the organiser should go — their own contact
+form. An admin or the page's owner sets it as **Contact page** in **Edit page**.
+When set, the page shows a **Contact** button at the top and in *Feedback &
+questions*, opening that page in a new tab **in place of** the on-site Message
+button; cleared, the Message flow (`docs/organiser-messages.md`) is back. Read it
+through `organiserContactUrl()`; it is not a social profile, so it stays out of
+`organiserLinks()` and `Organization.sameAs`.
 
 ## Messages from collectors
 

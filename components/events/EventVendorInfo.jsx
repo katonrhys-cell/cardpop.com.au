@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { isPdfUrl, isImageUrl, safeVendorUrl, VENDOR_INFO_ANCHOR } from '@/utils/eventVendorInfo.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import TraderTableIcon from '@/components/icons/TraderTableIcon.jsx';
 
 // The event page's "Vendor Information" section (events.vendor_info, cleaned
 // by cleanVendorInfo, + vendor_application_url): the organiser's words, the
@@ -28,7 +29,7 @@ const EventVendorInfo = ({ info, applicationUrl = '', isPast = false }) => {
           {apply && (
             <Button className="font-bold gap-2" asChild>
               <a href={apply} target="_blank" rel="noopener noreferrer">
-                <Store className="w-4 h-4" /> Apply for a trader table
+                <TraderTableIcon className="w-4 h-4" /> Apply for a Trader Table
               </a>
             </Button>
           )}

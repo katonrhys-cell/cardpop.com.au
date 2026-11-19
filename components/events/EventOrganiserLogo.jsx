@@ -23,7 +23,7 @@ export default function EventOrganiserLogo({ event, className = '', caption = tr
       playsInline
       aria-label={alt}
       onError={() => setFailed(true)}
-      className="max-h-28 md:max-h-36 w-auto max-w-full object-contain"
+      className="max-h-20 md:max-h-24 w-auto max-w-full object-contain"
       data-testid="organiser-logo-video"
     />
   ) : (
@@ -33,7 +33,7 @@ export default function EventOrganiserLogo({ event, className = '', caption = tr
       loading="eager"
       decoding="async"
       onError={() => setFailed(true)}
-      className="max-h-28 md:max-h-36 w-auto max-w-full object-contain"
+      className="max-h-20 md:max-h-24 w-auto max-w-full object-contain"
       data-testid="organiser-logo"
     />
   );
