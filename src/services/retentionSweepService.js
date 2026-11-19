@@ -114,6 +114,50 @@ async function profileContact(userId) {
   return { email: data?.email || null, name: data?.display_name || data?.username || null };
 }
 
+// Order statuses that mean the buyer paid.
+const PAID_ORDER_STATUSES = ['payment_confirmed', 'shipped', 'delivered', 'completed', 'disputed'];
+
+const orderHasListing = (order, listingId) => order?.listing_id === listingId
+  || lines(order).some((l) => l && (l.type === 'listing' || l.type === undefined) && l.id === listingId);
+
+/**
+ * Did this buyer pay, or get the reminder for, another checkout after this
+ * one? Every visit to the payment step writes its own `pending` order, so a
+ * buyer who changed their address and paid on a second attempt left the first
+ * attempt behind — and was emailed "your cart is waiting" for cards they had
+ * bought, once per abandoned attempt. Exported for tests.
+ */
+export function supersededBy(order, siblings) {
+  const created = new Date(order.created_at).getTime();
+  for (const o of siblings || []) {
+    if (!o || o.id === order.id) continue;
+    if (PAID_ORDER_STATUSES.includes(o.status) && new Date(o.created_at).getTime() >= created) return 'paid later';
+    if (o.abandoned_email_sent_at) return 'already reminded';
+  }
+  return null;
+}
+
+async function buyerRecentOrders(order, since) {
+  let q = supabase.from('orders').select('id, status, created_at, abandoned_email_sent_at').gte('created_at', since).limit(50);
+  q = order.buyer_id ? q.eq('buyer_id', order.buyer_id) : q.eq('buyer_email', order.buyer_email);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+/** True when the watcher is the one who bought the listing. */
+async function watcherBoughtListing(userId, listingId) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('listing_id, order_items')
+    .eq('buyer_id', userId)
+    .in('status', PAID_ORDER_STATUSES)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data || []).some((o) => orderHasListing(o, listingId));
+}
+
 // ── 1. Abandoned checkouts ──────────────────────────────────────────────────
 
 export async function abandonedCheckouts({ limit = 40, now = new Date(), deadline = null } = {}) {
@@ -134,6 +178,12 @@ export async function abandonedCheckouts({ limit = 40, now = new Date(), deadlin
     try {
       const decision = shouldEmailAbandoned(order, now);
       if (!decision.send) { out.skipped += 1; continue; }
+      if (supersededBy(order, await buyerRecentOrders(order, since))) {
+        // Stamp it so it isn't re-read every run for three days.
+        await supabase.from('orders').update({ abandoned_email_sent_at: now.toISOString() }).eq('id', order.id);
+        out.skipped += 1;
+        continue;
+      }
       if (order.buyer_id && !(await emailAllowed(order.buyer_id, 'abandoned_checkout'))) { out.skipped += 1; continue; }
       const contact = order.buyer_id ? await profileContact(order.buyer_id) : { email: order.buyer_email, name: order.shipping_name };
       if (!contact.email) { out.skipped += 1; continue; }
@@ -201,6 +251,11 @@ async function watchlistPage(rows, out, { now, deadline }) {
       const card = row.listing.vault_item?.card_name || 'A card you’re watching';
       const url = `${APP_URL()}/marketplace/${row.listing_id}`;
       if (alert.kind === 'sold') {
+        // "One got away" must not go to the collector who bought it.
+        if (await watcherBoughtListing(row.user_id, row.listing_id)) {
+          await supabase.from('watchlist').update({ sold_alerted_at: now.toISOString() }).eq('id', row.id);
+          continue;
+        }
         const sent = await sendWatchlistSold({ to: contact.email, name: contact.name, cardName: card, setName: row.listing.vault_item?.set_name, searchUrl: `${APP_URL()}/marketplace?q=${encodeURIComponent(card)}` });
         await supabase.from('watchlist').update({ sold_alerted_at: now.toISOString() }).eq('id', row.id);
         if (sent) out.sold += 1;
