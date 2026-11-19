@@ -109,7 +109,7 @@ describe('CommunityPage', () => {
     expect(withoutPoster.querySelector('svg')).toBeTruthy(); // falls back to the type icon
   });
 
-  it('fills every event tile with the brand gradient and leads with a date leaf', async () => {
+  it('fills every event tile with brand charcoal + a red accent and leads with a date leaf', async () => {
     const rowsQuery = (rows) => {
       const q = emptyQuery();
       q.then = (resolve) => Promise.resolve({ data: rows, error: null }).then(resolve);
@@ -125,9 +125,11 @@ describe('CommunityPage', () => {
     render(<MemoryRouter><CommunityPage /></MemoryRouter>);
     const tile = (await screen.findByText('Collectorama Melbourne')).closest('a');
     expect(tile.getAttribute('data-testid')).toBe('event-tile');
-    // CardPop red + charcoal, never the page's card/border tokens.
-    expect(tile.style.background).toMatch(/#CE1126|rgb\(206, 17, 38\)/i);
-    expect(tile.style.background).toMatch(/#1F2937|rgb\(31, 41, 55\)/i);
+    // Brand charcoal + a CardPop red accent bar, never the page's card/border
+    // tokens or an off-palette gradient blend.
+    expect(tile.className).toContain('bg-brand-charcoal');
+    expect(tile.style.background).toBe('');
+    expect(tile.querySelector('.bg-brand-red')).not.toBeNull();
     expect(tile.className).toContain('text-white');
     expect(tile.className).not.toContain('bg-card');
     // Date leaf: start day numeral over its month.

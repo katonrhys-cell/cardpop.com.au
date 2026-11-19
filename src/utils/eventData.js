@@ -1,4 +1,5 @@
 import { isValidUrl } from './safeFetch.js';
+import { EVENT_TYPE_VALUES } from '../../utils/eventTypes.js';
 
 // Shape and value validation for AI-extracted event data.
 //
@@ -9,7 +10,7 @@ import { isValidUrl } from './safeFetch.js';
 // date formats and non-URL strings are dropped rather than passed through to
 // the database.
 
-export const VALID_EVENT_TYPES = ['card_show', 'trade_event', 'lgs_event', 'community_event'];
+export const VALID_EVENT_TYPES = EVENT_TYPE_VALUES;
 export const VALID_STATES = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT'];
 
 export function parseAndValidateEventJson(jsonString) {

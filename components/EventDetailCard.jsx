@@ -1,12 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Instagram, Globe, Youtube, Music2, MessageCircle, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
+import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Globe, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
 import { eventTypeStyle, facebookEmbedUrl, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import XIcon from '@/components/XIcon.jsx';
+import TraderTableIcon from '@/components/icons/TraderTableIcon.jsx';
+import { DiscordIcon, FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
 import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
@@ -21,6 +23,8 @@ import { organisersForEvent, organiserNameParts, organiserPath } from '@/utils/e
 import { cleanEventVideos } from '@/utils/eventVideos.js';
 import { cleanSideEvents } from '@/utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
+import EventVendorInfo from '@/components/events/EventVendorInfo.jsx';
+import { cleanVendorInfo, hasVendorInfo, VENDOR_INFO_ANCHOR } from '@/utils/eventVendorInfo.js';
 import EventLocationMap from '@/components/events/EventLocationMap.jsx';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
@@ -60,6 +64,10 @@ const EventDetailCard = ({ event, isPast = false }) => {
   const sideEvents = cleanSideEvents(event.side_events);
   const prizes = cleanEventPrizes(event.event_prizes);
   const prizePool = cleanPrizePool(event.prize_pool);
+  // Vendor information (utils/eventVendorInfo.js): a section on the page, and
+  // "Want to be a vendor?" under the RSVP buttons once anything is entered.
+  const vendorInfo = cleanVendorInfo(event.vendor_info);
+  const showVendorInfo = !isPast && hasVendorInfo(vendorInfo, event.vendor_application_url);
   // Member ticket code + referral link (lib/eventTicketOffers.js). Finished
   // events show no tickets, so don't ask.
   const ticketOffer = useEventTicketOffer(event.id, { enabled: !isPast });
@@ -69,13 +77,13 @@ const EventDetailCard = ({ event, isPast = false }) => {
   // This event's own links (the event form's Organiser tab) as icon-only
   // buttons. The organiser's own profile links live on their organiser page.
   const followLinks = [
-    { key: 'instagram', label: 'Instagram', url: event.instagram_url, Icon: Instagram, iconClass: 'text-pink-600' },
-    { key: 'facebook', label: 'Facebook', url: event.facebook_url, Icon: Facebook, iconClass: 'text-blue-600' },
-    { key: 'youtube', label: 'YouTube', url: event.youtube_channel_url, Icon: Youtube, iconClass: 'text-red-600' },
-    { key: 'tiktok', label: 'TikTok', url: event.tiktok_url, Icon: Music2, iconClass: '' },
-    { key: 'x', label: 'X', url: event.x_url, Icon: XIcon, iconClass: '' },
-    { key: 'discord', label: 'Discord', url: event.discord_url, Icon: MessageCircle, iconClass: 'text-indigo-500' },
-    { key: 'website', label: 'Event website', url: event.website_url, Icon: Globe, iconClass: 'text-primary' },
+    { key: 'instagram', label: 'Instagram', url: event.instagram_url, Icon: InstagramIcon, iconClass: 'w-5 h-5' },
+    { key: 'facebook', label: 'Facebook', url: event.facebook_url, Icon: FacebookIcon, iconClass: 'w-5 h-5' },
+    { key: 'youtube', label: 'YouTube', url: event.youtube_channel_url, Icon: YouTubeIcon, iconClass: 'w-5 h-5' },
+    { key: 'tiktok', label: 'TikTok', url: event.tiktok_url, Icon: TikTokIcon, iconClass: 'w-5 h-5' },
+    { key: 'x', label: 'X', url: event.x_url, Icon: XIcon, iconClass: 'w-4 h-4' },
+    { key: 'discord', label: 'Discord', url: event.discord_url, Icon: DiscordIcon, iconClass: 'w-5 h-5' },
+    { key: 'website', label: 'Event website', url: event.website_url, Icon: Globe, iconClass: 'w-4 h-4 text-primary' },
   ].filter((l) => l.url);
 
   const handleShare = (platform) => {
@@ -134,7 +142,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
             title stops at the divider between About This Event and Event Details,
             and the logo sits in the sidebar column above Event Details. */}
         <div className={hasLogo ? 'grid grid-cols-1 lg:grid-cols-3 gap-0' : ''}>
-        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border' : 'px-5 pt-5 md:px-10 md:pt-8'}>
+        <div className={hasLogo ? 'min-w-0 lg:col-span-2 px-5 pt-5 md:px-10 md:pt-8 lg:border-r border-border lg:flex lg:flex-col lg:justify-center' : 'px-5 pt-5 md:px-10 md:pt-8'}>
           <div className="flex flex-wrap items-center gap-2">
           {(() => {
             const style = eventTypeStyle(event);
@@ -214,6 +222,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
             {(videos.length > 0 || fbEmbedUrl) && (
               <div className="mt-10">
                 <EventVideos videos={videos} fbEmbedUrl={fbEmbedUrl} eventName={event.name} watchBase={event.slug || event.id ? `/events/${event.slug || event.id}` : null} />
+              </div>
+            )}
+
+            {showVendorInfo && (
+              <div className="mt-10">
+                <EventVendorInfo info={vendorInfo} applicationUrl={event.vendor_application_url} isPast={isPast} />
               </div>
             )}
 
@@ -345,6 +359,24 @@ const EventDetailCard = ({ event, isPast = false }) => {
               <div className="space-y-3 pt-4 border-t border-border">
                 <h3 className="font-bold text-lg uppercase tracking-wider text-muted-foreground pb-1">Attending?</h3>
                 <EventRsvp event={event} variant="detail" />
+                {showVendorInfo && (
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Want to be a vendor?</span>{' '}
+                    <a
+                      href={`#${VENDOR_INFO_ANCHOR}`}
+                      className="font-semibold text-primary hover:underline underline-offset-2"
+                      onClick={(e) => {
+                        const target = document.getElementById(VENDOR_INFO_ANCHOR);
+                        if (!target) return;
+                        e.preventDefault();
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        window.history.replaceState(null, '', `#${VENDOR_INFO_ANCHOR}`);
+                      }}
+                    >
+                      See all the vendor info for this event
+                    </a>
+                  </p>
+                )}
               </div>
             )}
 
@@ -387,7 +419,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
               {event.vendor_application_url && (
                 <Button variant="outline" className="w-full h-12 border-border hover:bg-muted font-bold" asChild>
                   <a href={event.vendor_application_url} target="_blank" rel="noopener noreferrer">
-                    <Store className="w-5 h-5 mr-2" /> Apply for a trader table
+                    <TraderTableIcon className="w-5 h-5 mr-2" /> Apply for a Trader Table
                   </a>
                 </Button>
               )}
@@ -401,7 +433,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
                   {followLinks.map(({ key, label, url, Icon, iconClass }) => (
                     <Button key={key} variant="outline" size="icon" className="rounded-full w-10 h-10 border-border hover:bg-muted" asChild>
                       <a href={url} target="_blank" rel="noopener noreferrer" aria-label={label} title={label}>
-                        <Icon className={`w-4 h-4 ${iconClass}`} />
+                        <Icon className={iconClass} />
                       </a>
                     </Button>
                   ))}

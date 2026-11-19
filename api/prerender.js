@@ -10,7 +10,7 @@ import { BLOG_CATEGORIES, BLOG_CATEGORY_MAP } from '../data/blogCategories.js';
 import { buildEventReviewJsonLd, cleanDeals, cleanGallery, cleanPickups, dealSavingPct, formatAud, formatScore, hasScorecard, SCORE_CATEGORIES, cleanScores } from '../utils/eventReview.js';
 import { safeLogoUrl, isVideoLogoUrl, logoAltText } from '../utils/eventOrganiserLogo.js';
 import { ilikeContains, namesOrganiser } from '../utils/eventOrganisers.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, organiserContact, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, organiserContact, organiserContactUrl, organiserLinks, organiserLogos, organiserMetaDescription } from '../utils/organiserPage.js';
 import { BUYING_GUIDES, getBuyingGuide, GUIDE_CATEGORY_META, GUIDE_PRICE_CATEGORY } from '../data/buyingGuides.js';
 import { STOREFRONT_FILTER, hasStorefront } from '../config/plans.js';
 import {
@@ -45,6 +45,7 @@ import {
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
+import { cleanVendorInfo, safeVendorUrl, isPdfUrl } from '../utils/eventVendorInfo.js';
 import { creatorLinks } from '../utils/eventVideos.js';
 import {
   VIDEO_CREATOR_COLUMNS, CREATOR_EVENT_COLUMNS, CREATOR_ORGANISER_COLUMNS,
@@ -1711,7 +1712,7 @@ const ORGANISER_LINKS = [
   ['tiktok_url', 'TikTok'],
   ['x_url', 'X (Twitter)'],
   ['discord_url', 'Discord'],
-  ['vendor_application_url', 'Apply for a trader table'],
+  ['vendor_application_url', 'Apply for a Trader Table'],
 ];
 const organiserLinksHtml = (event) => {
   const links = ORGANISER_LINKS
@@ -1778,6 +1779,26 @@ const eventPrizesHtml = (prizes, prizePool, name) => {
     return `<li><strong>${esc(p.place)}</strong>${p.place && p.reward ? ': ' : ''}${esc(p.reward)}${figures}</li>`;
   }).join('');
   return `<section><h2>Prizes</h2>${prizePool ? `<p>Total prize pool: ${esc(prizePool)}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}</section>`;
+};
+
+// Vendor information (events.vendor_info + vendor_application_url,
+// utils/eventVendorInfo.js): the organiser's words, the application link,
+// documents, links and the vendor FAQ as plain text. Upcoming events only —
+// the SPA hides it once the event has passed. http(s) links only.
+const eventVendorInfoHtml = (event, isPast) => {
+  if (isPast) return '';
+  const info = cleanVendorInfo(event.vendor_info);
+  const apply = safeVendorUrl(event.vendor_application_url);
+  if (!info.intro && !info.faqs.length && !info.documents.length && !info.links.length && !apply) return '';
+  const links = [
+    ...(apply ? [[apply, 'Apply for a Trader Table']] : []),
+    ...info.links.map((l) => [l.url, l.label]),
+    ...info.documents.map((d) => [d.url, `${d.title}${isPdfUrl(d.url) ? ' (PDF)' : ''}`]),
+  ];
+  return `<section id="vendor-info"><h2>Vendor Information</h2>${info.intro ? `<p>${esc(info.intro)}</p>` : ''}`
+    + `${links.length ? `<ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul>` : ''}`
+    + `${info.faqs.length ? `<h3>Vendor FAQs</h3><dl>${info.faqs.map((f) => `<dt>${esc(f.question)}</dt><dd>${esc(f.answer)}</dd>`).join('')}</dl>` : ''}`
+    + '</section>';
 };
 
 // Full schema.org Event for a Supabase event record. Every field Google's
@@ -1974,8 +1995,9 @@ async function renderEventOrganiser(supabase, slug) {
   const canonical = `${BASE_URL}/events/organisers/${encodeURIComponent(slug)}`;
   const readOrganiser = (columns) => supabase
     .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
-  let { data: org, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS);
+  let { data: org, error: orgError } = await readOrganiser(ORGANISER_ENQUIRY_COLUMNS);
   // The profile columns ship in a migration; fall back to the original ones.
+  if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
   if (orgError) ({ data: org, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
@@ -2014,6 +2036,7 @@ async function renderEventOrganiser(supabase, slug) {
   const description = organiserMetaDescription(org, summary);
   const links = organiserLinks(org);
   const contact = organiserContact(org);
+  const contactUrl = organiserContactUrl(org);
   const logoImages = organiserLogos(org).filter((u) => !isVideoLogoUrl(u));
   const logo = logoImages[0];
 
@@ -2078,7 +2101,7 @@ async function renderEventOrganiser(supabase, slug) {
   <p>Event organiser</p>
   <h1>${esc(name)}</h1>
   <p>${esc(summary)}</p>
-${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(String(org.description).trim()).replace(/\r?\n/g, '<br />')}</p>\n  </section>\n` : ''}${links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener ugc">${esc(l.label)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}${contact.email || contact.phone ? `  <section>\n  <h2>Contact ${esc(contact.name || name)}</h2>\n  <ul>${contact.email ? `<li>Email: <a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a></li>` : ''}${contact.phone ? `<li>Phone: <a href="${esc(contact.telHref)}">${esc(contact.phone)}</a></li>` : ''}</ul>\n  </section>\n` : ''}${mediaHtml}${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
+${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(String(org.description).trim()).replace(/\r?\n/g, '<br />')}</p>\n  </section>\n` : ''}${links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener ugc">${esc(l.label)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}${contact.email || contact.phone ? `  <section>\n  <h2>Contact ${esc(contact.name || name)}</h2>\n  <ul>${contact.email ? `<li>Email: <a href="mailto:${esc(contact.email)}">${esc(contact.email)}</a></li>` : ''}${contact.phone ? `<li>Phone: <a href="${esc(contact.telHref)}">${esc(contact.phone)}</a></li>` : ''}</ul>\n  </section>\n` : ''}${contactUrl ? `  <p><a href="${esc(contactUrl)}" rel="nofollow noopener ugc">Contact ${esc(name)}</a></p>\n` : ''}${mediaHtml}${[listSection('Upcoming events', upcoming), listSection('Past events', past)].filter(Boolean).join('\n') || '  <p>No public events listed for this organiser right now.</p>'}
   <p><a href="${BASE_URL}/events">Browse all trading card events in Australia</a></p>
 </main>`;
 
@@ -2169,6 +2192,13 @@ async function renderEvent(supabase, param) {
         .from('events').select('side_events, event_prizes, prize_pool').eq('id', event.id).maybeSingle();
       if (extras) Object.assign(event, extras);
     } catch { /* no extras */ }
+    // Vendor info is its own best-effort read, so this page still gets the
+    // side events above while the vendor_info migration is landing.
+    try {
+      const { data: vendor } = await supabase
+        .from('events').select('vendor_info').eq('id', event.id).maybeSingle();
+      if (vendor) Object.assign(event, vendor);
+    } catch { /* no vendor info */ }
   }
 
   // Approved, or completed — an admin's archive. A finished event keeps its
@@ -2261,6 +2291,7 @@ async function renderEvent(supabase, param) {
   ${eventGalleryHtml(event, name)}
   ${eventPrizesHtml(prizes, prizePool, name)}
   ${watchLinksHtml(videoLinks, videoLinks.length > 1 ? 'Event Videos' : 'Event Video')}
+  ${eventVendorInfoHtml(event, isPast)}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
   ${ticketStatusHtml(event, isPast)}
   ${organiserLinksHtml(event)}

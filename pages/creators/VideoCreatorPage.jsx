@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, ChevronRight, Facebook, Instagram, MapPin, Music2, PlayCircle, Youtube } from 'lucide-react';
+import { CalendarDays, ChevronRight, MapPin, PlayCircle } from 'lucide-react';
+import { FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import SEOHead from '@/components/SEOHead.jsx';
 import XIcon from '@/components/XIcon.jsx';
 import { Button } from '@/components/ui/button';
@@ -14,7 +15,7 @@ import { fetchCreatorBySlug, fetchCreatorVideos } from '@/lib/videoCreators.js';
 // linking to its watch page. The prerender serves the same page to crawlers
 // (renderVideoCreator in api/prerender.js).
 
-const ICONS = { instagram: Instagram, youtube: Youtube, tiktok: Music2, facebook: Facebook, x: XIcon };
+const ICONS = { instagram: InstagramIcon, youtube: YouTubeIcon, tiktok: TikTokIcon, facebook: FacebookIcon, x: XIcon };
 
 const formatDate = (iso) => {
   if (!iso) return '';
@@ -137,7 +138,7 @@ const VideoCreatorPage = () => {
                         aria-label={`${name} on ${label}${handle ? ` (${handle})` : ''}`}
                         className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-brand-red hover:text-brand-red"
                       >
-                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        <Icon className="h-4 w-4 shrink-0" />
                         <span className="max-w-[12rem] truncate">{handle || label}</span>
                       </a>
                     </li>

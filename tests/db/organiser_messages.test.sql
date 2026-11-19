@@ -35,8 +35,13 @@ select pg_temp.must_fail(
   $q$update public.event_organisers set linktree_url = 'linktr.ee/show'$q$,
   'linktree_url accepted a link with no scheme');
 
+select pg_temp.must_fail(
+  $q$update public.event_organisers set contact_url = 'mailto:show@example.com'$q$,
+  'contact_url accepted a non-http link');
+
 set role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000a1', false);
+update public.event_organisers set contact_url = 'https://example.com/contact';
 update public.event_organisers
    set tiktok_url = 'https://tiktok.com/@show', x_url = 'https://x.com/show', linktree_url = 'https://linktr.ee/show';
 reset role;
@@ -44,7 +49,8 @@ do $$ declare r record; begin
   select * into r from public.event_organisers where name = 'Oz Comic-Con';
   if r.tiktok_url is distinct from 'https://tiktok.com/@show'
      or r.x_url is distinct from 'https://x.com/show'
-     or r.linktree_url is distinct from 'https://linktr.ee/show' then
+     or r.linktree_url is distinct from 'https://linktr.ee/show'
+     or r.contact_url is distinct from 'https://example.com/contact' then
     perform pg_temp.fail('owner could not save the TikTok / X / Linktree links');
   end if;
 end $$;

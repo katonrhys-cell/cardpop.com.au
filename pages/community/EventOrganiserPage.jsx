@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Mail, Phone, Instagram, Facebook, Youtube, Music2, Link2, MessageSquare } from 'lucide-react';
+import { CalendarDays, History, ArrowLeft, Users, Pencil, Globe, Mail, Phone, MessageSquare } from 'lucide-react';
 import XIcon from '@/components/XIcon.jsx';
+import { FacebookIcon, InstagramIcon, LinktreeIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import SEOHead from '@/components/SEOHead.jsx';
 import EventCard from '@/components/EventCard.jsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,7 +17,8 @@ import EventPhotoAlbums from '@/components/events/EventPhotoAlbums.jsx';
 import EventVideos from '@/components/events/EventVideos.jsx';
 import { cleanGalleryAlbums } from '@/utils/eventGallery.js';
 import { cleanEventVideos } from '@/utils/eventVideos.js';
-import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, organiserContact, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
+import OrganiserHeading from '@/components/events/OrganiserHeading.jsx';
+import { BASE_ORGANISER_COLUMNS, ORGANISER_PROFILE_COLUMNS, ORGANISER_LINK_COLUMNS, ORGANISER_PAGE_COLUMNS, ORGANISER_CONTACT_COLUMNS, ORGANISER_ENQUIRY_COLUMNS, ORGANISER_STYLED_COLUMNS, organiserContact, organiserContactUrl, organiserLinks, organiserLogos, canEditOrganiserPage, organiserMetaDescription } from '@/utils/organiserPage.js';
 import { EVENT_CARD_COLUMNS } from '@/lib/eventColumns.js';
 import { SITE_URL, toLocalDateStr } from '@/lib/eventSeo.js';
 import { isPastEvent } from '@/utils/eventPast.js';
@@ -30,8 +32,8 @@ import { ilikeContains, namesOrganiser, organiserPath } from '@/utils/eventOrgan
 const EVENT_LIMIT = 200;
 
 // Social links render as icon-only round buttons; the website keeps its label.
-const LINK_ICONS = { website_url: Globe, instagram_url: Instagram, facebook_url: Facebook, youtube_url: Youtube,
-  tiktok_url: Music2, x_url: XIcon, linktree_url: Link2,
+const LINK_ICONS = { website_url: Globe, instagram_url: InstagramIcon, facebook_url: FacebookIcon, youtube_url: YouTubeIcon,
+  tiktok_url: TikTokIcon, x_url: XIcon, linktree_url: LinktreeIcon,
 };
 
 const LOGO_BOX ='w-24 h-24 md:w-32 md:h-32 rounded-2xl bg-white border border-border object-contain p-2 shrink-0';
@@ -86,9 +88,11 @@ export default function EventOrganiserPage() {
       try {
         const readOrganiser = (columns) => supabase
           .from('event_organisers').select(columns).eq('slug', slug).maybeSingle();
-        let { data: found, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS);
+        let { data: found, error: orgError } = await readOrganiser(ORGANISER_STYLED_COLUMNS);
         // The profile columns ship in a migration; fall back to the original
         // columns if the app deployed first.
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_ENQUIRY_COLUMNS));
+        if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_CONTACT_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PAGE_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_LINK_COLUMNS));
         if (orgError) ({ data: found, error: orgError } = await readOrganiser(ORGANISER_PROFILE_COLUMNS));
@@ -142,6 +146,9 @@ export default function EventOrganiserPage() {
   const name = org?.name ?? '';
   const links = organiserLinks(org);
   const contact = organiserContact(org);
+  // The organiser's own contact form, when one is set: enquiries go there
+  // instead of through the on-site message.
+  const contactUrl = organiserContactUrl(org);
   const canEdit = canEditOrganiserPage(org, currentUser?.id, isAdmin);
   // The owner reads messages here; everyone else can send one.
   const isOwner = Boolean(currentUser?.id) && org?.owner_id === currentUser.id;
@@ -175,30 +182,37 @@ export default function EventOrganiserPage() {
               <div className="space-y-3"><Skeleton className="h-8 w-64" /><Skeleton className="h-4 w-40" /></div>
             </div>
           ) : (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-6">
               <OrganiserLogos org={org} />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Event organiser</p>
-                <h1 className={`font-serif font-extrabold text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`}>{name}</h1>
+                <OrganiserHeading name={name} headingStyle={org.heading_style} className={`text-foreground leading-tight break-words ${name.length > 24 ? 'text-2xl md:text-3xl' : 'text-3xl md:text-4xl'}`} />
                 <div className="flex flex-wrap items-center gap-2 mt-3">
                   {links.map(({ key, label, url }) => {
                     const Icon = LINK_ICONS[key];
                     return (
                       <Button key={key} asChild variant="outline" size="sm" className={Icon && key !== 'website_url' ? 'rounded-full w-9 h-9 p-0' : 'rounded-full gap-1.5'}>
                         <a href={url} target="_blank" rel="noopener noreferrer nofollow ugc" aria-label={`${name} on ${label}`} title={label}>
-                          {Icon && <Icon className="w-4 h-4" aria-hidden="true" />}
+                          {Icon && <Icon className={key === 'website_url' ? 'w-4 h-4' : 'w-5 h-5'} aria-hidden="true" />}
                           {key === 'website_url' && label}
                         </a>
                       </Button>
                     );
                   })}
-                  {!isOwner && (
+                  {contactUrl && (
+                    <Button asChild size="sm" className="rounded-full gap-1.5 font-bold">
+                      <a href={contactUrl} target="_blank" rel="noopener noreferrer nofollow ugc">
+                        <Mail className="w-3.5 h-3.5" aria-hidden="true" /> Contact
+                      </a>
+                    </Button>
+                  )}
+                  {!isOwner && !contactUrl && (
                     <Button size="sm" variant="outline" className="rounded-full gap-1.5 font-bold" onClick={() => setMessaging(true)}>
                       <MessageSquare className="w-3.5 h-3.5" aria-hidden="true" /> Message
                     </Button>
                   )}
                   {canEdit && (
-                    <Button size="sm" className="rounded-full gap-1.5 font-bold" onClick={() => setEditing(true)}>
+                    <Button size="sm" variant={contactUrl ? 'outline' : 'default'} className="rounded-full gap-1.5 font-bold" onClick={() => setEditing(true)}>
                       <Pencil className="w-3.5 h-3.5" aria-hidden="true" /> Edit page
                     </Button>
                   )}
@@ -278,14 +292,29 @@ export default function EventOrganiserPage() {
                   <div className="min-w-0 flex-1">
                     <h2 id="org-feedback" className="text-2xl font-bold">Feedback &amp; questions</h2>
                     <p className="text-muted-foreground mt-2">
-                      Been to one of {name}’s events, thinking of going, or want a trader table? Send a message
-                      {org.owner_id ? ' straight to the organiser.' : ' and the CardPop team will pass it on.'}
-                      {' '}Every message is checked before it’s delivered.
+                      Been to one of {name}’s events, thinking of going, or want a trader table?{' '}
+                      {contactUrl ? (
+                        'Get in touch through the organiser’s own contact page.'
+                      ) : (
+                        <>
+                          Send a message
+                          {org.owner_id ? ' straight to the organiser.' : ' and the CardPop team will pass it on.'}
+                          {' '}Every message is checked before it’s delivered.
+                        </>
+                      )}
                     </p>
                   </div>
-                  <Button size="lg" className="rounded-full gap-2 font-bold shrink-0" onClick={() => setMessaging(true)}>
-                    <MessageSquare className="w-4 h-4" aria-hidden="true" /> Message {name.length > 28 ? 'the organiser' : name}
-                  </Button>
+                  {contactUrl ? (
+                    <Button asChild size="lg" className="rounded-full gap-2 font-bold shrink-0">
+                      <a href={contactUrl} target="_blank" rel="noopener noreferrer nofollow ugc">
+                        <Mail className="w-4 h-4" aria-hidden="true" /> Contact {name.length > 28 ? 'the organiser' : name}
+                      </a>
+                    </Button>
+                  ) : (
+                    <Button size="lg" className="rounded-full gap-2 font-bold shrink-0" onClick={() => setMessaging(true)}>
+                      <MessageSquare className="w-4 h-4" aria-hidden="true" /> Message {name.length > 28 ? 'the organiser' : name}
+                    </Button>
+                  )}
                 </div>
               </section>
             )}
@@ -298,7 +327,7 @@ export default function EventOrganiserPage() {
       )}
 
       {canEdit && editing && (
-        <OrganiserPageEditor org={org} open={editing} onOpenChange={setEditing} onSaved={(next) => setOrg((o) => ({ ...o, ...next }))} />
+        <OrganiserPageEditor org={org} isAdmin={isAdmin} open={editing} onOpenChange={setEditing} onSaved={(next) => setOrg((o) => ({ ...o, ...next }))} />
       )}
     </div>
   );

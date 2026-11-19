@@ -22,6 +22,9 @@ import EventSideEventsEditor from '@/components/events/EventSideEventsEditor.jsx
 import EventPrizesEditor from '@/components/events/EventPrizesEditor.jsx';
 import { cleanSideEvents, sideEventsFormError, sideEventsToForm } from '@/utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
+import EventVendorInfoEditor from '@/components/events/EventVendorInfoEditor.jsx';
+import { cleanVendorInfo, emptyVendorForm, vendorInfoFormError, vendorInfoToForm } from '@/utils/eventVendorInfo.js';
+import { uploadEventVendorFile } from '@/utils/uploadEventVendorFile.js';
 import { cleanGalleryAlbums, flattenGalleryAlbums } from '@/utils/eventGallery.js';
 import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
 import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
@@ -29,8 +32,9 @@ import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx'
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
-import { useEventOrganisers, fillOrganiserPageFromEvent } from '@/hooks/useEventOrganisers.js';
-import { findOrganiser } from '@/utils/eventOrganisers.js';
+import { useEventOrganisers, fillOrganiserPageFromEvent, loadOrganiserDetails } from '@/hooks/useEventOrganisers.js';
+import { findOrganiser, organisersForEvent } from '@/utils/eventOrganisers.js';
+import { eventBlanksFromOrganiser } from '@/utils/organiserPage.js';
 import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
 import { createStepRunner, reportStalledStep, UPLOAD_STEP_TIMEOUT_MS } from '@/utils/saveSteps.js';
 import { toast } from 'sonner';
@@ -39,14 +43,14 @@ import {
   EVENT_IMAGE_ACCEPT, EVENT_URL_FIELDS,
 } from '@/utils/eventFormValidation.js';
 
+import {
+  EVENT_TYPES as SHARED_EVENT_TYPES, EVENT_FEATURE_GROUPS, EVENT_FEATURE_OPTIONS,
+  MAX_EVENT_FEATURE_LENGTH, cleanEventFeatures,
+} from '@/utils/eventTypes.js';
+
 const AUS_STATES = ['ACT', 'NSW', 'NT', 'QLD', 'SA', 'TAS', 'VIC', 'WA'];
 
-const EVENT_TYPES = [
-  { value: 'card_show',        label: 'Card Show' },
-  { value: 'trade_event',      label: 'Trade Event' },
-  { value: 'community_event',  label: 'Community Event' },
-  { value: 'lgs_event',        label: 'LGS (Local Game Store) Event' },
-];
+const EVENT_TYPES = SHARED_EVENT_TYPES.map(t => ({ value: t.value, label: t.formLabel }));
 
 const STATUS_OPTIONS = [
   { value: 'approved',       label: 'Approved (Live)' },
@@ -55,12 +59,6 @@ const STATUS_OPTIONS = [
   { value: 'cancelled',      label: 'Cancelled' },
   { value: 'completed',      label: 'Completed (archived — stays under Past Events)' },
   { value: 'rejected',       label: 'Rejected' },
-];
-
-const CARD_GAMES = [
-  'Pokémon', 'Magic: The Gathering', 'Yu-Gi-Oh!',
-  'One Piece', 'Flesh and Blood', 'Lorcana',
-  'Dragon Ball', 'Star Wars: Unlimited', 'MetaZoo',
 ];
 
 const INITIAL_STATE = {
@@ -236,6 +234,14 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const [fillOrganiserPage, setFillOrganiserPage] = useState(true);
   const { organisers, saveOrganiser } = useEventOrganisers(isOpen);
   const logoInputRef = useRef(null);
+  // What the organiser's page filled into this form's blank fields
+  // ({ name, labels }) — shown on the Organiser tab so it can be checked.
+  const [organiserFill, setOrganiserFill] = useState(null);
+  // The form + logo slot as of the latest render, for the async fill below.
+  const latestRef = useRef({});
+  latestRef.current = { formData, hasLogo: Boolean(logoPreview || logoFile) };
+  const organiserFillSeq = useRef(0);
+  const autoFilledRef = useRef(false);
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
   // { url } (saved) or { file, preview } (uploaded on save).
   const [gallery, setGallery] = useState([]);
@@ -246,6 +252,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   // (saved) or { file, preview } (uploaded on save).
   const [sideEvents, setSideEvents] = useState([]);
   const [prizeForm, setPrizeForm] = useState({ pool: '', prizes: [] });
+  // Vendors tab (utils/eventVendorInfo.js): { intro, faqs, documents, links },
+  // a document being { title, url } (saved) or { title, file } (uploaded on save).
+  const [vendorForm, setVendorForm] = useState(emptyVendorForm);
   const fileInputRef = useRef(null);
   // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
   // existing watch's on/off state replaces the default once it loads.
@@ -269,6 +278,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const changeVideos = (v) => { markDirty(); setVideos(v); };
   const changeSideEvents = (v) => { markDirty(); setSideEvents(v); };
   const changePrizes = (v) => { markDirty(); setPrizeForm(v); };
+  const changeVendor = (v) => { markDirty(); setVendorForm(v); };
   const changeOffer = (v) => { markDirty(); setOfferForm(v); };
 
   // Switch to the tab holding a field and put the cursor in it, so an error
@@ -312,6 +322,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   useEffect(() => {
     if (!isOpen) return;
     dirtyRef.current = false;
+    autoFilledRef.current = false;
+    organiserFillSeq.current += 1;
+    setOrganiserFill(null);
     setRescanWeekly(true);
     setExistingWatch(null);
     setOfferForm(EMPTY_OFFER_FORM);
@@ -435,6 +448,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
       setVideos(videosToForm(cleanEventVideos(event.event_videos, event.youtube_url)));
       setSideEvents(sideEventsToForm(event.side_events));
+      setVendorForm(vendorInfoToForm(event.vendor_info));
       setPrizeForm({
         pool: cleanPrizePool(event.prize_pool),
         prizes: cleanEventPrizes(event.event_prizes).map(p => ({ place: p.place, reward: p.reward, photos: p.images.map(url => ({ url })) })),
@@ -465,7 +479,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
 
     if (!event?.id || scrapedData) setGallery([emptyAlbum()]);
     if (!event?.id || scrapedData) setVideos([emptyVideo()]);
-    if (!event?.id || scrapedData) { setSideEvents([]); setPrizeForm({ pool: '', prizes: [] }); }
+    if (!event?.id || scrapedData) { setSideEvents([]); setPrizeForm({ pool: '', prizes: [] }); setVendorForm(emptyVendorForm()); }
     setImageFile(null);
     setRemoveExistingImage(false);
     setLogoFile(null);
@@ -484,7 +498,49 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     setLogoPreview(URL.createObjectURL(file));
     setRemoveExistingLogo(false);
   };
-  // Choose a saved organiser: fills the name and brings its logo along.
+  // Bring a saved organiser's page details (logo, website, socials, contact
+  // email / phone) into this form's BLANK fields — nothing typed here is
+  // replaced, and nothing is saved until the form is.
+  const fillFromOrganiserPage = useCallback(async (org) => {
+    if (!org?.id) return;
+    const seq = ++organiserFillSeq.current;
+    const page = await loadOrganiserDetails(org.id).catch(() => null);
+    if (!page || seq !== organiserFillSeq.current) return;
+    const { formData: current, hasLogo } = latestRef.current;
+    const { patch, labels } = eventBlanksFromOrganiser({ ...current, organizer_logo_url: hasLogo ? 'set' : '' }, page);
+    const { organizer_logo_url: logoUrl, ...fields } = patch;
+    if (logoUrl) {
+      setPickedLogoUrl(logoUrl);
+      setLogoPreview(logoUrl);
+      setLogoIsVideo(isVideoLogoUrl(logoUrl));
+      setRemoveExistingLogo(false);
+    }
+    if (Object.keys(fields).length) {
+      setFormData(prev => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(fields)) if (isBlankFormValue(prev[k])) next[k] = v;
+        return next;
+      });
+    }
+    setOrganiserFill(labels.length ? { name: page.name || org.name, labels } : null);
+  }, []);
+
+  // Admin: on opening an event whose organiser has a saved page, fill the
+  // blanks from that page once the organiser list has loaded.
+  useEffect(() => {
+    if (!isOpen || isUserMode || autoFilledRef.current || organisers.length === 0) return;
+    // The name this form opened with (the form state itself is set in the
+    // same pass, so it isn't readable yet).
+    const name = scrapedData ? (scrapedData.organizer_name || scrapedData.organizer) : event?.organizer_name;
+    autoFilledRef.current = true;
+    if (!String(name ?? '').trim()) return;
+    const matches = organisersForEvent(organisers, name);
+    // A co-hosted name matches several pages — whose links are these? Leave it.
+    if (matches.length === 1) fillFromOrganiserPage(matches[0]);
+  }, [isOpen, isUserMode, organisers, event, scrapedData, fillFromOrganiserPage]);
+
+  // Choose a saved organiser: fills the name, brings its logo along and fills
+  // the blank contact / link fields from its page.
   const pickOrganiser = (id) => {
     const org = organisers.find(o => o.id === id);
     if (!org) return;
@@ -496,6 +552,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     setLogoPreview(org.logo_url || null);
     setLogoIsVideo(isVideoLogoUrl(org.logo_url));
     setRemoveExistingLogo(!org.logo_url);
+    fillFromOrganiserPage(org);
   };
 
   // Admin: add / update this organiser (name + current logo) in the saved list.
@@ -531,6 +588,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const set = (field, value) => { markDirty(); setFormData(prev => ({ ...prev, [field]: value })); };
 
   const handleChange = (e) => set(e.target.name, e.target.value);
+
+  const [customFeature, setCustomFeature] = useState('');
+  const addCustomFeature = () => {
+    const text = customFeature.trim();
+    if (!text) return;
+    markDirty();
+    setFormData(prev => ({ ...prev, featured_card_games: cleanEventFeatures([...prev.featured_card_games, text]) }));
+    setCustomFeature('');
+  };
 
   const toggleCardGame = (game) => {
     markDirty();
@@ -576,6 +642,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     setVideos([emptyVideo()]);
     setSideEvents([]);
     setPrizeForm({ pool: '', prizes: [] });
+    setVendorForm(emptyVendorForm());
     setOfferForm(EMPTY_OFFER_FORM);
     setActiveTab('details');
     dirtyRef.current = false;
@@ -608,6 +675,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     if (sideEventError) {
       toast.error(sideEventError);
       focusField('extras');
+      return;
+    }
+
+    // Vendor links get the same https:// fix-up before the check.
+    const vendorRows = { ...vendorForm, links: vendorForm.links.map(l => ({ ...l, url: normalizeEventUrl(l.url) || '' })) };
+    const vendorError = vendorInfoFormError(vendorRows);
+    if (vendorError) {
+      toast.error(vendorError);
+      focusField('vendors');
       return;
     }
 
@@ -706,6 +782,21 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
       const prize_pool = cleanPrizePool(prizeForm.pool) || null;
       const side_events = cleanSideEvents(sideRows);
 
+      // Vendor documents: new files go up now (vendor-info/<uuid>.<ext>),
+      // saved ones keep their URL; uploaded ones become saved so a retry
+      // doesn't upload twice.
+      const uploadedDocs = [];
+      const newDocs = vendorRows.documents.filter(d => !d.url).length;
+      let docNo = 0;
+      for (const doc of vendorRows.documents) {
+        if (doc.url) { uploadedDocs.push({ title: doc.title, url: doc.url }); continue; }
+        docNo += 1;
+        const url = await step(`Uploading vendor document ${docNo} of ${newDocs}`, () => uploadEventVendorFile(doc.file), UPLOAD_STEP_TIMEOUT_MS);
+        uploadedDocs.push({ title: doc.title, url });
+      }
+      setVendorForm(prev => ({ ...prev, documents: uploadedDocs }));
+      const vendor_info = cleanVendorInfo({ ...vendorRows, documents: uploadedDocs });
+
       const payload = {
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
@@ -729,6 +820,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         side_events,
         event_prizes,
         prize_pool,
+        // Only sent once there's something in it (or to clear what was
+        // there), so saves keep working if the column's migration hasn't landed.
+        ...(event?.vendor_info && Object.keys(event.vendor_info).length
+          || vendor_info.intro || vendor_info.faqs.length || vendor_info.documents.length || vendor_info.links.length
+          ? { vendor_info } : {}),
         // Venue
         venue_name:          formData.venue_name.trim() || null,
         address:             formData.address.trim() || null,
@@ -965,6 +1061,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
               <TabsList aria-label="Event form sections" className="w-full justify-start h-12 bg-transparent p-0 gap-0 overflow-x-auto overflow-y-hidden">
                 {[
                   { id: 'details',   label: 'Details' },
+                  { id: 'vendors',   label: 'Vendors' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'extras',    label: 'Side Events & Prizes' },
                   { id: 'organiser', label: 'Organiser' },
@@ -1060,25 +1157,49 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                   </div>
                 )}
 
-                {/* Featured Card Games */}
-                <div className="space-y-2" role="group" aria-labelledby="featured_card_games_label">
-                  <p id="featured_card_games_label" className="text-sm font-bold leading-none">Featured Card Games</p>
-                  <div className="flex flex-wrap gap-2">
-                    {CARD_GAMES.map(game => (
-                      <button
-                        key={game} type="button"
-                        onClick={() => toggleCardGame(game)}
-                        aria-pressed={formData.featured_card_games.includes(game)}
-                        disabled={loading}
-                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                          formData.featured_card_games.includes(game)
-                            ? 'bg-primary text-primary-foreground border-primary'
-                            : 'bg-muted/40 text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
-                        }`}
-                      >
-                        {game}
-                      </button>
-                    ))}
+                {/* What's featured — card games, sports cards and other collectables */}
+                <div className="space-y-3" role="group" aria-labelledby="featured_card_games_label">
+                  <p id="featured_card_games_label" className="text-sm font-bold leading-none">
+                    What&rsquo;s Featured <span className="font-normal text-muted-foreground">(pick everything the event has)</span>
+                  </p>
+                  {[
+                    ...EVENT_FEATURE_GROUPS,
+                    { label: 'Added by you', options: formData.featured_card_games.filter(g => !EVENT_FEATURE_OPTIONS.includes(g)) },
+                  ].filter(group => group.options.length > 0).map(group => (
+                    <div key={group.label} className="space-y-1.5">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{group.label}</p>
+                      <div className="flex flex-wrap gap-2">
+                        {group.options.map(game => (
+                          <button
+                            key={game} type="button"
+                            onClick={() => toggleCardGame(game)}
+                            aria-pressed={formData.featured_card_games.includes(game)}
+                            disabled={loading}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                              formData.featured_card_games.includes(game)
+                                ? 'bg-primary text-primary-foreground border-primary'
+                                : 'bg-muted/40 text-muted-foreground border-border hover:border-primary/40 hover:text-foreground'
+                            }`}
+                          >
+                            {game}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex gap-2">
+                    <Input
+                      id="featured_custom"
+                      aria-label="Add something else the event features"
+                      value={customFeature}
+                      onChange={e => setCustomFeature(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addCustomFeature(); } }}
+                      placeholder="Something else? Type it and press Add"
+                      maxLength={MAX_EVENT_FEATURE_LENGTH}
+                      className={inputCls}
+                      disabled={loading}
+                    />
+                    <Button type="button" variant="outline" onClick={addCustomFeature} disabled={loading || !customFeature.trim()}>Add</Button>
                   </div>
                 </div>
 
@@ -1195,18 +1316,33 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                 </div>
               </TabsContent>
 
-              {/* ── TAB 3: ORGANISER ── */}
+              {/* ── TAB: VENDORS ── everything a would-be trader needs, shown on the
+                  event page as "Vendor Information" (utils/eventVendorInfo.js). */}
+              <TabsContent value="vendors" className="mt-0 space-y-8 animate-in fade-in">
+                <p className="text-sm text-muted-foreground">
+                  Everything for traders in one place. Once anything here is filled in, the event page shows a
+                  "Vendor Information" section and a "Want to be a vendor?" link under the RSVP buttons.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
+                  <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                  <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a Trader Table" on the event page until the event has passed.</p>
+                </div>
+                <EventVendorInfoEditor value={vendorForm} onChange={changeVendor} disabled={loading} />
+              </TabsContent>
+
               {/* ── TAB: SIDE EVENTS & PRIZES ── */}
               <TabsContent value="extras" className="mt-0 space-y-8 animate-in fade-in">
                 <EventSideEventsEditor value={sideEvents} onChange={changeSideEvents} disabled={loading} defaultDate={formData.start_date} />
                 <EventPrizesEditor value={prizeForm} onChange={changePrizes} disabled={loading} />
               </TabsContent>
 
+              {/* ── TAB: ORGANISER ── */}
               <TabsContent value="organiser" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {organisers.length > 0 && (
                     <div className="sm:col-span-2 space-y-2">
-                      <Label htmlFor="saved_organiser" className="font-bold">Saved Organiser <span className="text-muted-foreground font-normal text-xs">(pick one to fill the name and logo)</span></Label>
+                      <Label htmlFor="saved_organiser" className="font-bold">Saved Organiser <span className="text-muted-foreground font-normal text-xs">(pick one to fill the name, logo and any blank contact details and links from their page)</span></Label>
                       <Select
                         value={findOrganiser(organisers, formData.organizer_name)?.id ?? ''}
                         onValueChange={pickOrganiser}
@@ -1217,6 +1353,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                           {organisers.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+                  {organiserFill && (
+                    <div role="status" className="sm:col-span-2 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                      <p className="font-semibold">Filled from {organiserFill.name}’s organiser page: {organiserFill.labels.join(', ')}</p>
+                      <p className="text-xs text-muted-foreground">Only blank fields were filled — check them below. Nothing is saved until you save this event.</p>
                     </div>
                   )}
                   <div className="sm:col-span-2 space-y-2">
@@ -1324,11 +1466,6 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                       <Input id="waitlist_url" name="waitlist_url" type="url" value={formData.waitlist_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
                       <p className="text-xs text-muted-foreground">Where collectors can join the waitlist. Shown as "Join the waitlist" while the event is sold out.</p>
                     </div>
-                  </div>
-                  <div className="sm:col-span-2 space-y-2">
-                    <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
-                    <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
-                    <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a trader table" on the event page until the event has passed.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="instagram_url" className="font-bold">Instagram URL</Label>

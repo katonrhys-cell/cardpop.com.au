@@ -92,7 +92,7 @@ export function validateEventForm(form) {
   for (const [field, label] of Object.entries(EVENT_URL_FIELDS)) {
     const url = normalizeEventUrl(form[field]);
     if (url && !isValidHttpUrl(url)) {
-      return fail(field, 'organiser', `${label} isn’t a valid web address — paste the full link, e.g. https://example.com`);
+      return fail(field, field === 'vendor_application_url' ? 'vendors' : 'organiser', `${label} isn’t a valid web address — paste the full link, e.g. https://example.com`);
     }
   }
   if (!form.is_free) {
