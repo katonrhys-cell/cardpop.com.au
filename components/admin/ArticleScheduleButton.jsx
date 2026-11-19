@@ -36,12 +36,18 @@ const ArticleScheduleButton = ({ article, takenDates = [], onChange }) => {
     }
     setSaving(true);
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('blog_articles')
         .update({ publish_on: publishOn })
         .eq('id', article.id)
-        .eq('is_published', false);
+        .eq('is_published', false)
+        .select('id');
       if (error) throw error;
+      // Zero rows: it was published meanwhile (another tab, or the daily run).
+      if (!data?.length) {
+        toast.error('This article has already been published, so there is nothing to schedule.');
+        return;
+      }
       onChange?.(publishOn);
       toast.success(publishOn ? `Scheduled for ${formatPublishOn(publishOn)}.` : 'Schedule removed — the article stays a draft.');
       setOpen(false);

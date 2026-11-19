@@ -125,7 +125,9 @@ const AccountProfile = () => {
         location_state: formData.location_state,
         location_suburb: formData.location_suburb,
         ...profilePhotoColumns(avatar_url),
+        // Keep any other links on the profile (this form edits three of them).
         social_links: {
+          ...(currentUser.social_links || {}),
           twitter: formData.social_twitter,
           instagram: formData.social_instagram,
           whatnot: formData.social_whatnot,

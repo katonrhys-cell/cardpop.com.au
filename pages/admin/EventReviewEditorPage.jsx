@@ -51,6 +51,16 @@ import {
 const slugify = (text) =>
   String(text || '').toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
 
+// While typing, keep a trailing hyphen: slugify() trims it, so on every
+// keystroke "card-" snapped back to "card" and a separator could never be
+// typed (only pasted). The full slugify() runs on save.
+const slugDraft = (text) =>
+  String(text || '').toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+/, '');
+
 // A review's URL is the event's slug plus "-cardpop-review" (…/blog/vault-melbourne-card-collectible-show-cardpop-review),
 // so the event name and the word "review" both sit in the URL. Without an event
 // picked yet it falls back to the title.
@@ -632,7 +642,7 @@ const EventReviewEditorPage = () => {
                 <input
                   id="slug"
                   value={article.slug}
-                  onChange={(e) => { setSlugTouched(true); setA({ slug: slugify(e.target.value) }); }}
+                  onChange={(e) => { setSlugTouched(true); setA({ slug: slugDraft(e.target.value) }); }}
                   className="h-10 flex-1 min-w-0 bg-transparent px-1 text-sm focus:outline-none"
                   placeholder="url-slug"
                 />
