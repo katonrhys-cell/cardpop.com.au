@@ -1,12 +1,13 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Globe, Store, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
+import { MapPin, Calendar, Clock, Ticket, Share2, Facebook, Linkedin, ChevronRight, Users, DollarSign, Globe, Accessibility, ShieldAlert, History, MessageSquareQuote, Star, ListPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { isFeaturedEvent, FEATURED_PILL_CLASS } from '@/utils/eventFeatured.js';
 import { Button } from '@/components/ui/button';
 import { eventTypeStyle, facebookEmbedUrl, toLocalDateStr } from '@/lib/eventSeo.js';
 import EventRsvp from '@/components/EventRsvp.jsx';
 import XIcon from '@/components/XIcon.jsx';
+import TraderTableIcon from '@/components/icons/TraderTableIcon.jsx';
 import { DiscordIcon, FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import AddToCalendarButton from '@/components/AddToCalendarButton.jsx';
 import InArticleAd from '@/components/InArticleAd.jsx';
@@ -388,7 +389,7 @@ const EventDetailCard = ({ event, isPast = false }) => {
               {event.vendor_application_url && (
                 <Button variant="outline" className="w-full h-12 border-border hover:bg-muted font-bold" asChild>
                   <a href={event.vendor_application_url} target="_blank" rel="noopener noreferrer">
-                    <Store className="w-5 h-5 mr-2" /> Apply for a trader table
+                    <TraderTableIcon className="w-5 h-5 mr-2" /> Apply for a Trader Table
                   </a>
                 </Button>
               )}

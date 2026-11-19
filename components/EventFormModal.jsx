@@ -1389,7 +1389,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                   <div className="sm:col-span-2 space-y-2">
                     <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
                     <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
-                    <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a trader table" on the event page until the event has passed.</p>
+                    <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a Trader Table" on the event page until the event has passed.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="instagram_url" className="font-bold">Instagram URL</Label>
