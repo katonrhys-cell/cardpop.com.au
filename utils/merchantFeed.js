@@ -149,14 +149,17 @@ export function cardFeedRow(listing, { imageUrls = [] } = {}) {
 // A tab or newline inside a value would shift every column after it.
 const cell = (value) => String(value ?? '').replace(/[\t\r\n]+/g, ' ').trim();
 
-/** Serialise rows (nulls skipped) to Merchant Center's tab-delimited format. */
-export function toTsv(rows) {
-  const lines = [FEED_COLUMNS.join('\t')];
+/**
+ * Serialise rows (nulls skipped) to a tab-delimited feed. `columns` defaults to
+ * Merchant Center's; the Meta catalog feed passes its own (utils/metaCatalogFeed.js).
+ */
+export function toTsv(rows, columns = FEED_COLUMNS) {
+  const lines = [columns.join('\t')];
   const seen = new Set();
   for (const row of rows) {
     if (!row || seen.has(row.id)) continue; // ids must be unique in a feed
     seen.add(row.id);
-    lines.push(FEED_COLUMNS.map((col) => cell(row[col])).join('\t'));
+    lines.push(columns.map((col) => cell(row[col])).join('\t'));
   }
   return `${lines.join('\n')}\n`;
 }
