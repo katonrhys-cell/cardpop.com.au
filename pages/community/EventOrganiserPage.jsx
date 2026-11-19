@@ -182,7 +182,7 @@ export default function EventOrganiserPage() {
               <div className="space-y-3"><Skeleton className="h-8 w-64" /><Skeleton className="h-4 w-40" /></div>
             </div>
           ) : (
-            <div className="flex flex-col sm:flex-row sm:items-center gap-6">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-6">
               <OrganiserLogos org={org} />
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">Event organiser</p>
