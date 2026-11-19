@@ -255,9 +255,36 @@ export async function fetchWebpageContent(url, { timeoutMs = DEFAULT_TIMEOUT_MS,
 }
 
 /** Strip tags and entities down to the plain text an extraction prompt needs. */
+// Drop every <tag …>…</tag> block in one linear pass. The regex this
+// replaces (/<script[^>]*>.*?<\/script>/gis) rescanned to the end of the input
+// for each unclosed tag — quadratic on attacker-controlled HTML: 640 KB of
+// `<script>` took 12 s and the 2 MB cap about two minutes, synchronously, past
+// the event scanner's whole budget. An unclosed block runs to the end of the
+// document, as it does in a browser.
+function stripBlocks(html, tag) {
+  const lower = html.toLowerCase();
+  const open = `<${tag}`;
+  const close = `</${tag}`;
+  let out = '';
+  let pos = 0;
+  for (;;) {
+    let start = lower.indexOf(open, pos);
+    // `<scripts>` / `<styleguide>` aren't the tag.
+    while (start !== -1 && /[a-z0-9-]/.test(lower[start + open.length] || '')) {
+      start = lower.indexOf(open, start + open.length);
+    }
+    if (start === -1) return out + html.slice(pos);
+    out += html.slice(pos, start);
+    const end = lower.indexOf(close, start + open.length);
+    if (end === -1) return out;
+    const gt = lower.indexOf('>', end);
+    pos = gt === -1 ? html.length : gt + 1;
+  }
+}
+
 export function extractTextFromHtml(html, { maxLength = DEFAULT_MAX_TEXT_LENGTH } = {}) {
-  let text = html.replace(/<script[^>]*>.*?<\/script>/gis, '');
-  text = text.replace(/<style[^>]*>.*?<\/style>/gis, '');
+  let text = stripBlocks(String(html ?? ''), 'script');
+  text = stripBlocks(text, 'style');
   text = text.replace(/<[^>]+>/g, ' ');
   text = text
     .replace(/&nbsp;/g, ' ')
