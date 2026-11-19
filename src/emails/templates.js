@@ -435,7 +435,7 @@ ${centred('We’ll email you the tracking number as soon as it’s posted. Enjoy
     '',
     '',
     body,
-    `https://cardpop.com.au/orders/${orderId}`,
+    'https://cardpop.com.au/account/orders',
     'View Order',
     'This receipt was sent to confirm your purchase on CardPop. Keep it for your records.',
   );
@@ -525,7 +525,7 @@ ${centred(`The refund goes back to your original payment method within ${MARKETP
     '',
     '',
     body,
-    `https://cardpop.com.au/orders/${orderId}`,
+    'https://cardpop.com.au/account/orders',
     'View Order',
     null,
   );
@@ -882,7 +882,7 @@ ${centred('If you have any questions about this refund, reply to this email or c
     '',
     '',
     body,
-    `https://cardpop.com.au/orders/${orderId}`,
+    'https://cardpop.com.au/account/sales',
     'View Order',
     null,
   );
