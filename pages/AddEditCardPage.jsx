@@ -1875,7 +1875,7 @@ const AddEditCardPage = () => {
                       variant="ghost"
                       onClick={() => openAdjuster('main', imageFile, imagePreview)}
                       disabled={detectingKey !== null}
-                      title="Adjust crop corners manually"
+                      title="Crop photo"
                       className="gap-1.5"
                     >
                       <SlidersHorizontal className="w-3.5 h-3.5" /> Adjust

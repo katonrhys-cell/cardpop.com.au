@@ -1,338 +1,339 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, CheckCircle2, Frame, Square } from 'lucide-react';
-import {
-  defaultCorners, orderCorners, isRectangularQuad, rectifyQuad,
-} from '@/utils/cardCrop.js';
-import { warpCanvasPreview } from '@/utils/detectCard.js';
+import { Loader2, Check, RotateCcw, Scan } from 'lucide-react';
+import { defaultCorners, orderCorners } from '@/utils/cardCrop.js';
 
 const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
-// Colours for the crop overlay: emerald once the selection is a true
-// rectangle, the brand primary while it still needs straightening.
-const OK_COLOR = '#10b981';
+// Smallest crop box side, as a fraction of the image's shorter side, so a
+// stray drag can't collapse the box to nothing.
+const MIN_FRAC = 0.08;
 
-// Loupe shown while dragging a corner: on a phone the finger hides exactly
-// the pixels being aligned, so a magnified view is the difference between
-// "roughly there" and actually on the card edge.
-const LOUPE_SIZE = 110;   // diameter, px
-const LOUPE_ZOOM = 3;     // magnification relative to the on-screen image
+// Bounding box of a quad, in natural image coordinates.
+export function boundsOf(corners, w, h) {
+  const xs = corners.map(([x]) => x);
+  const ys = corners.map(([, y]) => y);
+  return {
+    x0: clamp(Math.min(...xs), 0, w),
+    y0: clamp(Math.min(...ys), 0, h),
+    x1: clamp(Math.max(...xs), 0, w),
+    y1: clamp(Math.max(...ys), 0, h),
+  };
+}
+
+const rectToCorners = ({ x0, y0, x1, y1 }) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
 
 /**
- * Manual crop editor: shows the original image with four draggable corner
- * handles (seeded from the auto-detected quad when available, otherwise an
- * inset rectangle). Displays a split-view: left side shows adjustment handles,
- * right side shows a live preview of what the cropped result will look like
- * with the card filling the entire container.
+ * Move one part of the crop box by (dx, dy) natural pixels. `part` is a
+ * combination of edges — 'n', 's', 'e', 'w', 'ne', … — or 'move' for the
+ * whole box. Edges stop at the image border and at the minimum size.
+ */
+export function dragRect(rect, part, dx, dy, w, h) {
+  const min = Math.min(w, h) * MIN_FRAC;
+  if (part === 'move') {
+    const bw = rect.x1 - rect.x0;
+    const bh = rect.y1 - rect.y0;
+    const x0 = clamp(rect.x0 + dx, 0, w - bw);
+    const y0 = clamp(rect.y0 + dy, 0, h - bh);
+    return { x0, y0, x1: x0 + bw, y1: y0 + bh };
+  }
+  const next = { ...rect };
+  if (part.includes('w')) next.x0 = clamp(rect.x0 + dx, 0, rect.x1 - min);
+  if (part.includes('e')) next.x1 = clamp(rect.x1 + dx, rect.x0 + min, w);
+  if (part.includes('n')) next.y0 = clamp(rect.y0 + dy, 0, rect.y1 - min);
+  if (part.includes('s')) next.y1 = clamp(rect.y1 + dy, rect.y0 + min, h);
+  return next;
+}
+
+const HANDLES = [
+  { part: 'nw', fx: 0, fy: 0, cursor: 'nwse-resize' },
+  { part: 'n', fx: 0.5, fy: 0, cursor: 'ns-resize' },
+  { part: 'ne', fx: 1, fy: 0, cursor: 'nesw-resize' },
+  { part: 'e', fx: 1, fy: 0.5, cursor: 'ew-resize' },
+  { part: 'se', fx: 1, fy: 1, cursor: 'nwse-resize' },
+  { part: 's', fx: 0.5, fy: 1, cursor: 'ns-resize' },
+  { part: 'sw', fx: 0, fy: 1, cursor: 'nesw-resize' },
+  { part: 'w', fx: 0, fy: 0.5, cursor: 'ew-resize' },
+];
+
+/**
+ * Manual crop editor for a card photo.
  *
- * Mount this only while editing (conditionally render in the parent) so it
+ * Default is a plain crop box: drag an edge or corner to trim, drag inside
+ * to move, and everything outside the box is dimmed so what you see is what
+ * you keep. For a card shot at an angle, "Straighten a tilted card" switches
+ * to four free corners that the crop is perspective-corrected from.
+ *
+ * `onApply(corners)` receives four [x, y] points in natural image
+ * coordinates either way — a straight box is just a rectangle quad.
+ *
+ * Mount only while editing (conditionally render in the parent) so it
  * re-seeds cleanly each time it opens.
  */
 const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => {
   const imgRef = useRef(null);
-  // Offscreen downscaled copy of the image, cached across corner drags and
-  // rebuilt when the image itself changes (see the preview effect).
-  const previewCanvasRef = useRef(null);
-  const [natural, setNatural] = useState(null); // { w, h } natural image size
-  const [displayW, setDisplayW] = useState(0);   // rendered image width (px)
-  const [corners, setCorners] = useState(null);  // [[x,y]×4] in natural coords
-  const [dragging, setDragging] = useState(null); // corner index | { edge: i } | null
+  const [natural, setNatural] = useState(null); // { w, h }
+  const [display, setDisplay] = useState(null); // { w, h } rendered size
+  const [mode, setMode] = useState('box');      // 'box' | 'tilt'
+  const [rect, setRect] = useState(null);       // box mode, natural coords
+  const [corners, setCorners] = useState(null); // tilt mode, natural coords
   const [applying, setApplying] = useState(false);
-  const lastPt = useRef(null); // last pointer position (natural coords) for edge drags
-  const [previewUrl, setPreviewUrl] = useState(null); // live preview of cropped result
+  const drag = useRef(null); // { part | corner, last: [x, y] }
+  const [dragging, setDragging] = useState(false);
+
+  const startCorners = useCallback((w, h) => (
+    initialCorners && initialCorners.length === 4
+      ? initialCorners.map(([x, y]) => [x, y])
+      : defaultCorners(w, h, 0.04)
+  ), [initialCorners]);
+
+  const measure = useCallback(() => {
+    const img = imgRef.current;
+    if (!img) return;
+    // Layout size, not getBoundingClientRect(): the dialog opens with a zoom
+    // animation, and a transformed measurement left the box short of the photo.
+    if (img.offsetWidth && img.offsetHeight) setDisplay({ w: img.offsetWidth, h: img.offsetHeight });
+  }, []);
 
   const seed = useCallback(() => {
     const img = imgRef.current;
-    if (!img) return;
+    if (!img || !img.naturalWidth) return;
     const w = img.naturalWidth;
     const h = img.naturalHeight;
     setNatural({ w, h });
-    setDisplayW(img.getBoundingClientRect().width);
-    setCorners(
-      initialCorners && initialCorners.length === 4
-        ? initialCorners.map(([x, y]) => [x, y])
-        : defaultCorners(w, h),
-    );
-  }, [initialCorners]);
+    const start = startCorners(w, h);
+    setCorners(start);
+    setRect(boundsOf(start, w, h));
+    measure();
+  }, [startCorners, measure]);
 
   // A cached image can be complete before onLoad attaches — seed immediately.
   useEffect(() => {
     if (imgRef.current?.complete && imgRef.current.naturalWidth) seed();
   }, [seed]);
 
-  // Keep the overlay aligned to the image if the viewport/layout changes.
+  // Keep the overlay exactly on top of the image as the dialog lays out or
+  // the viewport changes. The overlay is sized from the <img> itself, so the
+  // two can't drift apart.
   useEffect(() => {
-    const onResize = () => { if (imgRef.current) setDisplayW(imgRef.current.getBoundingClientRect().width); };
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
-  }, []);
+    const img = imgRef.current;
+    if (!img || typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(img);
+    return () => ro.disconnect();
+  }, [measure]);
 
-  // Live preview: the REAL perspective warp — the same one Apply runs — on a
-  // downscaled copy of the image, debounced behind the drag. The previous
-  // implementation approximated the warp with two bounding-box-stretched
-  // canvas triangles, which visibly sheared and seamed whenever the selection
-  // was tilted (any slab or hand-held card), so the preview contradicted the
-  // crop it was previewing.
-  useEffect(() => {
-    if (!imgRef.current || !natural || !corners) return undefined;
+  const ready = !!(natural && display && rect && corners);
+  const scale = ready ? display.w / natural.w : 1;
 
-    let stale = false;
-    const timer = setTimeout(async () => {
-      // Draw (and cache) a downscaled copy once per image; re-warp it as the
-      // handles move. ~700px is plenty for a side-panel preview.
-      let source = previewCanvasRef.current;
-      if (!source || source.dataset.for !== imageUrl) {
-        const scale = Math.min(1, 700 / Math.max(natural.w, natural.h));
-        source = document.createElement('canvas');
-        source.width = Math.max(1, Math.round(natural.w * scale));
-        source.height = Math.max(1, Math.round(natural.h * scale));
-        source.getContext('2d').drawImage(imgRef.current, 0, 0, source.width, source.height);
-        source.dataset.for = imageUrl;
-        source.dataset.scale = String(scale);
-        previewCanvasRef.current = source;
-      }
-      const scale = Number(source.dataset.scale) || 1;
-      const url = await warpCanvasPreview(source, corners.map(([x, y]) => [x * scale, y * scale]));
-      if (!stale && url) setPreviewUrl(url);
-    }, 150);
+  const toNatural = (e) => {
+    // On-screen rect → natural pixels; dividing by the live rect keeps this
+    // right even while a transform is still settling.
+    const r = imgRef.current.getBoundingClientRect();
+    return [(e.clientX - r.left) * (natural.w / r.width), (e.clientY - r.top) * (natural.h / r.height)];
+  };
 
-    return () => { stale = true; clearTimeout(timer); };
-  }, [corners, natural, imageUrl]);
-
-  const scale = natural && displayW ? displayW / natural.w : 1;
-  const displayH = natural ? natural.h * scale : 0;
-  const ready = !!(natural && corners && displayW > 0);
-
-  const pointerToImage = (e) => {
-    const rect = imgRef.current.getBoundingClientRect();
-    return [
-      clamp((e.clientX - rect.left) / scale, 0, natural.w),
-      clamp((e.clientY - rect.top) / scale, 0, natural.h),
-    ];
+  const begin = (target) => (e) => {
+    if (!ready || applying) return;
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    drag.current = { ...target, last: toNatural(e) };
+    setDragging(true);
   };
 
   const onPointerMove = (e) => {
-    if (dragging == null || !natural) return;
+    const d = drag.current;
+    if (!d || !ready) return;
     e.preventDefault();
-    const [x, y] = pointerToImage(e);
-
-    if (typeof dragging === 'number') {
-      setCorners(prev => prev.map((c, i) => (i === dragging ? [x, y] : c)));
-      return;
-    }
-    // Edge drag: translate both endpoints of the edge by the pointer delta so
-    // the whole side moves together — handy for straightening one edge.
-    if (dragging.edge != null && lastPt.current) {
-      const dx = x - lastPt.current[0];
-      const dy = y - lastPt.current[1];
-      const i = dragging.edge;
-      const j = (i + 1) % 4;
-      setCorners(prev => prev.map((c, k) => (
-        k === i || k === j
-          ? [clamp(c[0] + dx, 0, natural.w), clamp(c[1] + dy, 0, natural.h)]
-          : c
+    const [x, y] = toNatural(e);
+    const dx = x - d.last[0];
+    const dy = y - d.last[1];
+    d.last = [x, y];
+    if (d.part) {
+      setRect(prev => dragRect(prev, d.part, dx, dy, natural.w, natural.h));
+    } else if (d.corner != null) {
+      setCorners(prev => prev.map((c, i) => (
+        i === d.corner ? [clamp(x, 0, natural.w), clamp(y, 0, natural.h)] : c
       )));
-      lastPt.current = [x, y];
     }
   };
 
-  // Pointer capture keeps move/up events flowing to the handle even when the
-  // finger/cursor strays outside the SVG, so a drag toward the image edge no
-  // longer silently drops.
-  const capture = (e) => e.currentTarget.setPointerCapture?.(e.pointerId);
-  const startCornerDrag = (i) => (e) => { e.preventDefault(); capture(e); setDragging(i); };
-  const startEdgeDrag = (i) => (e) => {
-    e.preventDefault();
-    capture(e);
-    lastPt.current = pointerToImage(e);
-    setDragging({ edge: i });
-  };
-  const endDrag = () => { setDragging(null); lastPt.current = null; };
+  const end = () => { drag.current = null; setDragging(false); };
 
+  const switchMode = (next) => {
+    if (!ready || next === mode) return;
+    if (next === 'tilt') setCorners(rectToCorners(rect));
+    else setRect(boundsOf(corners, natural.w, natural.h));
+    setMode(next);
+  };
+
+  const reset = () => {
+    if (!natural) return;
+    const start = startCorners(natural.w, natural.h);
+    setCorners(start);
+    setRect(boundsOf(start, natural.w, natural.h));
+  };
 
   const apply = async () => {
-    if (!corners) return;
+    if (!ready) return;
     setApplying(true);
     try {
-      await onApply(corners);
+      await onApply(mode === 'box' ? rectToCorners(rect) : orderCorners(corners));
     } finally {
       setApplying(false);
     }
   };
 
-  // Snap the current selection to an upright rectangle (clamped to the image)
-  // so the user gets a perfect rectangle crop in one tap.
-  const snapToRectangle = () => {
-    if (!corners || !natural) return;
-    setCorners(
-      rectifyQuad(corners).map(([x, y]) => [clamp(x, 0, natural.w), clamp(y, 0, natural.h)]),
-    );
-  };
-
-  const polygon = ready ? corners.map(([x, y]) => `${x * scale},${y * scale}`).join(' ') : '';
-
-  // Is the selection square enough to crop without perspective distortion?
-  const isRect = ready ? isRectangularQuad(corners) : false;
-  const lineColor = isRect ? OK_COLOR : 'hsl(var(--primary))';
-
-  // Perspective-correct rule-of-thirds guide lines, drawn between the
-  // interpolated thirds of opposite edges of the (ordered) selection. They give
-  // the user a reference for keeping the card square as they drag the corners.
-  const gridLines = [];
-  if (ready) {
-    const [tl, tr, br, bl] = orderCorners(corners).map(([x, y]) => [x * scale, y * scale]);
-    for (const t of [1 / 3, 2 / 3]) {
-      gridLines.push([lerp(tl, tr, t), lerp(bl, br, t)]); // vertical thirds
-      gridLines.push([lerp(tl, bl, t), lerp(tr, br, t)]); // horizontal thirds
-    }
-  }
+  // Outline of the kept area, in display pixels.
+  const keep = ready
+    ? (mode === 'box' ? rectToCorners(rect) : orderCorners(corners)).map(([x, y]) => [x * scale, y * scale])
+    : [];
+  const keepPath = keep.length ? `M${keep.map(p => p.join(',')).join('L')}Z` : '';
 
   return (
     <Dialog open onOpenChange={(next) => { if (!next && !applying) onCancel(); }}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Adjust crop container</DialogTitle>
+          <DialogTitle>Crop photo</DialogTitle>
+          <DialogDescription>
+            {mode === 'box'
+              ? 'Drag the edges or corners to cut away what you don’t want. Drag inside the box to move it.'
+              : 'Drag each dot onto a corner of the card. The crop is straightened for you.'}
+          </DialogDescription>
         </DialogHeader>
-        <p className="text-xs text-muted-foreground -mt-2">
-          Drag handles to define the card's outer edges. The right side shows how
-          the card will fill the final container — aim for a perfect rectangle.
-        </p>
 
-        {/* Live rectangle indicator */}
-        <div
-          role="status"
-          className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium ${
-            isRect
-              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600'
-              : 'border-amber-500/30 bg-amber-500/10 text-amber-600'
-          }`}
-        >
-          {isRect ? (
-            <><CheckCircle2 className="w-3.5 h-3.5" /> Perfect rectangle — ready to crop</>
-          ) : (
-            <><Frame className="w-3.5 h-3.5" /> Line the handles up with the card edges to square the crop</>
-          )}
-        </div>
+        <div className="flex justify-center rounded-lg bg-black/80 p-3">
+          {/* The overlay is positioned against this wrapper, which hugs the
+              <img> exactly — no centring box between them to throw it off. */}
+          <div className="relative inline-block leading-none" style={{ touchAction: 'none' }}>
+            <img
+              ref={imgRef}
+              src={imageUrl}
+              alt="Photo to crop"
+              onLoad={seed}
+              draggable={false}
+              className="block max-w-full max-h-[60vh] select-none"
+            />
+            {ready && (
+              <svg
+                className="absolute inset-0 overflow-visible"
+                width={display.w}
+                height={display.h}
+                viewBox={`0 0 ${display.w} ${display.h}`}
+                onPointerMove={onPointerMove}
+                onPointerUp={end}
+                onPointerCancel={end}
+              >
+                {/* Dim everything outside the kept area. */}
+                <path
+                  d={`M0,0H${display.w}V${display.h}H0Z ${keepPath}`}
+                  fillRule="evenodd"
+                  fill="rgba(0,0,0,0.6)"
+                  pointerEvents="none"
+                />
 
-        {/* Split-view: adjustment panel (left) + live preview (right) */}
-        <div className="grid grid-cols-2 gap-4 rounded-lg border border-border bg-muted/30 p-4">
-          {/* Left: Original image with adjustment handles */}
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold text-foreground">Adjust corners</p>
-            <div className="relative inline-block flex-1 min-h-[300px] flex items-center justify-center" style={{ touchAction: 'none' }}>
-              <img
-                ref={imgRef}
-                src={imageUrl}
-                alt="Adjust crop"
-                onLoad={seed}
-                draggable={false}
-                className="block max-w-full max-h-[40vh] select-none rounded-lg"
-              />
-              {ready && (
-                <svg
-                  className="absolute left-0 top-0 overflow-visible"
-                  width={displayW}
-                  height={displayH}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={endDrag}
-                >
-                  <polygon
-                    points={polygon}
-                    fill={isRect ? `${OK_COLOR}1f` : 'hsl(var(--primary) / 0.12)'}
-                    stroke={lineColor}
-                    strokeWidth="2"
-                  />
-                  {gridLines.map(([[x1, y1], [x2, y2]], i) => (
-                    <line
-                      key={`g${i}`}
-                      x1={x1} y1={y1} x2={x2} y2={y2}
-                      stroke={lineColor}
-                      strokeWidth="1"
-                      strokeDasharray="4 4"
-                      strokeOpacity="0.55"
-                    />
-                  ))}
-                  {corners.map(([x, y], i) => (
-                    <circle
-                      key={i}
-                      cx={x * scale}
-                      cy={y * scale}
-                      r={11}
-                      fill={lineColor}
+                {mode === 'box' ? (
+                  <>
+                    <rect
+                      x={rect.x0 * scale}
+                      y={rect.y0 * scale}
+                      width={(rect.x1 - rect.x0) * scale}
+                      height={(rect.y1 - rect.y0) * scale}
+                      fill="transparent"
                       stroke="#fff"
                       strokeWidth="2"
-                      style={{ cursor: 'grab' }}
-                      onPointerDown={startCornerDrag(i)}
+                      style={{ cursor: dragging ? 'grabbing' : 'move' }}
+                      onPointerDown={begin({ part: 'move' })}
                     />
-                  ))}
-                </svg>
-              )}
-              {/* Magnifier loupe while a corner is being dragged. Anchored at
-                  the same left-0/top-0 origin as the SVG overlay so it shares
-                  its coordinate system; pointer-events-none so the drag keeps
-                  flowing to the captured handle underneath. */}
-              {ready && typeof dragging === 'number' && (() => {
-                const [cx, cy] = corners[dragging];
-                const dx = cx * scale;
-                const dy = cy * scale;
-                const zoom = LOUPE_ZOOM * scale; // background px per natural px
-                const above = dy > LOUPE_SIZE + 28;
-                return (
-                  <div className="pointer-events-none absolute left-0 top-0 z-10">
-                    <div
-                      className="absolute overflow-hidden rounded-full border-2 border-white shadow-xl"
-                      style={{
-                        width: LOUPE_SIZE,
-                        height: LOUPE_SIZE,
-                        left: clamp(dx - LOUPE_SIZE / 2, 0, Math.max(0, displayW - LOUPE_SIZE)),
-                        top: above ? dy - LOUPE_SIZE - 20 : dy + 20,
-                        backgroundColor: '#000',
-                        backgroundImage: `url(${imageUrl})`,
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: `${natural.w * zoom}px ${natural.h * zoom}px`,
-                        backgroundPosition: `${LOUPE_SIZE / 2 - cx * zoom}px ${LOUPE_SIZE / 2 - cy * zoom}px`,
-                      }}
-                    >
-                      <div className="absolute left-1/2 top-0 h-full w-px -translate-x-1/2" style={{ background: lineColor, opacity: 0.9 }} />
-                      <div className="absolute top-1/2 left-0 h-px w-full -translate-y-1/2" style={{ background: lineColor, opacity: 0.9 }} />
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-
-          {/* Right: Live preview of cropped result filling the container */}
-          <div className="flex flex-col gap-2">
-            <p className="text-xs font-semibold text-foreground">Container preview</p>
-            <div className="flex-1 flex items-center justify-center rounded-lg bg-black/10 min-h-[300px]">
-              {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt="Crop preview"
-                  className="h-full max-h-[40vh] object-contain rounded-md"
-                />
-              ) : (
-                <p className="text-xs text-muted-foreground">Preview loading…</p>
-              )}
-            </div>
+                    {/* Wide invisible hit areas along each edge. */}
+                    {['n', 's', 'e', 'w'].map((p) => {
+                      const horiz = p === 'n' || p === 's';
+                      const x = (p === 'e' ? rect.x1 : rect.x0) * scale;
+                      const y = (p === 's' ? rect.y1 : rect.y0) * scale;
+                      return (
+                        <rect
+                          key={`edge-${p}`}
+                          x={horiz ? rect.x0 * scale : x - 12}
+                          y={horiz ? y - 12 : rect.y0 * scale}
+                          width={horiz ? (rect.x1 - rect.x0) * scale : 24}
+                          height={horiz ? 24 : (rect.y1 - rect.y0) * scale}
+                          fill="transparent"
+                          style={{ cursor: horiz ? 'ns-resize' : 'ew-resize' }}
+                          onPointerDown={begin({ part: p })}
+                        />
+                      );
+                    })}
+                    {HANDLES.map(({ part, fx, fy, cursor }) => {
+                      const cx = (rect.x0 + (rect.x1 - rect.x0) * fx) * scale;
+                      const cy = (rect.y0 + (rect.y1 - rect.y0) * fy) * scale;
+                      const corner = part.length === 2;
+                      return (
+                        <g key={part} style={{ cursor }} onPointerDown={begin({ part })}>
+                          <circle cx={cx} cy={cy} r={20} fill="transparent" />
+                          {corner ? (
+                            <circle cx={cx} cy={cy} r={9} fill="#fff" stroke="#CE1126" strokeWidth="3" />
+                          ) : (
+                            <rect
+                              x={cx - (fy === 0.5 ? 4 : 12)}
+                              y={cy - (fy === 0.5 ? 12 : 4)}
+                              width={fy === 0.5 ? 8 : 24}
+                              height={fy === 0.5 ? 24 : 8}
+                              rx="4"
+                              fill="#fff"
+                              stroke="#CE1126"
+                              strokeWidth="2"
+                            />
+                          )}
+                        </g>
+                      );
+                    })}
+                  </>
+                ) : (
+                  <>
+                    <path d={keepPath} fill="transparent" stroke="#fff" strokeWidth="2" pointerEvents="none" />
+                    {corners.map(([x, y], i) => (
+                      <g key={i} style={{ cursor: 'grab' }} onPointerDown={begin({ corner: i })}>
+                        <circle cx={x * scale} cy={y * scale} r={20} fill="transparent" />
+                        <circle cx={x * scale} cy={y * scale} r={9} fill="#fff" stroke="#CE1126" strokeWidth="3" />
+                      </g>
+                    ))}
+                  </>
+                )}
+              </svg>
+            )}
           </div>
         </div>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={snapToRectangle}
-          disabled={!ready || applying}
-          className="gap-1.5 self-center text-xs text-muted-foreground"
-        >
-          <Square className="w-3.5 h-3.5" /> Snap to perfect rectangle
-        </Button>
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => switchMode(mode === 'box' ? 'tilt' : 'box')}
+            disabled={!ready || applying}
+            className="gap-1.5 text-xs text-muted-foreground"
+          >
+            <Scan className="w-3.5 h-3.5" />
+            {mode === 'box' ? 'Card is tilted? Straighten it' : 'Back to simple crop'}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={reset}
+            disabled={!ready || applying}
+            className="gap-1.5 text-xs text-muted-foreground"
+          >
+            <RotateCcw className="w-3.5 h-3.5" /> Reset
+          </Button>
+        </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
           <Button type="button" variant="outline" onClick={onCancel} disabled={applying} className="flex-1">
@@ -340,8 +341,8 @@ const CardCornerAdjuster = ({ imageUrl, initialCorners, onApply, onCancel }) => 
           </Button>
           <Button type="button" onClick={apply} disabled={!ready || applying} className="flex-1 gap-1.5">
             {applying
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Applying…</>
-              : <><Check className="w-4 h-4" /> Apply crop</>}
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Cropping…</>
+              : <><Check className="w-4 h-4" /> Crop</>}
           </Button>
         </DialogFooter>
       </DialogContent>
