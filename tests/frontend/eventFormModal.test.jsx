@@ -36,10 +36,10 @@ describe('EventFormModal — user/admin field parity', () => {
   it('shows every tab to admins and all but SEO to organisers, Member Offer included', () => {
     const { unmount } = renderForm('admin');
     const tabNames = (els) => els.map((el) => el.textContent);
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Side Events & Prizes', 'Organiser', 'SEO', 'Member Offer']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Vendors', 'Venue & Dates', 'Side Events & Prizes', 'Organiser', 'SEO', 'Member Offer']);
     unmount();
     renderForm('user');
-    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Venue & Dates', 'Side Events & Prizes', 'Organiser', 'Member Offer']);
+    expect(tabNames(screen.getAllByRole('tab'))).toEqual(['Details', 'Vendors', 'Venue & Dates', 'Side Events & Prizes', 'Organiser', 'Member Offer']);
   });
 
   it('gives organisers the Side Events & Prizes tab, with both editors', () => {
@@ -82,11 +82,27 @@ describe('EventFormModal — user/admin field parity', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Organiser' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Organiser' }));
     for (const label of [
-      'Event Website', 'Tickets / Registration URL', 'Trader / Vendor Applications URL',
+      'Event Website', 'Tickets / Registration URL',
       'Instagram URL', 'Facebook URL', 'YouTube Channel URL', 'TikTok URL', 'X (Twitter) URL', 'Discord URL',
     ]) {
       expect(screen.getByLabelText(label)).toBeInTheDocument();
     }
+  });
+
+  it('collects everything for vendors on its own Vendors tab', () => {
+    renderForm('admin');
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Vendors' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Vendors' }));
+    expect(screen.getByLabelText('Trader / Vendor Applications URL')).toBeInTheDocument();
+    expect(screen.getByLabelText('Information for vendors')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Upload document/ })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Add question/ }));
+    expect(screen.getByLabelText('Vendor FAQ 1 question')).toBeInTheDocument();
+    expect(screen.getByLabelText('Vendor FAQ 1 answer')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Add link/ }));
+    expect(screen.getByLabelText('Vendor link 1 address')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove vendor FAQ 1' }));
+    expect(screen.queryByLabelText('Vendor FAQ 1 question')).not.toBeInTheDocument();
   });
 
   it('flags a non-YouTube video link and adds / removes video rows', () => {

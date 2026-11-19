@@ -21,6 +21,8 @@ import { organisersForEvent, organiserNameParts, organiserPath } from '@/utils/e
 import { cleanEventVideos } from '@/utils/eventVideos.js';
 import { cleanSideEvents } from '@/utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
+import EventVendorInfo from '@/components/events/EventVendorInfo.jsx';
+import { cleanVendorInfo, hasVendorInfo, VENDOR_INFO_ANCHOR } from '@/utils/eventVendorInfo.js';
 import EventLocationMap from '@/components/events/EventLocationMap.jsx';
 import EventTicketOffer from '@/components/events/EventTicketOffer.jsx';
 import useEventTicketOffer from '@/hooks/useEventTicketOffer.js';
@@ -60,6 +62,10 @@ const EventDetailCard = ({ event, isPast = false }) => {
   const sideEvents = cleanSideEvents(event.side_events);
   const prizes = cleanEventPrizes(event.event_prizes);
   const prizePool = cleanPrizePool(event.prize_pool);
+  // Vendor information (utils/eventVendorInfo.js): a section on the page, and
+  // "Want to be a vendor?" under the RSVP buttons once anything is entered.
+  const vendorInfo = cleanVendorInfo(event.vendor_info);
+  const showVendorInfo = !isPast && hasVendorInfo(vendorInfo, event.vendor_application_url);
   // Member ticket code + referral link (lib/eventTicketOffers.js). Finished
   // events show no tickets, so don't ask.
   const ticketOffer = useEventTicketOffer(event.id, { enabled: !isPast });
@@ -217,6 +223,12 @@ const EventDetailCard = ({ event, isPast = false }) => {
               </div>
             )}
 
+            {showVendorInfo && (
+              <div className="mt-10">
+                <EventVendorInfo info={vendorInfo} applicationUrl={event.vendor_application_url} isPast={isPast} />
+              </div>
+            )}
+
             <InArticleAd className="my-10" />
 
             {event.accessibility_info && (
@@ -345,6 +357,24 @@ const EventDetailCard = ({ event, isPast = false }) => {
               <div className="space-y-3 pt-4 border-t border-border">
                 <h3 className="font-bold text-lg uppercase tracking-wider text-muted-foreground pb-1">Attending?</h3>
                 <EventRsvp event={event} variant="detail" />
+                {showVendorInfo && (
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-semibold text-foreground">Want to be a vendor?</span>{' '}
+                    <a
+                      href={`#${VENDOR_INFO_ANCHOR}`}
+                      className="font-semibold text-primary hover:underline underline-offset-2"
+                      onClick={(e) => {
+                        const target = document.getElementById(VENDOR_INFO_ANCHOR);
+                        if (!target) return;
+                        e.preventDefault();
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        window.history.replaceState(null, '', `#${VENDOR_INFO_ANCHOR}`);
+                      }}
+                    >
+                      See all the vendor info for this event
+                    </a>
+                  </p>
+                )}
               </div>
             )}
 

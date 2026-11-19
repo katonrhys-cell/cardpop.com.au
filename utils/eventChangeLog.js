@@ -14,7 +14,7 @@ import { ticketPriceLines } from './eventTicketPrices.js';
 export const EVENT_LOGGED_FIELDS = [
   'title', 'short_description', 'description', 'accessibility_info', 'age_restrictions',
   'event_type', 'featured_card_games', 'image_url', 'gallery_images', 'gallery_albums', 'event_videos',
-  'side_events', 'event_prizes', 'prize_pool',
+  'side_events', 'event_prizes', 'prize_pool', 'vendor_info',
   'venue_name', 'address', 'suburb', 'state', 'postcode',
   'start_date', 'end_date', 'start_time', 'end_time',
   'organizer_name', 'organizer_logo_url', 'organizer_email', 'organizer_phone',
@@ -43,6 +43,7 @@ export const EVENT_CHANGE_LABELS = {
   side_events: 'Side events',
   event_prizes: 'Prizes',
   prize_pool: 'Total prize pool',
+  vendor_info: 'Vendor information',
   venue_name: 'Venue',
   address: 'Street address',
   suburb: 'Suburb',
@@ -131,6 +132,16 @@ export function describeEventValue(field, value) {
   }
   if (field === 'event_prizes' && Array.isArray(v)) {
     return v.map((x) => [x?.place, x?.reward].filter(Boolean).join(': ')).filter(Boolean).join('\n') || plural(v.length, 'prize');
+  }
+  if (field === 'vendor_info' && v && typeof v === 'object' && !Array.isArray(v)) {
+    const n = (k) => (Array.isArray(v[k]) ? v[k].length : 0);
+    const parts = [
+      typeof v.intro === 'string' && v.intro.trim() ? 'intro text' : '',
+      n('faqs') ? plural(n('faqs'), 'FAQ') : '',
+      n('documents') ? plural(n('documents'), 'document') : '',
+      n('links') ? plural(n('links'), 'link') : '',
+    ].filter(Boolean);
+    return parts.join(', ') || '—';
   }
   if (field === 'ticket_prices' && Array.isArray(v)) {
     return ticketPriceLines(v).map((t) => `${t.label}: ${t.price}${t.soldOut ? ' (sold out)' : ''}`).join('\n') || '—';

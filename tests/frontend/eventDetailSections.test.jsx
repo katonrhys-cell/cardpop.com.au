@@ -382,7 +382,45 @@ describe('EventDetailCard — organiser links', () => {
     expect(screen.getByRole('link', { name: 'TikTok' })).toHaveAttribute('href', 'https://tiktok.com/@collectitcon');
     expect(screen.getByRole('link', { name: 'X' })).toHaveAttribute('href', 'https://x.com/collectitcon');
     expect(screen.getByRole('link', { name: 'Discord' })).toHaveAttribute('href', 'https://discord.gg/collectitcon');
-    expect(screen.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
+    // In the sidebar under the ticket button, and in the Vendor Information section.
+    const apply = screen.getAllByRole('link', { name: /Apply for a trader table/ });
+    expect(apply).toHaveLength(2);
+    for (const a of apply) expect(a).toHaveAttribute('href', 'https://collectitcon.com.au/traders');
+  });
+
+  it('shows "Want to be a vendor?" and the Vendor Information section once vendor info is entered', () => {
+    renderCard({
+      ...baseEvent,
+      vendor_application_url: 'https://toyfair.test/vendors',
+      vendor_info: {
+        intro: 'Tables are 6ft with two chairs.',
+        faqs: [{ question: 'Is power included?', answer: 'Yes, on request.' }],
+        documents: [{ title: 'Trader Pack', url: 'https://cdn.test/vendor-info/pack.pdf' }],
+        links: [{ label: 'Vendor FAQs', url: 'https://toyfair.test/faq' }],
+      },
+    });
+    expect(screen.getByText('Want to be a vendor?')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /See all the vendor info/ })).toHaveAttribute('href', '#vendor-info');
+    const section = document.getElementById('vendor-info');
+    expect(section).not.toBeNull();
+    const v = within(section);
+    expect(v.getByRole('heading', { name: 'Vendor Information' })).toBeInTheDocument();
+    expect(v.getByText('Tables are 6ft with two chairs.')).toBeInTheDocument();
+    expect(v.getByRole('link', { name: /Apply for a trader table/ })).toHaveAttribute('href', 'https://toyfair.test/vendors');
+    expect(v.getByRole('link', { name: /Vendor FAQs/ })).toHaveAttribute('href', 'https://toyfair.test/faq');
+    expect(v.getByRole('link', { name: /Trader Pack/ })).toHaveAttribute('href', 'https://cdn.test/vendor-info/pack.pdf');
+    expect(v.getByRole('button', { name: 'Is power included?' })).toBeInTheDocument();
+  });
+
+  it('shows no vendor line or section when nothing is entered, or once the event has passed', () => {
+    renderCard(baseEvent);
+    expect(screen.queryByText('Want to be a vendor?')).not.toBeInTheDocument();
+    expect(document.getElementById('vendor-info')).toBeNull();
+    render(
+      <MemoryRouter><EventDetailCard event={{ ...baseEvent, vendor_info: { intro: 'Tables are 6ft.' } }} isPast /></MemoryRouter>,
+    );
+    expect(screen.queryByText('Want to be a vendor?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tables are 6ft.')).not.toBeInTheDocument();
   });
 
   it('keeps the trader button off a past event', () => {

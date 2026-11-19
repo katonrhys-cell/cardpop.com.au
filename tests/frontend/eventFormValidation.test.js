@@ -45,6 +45,8 @@ describe('validateEventForm', () => {
     expect(validateEventForm({ ...base, instagram_url: 'instagram.com/show' })).toBeNull();
     const err = validateEventForm({ ...base, ticket_url: 'buy tickets at the door' });
     expect(err).toMatchObject({ field: 'ticket_url', tab: 'organiser' });
+    expect(validateEventForm({ ...base, vendor_application_url: 'javascript:alert(1)' }))
+      .toMatchObject({ field: 'vendor_application_url', tab: 'vendors' });
     expect(err.message).toMatch(/Tickets/);
   });
   it('checks capacity and prices', () => {
