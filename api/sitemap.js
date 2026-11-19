@@ -12,6 +12,7 @@ import { PUBLIC_SHOP_STATUSES } from '../utils/shopStock.js';
 import { shopCategoryLeaves, productInShopCategory } from '../utils/shopCategoryPages.js';
 import { GRADING_SCALE_SLUGS } from '../data/gradingScales.js';
 import { namesOrganiser, organiserPath } from '../utils/eventOrganisers.js';
+import { videoCreatorPath } from '../utils/videoCreators.js';
 import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import { eventRegionPath, regionsWithEvents } from '../data/eventRegions.js';
 import { staticPageLastmod } from '../data/sitemapPageSources.js';
@@ -145,6 +146,7 @@ const MAX_ROWS = {
   sellerProfiles: 10000,
   organisers: 1000,
   organiserEvents: 5000,
+  videoCreators: 500,
 };
 
 const STATIC_PAGE_ROWS = [
@@ -416,6 +418,12 @@ export default async function handler(req, res) {
         .select('id, category')
         .eq('is_published', true)
         .limit(MAX_ROWS.articles),
+      // Saved video creators (/creators/<slug>) — listed below only once a
+      // public video credits them (the page is noindex until then).
+      supabase
+        .from('video_creators')
+        .select('id, slug, updated_at')
+        .limit(MAX_ROWS.videoCreators),
     ].map(withinBudget));
     clearTimeout(budgetTimer);
 
@@ -441,6 +449,7 @@ export default async function handler(req, res) {
     const articleVideoRows = rows(15);
     const reviewVideoRows = rows(16);
     const articleCategoryRows = rows(17);
+    const videoCreatorRows = rows(18);
     // Set of seller ids with at least one active listing — cheap membership
     // test for the content gate below.
     const activeSellerIds = new Set(listings.map((r) => r.seller_id).filter(Boolean));
@@ -583,6 +592,28 @@ export default async function handler(req, res) {
         parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.6'));
         const withVideos = organiserVideoRows.find((row) => organiserPath(row) === path);
         if (withVideos) parts.push(...watchUrls(organiserWatchSource(withVideos), lastmod));
+      }
+    }
+
+    // Video creator pages: dated by the creator's row or the newest page
+    // carrying one of their videos, whichever is later.
+    if (videoCreatorRows.length > 0) {
+      const creatorUrls = [];
+      for (const creator of videoCreatorRows) {
+        const path = videoCreatorPath(creator);
+        if (!path) continue;
+        const credits = (list) => Array.isArray(list) && list.some((v) => v?.creator?.id === creator.id);
+        const carriers = [
+          ...events.filter((e) => credits(e.event_videos)),
+          ...organiserVideoRows.filter((o) => credits(o.videos)),
+        ];
+        if (carriers.length === 0) continue;
+        const lastmod = [creator, ...carriers].map((r) => dayOf(r.updated_at, r.created_at)).filter(Boolean).sort().pop() || TODAY;
+        creatorUrls.push({ path, lastmod });
+      }
+      if (creatorUrls.length > 0) {
+        parts.push('', `  <!-- Video creators (${creatorUrls.length}) -->`);
+        for (const { path, lastmod } of creatorUrls) parts.push(xmlUrl(`${BASE_URL}${path}`, lastmod, 'weekly', '0.5'));
       }
     }
 

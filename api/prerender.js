@@ -46,6 +46,10 @@ import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIS
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
 import { creatorLinks } from '../utils/eventVideos.js';
+import {
+  VIDEO_CREATOR_COLUMNS, CREATOR_EVENT_COLUMNS, CREATOR_ORGANISER_COLUMNS,
+  creatorEventsCovered, creatorPageMeta, creatorVideosFromRows, creatorVideosProbe, videoCreatorPath,
+} from '../utils/videoCreators.js';
 import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import {
   playerPath, playerSlug, splitParagraphs, groupPlayersBySport, playerSeo, playerFaqs, playersForSport,
@@ -413,7 +417,9 @@ const videoCreatorHtml = (creator) => {
   const picture = creator.avatar_url
     ? `<img src="${esc(creator.avatar_url)}" alt="${esc(creator.name ? `${creator.name} profile picture` : 'Video creator profile picture')}" width="44" height="44" loading="lazy"> `
     : '';
-  return `<p>${picture}Video by ${creator.name ? `<strong>${esc(creator.name)}</strong>` : 'the creator'}${links ? ` — ${links}` : ''}</p>`;
+  const page = videoCreatorPath(creator);
+  const more = page ? ` — <a href="${BASE_URL}${esc(page)}">More event videos by ${esc(creator.name || 'this creator')}</a>` : '';
+  return `<p>${picture}Video by ${creator.name ? `<strong>${esc(creator.name)}</strong>` : 'the creator'}${links ? ` — ${links}` : ''}${more}</p>`;
 };
 
 async function renderVideoWatch(supabase, kind, params, videoKey) {
@@ -2084,6 +2090,66 @@ ${org.description ? `  <section>\n  <h2>About ${esc(name)}</h2>\n  <p>${esc(Stri
     ogImageAlt: logo ? `${name} logo` : 'CardPop — trading card events across Australia',
     robots: events.length ? undefined : 'noindex, follow',
     jsonLdItems,
+    bodyHtml,
+  });
+}
+
+// A saved video creator's page (/creators/<slug>): who they are, where to
+// follow them and every event video that credits them, each linked to its
+// watch page. Mirrors pages/creators/VideoCreatorPage.jsx.
+async function renderVideoCreator(supabase, slug) {
+  const canonical = `${BASE_URL}/creators/${encodeURIComponent(slug)}`;
+  const { data: creator } = await supabase
+    .from('video_creators').select(VIDEO_CREATOR_COLUMNS).eq('slug', slug).maybeSingle();
+  if (!creator) {
+    return notFound({
+      title: 'Creator Not Found | CardPop',
+      description: 'This video creator could not be found on CardPop.',
+      canonical,
+      bodyHtml: '<main><h1>Creator Not Found</h1><p>This creator page doesn’t exist or has moved.</p></main>',
+    });
+  }
+
+  const probe = creatorVideosProbe(creator.id);
+  const [eventRows, organiserRows] = await Promise.all([
+    supabase.from('events').select(CREATOR_EVENT_COLUMNS)
+      .in('status', ['approved', 'completed'])
+      .contains('event_videos', probe).order('start_date', { ascending: false }).limit(200),
+    supabase.from('event_organisers').select(CREATOR_ORGANISER_COLUMNS)
+      .not('slug', 'is', null).contains('videos', probe).limit(100),
+  ]);
+  const videos = creatorVideosFromRows(creator.id, { events: eventRows.data || [], organisers: organiserRows.data || [] });
+  const meta = creatorPageMeta(creator, videos, { siteUrl: BASE_URL });
+  const events = creatorEventsCovered(videos);
+  const { name } = meta;
+
+  const videoItem = (v) => {
+    const facts = [v.date ? humanDate(v.date) : '', v.where].filter(Boolean).join(', ');
+    return `    <li><a href="${BASE_URL}${esc(v.path)}"><img src="${esc(v.thumbnailUrl)}" alt="" width="480" height="360" loading="lazy" /> <strong>${esc(v.title || `${v.parentName} video`)}</strong></a>`
+      + ` — <a href="${BASE_URL}${esc(v.parentPath)}">${esc(v.parentName)}</a>${facts ? ` (${esc(facts)})` : ''}</li>`;
+  };
+
+  const bodyHtml = `<main>
+  <nav aria-label="Breadcrumb"><a href="${BASE_URL}/">Home</a> / <a href="${BASE_URL}/events">Events</a> / ${esc(name)}</nav>
+  ${creator.avatar_url ? `<p><img src="${esc(creator.avatar_url)}" alt="${esc(name)} profile picture" width="88" height="88" /></p>` : ''}
+  <p>Video creator</p>
+  <h1>${esc(name)}</h1>
+  <p>${esc(meta.description)}</p>
+${meta.links.length ? `  <section>\n  <h2>Follow ${esc(name)}</h2>\n  <ul>${meta.links.map((l) => `<li><a href="${esc(l.url)}" rel="nofollow noopener">${esc(l.label)}${l.handle ? ` ${esc(l.handle)}` : ''}</a></li>`).join('')}</ul>\n  </section>\n` : ''}  <section>
+  <h2>Event videos by ${esc(name)}${videos.length ? ` (${videos.length})` : ''}</h2>
+${videos.length ? `  <ul>\n${videos.map(videoItem).join('\n')}\n  </ul>` : '  <p>No event videos on CardPop yet.</p>'}
+  </section>
+${events.length > 1 ? `  <section>\n  <h2>Events ${esc(name)} has covered</h2>\n  <ul>${events.map((ev) => `<li><a href="${BASE_URL}${esc(ev.parentPath)}">${esc(ev.parentName)}</a></li>`).join('')}</ul>\n  </section>\n` : ''}  <p><a href="${BASE_URL}/events">Browse all trading card events in Australia</a></p>
+</main>`;
+
+  return htmlDoc({
+    title: meta.title,
+    description: meta.description,
+    canonical,
+    ogImage: creator.avatar_url || `${BASE_URL}/og-image.jpg`,
+    ogImageAlt: creator.avatar_url ? `${name} profile picture` : 'CardPop — trading card events across Australia',
+    robots: meta.indexable ? undefined : 'noindex, follow',
+    jsonLdItems: meta.jsonLd,
     bodyHtml,
   });
 }
@@ -5006,6 +5072,11 @@ export default async function handler(req, res) {
 
     if (rawPath === '/events') {
       return sendDoc(res, await renderEventsLanding(supabase, null));
+    }
+
+    const creatorMatch = rawPath.match(/^\/creators\/([^/?#]+)\/?$/);
+    if (creatorMatch) {
+      return sendDoc(res, await renderVideoCreator(supabase, safeDecode(creatorMatch[1])));
     }
 
     const regionMatch = rawPath.match(/^\/card-shows\/([^/?#]+)\/?$/);

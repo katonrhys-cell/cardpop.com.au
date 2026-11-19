@@ -202,6 +202,7 @@ const EventDetailPage = lazy(() => import('@/pages/EventDetailPage.jsx'));
 // A video's own watch page, under the page it belongs to (docs/video-watch-pages.md).
 const VideoWatchPage = lazy(() => import('@/pages/videos/VideoWatchPage.jsx'));
 const EventOrganiserPage = lazy(() => import('@/pages/community/EventOrganiserPage.jsx'));
+const VideoCreatorPage = lazy(() => import('@/pages/creators/VideoCreatorPage.jsx'));
 const ListYourEventPage = lazy(() => import('@/pages/community/ListYourEventPage.jsx'));
 const EventRegionPage = lazy(() => import('@/pages/community/EventRegionPage.jsx'));
 const CommunityDiscussionPage = lazy(() => import('@/pages/community/CommunityDiscussionPage.jsx'));
@@ -528,6 +529,7 @@ const App = () => {
                         <Route path="/events/community-events" element={<CommunityEventsPage defaultType="community_event" />} />
                         <Route path="/events/store-events" element={<CommunityEventsPage defaultType="lgs_event" />} />
                         <Route path="/events/organisers/:slug" element={<EventOrganiserPage />} />
+                        <Route path="/creators/:slug" element={<VideoCreatorPage />} />
                         <Route path="/events/organisers/:slug/videos/:videoKey" element={<VideoWatchPage kind="organiser" />} />
                         <Route path="/list-your-event" element={<ListYourEventPage />} />
                         <Route path="/card-shows/:city" element={<EventRegionPage />} />

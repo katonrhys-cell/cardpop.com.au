@@ -20,6 +20,16 @@ describe('VideoCreatorCredit', () => {
     expect(screen.getByRole('link', { name: /on YouTube/ }).textContent).toBe('@SimpleSimon');
   });
 
+  it('links a saved creator to their page, unless told not to', () => {
+    const creator = { name: 'Simple Simon', id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', slug: 'simple-simon' };
+    const { unmount } = render(<VideoCreatorCredit creator={creator} />);
+    expect(screen.getByRole('link', { name: 'Simple Simon' }).getAttribute('href')).toBe('/creators/simple-simon');
+    expect(screen.getByRole('link', { name: 'More event videos by Simple Simon' }).getAttribute('href')).toBe('/creators/simple-simon');
+    unmount();
+    render(<VideoCreatorCredit creator={creator} linkProfile={false} />);
+    expect(screen.queryByRole('link')).toBeNull();
+  });
+
   it('renders nothing without a credit', () => {
     const { container } = render(<VideoCreatorCredit creator={null} />);
     expect(container.innerHTML).toBe('');
