@@ -295,6 +295,7 @@ ${robots ? `<meta name="robots" content="${esc(robots)}" />` : ''}
 <meta property="og:type" content="${esc(ogType)}" />
 <meta name="application-name" content="CardPop Australia™" />
 <meta name="google-adsense-account" content="ca-pub-8195080361704709" />
+<meta name="facebook-domain-verification" content="00hiq28rj1o746npmwyvyawd6ea2gz" />
 <meta property="og:site_name" content="CardPop Australia™" />
 <meta property="og:url" content="${esc(canonical)}" />
 ${ogImage ? `<meta property="og:image" content="${esc(ogImage)}" />` : ''}
