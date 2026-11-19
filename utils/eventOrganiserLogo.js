@@ -48,3 +48,21 @@ export function logoAltText(event) {
   const who = event?.organizer_name || event?.name || event?.title || 'Event organiser';
   return `${who} logo`;
 }
+
+/**
+ * Inline style that fills a logo tile with the logo's own background colour:
+ * the image is painted a second time as the tile's background, enlarged so
+ * only its top-left corner covers the tile. A logo on a black card then sits
+ * in a black tile instead of a white one with bars; a transparent logo has a
+ * transparent corner, so the tile's white shows through unchanged. Pure CSS —
+ * the image is already cached, and no canvas (or CORS request) is needed.
+ */
+export function logoBackdropStyle(src) {
+  if (typeof src !== 'string' || !src) return undefined;
+  return {
+    backgroundImage: `url(${JSON.stringify(src)})`,
+    backgroundSize: '10000% 10000%',
+    backgroundPosition: '0 0',
+    backgroundRepeat: 'no-repeat',
+  };
+}

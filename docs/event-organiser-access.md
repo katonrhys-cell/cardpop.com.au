@@ -84,6 +84,22 @@ independent of page ownership; an admin sets each deliberately.
 
 ## Social links
 
+An organiser can also show **contact details** — a contact name, email and
+phone (`contact_name` / `contact_email` / `contact_phone`,
+`20261118232637_organiser_contact_details.sql`). All three are optional, entered
+in **Edit page** (never copied from the member's account) and shown publicly on
+the page as `mailto:` / `tel:` links; `organiserContact()` in
+`utils/organiserPage.js` is the one normaliser for the SPA and the prerender.
+
+**Details typed on an event carry to the organiser's page.** When an admin saves
+an event, the Organiser tab's logo, website, social links and contact email /
+phone fill any **blank** field on that organiser's page
+(`fillOrganiserPageFromEvent()` in `hooks/useEventOrganisers.js`, rules in the
+pure `organiserBlanksFromEvent()`); nothing already on the page is overwritten,
+and a toast names what was added. The **Also add these details to the
+organiser's page** tick (on by default) is the admin's check before anything is
+published there. Only an exact name match is filled — a joint "A & B" name is not.
+
 An organiser page carries website, Instagram, Facebook, YouTube, **TikTok, X and
 Linktree** links (`event_organisers.*_url`, http(s) only by a CHECK constraint;
 TikTok / X / Linktree arrived in `20261116110000_organiser_tiktok_x_linktree_links.sql`).
@@ -92,6 +108,17 @@ The owner edits them in **Edit page** (`components/events/OrganiserPageEditor.js
 buttons and the prerender's `Organization.sameAs` read. To add another, extend
 `LINK_FIELDS` + `ORGANISER_PAGE_COLUMNS` there, the editor's `LINKS`, and the
 page's `LINK_ICONS`.
+
+## Contact link
+
+`event_organisers.contact_url` (`20261118233912_organiser_contact_url.sql`,
+http(s) only) is where enquiries for the organiser should go — their own contact
+form. An admin or the page's owner sets it as **Contact page** in **Edit page**.
+When set, the page shows a **Contact** button at the top and in *Feedback &
+questions*, opening that page in a new tab **in place of** the on-site Message
+button; cleared, the Message flow (`docs/organiser-messages.md`) is back. Read it
+through `organiserContactUrl()`; it is not a social profile, so it stays out of
+`organiserLinks()` and `Organization.sameAs`.
 
 ## Messages from collectors
 

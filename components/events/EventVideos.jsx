@@ -3,11 +3,12 @@ import { Link } from 'react-router-dom';
 import { Video } from 'lucide-react';
 import { youTubeEmbedUrl, videoLabel, VIDEO_AUTOPLAY_DELAY_MS } from '@/utils/eventVideos.js';
 import { watchVideoPath } from '@/utils/videoWatch.js';
+import VideoCreatorCredit from '@/components/events/VideoCreatorCredit.jsx';
 
 // The event page's videos (events.event_videos, normalised by
 // cleanEventVideos), shown below the photo gallery: one YouTube embed per
-// video with its title underneath, plus the optional Facebook video embed
-// last. Renders nothing without a usable video.
+// video with its title and creator credit (VideoCreatorCredit) underneath,
+// plus the optional Facebook video embed last. Renders nothing without a usable video.
 //
 // The first YouTube video starts by itself VIDEO_AUTOPLAY_DELAY_MS after the
 // page loads, through the iframe player API via postMessage (enabled by
@@ -76,6 +77,7 @@ const EventVideos = ({ videos = [], fbEmbedUrl = null, eventName = '', headingId
                   )}
                 </figcaption>
               )}
+              <VideoCreatorCredit creator={video.creator} />
             </figure>
           );
         })}

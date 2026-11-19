@@ -1,5 +1,5 @@
-import React from 'react';
-import { ArrowDown, ArrowUp, CheckCircle2, AlertCircle, Plus, Trash2 } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, CheckCircle2, AlertCircle, ChevronDown, Loader2, Plus, Trash2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,19 +7,128 @@ import { toast } from 'sonner';
 import {
   MAX_EVENT_VIDEOS,
   MAX_VIDEO_TITLE_CHARS,
+  MAX_CREATOR_NAME_CHARS,
+  CREATOR_PLATFORMS,
+  cleanVideoCreator,
+  creatorProfileUrl,
   emptyVideo,
   youTubeVideoId,
   youTubeThumbnailUrl,
 } from '@/utils/eventVideos.js';
+import { CREATOR_AVATAR_ACCEPT, creatorAvatarFileError, uploadVideoCreatorAvatar } from '@/utils/uploadVideoCreatorAvatar.js';
+import VideoCreatorCredit from '@/components/events/VideoCreatorCredit.jsx';
 
-// Video list for the event form. Controlled: `value` is [{ title, url }] in
+// Video list for the event form. Controlled: `value` is [{ title, url, creator? }] in
 // display order; the form normalises it with cleanEventVideos on save. The
 // event page embeds them below the photo gallery
 // (components/events/EventVideos.jsx) and starts the first one by itself.
+// The creator credit for one video: picture, name and social handles, shown
+// under the player on the page. The picture uploads as soon as it is picked
+// (the row then just holds its URL); socials take a handle or a pasted link
+// and are checked against that platform as they are typed.
+const CreatorFields = ({ video, n, onChange, disabled }) => {
+  const creator = video.creator || {};
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const set = (key, value) => onChange({ ...video, creator: { ...creator, [key]: value } });
+
+  const pickAvatar = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    const problem = creatorAvatarFileError(file);
+    if (problem) { toast.error(problem); return; }
+    setUploading(true);
+    try {
+      set('avatar_url', await uploadVideoCreatorAvatar(file));
+    } catch (err) {
+      toast.error(`The picture didn't upload — ${err?.message || 'please try again'}.`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const preview = cleanVideoCreator(creator);
+
+  return (
+    <div className="space-y-3 border-t border-border pt-3">
+      <p className="text-xs text-muted-foreground">
+        Credit whoever made this video. Their picture, name and handles show under the video on the page.
+      </p>
+      <div className="flex items-center gap-3">
+        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-border bg-muted flex items-center justify-center">
+          {uploading
+            ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" aria-label="Uploading picture" />
+            : creator.avatar_url
+              ? <img src={creator.avatar_url} alt="" className="h-full w-full object-cover" />
+              : <UserRound className="w-6 h-6 text-muted-foreground" aria-hidden="true" />}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input ref={fileRef} type="file" accept={CREATOR_AVATAR_ACCEPT} className="hidden" onChange={pickAvatar}
+            aria-label={`Video ${n} creator picture`} />
+          <Button type="button" variant="outline" size="sm" disabled={disabled || uploading} onClick={() => fileRef.current?.click()}>
+            {creator.avatar_url ? 'Change picture' : 'Upload picture'}
+          </Button>
+          {creator.avatar_url && (
+            <Button type="button" variant="ghost" size="sm" disabled={disabled || uploading} onClick={() => set('avatar_url', '')}>
+              Remove
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor={`video-creator-name-${n}`} className="text-xs">Creator name</Label>
+        <Input
+          id={`video-creator-name-${n}`}
+          value={creator.name || ''}
+          onChange={(e) => set('name', e.target.value.slice(0, MAX_CREATOR_NAME_CHARS))}
+          placeholder="e.g. Simple Simon"
+          maxLength={MAX_CREATOR_NAME_CHARS}
+          disabled={disabled}
+          className="h-9"
+        />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {CREATOR_PLATFORMS.map(({ key, label, placeholder }) => {
+          const typed = (creator[key] || '').trim();
+          const invalid = Boolean(typed) && !creatorProfileUrl(key, typed);
+          return (
+            <div key={key} className="space-y-1">
+              <Label htmlFor={`video-creator-${key}-${n}`} className="text-xs">{label}</Label>
+              <Input
+                id={`video-creator-${key}-${n}`}
+                value={creator[key] || ''}
+                onChange={(e) => set(key, e.target.value)}
+                placeholder={placeholder}
+                disabled={disabled}
+                className="h-9"
+                aria-invalid={invalid ? true : undefined}
+              />
+              {invalid && (
+                <p className="flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" /> Not a {label} handle or link — it won&apos;t be saved
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {preview && (
+        <div>
+          <p className="text-xs font-semibold text-muted-foreground">Preview</p>
+          <VideoCreatorCredit creator={preview} />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const VideoRow = ({ video, index, count, onChange, onRemove, onMove, disabled }) => {
   const n = index + 1;
   const id = youTubeVideoId(video.url);
   const typed = video.url.trim().length > 0;
+  const hasCreator = Boolean(cleanVideoCreator(video.creator));
+  const [creatorOpen, setCreatorOpen] = useState(hasCreator);
 
   return (
     <div className="rounded-2xl border border-border bg-muted/20 p-3 space-y-2">
@@ -80,6 +189,15 @@ const VideoRow = ({ video, index, count, onChange, onRemove, onMove, disabled })
           </Button>
         </div>
       </div>
+      <Button
+        type="button" variant="ghost" size="sm" className="h-8 gap-1.5 px-2 text-xs"
+        onClick={() => setCreatorOpen((open) => !open)} aria-expanded={creatorOpen} disabled={disabled}
+      >
+        <UserRound className="w-3.5 h-3.5" aria-hidden="true" />
+        {hasCreator ? `Creator credit${video.creator?.name ? ` — ${video.creator.name}` : ''}` : 'Add creator credit (picture & socials)'}
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${creatorOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+      </Button>
+      {creatorOpen && <CreatorFields video={video} n={n} onChange={onChange} disabled={disabled} />}
     </div>
   );
 };

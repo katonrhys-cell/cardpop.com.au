@@ -63,6 +63,8 @@ const fromYouTube = (v) => ({
   contentUrl: null,
   thumbnailUrl: youTubeThumbnailUrl(v.id),
   addedAt: v.added_at || null,
+  // Who made it (picture, name, socials) — shown under the player.
+  creator: v.creator || null,
 });
 
 // A review / article / store video ({ url, poster_url, caption } out of
