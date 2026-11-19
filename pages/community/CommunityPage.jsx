@@ -31,12 +31,13 @@ import ProfileAvatar from '@/components/ProfileAvatar.jsx';
 
 const TOTAL_SLIDES = 3;
 
-// The upcoming-event tiles are filled with the brand gradient (the same
-// charcoal → CardPop red sweep as the promo carousel) so the section reads as
-// a designed feature rather than four outlined boxes. Everything on a tile
-// is white-on-brand, so the thumb, pill and date leaf below are frosted
-// (white at low alpha) rather than the page's border/muted tokens.
-const EVENT_TILE_BG = 'linear-gradient(135deg, #1F2937 0%, #7F131F 58%, #CE1126 100%)';
+// The upcoming-event tiles are filled with solid brand charcoal and carry a
+// CardPop red accent bar along the top, so the section reads as a designed
+// feature rather than four outlined boxes. Only palette colours are used —
+// a charcoal → red gradient blends into an off-brand maroon in the middle.
+// Everything on a tile is white-on-charcoal, so the thumb, pill and date leaf
+// below are frosted (white at low alpha) rather than the page's
+// border/muted tokens.
 
 // The little picture on an upcoming-event tile: the event's own poster/logo
 // (`events.image_url`, routed through the image CDN like every stored image).
@@ -412,10 +413,12 @@ const CommunityPage = () => {
                   <Link
                     key={event.id}
                     to={eventPath(event)}
-                    className="group relative flex flex-col min-h-[13rem] overflow-hidden rounded-2xl p-5 text-white shadow-md ring-1 ring-black/10 hover:shadow-xl hover:-translate-y-1 transition-all duration-300"
-                    style={{ background: EVENT_TILE_BG }}
+                    className="group relative flex flex-col min-h-[13rem] overflow-hidden rounded-2xl p-5 bg-brand-charcoal text-white shadow-md ring-1 ring-black/10 hover:shadow-xl hover:ring-brand-red/60 hover:-translate-y-1 transition-all duration-300"
                     data-testid="event-tile"
                   >
+                    {/* CardPop red accent bar */}
+                    <div className="absolute inset-x-0 top-0 h-1 bg-brand-red" aria-hidden="true" />
+
                     {/* Diagonal accent slabs — the same device as the promo carousel */}
                     <div className="absolute inset-0 pointer-events-none overflow-hidden" aria-hidden="true">
                       <div className="absolute -right-10 top-0 w-36 h-full bg-white/[0.07] group-hover:bg-white/[0.11] transition-colors duration-300" style={{ transform: 'skewX(-12deg)' }} />
