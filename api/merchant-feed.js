@@ -1,8 +1,11 @@
-// Google Merchant Center product feed: shop products + Official CardPop Store
-// cards only (utils/merchantFeed.js, docs/merchant-feed.md). Served at
-// /merchant-feed.tsv; Merchant Center fetches it on a schedule.
+// Product feeds: shop products + Official CardPop Store cards only.
+// - Google Merchant Center: /merchant-feed.tsv (utils/merchantFeed.js, docs/merchant-feed.md)
+// - Meta catalog (Instagram / Facebook shopping): /meta-catalog.tsv → ?format=meta
+//   (utils/metaCatalogFeed.js, docs/meta-catalog.md)
+// One function serves both so the product set can't drift between them.
 import { createClient } from '@supabase/supabase-js';
 import { shopFeedRow, cardFeedRow, toTsv, FEED_SHOP_STATUSES } from '../utils/merchantFeed.js';
+import { metaShopFeedRow, metaCardFeedRow, META_FEED_COLUMNS } from '../utils/metaCatalogFeed.js';
 
 const SUPABASE_URL = 'https://vrfsaazuqjxotnieqlkd.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_lHlLkeTfwzhWQ80Zz6pL6g_jc7Y8p33';
@@ -40,6 +43,9 @@ async function fetchAll(build) {
 }
 
 export default async function handler(req, res) {
+  const meta = req.query?.format === 'meta';
+  const shopRow = meta ? metaShopFeedRow : shopFeedRow;
+  const cardRow = meta ? metaCardFeedRow : cardFeedRow;
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 
@@ -61,7 +67,7 @@ export default async function handler(req, res) {
     ]);
 
     const rows = [
-      ...products.map(shopFeedRow),
+      ...products.map(shopRow),
       ...listings.map((l) => {
         const card = l.vault_item || {};
         const paths = [
@@ -69,16 +75,16 @@ export default async function handler(req, res) {
           ...(Array.isArray(card.card_images) ? card.card_images : []),
           card.card_image,
         ].filter(Boolean);
-        return cardFeedRow(l, { imageUrls: [...new Set(paths.map(imageUrl))] });
+        return cardRow(l, { imageUrls: [...new Set(paths.map(imageUrl))] });
       }),
     ];
 
     res.setHeader('Content-Type', 'text/tab-separated-values; charset=utf-8');
     res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=3600');
-    res.status(200).send(toTsv(rows));
+    res.status(200).send(meta ? toTsv(rows, META_FEED_COLUMNS) : toTsv(rows));
   } catch (err) {
     console.error('[merchant-feed] failed:', err?.message);
-    // 5xx keeps Merchant Center on the last good fetch instead of an empty feed.
+    // 5xx keeps Merchant Center / Meta on the last good fetch instead of an empty feed.
     res.setHeader('Cache-Control', 'no-store');
     res.status(503).send('Feed temporarily unavailable');
   }

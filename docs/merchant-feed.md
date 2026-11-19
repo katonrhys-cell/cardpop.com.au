@@ -13,6 +13,9 @@ Code: `utils/merchantFeed.js` (row builders, TSV), `api/merchant-feed.js`
 (queries), rewrite `/merchant-feed.tsv` in `vercel.json`. Cached 15 minutes at
 the edge; a DB failure answers 503 so Merchant Center keeps its last good fetch.
 
+The same products also go to Meta (Instagram / Facebook shopping) as
+`/meta-catalog.tsv`. See `docs/meta-catalog.md`.
+
 ## Pre-orders
 
 Merchant Center needs an ISO `availability_date`; `shop_products.preorder_eta`

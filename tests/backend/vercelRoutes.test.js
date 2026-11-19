@@ -90,6 +90,7 @@ describe('rewrites', () => {
   it('serves the sitemap, feed, cron and grade-estimate functions', () => {
     expect(rewrite('/sitemap.xml').pathname).toBe('/api/sitemap');
     expect(rewrite('/merchant-feed.tsv').pathname).toBe('/api/merchant-feed');
+    expect(rewrite('/meta-catalog.tsv')).toEqual(expect.objectContaining({ pathname: '/api/merchant-feed', query: { format: 'meta' } }));
     expect(rewrite('/cron/blog-generate').pathname).toBe('/api/blog-generate');
     expect(rewrite('/cron/site-check').pathname).toBe('/api/site-check');
     expect(rewrite('/cron/event-scan', { query: { mode: 'watches' } })).toEqual(expect.objectContaining({ pathname: '/api/event-scan', query: { mode: 'watches' } }));

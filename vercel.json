@@ -95,6 +95,10 @@
       "destination": "/api/merchant-feed"
     },
     {
+      "source": "/meta-catalog.tsv",
+      "destination": "/api/merchant-feed?format=meta"
+    },
+    {
       "source": "/",
       "has": [
         {
