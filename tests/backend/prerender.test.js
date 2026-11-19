@@ -996,6 +996,31 @@ describe('prerender events', () => {
     expect(body).toContain('"startDate":"2026-11-14T09:00:00+10:00"');
   });
 
+  it('renders vendor information for bots on an upcoming event only', async () => {
+    const vendorEvent = {
+      id: UUID, slug: 'toy-fair', title: 'Toy Fair', status: 'approved',
+      start_date: '2099-11-22', vendor_application_url: 'https://toyfair.test/vendors',
+      vendor_info: {
+        intro: 'Tables are 6ft.',
+        faqs: [{ question: 'Is power included?', answer: 'Yes, on request.' }, { question: 'No answer', answer: '' }],
+        documents: [{ title: 'Trader Pack', url: 'https://cdn.test/vendor-info/pack.pdf' }, { title: 'Bad', url: 'javascript:alert(1)' }],
+        links: [{ label: 'Vendor FAQs', url: 'https://toyfair.test/faq' }],
+      },
+    };
+    state.result = { data: vendorEvent };
+    const { body } = await run('/events/toy-fair');
+    expect(body).toContain('<section id="vendor-info"><h2>Vendor Information</h2><p>Tables are 6ft.</p>');
+    expect(body).toContain('<a href="https://toyfair.test/faq" rel="nofollow noopener">Vendor FAQs</a>');
+    expect(body).toContain('<a href="https://cdn.test/vendor-info/pack.pdf" rel="nofollow noopener">Trader Pack (PDF)</a>');
+    expect(body).toContain('<dt>Is power included?</dt><dd>Yes, on request.</dd>');
+    expect(body).not.toContain('No answer');
+    expect(body).not.toContain('javascript:');
+
+    state.result = { data: { ...vendorEvent, status: 'completed', start_date: '2025-11-22' } };
+    const past = await run('/events/toy-fair');
+    expect(past.body).not.toContain('Vendor Information');
+  });
+
   it('renders a single untitled album without an album heading', async () => {
     state.result = { data: {
       id: UUID, slug: 'one-album', title: 'One Album', status: 'approved',

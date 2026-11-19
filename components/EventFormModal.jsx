@@ -22,6 +22,9 @@ import EventSideEventsEditor from '@/components/events/EventSideEventsEditor.jsx
 import EventPrizesEditor from '@/components/events/EventPrizesEditor.jsx';
 import { cleanSideEvents, sideEventsFormError, sideEventsToForm } from '@/utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '@/utils/eventPrizes.js';
+import EventVendorInfoEditor from '@/components/events/EventVendorInfoEditor.jsx';
+import { cleanVendorInfo, emptyVendorForm, vendorInfoFormError, vendorInfoToForm } from '@/utils/eventVendorInfo.js';
+import { uploadEventVendorFile } from '@/utils/uploadEventVendorFile.js';
 import { cleanGalleryAlbums, flattenGalleryAlbums } from '@/utils/eventGallery.js';
 import TicketPricesEditor from '@/components/events/TicketPricesEditor.jsx';
 import { cleanTicketPrices, ticketPricesFormError } from '@/utils/eventTicketPrices.js';
@@ -249,6 +252,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   // (saved) or { file, preview } (uploaded on save).
   const [sideEvents, setSideEvents] = useState([]);
   const [prizeForm, setPrizeForm] = useState({ pool: '', prizes: [] });
+  // Vendors tab (utils/eventVendorInfo.js): { intro, faqs, documents, links },
+  // a document being { title, url } (saved) or { title, file } (uploaded on save).
+  const [vendorForm, setVendorForm] = useState(emptyVendorForm);
   const fileInputRef = useRef(null);
   // Weekly re-scan of the "Website to scrape" (admin only). On by default; an
   // existing watch's on/off state replaces the default once it loads.
@@ -272,6 +278,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const changeVideos = (v) => { markDirty(); setVideos(v); };
   const changeSideEvents = (v) => { markDirty(); setSideEvents(v); };
   const changePrizes = (v) => { markDirty(); setPrizeForm(v); };
+  const changeVendor = (v) => { markDirty(); setVendorForm(v); };
   const changeOffer = (v) => { markDirty(); setOfferForm(v); };
 
   // Switch to the tab holding a field and put the cursor in it, so an error
@@ -441,6 +448,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         .map(a => ({ title: a.title, photos: a.images.map(url => ({ url })) })));
       setVideos(videosToForm(cleanEventVideos(event.event_videos, event.youtube_url)));
       setSideEvents(sideEventsToForm(event.side_events));
+      setVendorForm(vendorInfoToForm(event.vendor_info));
       setPrizeForm({
         pool: cleanPrizePool(event.prize_pool),
         prizes: cleanEventPrizes(event.event_prizes).map(p => ({ place: p.place, reward: p.reward, photos: p.images.map(url => ({ url })) })),
@@ -471,7 +479,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
 
     if (!event?.id || scrapedData) setGallery([emptyAlbum()]);
     if (!event?.id || scrapedData) setVideos([emptyVideo()]);
-    if (!event?.id || scrapedData) { setSideEvents([]); setPrizeForm({ pool: '', prizes: [] }); }
+    if (!event?.id || scrapedData) { setSideEvents([]); setPrizeForm({ pool: '', prizes: [] }); setVendorForm(emptyVendorForm()); }
     setImageFile(null);
     setRemoveExistingImage(false);
     setLogoFile(null);
@@ -634,6 +642,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     setVideos([emptyVideo()]);
     setSideEvents([]);
     setPrizeForm({ pool: '', prizes: [] });
+    setVendorForm(emptyVendorForm());
     setOfferForm(EMPTY_OFFER_FORM);
     setActiveTab('details');
     dirtyRef.current = false;
@@ -666,6 +675,15 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     if (sideEventError) {
       toast.error(sideEventError);
       focusField('extras');
+      return;
+    }
+
+    // Vendor links get the same https:// fix-up before the check.
+    const vendorRows = { ...vendorForm, links: vendorForm.links.map(l => ({ ...l, url: normalizeEventUrl(l.url) || '' })) };
+    const vendorError = vendorInfoFormError(vendorRows);
+    if (vendorError) {
+      toast.error(vendorError);
+      focusField('vendors');
       return;
     }
 
@@ -764,6 +782,21 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
       const prize_pool = cleanPrizePool(prizeForm.pool) || null;
       const side_events = cleanSideEvents(sideRows);
 
+      // Vendor documents: new files go up now (vendor-info/<uuid>.<ext>),
+      // saved ones keep their URL; uploaded ones become saved so a retry
+      // doesn't upload twice.
+      const uploadedDocs = [];
+      const newDocs = vendorRows.documents.filter(d => !d.url).length;
+      let docNo = 0;
+      for (const doc of vendorRows.documents) {
+        if (doc.url) { uploadedDocs.push({ title: doc.title, url: doc.url }); continue; }
+        docNo += 1;
+        const url = await step(`Uploading vendor document ${docNo} of ${newDocs}`, () => uploadEventVendorFile(doc.file), UPLOAD_STEP_TIMEOUT_MS);
+        uploadedDocs.push({ title: doc.title, url });
+      }
+      setVendorForm(prev => ({ ...prev, documents: uploadedDocs }));
+      const vendor_info = cleanVendorInfo({ ...vendorRows, documents: uploadedDocs });
+
       const payload = {
         title:               formData.title.trim(),
         short_description:   formData.short_description.trim() || null,
@@ -787,6 +820,11 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
         side_events,
         event_prizes,
         prize_pool,
+        // Only sent once there's something in it (or to clear what was
+        // there), so saves keep working if the column's migration hasn't landed.
+        ...(event?.vendor_info && Object.keys(event.vendor_info).length
+          || vendor_info.intro || vendor_info.faqs.length || vendor_info.documents.length || vendor_info.links.length
+          ? { vendor_info } : {}),
         // Venue
         venue_name:          formData.venue_name.trim() || null,
         address:             formData.address.trim() || null,
@@ -1023,6 +1061,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
               <TabsList aria-label="Event form sections" className="w-full justify-start h-12 bg-transparent p-0 gap-0 overflow-x-auto overflow-y-hidden">
                 {[
                   { id: 'details',   label: 'Details' },
+                  { id: 'vendors',   label: 'Vendors' },
                   { id: 'venue',     label: 'Venue & Dates' },
                   { id: 'extras',    label: 'Side Events & Prizes' },
                   { id: 'organiser', label: 'Organiser' },
@@ -1277,13 +1316,28 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                 </div>
               </TabsContent>
 
-              {/* ── TAB 3: ORGANISER ── */}
+              {/* ── TAB: VENDORS ── everything a would-be trader needs, shown on the
+                  event page as "Vendor Information" (utils/eventVendorInfo.js). */}
+              <TabsContent value="vendors" className="mt-0 space-y-8 animate-in fade-in">
+                <p className="text-sm text-muted-foreground">
+                  Everything for traders in one place. Once anything here is filled in, the event page shows a
+                  "Vendor Information" section and a "Want to be a vendor?" link under the RSVP buttons.
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
+                  <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
+                  <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a Trader Table" on the event page until the event has passed.</p>
+                </div>
+                <EventVendorInfoEditor value={vendorForm} onChange={changeVendor} disabled={loading} />
+              </TabsContent>
+
               {/* ── TAB: SIDE EVENTS & PRIZES ── */}
               <TabsContent value="extras" className="mt-0 space-y-8 animate-in fade-in">
                 <EventSideEventsEditor value={sideEvents} onChange={changeSideEvents} disabled={loading} defaultDate={formData.start_date} />
                 <EventPrizesEditor value={prizeForm} onChange={changePrizes} disabled={loading} />
               </TabsContent>
 
+              {/* ── TAB: ORGANISER ── */}
               <TabsContent value="organiser" className="mt-0 space-y-5 animate-in fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {organisers.length > 0 && (
@@ -1412,11 +1466,6 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                       <Input id="waitlist_url" name="waitlist_url" type="url" value={formData.waitlist_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
                       <p className="text-xs text-muted-foreground">Where collectors can join the waitlist. Shown as "Join the waitlist" while the event is sold out.</p>
                     </div>
-                  </div>
-                  <div className="sm:col-span-2 space-y-2">
-                    <Label htmlFor="vendor_application_url" className="font-bold">Trader / Vendor Applications URL</Label>
-                    <Input id="vendor_application_url" name="vendor_application_url" type="url" value={formData.vendor_application_url} onChange={handleChange} className={inputCls} placeholder="https://" disabled={loading} />
-                    <p className="text-xs text-muted-foreground">Where dealers book a table — shown as "Apply for a Trader Table" on the event page until the event has passed.</p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="instagram_url" className="font-bold">Instagram URL</Label>

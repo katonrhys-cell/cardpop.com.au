@@ -45,6 +45,7 @@ import {
 import { LIST_EVENT_FAQS, LIST_EVENT_HERO, LIST_EVENT_SEO, LIST_EVENT_STEPS, LIST_EVENT_TIERS, SUBMIT_EVENT_PATH, LIST_EVENT_FEATURED_PACKAGES, LIST_EVENT_EXTRAS, EXTRAS_NOTE, EXTRAS_ENQUIRY_NOTE, FEATURED_MEMBERSHIP_NOTE, FEATURED_EARLY_BIRD_NOTE, FEATURED_BUNDLE_NOTE } from '../data/listYourEvent.js';
 import { cleanSideEvents, groupSideEventsByDay, formatSideEventDay, formatSideEventTime, formatSideEventFee, buildSubEventLds } from '../utils/eventSideEvents.js';
 import { cleanEventPrizes, cleanPrizePool } from '../utils/eventPrizes.js';
+import { cleanVendorInfo, safeVendorUrl, isPdfUrl } from '../utils/eventVendorInfo.js';
 import { creatorLinks } from '../utils/eventVideos.js';
 import { eventWatchSource, organiserWatchSource, articleWatchSource, storeWatchSource, buildWatchPage, watchLinks } from '../utils/videoWatch.js';
 import {
@@ -1774,6 +1775,26 @@ const eventPrizesHtml = (prizes, prizePool, name) => {
   return `<section><h2>Prizes</h2>${prizePool ? `<p>Total prize pool: ${esc(prizePool)}</p>` : ''}${rows ? `<ul>${rows}</ul>` : ''}</section>`;
 };
 
+// Vendor information (events.vendor_info + vendor_application_url,
+// utils/eventVendorInfo.js): the organiser's words, the application link,
+// documents, links and the vendor FAQ as plain text. Upcoming events only —
+// the SPA hides it once the event has passed. http(s) links only.
+const eventVendorInfoHtml = (event, isPast) => {
+  if (isPast) return '';
+  const info = cleanVendorInfo(event.vendor_info);
+  const apply = safeVendorUrl(event.vendor_application_url);
+  if (!info.intro && !info.faqs.length && !info.documents.length && !info.links.length && !apply) return '';
+  const links = [
+    ...(apply ? [[apply, 'Apply for a Trader Table']] : []),
+    ...info.links.map((l) => [l.url, l.label]),
+    ...info.documents.map((d) => [d.url, `${d.title}${isPdfUrl(d.url) ? ' (PDF)' : ''}`]),
+  ];
+  return `<section id="vendor-info"><h2>Vendor Information</h2>${info.intro ? `<p>${esc(info.intro)}</p>` : ''}`
+    + `${links.length ? `<ul>${links.map(([url, label]) => `<li><a href="${esc(url)}" rel="nofollow noopener">${esc(label)}</a></li>`).join('')}</ul>` : ''}`
+    + `${info.faqs.length ? `<h3>Vendor FAQs</h3><dl>${info.faqs.map((f) => `<dt>${esc(f.question)}</dt><dd>${esc(f.answer)}</dd>`).join('')}</dl>` : ''}`
+    + '</section>';
+};
+
 // Full schema.org Event for a Supabase event record. Every field Google's
 // event rich-result report checks (description, image, eventStatus, offers,
 // organizer, performer, endDate) is always present, falling back to site-level
@@ -2105,6 +2126,13 @@ async function renderEvent(supabase, param) {
         .from('events').select('side_events, event_prizes, prize_pool').eq('id', event.id).maybeSingle();
       if (extras) Object.assign(event, extras);
     } catch { /* no extras */ }
+    // Vendor info is its own best-effort read, so this page still gets the
+    // side events above while the vendor_info migration is landing.
+    try {
+      const { data: vendor } = await supabase
+        .from('events').select('vendor_info').eq('id', event.id).maybeSingle();
+      if (vendor) Object.assign(event, vendor);
+    } catch { /* no vendor info */ }
   }
 
   // Approved, or completed — an admin's archive. A finished event keeps its
@@ -2197,6 +2225,7 @@ async function renderEvent(supabase, param) {
   ${eventGalleryHtml(event, name)}
   ${eventPrizesHtml(prizes, prizePool, name)}
   ${watchLinksHtml(videoLinks, videoLinks.length > 1 ? 'Event Videos' : 'Event Video')}
+  ${eventVendorInfoHtml(event, isPast)}
   ${event.website_url ? `<p><a href="${esc(event.website_url)}" rel="nofollow">Event website</a></p>` : ''}
   ${ticketStatusHtml(event, isPast)}
   ${organiserLinksHtml(event)}
