@@ -45,6 +45,8 @@ export const emptyVideo = () => ({ title: '', url: '' });
 // player: `creator: { name, avatar_url, instagram, youtube, tiktok, facebook,
 // x }`. Each social is stored as a canonical profile URL on that platform's
 // own host; the form accepts a handle ("@name") or a pasted profile link.
+// A credit picked from the saved creators also carries `id` + `slug`, which
+// link the video to that creator's page (utils/videoCreators.js).
 
 export const MAX_CREATOR_NAME_CHARS = 60;
 
@@ -104,6 +106,10 @@ export const creatorHandleLabel = (url) => {
   return handle ? `@${handle}` : '';
 };
 
+// A saved creator's id (a uuid) and page slug, as public.video_creators holds them.
+export const CREATOR_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+export const CREATOR_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 // The creator's picture: an uploaded image's public URL — http(s) only.
 const cleanAvatarUrl = (value) => {
   const s = trimOrEmpty(value);
@@ -125,7 +131,13 @@ export const cleanVideoCreator = (creator) => {
     const url = creatorProfileUrl(key, creator[key]);
     if (url) out[key] = url;
   }
-  return Object.keys(out).length ? out : null;
+  if (!Object.keys(out).length) return null;
+  // A saved creator (public.video_creators, utils/videoCreators.js): the id is
+  // what ties this video to their page, the slug is that page's address.
+  const id = trimOrEmpty(creator.id).toLowerCase();
+  const slug = trimOrEmpty(creator.slug);
+  if (CREATOR_ID_RE.test(id) && CREATOR_SLUG_RE.test(slug)) { out.id = id; out.slug = slug; }
+  return out;
 };
 
 /** The creator's socials that are set, in display order: [{ key, label, url, handle }]. */

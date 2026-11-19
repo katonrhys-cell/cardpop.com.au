@@ -35,6 +35,9 @@ The same credit shows on the video's watch page and in its prerendered copy.
   `utils/uploadVideoCreatorAvatar.js`: 256 px, `events` bucket,
   `logos/creator-<uuid>.<ext>` (same naming rule as the organiser logo — never
   a `Date.now()` name in that bucket).
+- A credit can be **saved and reused**: *Saved creators* in the form picks one,
+  admins save a new one from what they typed, and each saved creator has a page
+  at `/creators/<slug>` listing their videos — see `docs/video-creators.md`.
 - Forms hold videos as `videosToForm(cleanEventVideos(...))`. Mapping a list
   down to `{ title, url }` by hand drops the credit on the next save.
 

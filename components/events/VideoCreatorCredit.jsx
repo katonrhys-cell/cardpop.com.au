@@ -1,18 +1,29 @@
 import React from 'react';
+import { Link, useInRouterContext } from 'react-router-dom';
 import { FacebookIcon, InstagramIcon, TikTokIcon, YouTubeIcon } from '@/components/SocialBrandIcons.jsx';
 import XIcon from '@/components/XIcon.jsx';
 import { creatorLinks } from '@/utils/eventVideos.js';
 import { publicImageUrl } from '@/utils/imageUrl.js';
+import { videoCreatorPath } from '@/utils/videoCreators.js';
 
 const ICONS = { instagram: InstagramIcon, youtube: YouTubeIcon, tiktok: TikTokIcon, facebook: FacebookIcon, x: XIcon };
 
 // Who made a video — the creator's picture, name and social handles, shown
 // under the player (`creator` out of cleanVideoCreator, utils/eventVideos.js).
 // Renders nothing without a credit.
-const VideoCreatorCredit = ({ creator }) => {
+//
+// A saved creator (the credit carries `slug`) links to their page — every
+// event video they have made (/creators/<slug>). `linkProfile={false}` leaves
+// that out: the form's preview, and the creator's own page.
+const VideoCreatorCredit = ({ creator, linkProfile = true }) => {
+  const inRouter = useInRouterContext();
   if (!creator) return null;
   const links = creatorLinks(creator);
   const name = creator.name || '';
+  const profilePath = linkProfile ? videoCreatorPath(creator) : null;
+  const profileLink = (className, children) => (inRouter
+    ? <Link to={profilePath} className={className}>{children}</Link>
+    : <a href={profilePath} className={className}>{children}</a>);
 
   return (
     <div className="mt-3 flex items-center gap-3 rounded-2xl border border-border bg-muted/30 p-3">
@@ -33,7 +44,9 @@ const VideoCreatorCredit = ({ creator }) => {
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-tight">
           <span className="text-xs text-muted-foreground">Video by </span>
-          {name && <span className="font-semibold text-foreground">{name}</span>}
+          {name && (profilePath
+            ? profileLink('font-semibold text-foreground underline-offset-2 hover:text-brand-red hover:underline', name)
+            : <span className="font-semibold text-foreground">{name}</span>)}
         </p>
         {links.length > 0 && (
           <ul className="mt-1.5 flex flex-wrap gap-1.5">
@@ -55,6 +68,11 @@ const VideoCreatorCredit = ({ creator }) => {
               );
             })}
           </ul>
+        )}
+        {profilePath && (
+          <p className="mt-1.5 text-xs">
+            {profileLink('font-medium text-muted-foreground underline-offset-2 hover:text-brand-red hover:underline', `More event videos by ${name || 'this creator'}`)}
+          </p>
         )}
       </div>
     </div>
