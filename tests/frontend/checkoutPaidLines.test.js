@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { cartLineKey, rememberPaidLines, takePaidLines } from '@/lib/checkoutPaidLines.js';
+import { cartLineKey, rememberPaidLines, takePaidLines, claimCheckoutSession } from '@/lib/checkoutPaidLines.js';
 
 describe('checkoutPaidLines', () => {
   beforeEach(() => window.sessionStorage.clear());
@@ -21,5 +21,19 @@ describe('checkoutPaidLines', () => {
     expect(takePaidLines()).toBeNull();
     rememberPaidLines([]);
     expect(takePaidLines()).toBeNull();
+  });
+});
+
+describe('claimCheckoutSession', () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it('settles a payment once: a reload of the success page is a no-op', () => {
+    expect(claimCheckoutSession('cs_1')).toBe(true);
+    expect(claimCheckoutSession('cs_1')).toBe(false);
+    expect(claimCheckoutSession('cs_2')).toBe(true);
+  });
+
+  it('treats a missing session id as unclaimed', () => {
+    expect(claimCheckoutSession('')).toBe(true);
   });
 });
