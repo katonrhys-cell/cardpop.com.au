@@ -121,6 +121,32 @@ export function organiserBlanksFromEvent(org, event) {
 }
 
 /**
+ * The other direction: the event-form fields an organiser's page can fill in,
+ * `{ patch, labels }`. Only a form field that is **blank** is filled — what is
+ * already on the event is never overwritten — and only with a value the page
+ * holds in a usable shape. `organizer_logo_url` is in the patch when the page
+ * has a logo; the form decides whether its own logo slot is empty. The form
+ * shows what was filled so it can be checked before saving.
+ */
+export function eventBlanksFromOrganiser(form, org) {
+  const patch = {};
+  const labels = [];
+  if (!org || !form) return { patch, labels };
+  for (const [eventKey, orgKey, label] of EVENT_ORGANISER_FIELDS) {
+    if (String(form[eventKey] ?? '').trim()) continue;
+    const raw = String(org[orgKey] ?? '').trim();
+    let value = '';
+    if (orgKey === 'contact_email') value = cleanContactEmail(raw);
+    else if (orgKey === 'contact_phone') value = cleanContactPhone(raw);
+    else if (HTTP_URL_RE.test(raw)) value = raw;
+    if (!value) continue;
+    patch[eventKey] = value;
+    labels.push(label);
+  }
+  return { patch, labels };
+}
+
+/**
  * Where enquiries for this organiser go (their own contact form) — the
  * "Contact" button at the top of the page. http(s) only, else ''.
  */

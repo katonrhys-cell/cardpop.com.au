@@ -29,8 +29,9 @@ import EventTicketOfferPanel from '@/components/admin/EventTicketOfferPanel.jsx'
 import { EMPTY_OFFER_FORM, loadAdminTicketOffer, saveAdminTicketOffer, validateOfferForm } from '@/lib/eventTicketOffers.js';
 import { uploadEventOrganiserLogo } from '@/utils/uploadEventOrganiserLogo.js';
 import { LOGO_ACCEPT, LOGO_MAX_LABEL, logoFileError, isVideoLogoFile, isVideoLogoUrl } from '@/utils/eventOrganiserLogo.js';
-import { useEventOrganisers, fillOrganiserPageFromEvent } from '@/hooks/useEventOrganisers.js';
-import { findOrganiser } from '@/utils/eventOrganisers.js';
+import { useEventOrganisers, fillOrganiserPageFromEvent, loadOrganiserDetails } from '@/hooks/useEventOrganisers.js';
+import { findOrganiser, organisersForEvent } from '@/utils/eventOrganisers.js';
+import { eventBlanksFromOrganiser } from '@/utils/organiserPage.js';
 import { notifyEventDecision, notifyEventChanges } from '@/lib/eventReviewApi.js';
 import { createStepRunner, reportStalledStep, UPLOAD_STEP_TIMEOUT_MS } from '@/utils/saveSteps.js';
 import { toast } from 'sonner';
@@ -236,6 +237,14 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   const [fillOrganiserPage, setFillOrganiserPage] = useState(true);
   const { organisers, saveOrganiser } = useEventOrganisers(isOpen);
   const logoInputRef = useRef(null);
+  // What the organiser's page filled into this form's blank fields
+  // ({ name, labels }) — shown on the Organiser tab so it can be checked.
+  const [organiserFill, setOrganiserFill] = useState(null);
+  // The form + logo slot as of the latest render, for the async fill below.
+  const latestRef = useRef({});
+  latestRef.current = { formData, hasLogo: Boolean(logoPreview || logoFile) };
+  const organiserFillSeq = useRef(0);
+  const autoFilledRef = useRef(false);
   // Photo gallery, grouped into albums: [{ title, photos }] where a photo is
   // { url } (saved) or { file, preview } (uploaded on save).
   const [gallery, setGallery] = useState([]);
@@ -312,6 +321,9 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
   useEffect(() => {
     if (!isOpen) return;
     dirtyRef.current = false;
+    autoFilledRef.current = false;
+    organiserFillSeq.current += 1;
+    setOrganiserFill(null);
     setRescanWeekly(true);
     setExistingWatch(null);
     setOfferForm(EMPTY_OFFER_FORM);
@@ -484,7 +496,49 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     setLogoPreview(URL.createObjectURL(file));
     setRemoveExistingLogo(false);
   };
-  // Choose a saved organiser: fills the name and brings its logo along.
+  // Bring a saved organiser's page details (logo, website, socials, contact
+  // email / phone) into this form's BLANK fields — nothing typed here is
+  // replaced, and nothing is saved until the form is.
+  const fillFromOrganiserPage = useCallback(async (org) => {
+    if (!org?.id) return;
+    const seq = ++organiserFillSeq.current;
+    const page = await loadOrganiserDetails(org.id).catch(() => null);
+    if (!page || seq !== organiserFillSeq.current) return;
+    const { formData: current, hasLogo } = latestRef.current;
+    const { patch, labels } = eventBlanksFromOrganiser({ ...current, organizer_logo_url: hasLogo ? 'set' : '' }, page);
+    const { organizer_logo_url: logoUrl, ...fields } = patch;
+    if (logoUrl) {
+      setPickedLogoUrl(logoUrl);
+      setLogoPreview(logoUrl);
+      setLogoIsVideo(isVideoLogoUrl(logoUrl));
+      setRemoveExistingLogo(false);
+    }
+    if (Object.keys(fields).length) {
+      setFormData(prev => {
+        const next = { ...prev };
+        for (const [k, v] of Object.entries(fields)) if (isBlankFormValue(prev[k])) next[k] = v;
+        return next;
+      });
+    }
+    setOrganiserFill(labels.length ? { name: page.name || org.name, labels } : null);
+  }, []);
+
+  // Admin: on opening an event whose organiser has a saved page, fill the
+  // blanks from that page once the organiser list has loaded.
+  useEffect(() => {
+    if (!isOpen || isUserMode || autoFilledRef.current || organisers.length === 0) return;
+    // The name this form opened with (the form state itself is set in the
+    // same pass, so it isn't readable yet).
+    const name = scrapedData ? (scrapedData.organizer_name || scrapedData.organizer) : event?.organizer_name;
+    autoFilledRef.current = true;
+    if (!String(name ?? '').trim()) return;
+    const matches = organisersForEvent(organisers, name);
+    // A co-hosted name matches several pages — whose links are these? Leave it.
+    if (matches.length === 1) fillFromOrganiserPage(matches[0]);
+  }, [isOpen, isUserMode, organisers, event, scrapedData, fillFromOrganiserPage]);
+
+  // Choose a saved organiser: fills the name, brings its logo along and fills
+  // the blank contact / link fields from its page.
   const pickOrganiser = (id) => {
     const org = organisers.find(o => o.id === id);
     if (!org) return;
@@ -496,6 +550,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
     setLogoPreview(org.logo_url || null);
     setLogoIsVideo(isVideoLogoUrl(org.logo_url));
     setRemoveExistingLogo(!org.logo_url);
+    fillFromOrganiserPage(org);
   };
 
   // Admin: add / update this organiser (name + current logo) in the saved list.
@@ -1206,7 +1261,7 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   {organisers.length > 0 && (
                     <div className="sm:col-span-2 space-y-2">
-                      <Label htmlFor="saved_organiser" className="font-bold">Saved Organiser <span className="text-muted-foreground font-normal text-xs">(pick one to fill the name and logo)</span></Label>
+                      <Label htmlFor="saved_organiser" className="font-bold">Saved Organiser <span className="text-muted-foreground font-normal text-xs">(pick one to fill the name, logo and any blank contact details and links from their page)</span></Label>
                       <Select
                         value={findOrganiser(organisers, formData.organizer_name)?.id ?? ''}
                         onValueChange={pickOrganiser}
@@ -1217,6 +1272,12 @@ const EventFormModal = ({ isOpen, onClose, event, scrapedData, onSaved, onSubmit
                           {organisers.map(o => <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+                  {organiserFill && (
+                    <div role="status" className="sm:col-span-2 rounded-xl border border-border bg-muted/30 p-3 text-sm">
+                      <p className="font-semibold">Filled from {organiserFill.name}’s organiser page: {organiserFill.labels.join(', ')}</p>
+                      <p className="text-xs text-muted-foreground">Only blank fields were filled — check them below. Nothing is saved until you save this event.</p>
                     </div>
                   )}
                   <div className="sm:col-span-2 space-y-2">

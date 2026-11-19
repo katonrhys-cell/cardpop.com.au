@@ -26,6 +26,19 @@ export async function fillOrganiserPageFromEvent(organiserId, event) {
 }
 
 /**
+ * One organiser page's details (logo, links, public contact email / phone) for
+ * the event form to fill its blank fields from. Null when it can't be read.
+ */
+export async function loadOrganiserDetails(organiserId) {
+  if (!organiserId) return null;
+  const read = (columns) => supabase.from('event_organisers').select(columns).eq('id', organiserId).maybeSingle();
+  let { data, error } = await read(ORGANISER_CONTACT_COLUMNS);
+  if (error) ({ data, error } = await read(ORGANISER_LINK_COLUMNS));
+  if (error) ({ data, error } = await read(ORGANISER_PROFILE_COLUMNS));
+  return error ? null : data ?? null;
+}
+
+/**
  * The saved organisers list for the event form, plus `saveOrganiser` (admins:
  * RLS refuses everyone else) which adds the organiser or updates the one with
  * the same name. A failed read just leaves the list empty — the form still
