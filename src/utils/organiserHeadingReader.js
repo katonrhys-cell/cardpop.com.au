@@ -7,12 +7,15 @@ import { OUTBOUND_TIMEOUT_MS } from './outboundTimeouts.js';
 import { recordAiUsage } from './aiUsage.js';
 import { traceMessagesCreate } from './aiTracing.js';
 import {
-  HEADING_FONTS, HEADING_FONT_KEYS, HEADING_CASES, HEADING_TRACKING, cleanHeadingStyle,
+  HEADING_FONTS, HEADING_FONT_KEYS, HEADING_CASES, HEADING_TRACKING, HEADING_LAYOUTS,
+  MIN_HEADING_SCALE, MAX_HEADING_SCALE, cleanHeadingStyle,
 } from '../../utils/organiserHeadingStyle.js';
 
 // Telling one display typeface from another is fine visual judgement, so this
 // is not the cheapest model; it runs once per logo, for admins only.
 const MODEL = 'claude-sonnet-5-5';
+// Telling League Gothic from Bebas Neue is careful looking; low effort guessed.
+const EFFORT = 'medium';
 export const HEADING_FEATURE = 'organiser_heading_style';
 
 export const LOGO_MEDIA_TYPES = Object.freeze(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -22,22 +25,26 @@ export const MAX_LOGO_BASE64_CHARS = 240_000;
 const STYLE_SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['has_lettering', 'segments', 'source_fonts'],
+  required: ['has_lettering', 'layout', 'segments', 'source_fonts'],
   properties: {
     has_lettering: { type: 'boolean', description: 'false when the logo shows no readable lettering to match.' },
+    layout: { type: 'string', enum: HEADING_LAYOUTS, description: '"stacked" when the logo sets the name on several lines, one segment per line; "inline" when it reads on one line.' },
     segments: {
       type: 'array',
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['text', 'font', 'italic', 'case', 'tracking', 'accent'],
+        required: ['text', 'font', 'italic', 'case', 'tracking', 'scale', 'fill', 'outline', 'shadow'],
         properties: {
           text: { type: 'string', description: 'Consecutive words of the organiser name, spelled exactly as the name is given.' },
           font: { type: 'string', enum: HEADING_FONT_KEYS },
-          italic: { type: 'boolean', description: 'true only when the lettering is slanted AND the chosen font is not already slanted (bangers and lobster already are).' },
+          italic: { type: 'boolean', description: 'true when this lettering leans to the right in the logo. Most listed fonts are upright (Bangers included), so a slanted comic word needs true.' },
           case: { type: 'string', enum: HEADING_CASES },
           tracking: { type: 'string', enum: Object.keys(HEADING_TRACKING) },
-          accent: { type: ['string', 'null'], description: 'Hex colour (#rrggbb) of a coloured outline or drop shadow on this lettering, else null.' },
+          scale: { type: 'number', description: `Letter height of this part relative to the tallest part of the name, ${MIN_HEADING_SCALE} to ${MAX_HEADING_SCALE}; 1 for the main line.` },
+          fill: { type: ['string', 'null'], description: 'Hex colour (#rrggbb) of the letters themselves.' },
+          outline: { type: ['string', 'null'], description: 'Hex colour of a thin outline traced around each letter, else null.' },
+          shadow: { type: ['string', 'null'], description: 'Hex colour of a thicker offset outline or drop shadow behind the letters (often a bright colour on comic lettering), else null.' },
         },
       },
     },
@@ -75,7 +82,7 @@ export async function readHeadingStyleFromLogo({ name, mediaType, base64, userId
   const message = await traceMessagesCreate('Organiser logo font reader', {
     model: MODEL,
     max_tokens: 1500,
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: STYLE_SCHEMA } },
+    output_config: { effort: EFFORT, format: { type: 'json_schema', schema: STYLE_SCHEMA } },
     messages: [{
       role: 'user',
       content: [
@@ -84,11 +91,12 @@ export async function readHeadingStyleFromLogo({ name, mediaType, base64, userId
           type: 'text',
           text: `This is the logo of an event organiser called "${name}". Their page heading shows that name as text, and we want the heading set in type that looks like the logo's lettering.
 
-1. Identify the typeface(s) the logo's lettering is set in, as specifically as you can (source_fonts). Say "or similar" when unsure; never invent a name.
-2. Split the name "${name}" into segments, one per run of consecutive words that the logo sets in the same typeface (often one line of the logo each). Together, in order, the segments must spell the name exactly as given — use the name's spelling even where the logo differs (an "&" for "and", different capitals). Use a single segment when the whole logo is one typeface, or when the name's words aren't in the logo.
-3. For each segment pick the closest font from this list (key: family — look):
+1. Identify the typeface(s) the logo's lettering is set in, as specifically as you can (source_fonts). Look closely at letter widths, stroke contrast, the shape of G, R and S, and whether the letters lean. Say "or similar" when unsure; never invent a name.
+2. Split the name "${name}" into segments, one per run of consecutive words that the logo sets in the same style — normally one per line of the logo. Together, in order, the segments must spell the name exactly as given — use the name's spelling even where the logo differs (an "&" for "and", different capitals). Use a single segment when the whole logo is one style, or when the name's words aren't in the logo.
+3. For each segment pick the font from this list (key: family — look) whose letters are shaped most like the logo's — compare proportions first (narrow, regular or wide), then weight, then details:
 ${FONT_GUIDE}
-   Also report whether its letters are all capitals (case "upper"), all lower case ("lower") or mixed ("as-typed"); how far apart the letters are spaced (tracking "normal", "wide" or "wider"); and the colour of any coloured outline or offset shadow (accent), ignoring plain black or white.
+4. For each segment also report: capitals or not (case); letter spacing (tracking: "wider" when the letters are spaced well apart, as on a spread-out word); its size relative to the biggest part (scale); whether it leans (italic); and its colours — the letter colour (fill), a thin outline traced around each letter (outline) and a thicker or offset coloured outline / drop shadow behind it (shadow). Colours are #rrggbb as they appear in the logo, including white and black; null when there is no outline or shadow.
+5. layout: "stacked" when the name is set over several lines, "inline" when on one line.
 
 If the logo has no readable lettering at all (a picture or symbol only), answer has_lettering false with no segments.
 

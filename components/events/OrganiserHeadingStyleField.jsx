@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Loader2, Type, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import OrganiserHeading from '@/components/events/OrganiserHeading.jsx';
 import { logoForReading } from '@/utils/logoForReading.js';
 import { isVideoLogoFile, isVideoLogoUrl, safeLogoUrl } from '@/utils/eventOrganiserLogo.js';
 import { HEADING_FONTS, HEADING_FONT_KEYS, cleanHeadingStyle } from '@/utils/organiserHeadingStyle.js';
+import { publicImageUrl } from '@/utils/imageUrl.js';
 
 // "Match heading to logo" in the organiser page editor (admins only). Picking
 // a new logo reads its lettering straight away; the preview below shows the
@@ -21,6 +22,10 @@ export default function OrganiserHeadingStyleField({ org, logoFile, value, onCha
   const savedLogo = safeLogoUrl(org.logo_url);
   const source = logoFile && !isVideoLogoFile(logoFile) ? logoFile
     : (!logoFile && savedLogo && !isVideoLogoUrl(savedLogo) ? savedLogo : null);
+
+  // The logo shown beside the preview, so the two can be compared by eye.
+  const logoSrc = useMemo(() => (source && typeof source !== 'string' ? URL.createObjectURL(source) : (source ? publicImageUrl(source) : null)), [source]);
+  useEffect(() => () => { if (logoSrc?.startsWith('blob:')) URL.revokeObjectURL(logoSrc); }, [logoSrc]);
 
   const match = async (from) => {
     const mine = ++run.current;
@@ -53,10 +58,13 @@ export default function OrganiserHeadingStyleField({ org, logoFile, value, onCha
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logoFile]);
 
-  const setFont = (index, font) => onChange({
+  // Every hand edit goes back through the normaliser, as a saved style would.
+  const setSegment = (index, patch) => onChange(cleanHeadingStyle({
     ...value,
-    segments: value.segments.map((s, i) => (i === index ? { ...s, font } : s)),
-  });
+    segments: value.segments.map((s, i) => (i === index ? { ...s, ...patch } : s)),
+  }, org.name));
+  const setLayout = (layout) => onChange(cleanHeadingStyle({ ...value, layout }, org.name));
+  const selectClass = 'h-8 rounded-md border border-input bg-background px-2 text-sm';
 
   return (
     <div className="space-y-2 rounded-xl border border-border p-3">
@@ -75,9 +83,14 @@ export default function OrganiserHeadingStyleField({ org, logoFile, value, onCha
         </div>
       </div>
 
-      <div className="rounded-lg bg-card border border-border px-4 py-5" aria-live="polite">
-        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Heading preview</p>
-        <OrganiserHeading as="p" name={org.name} headingStyle={value} className="text-3xl md:text-4xl text-foreground leading-tight break-words" />
+      <div className="rounded-lg bg-card border border-border px-4 py-5 flex flex-col sm:flex-row sm:items-center gap-4" aria-live="polite">
+        {logoSrc && (
+          <img src={logoSrc} alt="The logo being matched" className="w-28 h-28 rounded-xl bg-white border border-border object-contain p-1 shrink-0" />
+        )}
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Heading preview</p>
+          <OrganiserHeading as="p" name={org.name} headingStyle={value} className="text-3xl md:text-4xl text-foreground leading-tight break-words" />
+        </div>
       </div>
 
       {value?.source_fonts?.length > 0 && (
@@ -85,21 +98,48 @@ export default function OrganiserHeadingStyleField({ org, logoFile, value, onCha
           <span className="font-semibold">Font in the logo:</span> {value.source_fonts.join(' · ')}
         </p>
       )}
+      {value && value.segments.length > 1 && (
+        <label className="flex items-center gap-2 text-sm">
+          <span className="flex-1">Lines</span>
+          <select aria-label="Heading lines" className={selectClass} value={value.layout} onChange={(e) => setLayout(e.target.value)} disabled={disabled || reading}>
+            <option value="stacked">Stacked, like the logo</option>
+            <option value="inline">All on one line</option>
+          </select>
+        </label>
+      )}
       {value && (
-        <ul className="space-y-1.5">
+        <ul className="space-y-2">
           {value.segments.map((segment, i) => (
-            <li key={`${i}-${segment.text}`} className="flex items-center gap-2 text-sm">
-              <span className="truncate flex-1">“{segment.text}”</span>
+            <li key={`${i}-${segment.text}`} className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="truncate flex-1 min-w-[8rem]">“{segment.text}”</span>
               <select
                 aria-label={`Font for ${segment.text}`}
-                className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                className={selectClass}
                 value={segment.font || ''}
-                onChange={(e) => setFont(i, e.target.value || null)}
+                onChange={(e) => setSegment(i, { font: e.target.value || null })}
                 disabled={disabled || reading}
               >
                 <option value="">Site heading font</option>
                 {HEADING_FONT_KEYS.map((key) => <option key={key} value={key}>{HEADING_FONTS[key].family}</option>)}
               </select>
+              <label className="flex items-center gap-1 text-xs">
+                <input type="checkbox" checked={segment.italic} onChange={(e) => setSegment(i, { italic: e.target.checked })} disabled={disabled || reading} />
+                Slanted
+              </label>
+              {(segment.outline || segment.shadow) && (
+                <label className="flex items-center gap-1 text-xs">
+                  <input
+                    type="checkbox"
+                    checked
+                    onChange={() => setSegment(i, { fill: null, outline: null, shadow: null })}
+                    disabled={disabled || reading}
+                  />
+                  Logo colours
+                  {[segment.fill, segment.outline, segment.shadow].filter(Boolean).map((c) => (
+                    <span key={c} className="inline-block w-3 h-3 rounded-sm border border-border" style={{ background: c }} aria-hidden="true" />
+                  ))}
+                </label>
+              )}
             </li>
           ))}
         </ul>
