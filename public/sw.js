@@ -54,7 +54,6 @@ const MAX_DYNAMIC_ENTRIES = 50;
 // (including '/') silently fail. Hashed assets are cached on demand (cacheFirst).
 const STATIC_ASSETS = [
   '/',
-  '/index.html',
   // Stable (unhashed) path. Precaching the heading font guarantees repeat
   // visits paint Syne on the first frame even if the HTTP cache was evicted.
   '/fonts/syne-latin-var.woff2',
@@ -385,7 +384,7 @@ const navigationNetworkFirst = async (request) => {
     const cached =
       (await caches.match(request)) ||
       (await caches.match('/app.html')) ||
-      (await caches.match('/index.html')) ||
+      (await caches.match('/home.html')) ||
       (await caches.match('/'));
     if (cached) return cached;
     return new Response('Offline', { status: 503 });

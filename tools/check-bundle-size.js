@@ -9,10 +9,10 @@
 // Lazy route/feature chunks (e.g. opencv) are intentionally excluded — they
 // only load when their feature is used.
 //
-// Two documents are measured. dist/index.html is "/" (the homepage shell), and
+// Two documents are measured. dist/home.html is "/" (the homepage shell), and
 // dist/app.html is what Vercel serves for EVERY other route (vercel.json's SPA
 // fallback) — so a visitor landing on /marketplace or a product page downloads
-// app.html's set, not index.html's. Measuring only index.html let weight land
+// app.html's set, not home.html's. Measuring only home.html let weight land
 // on every other route unnoticed. Each is held to the same budget.
 
 import process from 'node:process';
@@ -29,7 +29,7 @@ import path from 'node:path';
 const BUDGET_KB = 320;
 
 const distDir = 'dist';
-const DOCUMENTS = ['index.html', 'app.html'];
+const DOCUMENTS = ['home.html', 'app.html'];
 
 const kb = (n) => (n / 1024).toFixed(1).padStart(7) + ' KB';
 
@@ -70,9 +70,9 @@ function measure(htmlFile) {
 let failed = false;
 for (const doc of DOCUMENTS) {
   if (!existsSync(path.join(distDir, doc))) {
-    // index.html is always emitted; app.html only by the shell build step.
-    if (doc === 'index.html') {
-      console.error('check-bundle-size: dist/index.html is missing — did the build run?');
+    // home.html is always emitted; app.html only by the shell build step.
+    if (doc === 'home.html') {
+      console.error('check-bundle-size: dist/home.html is missing — did the build run?');
       process.exit(1);
     }
     console.log(`\n${doc} not in dist/ — skipped.`);

@@ -13,7 +13,7 @@
 //                           /assets/*, /.well-known/*) — served as-is
 //   4. rewrites             bot-only prerender, /sitemap.xml, /hcgi/api → API,
 //                           the cron and grade-estimate functions
-//   5. SPA fallback         "/" → index.html (hero shell); everything else →
+//   5. SPA fallback         "/" → home.html (hero shell); everything else →
 //                           app.html, except a missing /images or /assets
 //                           file, which is a 404 (a cached shell under an
 //                           immutable image URL would stick for a year)
@@ -30,7 +30,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isCloudflareIp } from '../src/utils/cloudflareIps.js';
 import {
-  loadRoutingConfig, requestFacts, matchRedirect, resolveRewrite, headersFor, isSpaFallback,
+  loadRoutingConfig, requestFacts, matchRedirect, resolveRewrite, headersFor, isSpaFallback, isDocumentRewrite,
 } from './vercelRoutes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -55,7 +55,7 @@ export const FUNCTION_MODULES = Object.freeze({
 
 // A rewrite chain stops on one of these — the functions above and the two
 // HTML entries — the way Vercel's filesystem check stops it.
-const TERMINALS = new Set([...Object.keys(FUNCTION_MODULES), '/app.html', '/index.html']);
+const TERMINALS = new Set([...Object.keys(FUNCTION_MODULES), '/app.html', '/home.html']);
 
 /** Lazily import each function once; `server/index.js` warms them all at boot. */
 export function createFunctionLoader(modules = FUNCTION_MODULES) {
@@ -100,7 +100,7 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
   })();
   app.set('trust proxy', (addr, hop) => hop < trustProxyHops || isCloudflareIp(addr));
 
-  const indexHtml = path.join(distDir, 'index.html');
+  const homeHtml = path.join(distDir, 'home.html');
   const appHtml = path.join(distDir, 'app.html');
   const spaFallback = routing.rewrites.find(isSpaFallback);
   const isTerminal = (p) => TERMINALS.has(p);
@@ -109,7 +109,7 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
   // cheaper than /api/health, which runs through the API's rate limiter.
   app.get('/healthz', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({ status: 'ok', dist: existsSync(indexHtml) });
+    res.json({ status: 'ok', dist: existsSync(homeHtml) });
   });
 
   // 1 + 2. Redirects, then headers for everything that stays.
@@ -130,7 +130,7 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
   // 4. Rewrites → functions.
   app.use(async (req, res, next) => {
     const facts = req.routingFacts || requestFacts(req);
-    const { pathname, query, matched } = resolveRewrite(routing, facts, { isTerminal, skip: isSpaFallback });
+    const { pathname, query, matched } = resolveRewrite(routing, facts, { isTerminal, skip: isDocumentRewrite });
     if (matched.length === 0) return next();
     if (!FUNCTION_MODULES[pathname]) {
       // A chain that ends on something that is neither a function nor a
@@ -154,7 +154,7 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
   app.use((req, res, next) => {
     if (!['GET', 'HEAD'].includes(req.method)) return next();
     const pathname = req.routingFacts?.pathname ?? req.path;
-    if (pathname === '/' || pathname === '') return res.sendFile(indexHtml);
+    if (pathname === '/' || pathname === '') return res.sendFile(homeHtml);
     if (spaFallback && spaFallback.matcher(pathname)) return res.sendFile(appHtml);
     return next();
   });
@@ -176,7 +176,7 @@ export function createServer({ distDir = DEFAULT_DIST_DIR, routing = loadRouting
 /** Whether the build the server would serve is present (both HTML entries). */
 export function distIsBuilt(distDir = DEFAULT_DIST_DIR) {
   try {
-    return statSync(path.join(distDir, 'index.html')).isFile() && statSync(path.join(distDir, 'app.html')).isFile();
+    return statSync(path.join(distDir, 'home.html')).isFile() && statSync(path.join(distDir, 'app.html')).isFile();
   } catch {
     return false;
   }

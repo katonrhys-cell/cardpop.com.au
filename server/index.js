@@ -32,7 +32,7 @@ const tls = process.env.TLS_CERT_FILE && process.env.TLS_KEY_FILE
   : null;
 
 if (!distIsBuilt(distDir)) {
-  console.error(`[SERVER] No build in ${distDir} (need index.html and app.html). Run \`npm run build\` first.`);
+  console.error(`[SERVER] No build in ${distDir} (need home.html and app.html). Run \`npm run build\` first.`);
   process.exit(1);
 }
 

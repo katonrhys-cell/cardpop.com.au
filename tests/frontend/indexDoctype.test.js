@@ -41,9 +41,28 @@ describe('doctypeProblem', () => {
 // this re-checks them locally whenever a build output is present. CI runs
 // the tests before the build, so these skip there and the build step is the
 // gate.
-describe.each(['dist/index.html', 'dist/app.html'])('%s (built)', (rel) => {
+describe.each(['dist/home.html', 'dist/app.html'])('%s (built)', (rel) => {
   it.skipIf(!existsSync(path.join(root, rel)))('starts with <!DOCTYPE html> and nothing before it', () => {
     expect(doctypeProblem(read(rel))).toBeNull();
+  });
+});
+
+// A file at dist/index.html is served for "/" before vercel.json's rewrites
+// run, so the crawler rule never fired and Googlebot / AdSense got the
+// hero-only shell (docs/adsense-readiness.md). The homepage is home.html.
+describe('no index.html in the build', () => {
+  it('has no public/index.html to be copied into dist/', () => {
+    expect(existsSync(path.join(root, 'public', 'index.html'))).toBe(false);
+  });
+
+  it('emits home.html and deletes the Vite index.html', () => {
+    const config = read('vite.config.js');
+    expect(config).toContain("const HOME_DOCUMENT = 'home.html';");
+    expect(config).toContain('unlinkSync(viteIndexPath);');
+  });
+
+  it.skipIf(!existsSync(path.join(root, 'dist', 'app.html')))('left no dist/index.html after the build', () => {
+    expect(existsSync(path.join(root, 'dist', 'index.html'))).toBe(false);
   });
 });
 

@@ -226,3 +226,6 @@ export function headersFor(routing, facts) {
 
 /** Is this the SPA fallback rule (the unconditional rewrite to app.html)? */
 export const isSpaFallback = (rule) => rule.destination === '/app.html' && !rule.hasConditions;
+
+/** Is this an unconditional rewrite to one of the two HTML documents ("/" → home.html, or the SPA fallback)? */
+export const isDocumentRewrite = (rule) => ['/app.html', '/home.html'].includes(rule.destination) && !rule.hasConditions;

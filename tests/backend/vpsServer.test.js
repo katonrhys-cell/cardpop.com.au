@@ -51,7 +51,7 @@ beforeAll(() => {
   mkdirSync(path.join(distDir, 'images'));
   mkdirSync(path.join(distDir, 'fonts'));
   mkdirSync(path.join(distDir, '.well-known'), { recursive: true });
-  writeFileSync(path.join(distDir, 'index.html'), '<!DOCTYPE html><html><body>HOME SHELL</body></html>');
+  writeFileSync(path.join(distDir, 'home.html'), '<!DOCTYPE html><html><body>HOME SHELL</body></html>');
   writeFileSync(path.join(distDir, 'app.html'), '<!DOCTYPE html><html><body>APP SHELL</body></html>');
   writeFileSync(path.join(distDir, 'robots.txt'), 'User-agent: *\n');
   writeFileSync(path.join(distDir, 'sw.js'), '// sw');

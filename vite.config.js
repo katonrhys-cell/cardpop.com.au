@@ -2,7 +2,7 @@ import path from 'node:path';
 import react from '@vitejs/plugin-react';
 import { createLogger, defineConfig } from 'vite';
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, statSync, unlinkSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import Beasties from 'beasties';
@@ -21,9 +21,14 @@ const hasRootEntry = (dep) => {
 const allDeps = Object.keys(pkg.dependencies || {}).filter(hasRootEntry);
 
 // After the build, emit two HTML entries from one Vite-built index.html:
-//   • index.html — the "/"-only document, with the static hero shell injected
-//     into #root so the LCP paints from HTML before any JS runs (Vercel serves
-//     this for "/" via the filesystem index).
+//   • home.html  — the "/"-only document, with the static hero shell injected
+//     into #root so the LCP paints from HTML before any JS runs. vercel.json
+//     rewrites "/" to it AFTER the bot rule that sends crawlers to the
+//     prerendered homepage. It must NOT be called index.html: Vercel serves a
+//     file that matches the path before it looks at any rewrite, so a
+//     dist/index.html answered "/" for every visitor and the bot rule never
+//     ran — Googlebot and the AdSense reviewer got a hero with no body
+//     (docs/adsense-readiness.md). The Vite-emitted index.html is deleted.
 //   • app.html   — served for every OTHER route via the catch-all rewrite in
 //     vercel.json. It carries the same shell CHROME (announcement bar, header,
 //     cookie banner — tools/appShell.mjs derives it from the homepage shell)
@@ -32,6 +37,44 @@ const allDeps = Object.keys(pkg.dependencies || {}).filter(hasRootEntry);
 //     never flash the homepage hero. Both documents get the same critical-CSS
 //     inlining and deferred stylesheet, and reference the identical hashed
 //     JS/CSS, so the SPA boots the same.
+
+// The built homepage document's name. Never "index.html" — see above.
+const HOME_DOCUMENT = 'home.html';
+
+// `vite preview` (npm run preview, the E2E run) falls back to index.html,
+// which the build no longer emits (see HOME_DOCUMENT). Route documents the way
+// vercel.json does: "/" → home.html, any other page → app.html. A plugin of its
+// own because `apply: 'build'` plugins are not loaded by `vite preview`.
+function isBuiltFile(outDir, pathname) {
+	try {
+		return statSync(path.join(outDir, decodeURIComponent(pathname))).isFile();
+	} catch {
+		return false;
+	}
+}
+
+function previewDocumentRouting() {
+	return {
+		name: 'cardpop-preview-documents',
+		configurePreviewServer(server) {
+			const outDir = server.config.build?.outDir
+				? path.resolve(server.config.root, server.config.build.outDir)
+				: path.resolve(__dirname, 'dist');
+			server.middlewares.use((req, _res, next) => {
+				if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+				const [pathname, search = ''] = (req.url || '/').split('?');
+				const query = search ? `?${search}` : '';
+				if (pathname === '/' || pathname === '/index.html') {
+					req.url = `/${HOME_DOCUMENT}${query}`;
+				} else if (!/^\/(api|hcgi|assets|images)\//.test(pathname) && !isBuiltFile(outDir, pathname)) {
+					req.url = `/app.html${query}`;
+				}
+				return next();
+			});
+		},
+	};
+}
+
 // CSP `strict-dynamic` bootstrap. The parser-inserted module entry tag can't be
 // allowlisted by hash in a static vercel.json (its filename hash changes every
 // build), so we swap it for this CONSTANT inline script: the build-varying bits
@@ -419,12 +462,16 @@ function homeShellPlugin() {
 		apply: 'build',
 		async writeBundle(outputOptions, bundle) {
 			const outDir = outputOptions.dir || path.resolve(__dirname, 'dist');
-			const indexPath = path.join(outDir, 'index.html');
+			// Vite emits index.html; it is read here and re-emitted as home.html
+			// (see HOME_DOCUMENT), and index.html is then removed.
+			const viteIndexPath = path.join(outDir, 'index.html');
+			const indexPath = path.join(outDir, HOME_DOCUMENT);
 			const appPath = path.join(outDir, 'app.html');
-			if (!existsSync(indexPath)) return;
+			if (!existsSync(viteIndexPath)) return;
 			const warn = (m) => this.warn(m);
 
-			const builtIndex = applyCspBootstrap(readFileSync(indexPath, 'utf-8'), warn);
+			const builtIndex = applyCspBootstrap(readFileSync(viteIndexPath, 'utf-8'), warn);
+			unlinkSync(viteIndexPath);
 
 			// Content routes (marketplace, shop, product, category…) render an
 			// above-the-fold card image from the image CDN as their LCP element, so
@@ -442,6 +489,7 @@ function homeShellPlugin() {
 			if (!baseHtml.includes(marker)) {
 				this.warn('home-shell: `<div id="root"></div>` not found — shells not injected');
 				writeFileSync(appPath, baseHtml, 'utf-8');
+				writeFileSync(indexPath, baseHtml, 'utf-8');
 				verifyCspBootstrap(this, [indexPath, appPath]);
 			verifyDoctype(this, [indexPath, appPath]);
 				return;
@@ -455,7 +503,7 @@ function homeShellPlugin() {
 			appHtml = addRoutePreloadMap(appHtml, bundle, warn);
 			writeFileSync(appPath, appHtml, 'utf-8');
 
-			// index.html — the "/"-only document with the hero shell.
+			// home.html — the "/"-only document with the hero shell.
 			let indexHtml = baseHtml.replace(marker, `<div id="root">${readFileSync(shellPath, 'utf-8')}</div>`);
 			indexHtml = await inlineCriticalCss(indexHtml, outDir, 'home-shell', warn);
 
@@ -520,6 +568,7 @@ export default defineConfig({
 	plugins: [
 		react(),
 		homeShellPlugin(),
+		previewDocumentRouting(),
 		opencvCspPatchPlugin(),
 	],
 	server: {

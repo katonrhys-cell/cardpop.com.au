@@ -13,7 +13,7 @@ const facts = (pathname, { ua = HUMAN, host = 'cardpop.com.au', query = {} } = {
 });
 
 // The functions api/*.js and the two HTML entries — what a rewrite chain can end on.
-const FUNCTIONS = new Set(['/api/index', '/api/prerender', '/api/sitemap', '/api/merchant-feed', '/api/blog-generate', '/api/event-scan', '/api/site-check', '/api/grade-estimate', '/app.html', '/index.html']);
+const FUNCTIONS = new Set(['/api/index', '/api/prerender', '/api/sitemap', '/api/merchant-feed', '/api/blog-generate', '/api/event-scan', '/api/site-check', '/api/grade-estimate', '/app.html', '/home.html']);
 const isTerminal = (p) => FUNCTIONS.has(p);
 const rewrite = (pathname, opts) => resolveRewrite(routing, facts(pathname, opts), { isTerminal });
 
@@ -127,8 +127,23 @@ describe('rewrites', () => {
   it('does not prerender for a browser, or a page outside the list, or Lighthouse on /', () => {
     expect(rewrite('/shop', { ua: HUMAN }).matched).toEqual(['/((?!images/|assets/).*)']);
     expect(rewrite('/account/orders', { ua: BOT }).pathname).toBe('/app.html');
-    expect(rewrite('/', { ua: 'Mozilla/5.0 Chrome-Lighthouse' }).matched).not.toContain('/');
+    expect(rewrite('/', { ua: 'Mozilla/5.0 Chrome-Lighthouse' }).pathname).toBe('/home.html');
     expect(rewrite('/shop', { ua: 'Mozilla/5.0 Chrome-Lighthouse' }).pathname).toBe('/api/prerender');
+  });
+
+  // Vercel serves a file matching the path before any rewrite, so the build
+  // must not emit dist/index.html (it answered "/" for crawlers too, and the
+  // homepage prerender never ran). "/" reaches the hero document by rewrite,
+  // and only after the bot rule has had its turn.
+  it('sends a browser on / to home.html and a crawler to the prerender', () => {
+    expect(rewrite('/', { ua: HUMAN }).pathname).toBe('/home.html');
+    expect(rewrite('/', { ua: BOT }).pathname).toBe('/api/prerender');
+    expect(rewrite('/', { ua: 'Mediapartners-Google' }).pathname).toBe('/api/prerender');
+    const sources = routing.rewrites.map((r) => `${r.source}|${r.destination}`);
+    const botHome = sources.indexOf('/|/api/prerender?path=/');
+    const shellHome = sources.indexOf('/|/home.html');
+    expect(botHome).toBeGreaterThanOrEqual(0);
+    expect(shellHome).toBeGreaterThan(botHome);
   });
 
   it('never rewrites a missing asset or image onto the shell', () => {
