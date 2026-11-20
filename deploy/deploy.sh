@@ -107,7 +107,7 @@ log "installing dependencies"
 
 log "building"
 (cd "$release" && NODE_OPTIONS=--max-old-space-size=3072 npm run build)
-[[ -f "$release/dist/index.html" && -f "$release/dist/app.html" ]] || { log "build produced no dist/index.html + app.html"; false; }
+[[ -f "$release/dist/home.html" && -f "$release/dist/app.html" ]] || { log "build produced no dist/home.html + app.html"; false; }
 
 log "pruning development dependencies"
 (cd "$release" && npm prune --omit=dev --no-audit --no-fund --loglevel=error)

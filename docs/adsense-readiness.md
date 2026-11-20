@@ -165,6 +165,31 @@ is most likely reacting to now:
 Re-submit only after 1–4 are done and two or three weeks of spaced publishing
 are visible; a third rejection on an unchanged site lengthens the wait.
 
+## Third finding — the homepage render never reached crawlers (2026-11-20)
+
+The bot rewrite for `/` in `vercel.json` had never fired in production.
+Vercel serves a file that matches the request path **before** it applies any
+rewrite, and the build emitted `dist/index.html` — so `/` was answered from the
+filesystem for every visitor, Googlebot and `Mediapartners-Google` included,
+and `renderHome()` never ran. The AdSense reviewer's first page was still the
+hero-only shell that caused the October rejection, through both re-reviews.
+(Every other content route was unaffected: no file exists at those paths.)
+
+Fixed by renaming the built homepage document: the build plugin now emits
+`dist/home.html` and deletes Vite's `index.html`, and `vercel.json` rewrites
+`/` → `/home.html` *after* the bot rule. The VPS server, `vite preview`, the
+service worker, the deploy script and the bundle budget follow the new name.
+Tests: `tests/backend/vercelRoutes.test.js` (a browser on `/` gets
+`home.html`, a crawler the prerender, and the bot rule comes first) and
+`tests/frontend/indexDoctype.test.js` (no `index.html` in `public/` or the
+build). **Never add a `public/index.html` or let the build emit
+`dist/index.html` again.**
+
+After the deploy: Search Console → URL Inspection on `https://cardpop.com.au/`
+→ *Test live URL* → *View tested page*; the HTML should contain the "how it
+works", newest listings and latest articles sections, not just the hero. Then
+*Request indexing*.
+
 ## Keeping it fixed
 
 - A new public route gets a prerender renderer and a sitemap entry **only if it

@@ -110,9 +110,9 @@ things flashed or jumped during a load. The rules that came out of fixing them:
 - **One spinner.** `ProtectedRoute` / `ProtectedAdminRoute` show `PageLoader`,
   the same one the shell and the route Suspense show.
 
-To check a change, serve `dist/` with "/" → `index.html` and every other path →
-`app.html` (`vite preview` serves `index.html` for everything, so it never
-exercises the app shell), throttle the network, and watch the
+To check a change, run `npm run preview` — it routes "/" → `home.html` and
+every other page → `app.html` the way `vercel.json` does
+(`previewDocumentRouting` in `vite.config.js`) — throttle the network, and watch the
 `layout-shift` entries across the takeover — there should be none.
 
 ## Keeping third parties out of the measured window
@@ -143,7 +143,7 @@ AdSense never loads on the homepage (`NO_AD_PREFIXES` in `lib/adsense.js`).
   stand flight runs from the second card on (it was keeping above-the-fold pixels
   changing for ~4 s after the hero painted — Speed Index).
 - `tools/check-bundle-size.js` budgets the initial JS of **both** documents
-  Vite emits — `index.html` ("/") and `app.html` (what Vercel serves for every
+  the build emits — `home.html` ("/") and `app.html` (what Vercel serves for every
   other route) — each held to the same 320 KB gzip budget; the entry's largest
   pieces are `supabase-js` (~50 KB gzip, mostly unused at first paint but
   needed by every provider) and React itself.

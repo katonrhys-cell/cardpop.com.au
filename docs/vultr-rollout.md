@@ -44,7 +44,7 @@ second or two of connection resets while a deploy restarts the process.
 | File | Role |
 |---|---|
 | `server/index.js` | Entry point (`npm start`, the systemd `ExecStart`). Loads `.env`, warms every function module, listens — HTTPS on `HTTPS_PORT` when `TLS_CERT_FILE`/`TLS_KEY_FILE` are set (with `PORT` redirecting to https), plain HTTP on `PORT` otherwise — and drains on SIGTERM |
-| `server/app.js` | The Express server: redirects → headers → exact static file → rewrites into functions → `index.html` for `/`, `app.html` for every other route, 404 for a missing `/images` or `/assets` file. `GET /healthz` for the deploy script and monitoring |
+| `server/app.js` | The Express server: redirects → headers → exact static file → rewrites into functions → `home.html` for `/`, `app.html` for every other route, 404 for a missing `/images` or `/assets` file. `GET /healthz` for the deploy script and monitoring |
 | `server/vercelRoutes.js` | Interprets `vercel.json`: path-to-regexp v6 sources, `has` host/header conditions (`(?i)` → the `i` flag), chained rewrites that stop on a function or file (Vercel's filesystem check), "last header wins" |
 | `deploy/cardpop.service` | systemd unit: `User=cardpop`, `WorkingDirectory=/opt/cardpop/current`, binds :80/:443 with `CAP_NET_BIND_SERVICE` only, `TRUST_PROXY_HOPS=0`, hardened (`ProtectSystem=strict`, `NoNewPrivileges`…) |
 | `deploy/setup-vps.sh` | One-time Ubuntu 24.04 bootstrap (Node 24, swap, `cardpop` user, layout, unit, sudo rule, firewall, clone) |

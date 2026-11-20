@@ -1,7 +1,7 @@
 // Google Customer Reviews requires the HTML5 DOCTYPE to be the very first thing
 // in the order-confirmation page — no byte-order mark, comment or whitespace
 // before it (docs/google-customer-reviews.md). The confirmation page is served
-// from the built app.html, and "/" from the built index.html, both derived
+// from the built app.html, and "/" from the built home.html, both derived
 // from the source index.html by the home-shell build plugin (vite.config.js),
 // so the guarantee has to hold on the EMITTED files, not just the source.
 //

@@ -585,6 +585,10 @@
       "destination": "/api/index"
     },
     {
+      "source": "/",
+      "destination": "/home.html"
+    },
+    {
       "source": "/((?!images/|assets/).*)",
       "destination": "/app.html"
     }
@@ -663,7 +667,7 @@
       ]
     },
     {
-      "source": "/index.html",
+      "source": "/home.html",
       "headers": [
         {
           "key": "X-Content-Type-Options",
