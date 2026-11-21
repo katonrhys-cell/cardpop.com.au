@@ -229,6 +229,7 @@ const EventReviewEditorPage = () => {
           verdict: data.verdict || '',
           ticket_paid_aud: data.ticket_paid_aud ?? '',
           hours_spent: data.hours_spent ?? '',
+          deals_done: data.deals_done ?? '',
           crowd_level: data.crowd_level,
           headline_pickup: data.headline_pickup || '',
           gallery: Array.isArray(data.gallery) ? data.gallery : [],
@@ -753,6 +754,11 @@ const EventReviewEditorPage = () => {
             <Input id="hours" type="number" min="0" step="0.5" inputMode="decimal" value={review.hours_spent} onChange={(e) => setR({ hours_spent: e.target.value })} placeholder="e.g. 3.5" className="mt-1.5 rounded-xl" />
           </div>
           <div>
+            <Label htmlFor="deals-done">Deals done</Label>
+            <Input id="deals-done" type="number" min="0" step="1" inputMode="numeric" value={review.deals_done} onChange={(e) => setR({ deals_done: e.target.value })} placeholder="Buys, sells & trades" className="mt-1.5 rounded-xl" />
+            <p className="mt-1 text-xs text-muted-foreground">How many deals we did on the day. Added to the homepage total.</p>
+          </div>
+          <div className="lg:col-span-2">
             <Label htmlFor="headline">Headline pickup</Label>
             <Input id="headline" value={review.headline_pickup} onChange={(e) => setR({ headline_pickup: e.target.value })} maxLength={120} placeholder="The one card of the day" className="mt-1.5 rounded-xl" />
           </div>

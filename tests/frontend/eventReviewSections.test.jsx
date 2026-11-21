@@ -23,6 +23,7 @@ const review = {
   attended_on: '2026-10-04',
   ticket_paid_aud: 15,
   hours_spent: 3.5,
+  deals_done: 12,
   crowd_level: 'busy',
   headline_pickup: 'Base Set Charizard, PSA 7',
   gallery: [
@@ -72,6 +73,8 @@ describe('EventReviewQuickFacts', () => {
     expect(screen.getByText('Melbourne Showgrounds, Ascot Vale, VIC')).toBeInTheDocument();
     expect(screen.getByText('$15')).toBeInTheDocument();
     expect(screen.getByText('3.5 hours')).toBeInTheDocument();
+    expect(screen.getByText('Deals done')).toBeInTheDocument();
+    expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByText(/Busy/)).toBeInTheDocument();
     expect(screen.getByText('Base Set Charizard, PSA 7')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Event page/ })).toHaveAttribute('href', '/events/vault-melbourne');
@@ -81,6 +84,7 @@ describe('EventReviewQuickFacts', () => {
     wrap(<EventReviewQuickFacts review={{ ticket_paid_aud: 0 }} event={null} />);
     expect(screen.getByText('Free')).toBeInTheDocument();
     expect(screen.queryByText('Time on the floor')).not.toBeInTheDocument();
+    expect(screen.queryByText('Deals done')).not.toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

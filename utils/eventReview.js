@@ -89,6 +89,16 @@ const numberOrNull = (v) => {
   return Number.isFinite(n) && n >= 0 ? n : null;
 };
 
+// Deals done: how many buys, sells and trades CardPop did on the day — a
+// whole number, 0 or more (event_reviews.deals_done, summed on the homepage).
+export const MAX_DEALS_DONE = 100000;
+export const dealsDoneOrNull = (v) => {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return Math.min(MAX_DEALS_DONE, Math.floor(n));
+};
+
 // Only http(s) URLs or site-relative paths may be stored as links — a
 // `javascript:` URL pasted into a pickup link must never reach an <a href>.
 export const safeLink = (v) => {
@@ -236,6 +246,7 @@ export const emptyReview = () => ({
   verdict: '',
   ticket_paid_aud: '',
   hours_spent: '',
+  deals_done: '',
   crowd_level: null,
   headline_pickup: '',
   gallery: [],
@@ -263,6 +274,7 @@ export const normalizeReview = (input = {}) => {
     verdict: trimOrNull(input.verdict),
     ticket_paid_aud: numberOrNull(input.ticket_paid_aud),
     hours_spent: numberOrNull(input.hours_spent),
+    deals_done: dealsDoneOrNull(input.deals_done),
     crowd_level: CROWD_LEVEL_MAP[input.crowd_level] ? input.crowd_level : null,
     headline_pickup: trimOrNull(input.headline_pickup),
     gallery: cleanGallery(input.gallery),
@@ -302,7 +314,7 @@ export const hasScorecard = (review) =>
 export const hasQuickFacts = (review) =>
   Boolean(review && (
     review.attended_on || review.go_again || review.verdict || review.crowd_level ||
-    review.ticket_paid_aud != null || review.hours_spent != null || review.headline_pickup
+    review.ticket_paid_aud != null || review.hours_spent != null || review.deals_done != null || review.headline_pickup
   ));
 
 export const formatAud = (v) => {

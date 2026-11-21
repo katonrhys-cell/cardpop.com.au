@@ -2,14 +2,18 @@
 
 CardPop shows how people find and land on the site in two places:
 
-- **Home page stats strip** (`pages/HomePage.jsx`) — two panels side by side.
+- **Home page stats strip** (`pages/HomePage.jsx`) — up to three panels, two
+  to a row on desktop (an odd one out spans the row).
   **Found on Google**: Search Console *impressions* (times a CardPop page
   appeared in Google results), *clicks* (searchers who came through) and GA4
   *visitors*, each over the last 28 days with the since-launch total
-  underneath. **The CardPop community**: Cards in Member Vaults / Active
-  Members / Events Listed, with a "Join free" nudge for signed-out visitors.
-  (Live Listings is no longer a tile — the ticker underneath already shows
-  what's live.)
+  underneath. **The CardPop community**: Cards in Member Vaults / Live
+  Products Listed (active marketplace listings + shop products in stock or on
+  pre-order) / Active Members, with a "Join free" nudge for signed-out
+  visitors. **CardPop at events**: Events We Attended (published event
+  reviews, one per event) / Events Listed / Deals Done at Events (the sum of
+  each review's *Deals done*, via `public_event_review_stats()` —
+  docs/event-reviews.md). Every tile hides itself at zero.
 - **Admin → Dashboard → Visitors card** (`components/admin/SiteTrafficCard.jsx`)
   — the visitor figures plus 28-day page views, the Search Console line, a
   daily-visitors sparkline (hover for a day's count) and a **Sync now** button.
