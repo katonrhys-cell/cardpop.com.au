@@ -51,7 +51,7 @@ jobs:
       # trying the new version against a throwaway database (docs in CLAUDE.md
       # → Supabase → Migrations).
       - name: Set up Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@v3
         with:
           version: 3.0.0
 
